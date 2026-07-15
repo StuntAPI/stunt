@@ -137,7 +137,9 @@ rules:
 
 **Respond** supports: `status`, `headers`, `body.template` | `body.generate`, `latency_ms`, `behavior: timeout` (hang), and (for stateful adapters) triggering a **state transition** via Starlark.
 
-**`when.chance: N`** is the primitive for "N% of replies should error": the rule only fires when a 0–100 roll is ≤ N; otherwise it's skipped and evaluation continues to the next rule. This composes a baseline + injected faults cleanly and stays deterministic under a seeded RNG (`state.rng_seed`).
+**`when`** gates whether a rule fires:
+- `when.chance: N` (percent): the rule fires only when a 0–100 roll is ≤ N; otherwise it's skipped and evaluation continues. This is the primitive for "N% of replies should error" and composes a baseline + injected faults cleanly. Deterministic under a seeded RNG (`state.rng_seed`).
+- `when.expr: "<predicate>"`: a boolean expression over request/store state (e.g. `not store.charges.exists(request.path.id)`) for conditional rules such as 404-on-unknown-resource. `chance` and `expr` may be combined (both must pass).
 
 **Overlay semantics:** for a service, the engine evaluates **project rules first**, then the **adapter's own rules** as the fallback chain. This lets a project inject faults or pin specific responses without forking the adapter.
 
@@ -288,7 +290,7 @@ See `api-simulator-research/FEASIBILITY.md` §3 for the full legal landscape (To
 - Full CLI (setup/init/plan/up/down/status/logs/reset/adapter/catalog/exec).
 - Adapter distribution: git-pinned refs + cache + convention dirs.
 - Catalog: static registry keyed by `api-sim-adapter`.
-- **3 first-party adapters:** Stripe (stateful-lite: charges/customers), Google Drive (blob + metadata), X.com (pure-mock auth + a couple endpoints) — chosen to exercise Collection, Blob, and pure-mock paths.
+- **3 first-party adapters:** Stripe (stateful-lite: charges/customers), Google Drive (blob + metadata), X.com (pure-mock auth + a couple endpoints) — chosen to exercise Collection, Blob, and pure-mock paths. **Dropbox** (the fourth requested service) is the immediate next adapter; it reuses the Blob path proven by Drive, so it is deferred from the initial cut without loss of coverage.
 - Synthetic-fixture enforcement (`adapter lint`).
 
 **Out (later):**
