@@ -42,7 +42,7 @@ Developers integrate many remote APIs (Stripe, Drive, Dropbox, X, …). Testing 
 | D4 | Distribution | **pi-style**: git repos (npm later), pinned by tag/hash/head, convention dirs, catalog keyword, global vs project scope | Proven, contributor-friendly model |
 | D5 | Language/stack | **Go + YAML + Starlark** | Static binary; universal YAML; sandboxed Starlark (safe community adapters) |
 | C1 | Name | `stunt` | "stunt double for your APIs" |
-| C2 | Low-port mechanism | One-time `stunt setup` privileged helper (puma-dev-style) on :80/:443 → high-port unprivileged process; high-port fallback | True port-less URLs without sudo-every-run |
+| C2 | `.localhost` networking | **Follow portless.dev (vercel-labs)**: privileged listener on `:80/:443` (auto-elevates with sudo; installable as an OS startup service — launchd/systemd/Task Scheduler — so it binds at boot, no per-run sudo) that forwards by Host/SNI to the **unprivileged** engine on a high port. HTTP/2 + HTTPS default; local CA auto-trusted; `/etc/hosts` auto-sync; high-port fallback. | True port-less URLs without sudo-every-run, **and** adapter code never runs as root (portless topology already separates privileged proxy from unprivileged apps) |
 | C3 | State store | **SQLite** (collections/KV) + **local FS** (blobs) under `./.stunt/state` | Free query/persistence; trivial blobs |
 | C4 | Catalog | Static registry/list keyed by `api-sim-adapter` keyword (pi gallery model); website later | Lowest-friction start |
 
@@ -80,9 +80,11 @@ version: 1
 
 network:
   mode: subdomain            # subdomain (default) | port
-  tld: localhost             # -> https://<service>.localhost
-  tls: true                  # local CA, auto-trusted after `stunt setup`
-  spoof_real_hosts: false    # true: also answer api.stripe.com -> 127.0.0.1
+  tld: localhost             # -> https://<service>.localhost (repeatable; e.g. also 'test')
+  tls: true                  # local CA auto-trusted; HTTP/2 + HTTPS (use false for plain HTTP :80)
+  wildcard: false            # true: unregistered sub.<service>.<tld> falls back to the parent service
+  sync_hosts: true           # auto-sync /etc/hosts so Safari/custom TLDs resolve
+  spoof_real_hosts: false    # true: also map real hostnames (api.stripe.com) -> 127.0.0.1
 
 state:
   dir: ./.stunt/state        # sqlite + blob files
@@ -103,8 +105,11 @@ services:
 - Refs *inside an adapter* resolve relative to the adapter root using convention dirs: `templates/`, `fixtures/`, `schemas/`, `scripts/`, `endpoints/`.
 
 **Field semantics:**
-- `network.mode`: `subdomain` → `<service>.<tld>` (no ports, needs the helper); `port` → `<host>:<base_port+offset>` (fallback).
-- `network.spoof_real_hosts`: when true, `stunt` adds `/etc/hosts` entries mapping the real hostnames (declared by each adapter) to 127.0.0.1, for clients that hardcode hosts.
+- `network.mode`: `subdomain` → `<service>.<tld>` (no ports; needs the privileged listener or OS service); `port` → `<host>:<base_port+offset>` (fallback, no sudo).
+- `network.tld`: default `localhost` (auto-resolves to 127.0.0.1 in Chrome/Firefox/Edge); repeatable to also serve `.test` etc. Avoid `.local` (mDNS) and `.dev` (HSTS).
+- `network.wildcard`: when true, any unregistered `sub.<service>.<tld>` routes to `<service>` (useful for multi-tenant-style paths).
+- `network.sync_hosts`: auto-sync `/etc/hosts` for route hostnames so Safari and custom TLDs resolve (Safari uses the system resolver, which may not handle `.localhost` subdomains).
+- `network.spoof_real_hosts`: when true, also map the real hostnames each adapter declares (e.g. `api.stripe.com`) to 127.0.0.1, for clients that hardcode hosts.
 - `state.reset`: when persisted state is cleared.
 - `services.<name>.rules`: a list that **overlays** the adapter's own rules (see 6.2).
 - `services.<name>.config`: free-form object passed into the adapter (e.g. quotas, feature toggles).
@@ -210,27 +215,51 @@ def _settle(charge_id):
 
 **Sandbox guarantees:** Starlark has no I/O, no `os`, no network by design — only the explicitly injected primitive API (`store`, `gen`, `clock`, `events`, `respond`, `request`). This is the trust property that lets users install community adapters safely, and is the deliberate advantage over a TS/JS adapter model.
 
-### 6.6 Networking — named `*.localhost`, no ports
+### 6.6 Networking — named `*.localhost`, no ports (portless.dev model)
 
-- **DNS:** `*.localhost` resolves to 127.0.0.1 automatically (RFC 6761) on macOS/Linux, so `https://stripe.localhost` works with no `/etc/hosts` edits for the `.localhost` names themselves.
-- **TLS:** bundled local CA (mkcert-style), installed into the OS/browser trust store once via `stunt setup`.
-- **Low ports without sudo-every-run:** a one-time **privileged helper** (puma-dev-style) bound to `:80`/`:443` that forwards by SNI/Host to the unprivileged `stunt` process on a high port. `stunt setup` (sudo once) installs it; afterwards `stunt up` runs as the normal user.
-- **Fallback:** `network.mode: port` for locked-down machines that disallow the helper.
-- **Hardcoded hosts:** `network.spoof_real_hosts: true` patches `/etc/hosts` so real hostnames (e.g. `api.stripe.com`) also resolve to 127.0.0.1.
+Following the **portless.dev** (vercel-labs) approach, with one stunt-specific security addition.
+
+**Topology — privileged listener + unprivileged engine.** This is portless's own topology (privileged proxy `:443` → unprivileged app processes), which maps cleanly onto stunt:
+
+```
+client (https://stripe.localhost) ──► [privileged listener :80/:443] ──► [unprivileged stunt engine :4xxx]
+                                            (TLS, HTTP/2, Host/SNI)            (adapters / Starlark / state)
+```
+
+- **Listener** binds `:80`/`:443`. It terminates TLS, speaks **HTTP/2**, routes by Host/SNI, and forwards to the engine on a high port. It does **no** untrusted work.
+- **Engine** runs as the normal user, holds the manifest/state, and runs adapters (Starlark). Because the listener forwards to it, **adapter code never runs as root** — preserving the sandbox safety story (§8). This is why stunt adopts portless's topology rather than running a single root process.
+
+**Binding low ports (no sudo-every-run):**
+- `stunt up` auto-elevates with sudo to start the listener (mirrors `portless proxy start`).
+- `stunt service install` installs the listener as a root-owned **OS startup service** (launchd on macOS, systemd on Linux, Task Scheduler as SYSTEM on Windows) so `:443` is bound at boot and no sudo is needed per run — survives reboots. Config (port, TLS, TLDs) is persisted and reused (won't silently revert).
+- **Fallback:** `mode: port` (or `--port <n>`) binds a high port with no sudo for locked-down machines.
+
+**TLS:** a local CA is generated on first run and auto-trusted into the OS/browser store, cross-platform: macOS Keychain, Linux `update-ca-certificates`/`update-ca-trust`, Windows `certutil`, and **both** stores under WSL. HTTP/2 + HTTPS by default (multiplexing avoids the HTTP/1.1 6-connection-per-host bottleneck); `--no-tls` for plain HTTP on :80. Bring-your-own certs supported (`--cert`/`--key`, e.g. mkcert).
+
+**DNS:** `.localhost` auto-resolves to 127.0.0.1 in Chrome/Firefox/Edge. For Safari / custom TLDs (`.test`), `/etc/hosts` is auto-synced (`sync_hosts: true`) so hostnames resolve on the system resolver.
+
+**Subdomains & wildcards:** `<service>.<tld>` by default; `<sub>.<service>.<tld>` for nested resources; `wildcard: true` lets unregistered subdomains fall back to the parent service. `spoof_real_hosts: true` additionally maps real hostnames (declared per-adapter) to 127.0.0.1 for clients that hardcode hosts.
 
 ### 6.7 CLI (Cobra, Hashicorp-style)
 
 ```
-stunt setup            # one-time: local CA + privileged port helper
-stunt init             # wizard -> generates/edits stunt.yaml
-stunt plan             # validate manifest, resolve adapters, show what'll run
-stunt up / down        # start / stop all services
-stunt status           # running services, URLs, state summary
-stunt logs [service]   # tail logs
-stunt reset [service]  # wipe state
+stunt init                       # wizard -> generates/edits stunt.yaml
+stunt plan                       # validate manifest, resolve adapters, show what'll run
+stunt up / down                  # start / stop engine + services (auto-starts listener if needed)
+stunt status                     # running services, URLs, state summary
+stunt logs [service]             # tail logs
+stunt reset [service]            # wipe state
 stunt adapter add|remove|list|update   # pi-style, pinned git refs
 stunt catalog search|show              # browse the registry
 stunt exec '<request>'                 # fire one request against a service
+
+# networking lifecycle (portless-style)
+stunt proxy start|stop           # privileged listener on :443 (auto-elevates; HTTP/2 + HTTPS)
+stunt service install|status|uninstall  # install listener as OS startup service (no per-run sudo)
+stunt trust                      # (re)add local CA to the system trust store
+stunt hosts sync|clean           # manage the /etc/hosts block (fixes Safari/custom TLDs)
+stunt doctor                     # health check: listener, routes, DNS, CA trust
+stunt clean                      # remove state, CA trust entry, service, and hosts block
 stunt version
 ```
 
@@ -272,7 +301,7 @@ stunt version
 This operationalizes the rules from the feasibility study:
 
 - **Synthetic data only.** `stunt adapter lint` flags any shipped fixture/template that looks like raw recorded data (real-looking IDs, PII patterns, provider-copyrighted blobs). HAR import may *seed local dev state* but adapters must ship synthetic fixtures.
-- **Sandboxed adapters.** Starlark has no host I/O; community adapters cannot execute arbitrary code. (Contrast: pi extensions run with full system access — `stunt` improves on this.)
+- **Sandboxed adapters.** Starlark has no host I/O; community adapters cannot execute arbitrary code. (Contrast: pi extensions run with full system access — `stunt` improves on this.) The adapter engine also **runs unprivileged** behind the privileged listener (§6.6), so even a sandbox escape can't do root-level damage.
 - **No scraping/bypass positioning.** Framed as local dev/testing/interoperability; the user still needs a real account for production. The simulator spares the *remote* API during development — it does not enable evasion.
 - **Neutral naming + non-affiliation** for any branded adapters in the first-party set.
 - **Structure, not documentation.** Adapters extract API *structure*; they do not reproduce proprietary docs verbatim.
@@ -286,7 +315,7 @@ See `api-simulator-research/FEASIBILITY.md` §3 for the full legal landscape (To
 **In:**
 - Go binary; YAML manifest; Starlark engine.
 - Primitives: Collection, Blob, KV, Clock+scheduler, Identity, Events, Generator, Validator.
-- Networking: `*.localhost` + TLS + one-time privileged helper + high-port fallback.
+- Networking: `*.localhost` (portless.dev model) — privileged listener + unprivileged engine, HTTP/2+HTTPS, auto-trusted local CA, `/etc/hosts` sync, OS service install, high-port fallback.
 - Full CLI (setup/init/plan/up/down/status/logs/reset/adapter/catalog/exec).
 - Adapter distribution: git-pinned refs + cache + convention dirs.
 - Catalog: static registry keyed by `api-sim-adapter`.
@@ -305,7 +334,7 @@ See `api-simulator-research/FEASIBILITY.md` §3 for the full legal landscape (To
 ## 10. Risks & open questions
 
 - **Fidelity ceiling:** how realistic must a first-party adapter be to be useful? Define a "conformance score" target per adapter.
-- **Low-port helper cross-OS:** macOS (launchd) vs Linux (systemd/setcap) vs Windows (needs design). v1 may ship macOS+Linux first.
+- **Networking cross-OS:** the portless model gives a concrete plan per OS (launchd / systemd / Task Scheduler; Keychain / update-ca-certificates / certutil). Windows/WSL support is well-defined but more work; v1 may ship macOS+Linux first, Windows after.
 - **Starlark ergonomics:** contributors must learn a small Starlark SDK; mitigate with great docs + the import scaffolding doing the heavy lifting.
 - **Catalog trust:** how to signal reviewed vs unreviewed adapters (signed adapters later).
 - **`.localhost` on Windows:** resolution is less reliable; document/automate the `/etc/hosts`-equivalent.
@@ -320,7 +349,9 @@ version: 1
 network:
   mode: subdomain
   tld: localhost
-  tls: true
+  tls: true                 # HTTP/2 + HTTPS, local CA auto-trusted
+  wildcard: false
+  sync_hosts: true          # /etc/hosts sync for Safari/custom TLDs
   spoof_real_hosts: false
 
 state:
