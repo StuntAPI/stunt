@@ -175,6 +175,23 @@ func TestRegisterNilFunc(t *testing.T) {
 	r.Register("x", nil)
 }
 
+// TestNewRegistryNilFakerPanics verifies that NewRegistry panics early with a
+// clear message when fk is nil, rather than deferring the panic to the first
+// Generate call.
+func TestNewRegistryNilFakerPanics(t *testing.T) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			t.Fatal("NewRegistry(nil) should panic")
+		}
+		msg, _ := r.(string)
+		if !strings.Contains(msg, "nil") && !strings.Contains(msg, "faker") {
+			t.Fatalf("panic message should mention nil faker, got: %v", r)
+		}
+	}()
+	NewRegistry(nil)
+}
+
 // --- helpers ---
 
 func contains(slice []string, s string) bool {

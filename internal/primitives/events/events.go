@@ -52,6 +52,17 @@ func NewEmitter() *Emitter {
 	}
 }
 
+// SetMaxRetries configures the maximum number of delivery attempts. Values
+// less than 1 are clamped to 1 so that Emit always makes at least one attempt
+// (otherwise the retry loop is skipped and a confusing nil-wrapped error is
+// returned). Not safe for concurrent use with Emit; call before emitting.
+func (e *Emitter) SetMaxRetries(n int) {
+	if n < 1 {
+		n = 1
+	}
+	e.maxRetries = n
+}
+
 // Register sets the webhook target URL for the given namespace, overwriting
 // any previous registration.
 func (e *Emitter) Register(ns, url string) {
@@ -81,8 +92,15 @@ func (e *Emitter) Emit(ctx context.Context, ns, eventType string, payload map[st
 		return fmt.Errorf("events: marshal envelope: %w", err)
 	}
 
+	// Defensive: ensure at least one attempt even if maxRetries was set to
+	// zero or negative externally.
+	maxRetries := e.maxRetries
+	if maxRetries < 1 {
+		maxRetries = 1
+	}
+
 	var lastErr error
-	for attempt := 0; attempt < e.maxRetries; attempt++ {
+	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
 			select {
 			case <-ctx.Done():
@@ -101,7 +119,7 @@ func (e *Emitter) Emit(ctx context.Context, ns, eventType string, payload map[st
 			return lastErr
 		}
 	}
-	return fmt.Errorf("events: emit %s/%s failed after %d attempts: %w", ns, eventType, e.maxRetries, lastErr)
+	return fmt.Errorf("events: emit %s/%s failed after %d attempts: %w", ns, eventType, maxRetries, lastErr)
 }
 
 // doPost performs a single HTTP POST and returns nil on 2xx, an error otherwise.
@@ -117,7 +135,9 @@ func (e *Emitter) doPost(ctx context.Context, url string, body []byte) error {
 		return err
 	}
 	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
+	// Cap the response body read to avoid unbounded memory use from a
+	// misbehaving or malicious server.
+	io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)

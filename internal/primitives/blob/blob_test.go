@@ -313,3 +313,123 @@ func TestOpenCreatesRootDir(t *testing.T) {
 		t.Fatal("root should be a directory")
 	}
 }
+
+// TestPutLeavesNoOrphan verifies that after a successful Put, both the
+// content file and the meta file are present. This guards against the
+// scenario where content is written but meta is missing, making the blob
+// invisible to List/Stat.
+func TestPutLeavesNoOrphan(t *testing.T) {
+	s := newTestStore(t)
+
+	id, err := s.PutWith("drive", "report.txt", "text/plain", strings.NewReader("hello"))
+	if err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	// Both files should exist.
+	contentPath := filepath.Join(s.root, "drive", id+".content")
+	metaPath := filepath.Join(s.root, "drive", id+".meta")
+
+	if _, err := os.Stat(contentPath); err != nil {
+		t.Errorf("content file missing after Put: %v", err)
+	}
+	if _, err := os.Stat(metaPath); err != nil {
+		t.Errorf("meta file missing after Put: %v", err)
+	}
+
+	// List and Stat should both see the blob.
+	infos, err := s.List("drive")
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(infos) != 1 {
+		t.Fatalf("List returned %d blobs, want 1", len(infos))
+	}
+	statInfo, err := s.Stat("drive", id)
+	if err != nil {
+		t.Fatalf("Stat: %v", err)
+	}
+	if statInfo.Size != int64(len("hello")) {
+		t.Fatalf("Stat Size = %d, want 5", statInfo.Size)
+	}
+	if statInfo.ContentType != "text/plain" {
+		t.Fatalf("Stat ContentType = %q, want text/plain", statInfo.ContentType)
+	}
+}
+
+// TestNoTempFilesLeaked verifies that Put does not leave temp files behind.
+func TestNoTempFilesLeaked(t *testing.T) {
+	s := newTestStore(t)
+
+	for i := 0; i < 5; i++ {
+		name := "file" + string(rune('0'+i)) + ".txt"
+		_, err := s.Put("drive", name, strings.NewReader("content"))
+		if err != nil {
+			t.Fatalf("Put: %v", err)
+		}
+	}
+
+	entries, err := os.ReadDir(filepath.Join(s.root, "drive"))
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, ".tmp") {
+			t.Errorf("temp file leaked: %s", name)
+		}
+	}
+}
+
+// TestPutAtomicityContentAndMetaConsistent verifies that content and meta are
+// always consistent: if content is visible, meta must also be visible. We
+// simulate this by checking the on-disk state matches what List/Stat report.
+func TestPutAtomicityContentAndMetaConsistent(t *testing.T) {
+	s := newTestStore(t)
+
+	// Put multiple blobs.
+	for _, name := range []string{"a.txt", "b.txt", "c.txt"} {
+		_, err := s.Put("drive", name, strings.NewReader(name))
+		if err != nil {
+			t.Fatalf("Put(%s): %v", name, err)
+		}
+	}
+
+	// Enumerate on-disk files.
+	entries, err := os.ReadDir(filepath.Join(s.root, "drive"))
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+
+	var contentFiles, metaFiles []string
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasSuffix(name, ".content") {
+			contentFiles = append(contentFiles, name)
+		} else if strings.HasSuffix(name, ".meta") {
+			metaFiles = append(metaFiles, name)
+		}
+	}
+
+	// Every content file must have a corresponding meta file.
+	metaSet := make(map[string]bool, len(metaFiles))
+	for _, m := range metaFiles {
+		metaSet[m] = true
+	}
+	for _, c := range contentFiles {
+		expectedMeta := strings.TrimSuffix(c, ".content") + ".meta"
+		if !metaSet[expectedMeta] {
+			t.Errorf("content file %s has no matching meta file", c)
+		}
+	}
+
+	// List should see exactly the same count as content files.
+	infos, err := s.List("drive")
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(infos) != len(contentFiles) {
+		t.Fatalf("List returned %d blobs, but %d content files on disk", len(infos), len(contentFiles))
+	}
+}

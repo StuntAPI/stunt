@@ -11,7 +11,9 @@ package validator
 import (
 	"errors"
 	"fmt"
+	"io"
 	"strings"
+	"sync"
 
 	"github.com/santhosh-tekuri/jsonschema/v5"
 )
@@ -42,18 +44,35 @@ type Schema struct {
 }
 
 // Validator compiles JSON-Schema documents into reusable *Schema objects.
+// It is safe for concurrent use: Compile is serialised by a mutex because
+// the underlying jsonschema.Compiler is not goroutine-safe.
 type Validator struct {
 	compiler *jsonschema.Compiler
+	mu       sync.Mutex // guards compiler during Compile
 }
 
-// NewValidator creates a Validator with a fresh schema compiler.
+// NewValidator creates a Validator with a fresh schema compiler. The
+// compiler is configured to reject any $ref that resolves to an external
+// resource (file paths, http URLs, etc.), so a schema like {"$ref":"/etc/passwd"}
+// cannot read files from the local filesystem.
 func NewValidator() *Validator {
-	return &Validator{compiler: jsonschema.NewCompiler()}
+	c := jsonschema.NewCompiler()
+	// Override the loader so that external $ref resolution always fails.
+	// This prevents schemas from reading arbitrary local files or making
+	// network requests during compilation.
+	c.LoadURL = func(url string) (io.ReadCloser, error) {
+		return nil, fmt.Errorf("validator: external $ref resolution disabled (ref: %s)", url)
+	}
+	return &Validator{compiler: c}
 }
 
 // Compile parses schemaJSON (a JSON-Schema document) and returns a compiled
 // Schema. Returns an error if the JSON is malformed or the schema is invalid.
+// Safe for concurrent use: the underlying compiler is serialised by a mutex.
 func (v *Validator) Compile(schemaJSON []byte) (*Schema, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
 	url := "schema.json"
 	if err := v.compiler.AddResource(url, strings.NewReader(string(schemaJSON))); err != nil {
 		return nil, fmt.Errorf("validator: add resource: %w", err)

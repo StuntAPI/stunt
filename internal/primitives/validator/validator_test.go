@@ -3,6 +3,7 @@ package validator
 import (
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -204,6 +205,64 @@ func TestRecompileSeparateSchemas(t *testing.T) {
 	errs, _ = s2.Validate("hello")
 	if len(errs) == 0 {
 		t.Errorf("s2.Validate(hello): expected errors, got none")
+	}
+}
+
+// TestConcurrentCompile verifies that Compile is safe under concurrent use.
+// The underlying jsonschema.Compiler is not goroutine-safe; this test guards
+// the mutex fix. Run with -race.
+func TestConcurrentCompile(t *testing.T) {
+	v := NewValidator()
+
+	schemas := []string{
+		`{"type": "string"}`,
+		`{"type": "integer"}`,
+		`{"type": "object", "properties": {"x": {"type": "string"}}}`,
+		`{"type": "array", "items": {"type": "boolean"}}}`,
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 20; i++ {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			sch := schemas[idx%len(schemas)]
+			for j := 0; j < 10; j++ {
+				_, err := v.Compile([]byte(sch))
+				if err != nil {
+					t.Errorf("Compile: %v", err)
+					return
+				}
+			}
+		}(i)
+	}
+	wg.Wait()
+}
+
+// TestFileRefRejected verifies that a $ref pointing to a local file path
+// (e.g. /etc/passwd) does NOT read the file contents but instead errors.
+// This prevents information leakage via malicious schemas.
+func TestFileRefRejected(t *testing.T) {
+	v := NewValidator()
+
+	// A $ref to a filesystem path should fail compilation, not read the file.
+	_, err := v.Compile([]byte(`{"$ref": "/etc/passwd"}`))
+	if err == nil {
+		t.Fatal("expected error compiling schema with $ref to /etc/passwd, got nil")
+	}
+	if !strings.Contains(err.Error(), "external") && !strings.Contains(err.Error(), "disabled") {
+		t.Fatalf("error should mention external ref disabled, got: %v", err)
+	}
+}
+
+// TestHTTPRefRejected verifies that a $ref pointing to an HTTP URL is also
+// rejected (no network access during compilation).
+func TestHTTPRefRejected(t *testing.T) {
+	v := NewValidator()
+
+	_, err := v.Compile([]byte(`{"$ref": "https://evil.example.com/schema.json"}`))
+	if err == nil {
+		t.Fatal("expected error compiling schema with HTTP $ref, got nil")
 	}
 }
 

@@ -2,6 +2,7 @@ package clock
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -214,12 +215,12 @@ func TestRealClockNow(t *testing.T) {
 func TestRealClockAfter(t *testing.T) {
 	c := NewClock()
 
-	var fired bool
-	c.After(50*time.Millisecond, func() { fired = true })
+	var fired atomic.Bool
+	c.After(50*time.Millisecond, func() { fired.Store(true) })
 
 	// Give it time to fire.
 	time.Sleep(150 * time.Millisecond)
-	if !fired {
+	if !fired.Load() {
 		t.Fatal("real After callback did not fire")
 	}
 }
@@ -252,5 +253,64 @@ func TestConcurrencySafe(t *testing.T) {
 	c.Advance(2 * time.Second)
 	if count != 100 {
 		t.Fatalf("count = %d, want 100", count)
+	}
+}
+
+// TestConcurrentStopRealClock verifies that calling Stop concurrently on a
+// real-mode ticker does not panic (close of closed channel). Run with -race.
+func TestConcurrentStopRealClock(t *testing.T) {
+	c := NewClock()
+
+	var fired atomic.Int32
+	tk := c.Tick(10*time.Millisecond, func() {
+		fired.Add(1)
+	})
+
+	// Let the ticker fire a couple of times.
+	time.Sleep(50 * time.Millisecond)
+
+	// Hammer Stop from many goroutines simultaneously.
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			tk.Stop()
+		}()
+	}
+	wg.Wait()
+}
+
+// TestConcurrentStopVirtualClock verifies that calling Stop concurrently on
+// a virtual-mode ticker does not panic or deadlock. Run with -race.
+func TestConcurrentStopVirtualClock(t *testing.T) {
+	start := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	c := NewVirtualClock(start)
+
+	var fired atomic.Int32
+	tk := c.Tick(2*time.Second, func() {
+		fired.Add(1)
+	})
+
+	c.Advance(2 * time.Second)
+	if fired.Load() != 1 {
+		t.Fatalf("fired = %d, want 1", fired.Load())
+	}
+
+	// Hammer Stop from many goroutines simultaneously.
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			tk.Stop()
+		}()
+	}
+	wg.Wait()
+
+	// Stopped ticker should not fire after Advance.
+	c.Advance(10 * time.Second)
+	if fired.Load() != 1 {
+		t.Fatalf("fired = %d after Stop, want 1", fired.Load())
 	}
 }
