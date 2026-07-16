@@ -7,6 +7,7 @@ type Request struct {
 	Method  string
 	Path    string
 	Headers map[string]string
+	Body    []byte // raw request body (JSON expected for structured access)
 }
 
 // Matches reports whether req satisfies all non-empty fields of m.
