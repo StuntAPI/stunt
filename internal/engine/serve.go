@@ -55,7 +55,7 @@ func (e *Engine) serve(ctx context.Context, freePorts bool) (map[string]string, 
 		listeners = append(listeners, ln)
 		svc := e.manifest.Services[name]
 		srv := &http.Server{
-			Handler:           e.serviceHandler(svc),
+			Handler:           e.serviceHandler(name, svc),
 			ReadHeaderTimeout: 5 * time.Second,
 		}
 		servers = append(servers, srv)

@@ -13,7 +13,8 @@ type Network struct {
 }
 
 type Service struct {
-	Rules []rules.Rule `yaml:"rules"`
+	Adapter string       `yaml:"adapter"` // path to an adapter dir (optional)
+	Rules   []rules.Rule `yaml:"rules"`
 }
 
 type Manifest struct {

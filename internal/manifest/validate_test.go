@@ -1,9 +1,13 @@
 package manifest
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stunt-adapters/stunt/internal/rules"
+)
 
 func TestValidateOK(t *testing.T) {
-	m := &Manifest{Version: 1, Network: Network{Mode: "port", BasePort: 9000}, Services: map[string]Service{"x": {}}}
+	m := &Manifest{Version: 1, Network: Network{Mode: "port", BasePort: 9000}, Services: map[string]Service{"x": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}}
 	if err := Validate(m); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -19,6 +23,7 @@ func TestValidateErrors(t *testing.T) {
 		{"no services", &Manifest{Version: 1, Network: Network{Mode: "port", BasePort: 9000}}},
 		{"empty mode", &Manifest{Version: 1, Network: Network{BasePort: 9000}, Services: map[string]Service{"x": {}}}},
 		{"zero base_port", &Manifest{Version: 1, Network: Network{Mode: "port"}, Services: map[string]Service{"x": {}}}},
+		{"service without adapter or rules", &Manifest{Version: 1, Network: Network{Mode: "port", BasePort: 9000}, Services: map[string]Service{"x": {}}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -13,6 +13,7 @@ type Request struct {
 	Path    string
 	Headers map[string]string
 	Body    map[string]any
+	Params  map[string]string // path params extracted from route match
 }
 
 // Response is the Go-friendly representation of the HTTP response produced
@@ -75,6 +76,7 @@ func (vm *VM) Call(handlerName string, req Request) (Response, error) {
 		"path":    req.Path,
 		"headers": req.Headers,
 		"body":    req.Body,
+		"params":  req.Params,
 	})
 
 	result, err := sk.Call(vm.thread, fn, sk.Tuple{reqVal}, nil)

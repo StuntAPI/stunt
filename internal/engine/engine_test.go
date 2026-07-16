@@ -27,7 +27,10 @@ func newManifest(t *testing.T, port int) *manifest.Manifest {
 
 func TestEngineServesRules(t *testing.T) {
 	m := newManifest(t, 0) // 0 -> we read assigned port after Listen
-	e := New(m)
+	e, err := New(m)
+	if err != nil {
+		t.Fatal(err)
+	}
 	addr, shutdown := startOnFreePort(t, e)
 	defer shutdown()
 

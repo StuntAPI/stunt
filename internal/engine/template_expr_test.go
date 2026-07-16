@@ -27,7 +27,10 @@ func TestServeTemplateAndExpr(t *testing.T) {
 			}},
 		},
 	}
-	e := New(m)
+	e, err := New(m)
+	if err != nil {
+		t.Fatal(err)
+	}
 	addrs, cancel, err := e.ServeForTest(context.Background())
 	if err != nil {
 		t.Fatal(err)
