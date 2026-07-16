@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"io"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -39,10 +40,15 @@ func (e *Engine) HTTPServerForTest() *http.Server {
 
 func (e *Engine) serviceHandler(svc manifest.Service) http.Handler {
 	rng := rules.NewRNG(e.manifest.RNGSeed)
+	fk := rules.NewFaker(e.manifest.RNGSeed)
 	baseDir := filepath.Dir(e.manifest.Path)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		req := rules.Request{Method: r.Method, Path: r.URL.Path, Headers: headerMap(r.Header)}
-		d := rules.Evaluate(req, svc.Rules, rng, baseDir)
+		var body []byte
+		if r.Body != nil {
+			body, _ = io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+		}
+		req := rules.Request{Method: r.Method, Path: r.URL.Path, Headers: headerMap(r.Header), Body: body}
+		d := rules.Evaluate(req, svc.Rules, rng, fk, baseDir)
 		if !d.Matched {
 			writeStatus(w, 404, `{"error":"no matching rule"}`)
 			return
