@@ -1,0 +1,15 @@
+version: 1
+rng_seed: 42
+network:
+  mode: port
+  base_port: 9000
+services:
+  hello:
+    rules:
+      - name: ok
+        match: { method: GET, path: /hello }
+        respond: { status: 200, body: { inline: { msg: hi } } }
+      - name: flaky
+        match: { method: GET, path: /hello }
+        when: { chance: 30 }
+        respond: { status: 503, body: { inline: { err: boom } } }
