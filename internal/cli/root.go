@@ -23,6 +23,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newCleanCmd())
 	root.AddCommand(newServiceCmd())
 	root.AddCommand(newAdapterCmd())
+	root.AddCommand(newCatalogCmd())
 	return root
 }
 
