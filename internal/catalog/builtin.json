@@ -1,0 +1,23 @@
+[
+  {
+    "name": "stripe",
+    "description": "Stripe payment API — charges, customers, subscriptions",
+    "git_url": "https://github.com/stunt-adapters/stripe",
+    "latest_ref": "v0.1.0",
+    "tags": ["payments", "fintech"]
+  },
+  {
+    "name": "google-drive",
+    "description": "Google Drive file storage API — files, folders, sharing",
+    "git_url": "https://github.com/stunt-adapters/google-drive",
+    "latest_ref": "v0.1.0",
+    "tags": ["storage", "files"]
+  },
+  {
+    "name": "twitter",
+    "description": "Twitter/X social media API — tweets, users, timelines",
+    "git_url": "https://github.com/stunt-adapters/twitter",
+    "latest_ref": "v0.1.0",
+    "tags": ["social", "media"]
+  }
+]
