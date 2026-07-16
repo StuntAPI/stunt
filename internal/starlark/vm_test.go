@@ -1,7 +1,9 @@
 package starlark
 
 import (
+	"sync"
 	"testing"
+	"time"
 
 	sk "go.starlark.net/starlark"
 )
@@ -191,5 +193,134 @@ def on_get(req):
 
 	if resp.Body["msg"] != "hello World" {
 		t.Fatalf("Body[msg] = %v, want 'hello World'", resp.Body["msg"])
+	}
+}
+
+// --- C1: concurrent calls must not share thread state ---
+
+// TestConcurrentCall exercises the VM under concurrent requests to prove the
+// per-call thread (C1) avoids data races / segfaults.
+func TestConcurrentCall(t *testing.T) {
+	src := `
+def on_get(req):
+    return respond(200, {"ok": True})
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			resp, err := vm.Call("on_get", Request{Method: "GET"})
+			if err != nil {
+				t.Errorf("Call: %v", err)
+				return
+			}
+			if resp.Status != 200 {
+				t.Errorf("Status = %d, want 200", resp.Status)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// --- I1: globals are frozen, so a handler modifying a global gets an error,
+// not a crash ---
+
+func TestFrozenGlobalError(t *testing.T) {
+	src := `
+counter = 0
+def on_get(req):
+    counter = counter + 1
+    return respond(200, {"count": counter})
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	_, err = vm.Call("on_get", Request{Method: "GET"})
+	if err == nil {
+		t.Fatal("expected error when modifying frozen global, got nil")
+	}
+}
+
+// TestFrozenGlobalConcurrent proves that even with frozen globals, concurrent
+// calls are race-free (run with -race).
+func TestFrozenGlobalConcurrent(t *testing.T) {
+	src := `
+counter = 0
+def on_get(req):
+    return respond(200, {"count": counter})
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := vm.Call("on_get", Request{Method: "GET"})
+			if err != nil {
+				t.Errorf("Call: %v", err)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// --- I5: infinite loop is bounded by max execution steps ---
+
+func TestInfiniteLoopBounded(t *testing.T) {
+	src := `
+def loop():
+    return loop()
+
+def on_get(req):
+    return loop()
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := vm.Call("on_get", Request{Method: "GET"})
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected error from infinite loop, got nil")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("handler did not return within 5 seconds; step limit not enforced")
+	}
+}
+
+// --- M8: non-int status returns an error ---
+
+func TestNonIntStatusError(t *testing.T) {
+	src := `
+def on_get(req):
+    return {"status": "not-an-int", "body": {}}
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	_, err = vm.Call("on_get", Request{Method: "GET"})
+	if err == nil {
+		t.Fatal("expected error for non-int status, got nil")
 	}
 }

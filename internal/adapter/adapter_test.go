@@ -158,6 +158,52 @@ func TestReadFile(t *testing.T) {
 	}
 }
 
+// --- I4: path traversal protection ---
+
+func TestReadFileRejectsTraversal(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapter(t, dir, map[string]string{
+		"adapter.yaml": "id: test\n",
+	})
+	a, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	traversalPaths := []string{
+		"../../etc/passwd",
+		"../../../etc/shadow",
+		"fixtures/../../../etc/passwd",
+		"..\\..\\..\\etc\\passwd",
+	}
+	for _, p := range traversalPaths {
+		_, err := a.ReadFile(p)
+		if err == nil {
+			t.Errorf("ReadFile(%q) should have been rejected", p)
+		}
+	}
+}
+
+func TestReadFileAllowsSubdirs(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapter(t, dir, map[string]string{
+		"adapter.yaml": "id: test\n",
+		"templates/email.tmpl": "Hello {{.name}}\n",
+	})
+	a, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	data, err := a.ReadFile("templates/email.tmpl")
+	if err != nil {
+		t.Fatalf("ReadFile(subdir) should work: %v", err)
+	}
+	if !strings.Contains(string(data), "Hello") {
+		t.Fatalf("unexpected content: %q", data)
+	}
+}
+
 // --- error cases ---
 
 func TestLoadMissingAdapterYAML(t *testing.T) {

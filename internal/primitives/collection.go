@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -36,16 +38,25 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
+// validName matches safe SQL identifiers: a letter or underscore followed
+// by letters, digits, or underscores.
+var validName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
 // Collection returns a Collection backed by table <name>, creating it if needed.
+// The name must match ^[A-Za-z_][A-Za-z0-9_]*$ to prevent SQL injection (C2).
 func (s *Store) Collection(name string) (*Collection, error) {
+	if !validName.MatchString(name) {
+		return nil, fmt.Errorf("invalid collection name %q: must match ^[A-Za-z_][A-Za-z0-9_]*$", name)
+	}
+	quoted := quoteIdent(name)
 	_, err := s.db.Exec(fmt.Sprintf(
 		`CREATE TABLE IF NOT EXISTS %s (id TEXT PRIMARY KEY, data TEXT)`,
-		quoteIdent(name),
+		quoted,
 	))
 	if err != nil {
 		return nil, fmt.Errorf("create collection %s: %w", name, err)
 	}
-	return &Collection{store: s, name: quoteIdent(name)}, nil
+	return &Collection{store: s, name: quoted}, nil
 }
 
 // Collection is a simple document store backed by a SQLite table.
@@ -57,15 +68,25 @@ type Collection struct {
 
 // Insert adds doc to the collection. If doc has an "id" key it is used;
 // otherwise a random hex id is generated. The id is stamped into the stored
-// document and returned.
+// document (on a copy) and returned. The caller's map is never mutated (M1).
 func (c *Collection) Insert(doc map[string]any) (string, error) {
-	id, _ := doc["id"].(string)
-	if id == "" {
-		id = randomID()
+	// Work on a copy so we never mutate the caller's map (M1).
+	stored := make(map[string]any, len(doc)+1)
+	for k, v := range doc {
+		stored[k] = v
 	}
-	doc["id"] = id
 
-	data, err := json.Marshal(doc)
+	id, _ := stored["id"].(string)
+	if id == "" {
+		var err error
+		id, err = randomID()
+		if err != nil {
+			return "", fmt.Errorf("generate id: %w", err)
+		}
+	}
+	stored["id"] = id
+
+	data, err := json.Marshal(stored)
 	if err != nil {
 		return "", fmt.Errorf("marshal doc: %w", err)
 	}
@@ -119,10 +140,17 @@ func (c *Collection) List() ([]map[string]any, error) {
 	return docs, rows.Err()
 }
 
-// Update replaces the document at id with doc. The id is preserved.
+// Update replaces the document at id with doc. The id is preserved. The
+// caller's map is never mutated (M1).
 func (c *Collection) Update(id string, doc map[string]any) error {
-	doc["id"] = id
-	data, err := json.Marshal(doc)
+	// Work on a copy so we never mutate the caller's map (M1).
+	stored := make(map[string]any, len(doc)+1)
+	for k, v := range doc {
+		stored[k] = v
+	}
+	stored["id"] = id
+
+	data, err := json.Marshal(stored)
 	if err != nil {
 		return fmt.Errorf("marshal doc: %w", err)
 	}
@@ -154,7 +182,18 @@ func (c *Collection) Delete(id string) error {
 }
 
 // Seed reads a JSONL file (one JSON object per line) and inserts each object.
+// It only seeds when the collection is empty, making restarts idempotent and
+// avoiding duplicate seed rows or UNIQUE-constraint failures (C3).
 func (c *Collection) Seed(path string) error {
+	// Skip seeding if the collection already has data (C3).
+	count, err := c.Count()
+	if err != nil {
+		return fmt.Errorf("count before seed: %w", err)
+	}
+	if count > 0 {
+		return nil
+	}
+
 	f, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("open seed file %s: %w", path, err)
@@ -174,6 +213,18 @@ func (c *Collection) Seed(path string) error {
 	return nil
 }
 
+// Count returns the number of documents in the collection.
+func (c *Collection) Count() (int, error) {
+	var n int
+	err := c.store.db.QueryRow(
+		fmt.Sprintf(`SELECT COUNT(*) FROM %s`, c.name),
+	).Scan(&n)
+	if err != nil {
+		return 0, fmt.Errorf("count %s: %w", c.name, err)
+	}
+	return n, nil
+}
+
 // --- helpers ---
 
 func unmarshalDoc(data string) (map[string]any, error) {
@@ -184,15 +235,16 @@ func unmarshalDoc(data string) (map[string]any, error) {
 	return doc, nil
 }
 
-func randomID() string {
+func randomID() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		panic("crypto/rand failed: " + err.Error())
+		return "", fmt.Errorf("crypto/rand: %w", err)
 	}
-	return hex.EncodeToString(b)
+	return hex.EncodeToString(b), nil
 }
 
-// quoteIdent wraps a SQL identifier in double quotes for safe interpolation.
+// quoteIdent wraps a validated SQL identifier in double quotes, escaping any
+// embedded double quotes by doubling them per the SQL standard (C2).
 func quoteIdent(name string) string {
-	return `"` + name + `"`
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }

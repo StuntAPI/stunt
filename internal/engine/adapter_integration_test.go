@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -255,6 +256,157 @@ func TestAdapterRulesOverlay(t *testing.T) {
 	if status != 404 || !strings.Contains(body, "not_found") {
 		t.Fatalf("GET /nope -> status %d body %q, want 404 not_found", status, body)
 	}
+}
+
+const seededAdapterYAML = `
+id: seeded
+name: Seeded
+endpoints:
+  - route: /items
+    method: GET
+    handler: scripts/items.star#on_list
+resources:
+  - name: items
+    kind: collection
+    seed: fixtures/items.jsonl
+`
+
+const seededStar = `
+def on_list(req):
+    c = store_collection("items")
+    docs = c.list()
+    return respond(200, {"count": len(docs)})
+`
+
+const seedItemsJSONL = `{"id":"i1","name":"widget"}` + "\n" + `{"id":"i2","name":"gadget"}` + "\n"
+
+// TestSeedNoDuplicateOnRestart proves that re-opening the same state dir
+// does not duplicate seed rows (C3).
+func TestSeedNoDuplicateOnRestart(t *testing.T) {
+	adapterDir := t.TempDir()
+	writeFile(t, adapterDir, "adapter.yaml", seededAdapterYAML)
+	writeFile(t, adapterDir, "scripts/items.star", seededStar)
+	writeFile(t, adapterDir, "fixtures/items.jsonl", seedItemsJSONL)
+
+	stateDir := t.TempDir()
+	manifestPath := filepath.Join(stateDir, "stunt.yaml")
+
+	makeManifest := func() *manifest.Manifest {
+		return &manifest.Manifest{
+			Path:    manifestPath,
+			Version: 1,
+			Network: manifest.Network{Mode: "port", BasePort: 0},
+			Services: map[string]manifest.Service{
+				"seeded": {Adapter: adapterDir},
+			},
+		}
+	}
+
+	// First engine open: seed 2 rows.
+	e1, err := New(makeManifest())
+	if err != nil {
+		t.Fatalf("engine.New (first): %v", err)
+	}
+	addrs1, cancel1, err := e1.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest (first): %v", err)
+	}
+	time.Sleep(30 * time.Millisecond)
+
+	body, status := get2(t, addrs1["seeded"]+"/items")
+	if status != 200 {
+		t.Fatalf("GET /items (first) -> status %d, body %s", status, body)
+	}
+	if !strings.Contains(body, `"count":2`) {
+		t.Fatalf("first open: body = %s, want count 2", body)
+	}
+	cancel1()
+	e1.Close()
+
+	// Second engine open (restart with same state dir): no duplicates.
+	e2, err := New(makeManifest())
+	if err != nil {
+		t.Fatalf("engine.New (restart): %v", err)
+	}
+	defer e2.Close()
+	addrs2, cancel2, err := e2.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest (restart): %v", err)
+	}
+	defer cancel2()
+	time.Sleep(30 * time.Millisecond)
+
+	body, status = get2(t, addrs2["seeded"]+"/items")
+	if status != 200 {
+		t.Fatalf("GET /items (restart) -> status %d, body %s", status, body)
+	}
+	if !strings.Contains(body, `"count":2`) {
+		t.Fatalf("restart: body = %s, want count 2 (no duplicates)", body)
+	}
+}
+
+// --- I2: concurrent requests with shared rng/faker must be race-free ---
+
+const chanceAdapterYAML = `
+id: chance-svc
+name: Chance Service
+endpoints:
+  - route: /maybe
+    method: GET
+    rules:
+      - name: sometimes-fail
+        match: { method: GET, path: /maybe }
+        when: { chance: 50 }
+        respond: { status: 200, body: { inline: { result: hit } } }
+      - name: default
+        match: { method: GET, path: /maybe }
+        respond: { status: 200, body: { inline: { result: miss } } }
+`
+
+func TestConcurrentRulesRaceFree(t *testing.T) {
+	adapterDir := t.TempDir()
+	writeFile(t, adapterDir, "adapter.yaml", chanceAdapterYAML)
+
+	stateDir := t.TempDir()
+	manifestPath := filepath.Join(stateDir, "stunt.yaml")
+
+	m := &manifest.Manifest{
+		Path:    manifestPath,
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"chance": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(30 * time.Millisecond)
+
+	url := addrs["chance"] + "/maybe"
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			resp, err := http.Get(url)
+			if err != nil {
+				t.Errorf("GET: %v", err)
+				return
+			}
+			io.Copy(io.Discard, resp.Body)
+			resp.Body.Close()
+		}()
+	}
+	wg.Wait()
 }
 
 // --- HTTP helpers for this test file ---

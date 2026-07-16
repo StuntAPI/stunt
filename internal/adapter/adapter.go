@@ -51,15 +51,20 @@ type Identity struct {
 }
 
 // ReadFile reads a file referenced by a relative path (relative to the
-// adapter directory). It is a convenience for consumers that need to load
-// fixtures, templates, or other artifacts by the paths written in
-// adapter.yaml.
+// adapter directory). It rejects paths that escape the adapter directory via
+// traversal (e.g. ../../etc/passwd) to prevent unauthorized file access (I4).
 func (a *Adapter) ReadFile(rel string) ([]byte, error) {
-	p := rel
-	if !filepath.IsAbs(p) {
-		p = filepath.Join(a.Dir, rel)
+	full := rel
+	if !filepath.IsAbs(rel) {
+		full = filepath.Join(a.Dir, rel)
 	}
-	return os.ReadFile(p)
+	// Security: verify the cleaned path is within a.Dir (I4).
+	cleanPath := filepath.Clean(full)
+	relChecked, err := filepath.Rel(a.Dir, cleanPath)
+	if err != nil || strings.HasPrefix(relChecked, "..") || filepath.IsAbs(relChecked) {
+		return nil, fmt.Errorf("adapter: path %q escapes adapter directory", rel)
+	}
+	return os.ReadFile(cleanPath)
 }
 
 // validate checks basic structural invariants after parsing.
@@ -93,10 +98,16 @@ func (a *Adapter) resolveHandlerPaths() {
 }
 
 // splitHandler splits "scripts/x.star#on_post" into ("scripts/x.star", "on_post").
+// Exported as SplitHandler for reuse by the engine package (M7).
 func splitHandler(h string) (path, fn string) {
 	idx := strings.Index(h, "#")
 	if idx < 0 {
 		return h, ""
 	}
 	return h[:idx], h[idx+1:]
+}
+
+// SplitHandler splits "scripts/x.star#on_post" into ("scripts/x.star", "on_post").
+func SplitHandler(h string) (path, fn string) {
+	return splitHandler(h)
 }

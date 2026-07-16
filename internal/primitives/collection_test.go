@@ -216,3 +216,139 @@ func TestCollectionReuseSameCollection(t *testing.T) {
 		t.Fatalf("len(docs) = %d, want 1", len(docs))
 	}
 }
+
+// --- C2: quoteIdent must reject invalid names ---
+
+func TestCollectionInvalidName(t *testing.T) {
+	s := newTestStore(t)
+
+	invalidNames := []string{
+		`foo"bar`,     // embedded double-quote
+		`'; DROP TABLE--`, // SQL injection
+		"123abc",        // starts with digit
+		`has space`,      // space
+		``,               // empty
+		"has-dash",      // dash
+	}
+	for _, name := range invalidNames {
+		_, err := s.Collection(name)
+		if err == nil {
+			t.Errorf("Collection(%q) should have returned an error", name)
+		}
+	}
+}
+
+func TestCollectionValidName(t *testing.T) {
+	s := newTestStore(t)
+
+	validNames := []string{
+		"users",
+		"_private",
+		"Orders2024",
+		"a_b_c",
+		"X",
+	}
+	for _, name := range validNames {
+		c, err := s.Collection(name)
+		if err != nil {
+			t.Errorf("Collection(%q) returned unexpected error: %v", name, err)
+		}
+		// Round-trip: insert + get works.
+		id, err := c.Insert(map[string]any{"n": name})
+		if err != nil {
+			t.Errorf("Insert into %q: %v", name, err)
+		}
+		_, err = c.Get(id)
+		if err != nil {
+			t.Errorf("Get from %q: %v", name, err)
+		}
+	}
+}
+
+// --- M1: Insert/Update must not mutate the caller's map ---
+
+func TestInsertDoesNotMutateCaller(t *testing.T) {
+	s := newTestStore(t)
+	c, _ := s.Collection("things")
+
+	doc := map[string]any{"name": "Alice"}
+	_, err := c.Insert(doc)
+	if err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+	if _, ok := doc["id"]; ok {
+		t.Fatalf("caller's map was mutated: id=%v (should not have id)", doc["id"])
+	}
+}
+
+func TestUpdateDoesNotMutateCaller(t *testing.T) {
+	s := newTestStore(t)
+	c, _ := s.Collection("things")
+
+	id, _ := c.Insert(map[string]any{"name": "Bob"})
+	doc := map[string]any{"name": "Bobby"}
+	if err := c.Update(id, doc); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+	if _, ok := doc["id"]; ok {
+		t.Fatalf("caller's map was mutated: id=%v (should not have id)", doc["id"])
+	}
+}
+
+// --- C3: Seed must not duplicate rows on restart ---
+
+func TestSeedNoDuplicateOnRestart(t *testing.T) {
+	dir := t.TempDir()
+	seedPath := filepath.Join(dir, "seed.jsonl")
+	seedData := `{"id":"ch_1","amount":1000}` + "\n" + `{"id":"ch_2","amount":2000}` + "\n"
+	if err := writeFile(seedPath, seedData); err != nil {
+		t.Fatalf("writeFile: %v", err)
+	}
+
+	dbPath := filepath.Join(dir, "test.db")
+
+	// First open: seed 2 rows.
+	s1, _ := Open(dbPath)
+	c1, _ := s1.Collection("charges")
+	if err := c1.Seed(seedPath); err != nil {
+		t.Fatalf("Seed (first): %v", err)
+	}
+	docs, _ := c1.List()
+	if len(docs) != 2 {
+		t.Fatalf("after first seed: len = %d, want 2", len(docs))
+	}
+	s1.Close()
+
+	// Second open (restart): seed again — should be a no-op.
+	s2, _ := Open(dbPath)
+	c2, _ := s2.Collection("charges")
+	if err := c2.Seed(seedPath); err != nil {
+		t.Fatalf("Seed (restart): %v", err)
+	}
+	docs, _ = c2.List()
+	if len(docs) != 2 {
+		t.Fatalf("after re-seed: len = %d, want 2 (no duplicates)", len(docs))
+	}
+	s2.Close()
+}
+
+func TestCollectionCount(t *testing.T) {
+	s := newTestStore(t)
+	c, _ := s.Collection("items")
+
+	n, err := c.Count()
+	if err != nil {
+		t.Fatalf("Count: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("empty collection count = %d, want 0", n)
+	}
+
+	c.Insert(map[string]any{"x": 1})
+	c.Insert(map[string]any{"x": 2})
+
+	n, _ = c.Count()
+	if n != 2 {
+		t.Fatalf("count = %d, want 2", n)
+	}
+}
