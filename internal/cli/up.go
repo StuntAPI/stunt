@@ -28,14 +28,23 @@ func newUpCmd() *cobra.Command {
 			out := cmd.OutOrStdout()
 			port := m.Network.BasePort
 			for name, svc := range m.Services {
-				fmt.Fprintf(out, "  %s  ->  http://127.0.0.1:%d  (%d rules)\n", name, port, len(svc.Rules))
+				if svc.Adapter != "" {
+					fmt.Fprintf(out, "  %s  ->  http://127.0.0.1:%d  (adapter: %s, %d rules)\n", name, port, svc.Adapter, len(svc.Rules))
+				} else {
+					fmt.Fprintf(out, "  %s  ->  http://127.0.0.1:%d  (%d rules)\n", name, port, len(svc.Rules))
+				}
 				port++
 			}
 			fmt.Fprintln(out, "stunt up — Ctrl-C to stop")
 
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 			defer stop()
-			return engine.New(m).Serve(ctx)
+			e, err := engine.New(m)
+			if err != nil {
+				return err
+			}
+			defer e.Close()
+			return e.Serve(ctx)
 		},
 	}
 }

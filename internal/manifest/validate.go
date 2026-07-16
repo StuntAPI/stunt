@@ -33,8 +33,11 @@ func Validate(m *Manifest) error {
 	sort.Strings(names)
 	for _, n := range names {
 		s := m.Services[n]
-		// A service with no rules is valid: it simply returns 404 for every
-		// request (the engine's unmatched default). Only validate rules that exist.
+		// A service must declare at least one of an adapter or rules.
+		if s.Adapter == "" && len(s.Rules) == 0 {
+			return fmt.Errorf("manifest: service %q must have at least one of 'adapter' or 'rules'", n)
+		}
+		// Only validate rules that exist.
 		for i, r := range s.Rules {
 			if r.Respond.Status == 0 && r.Respond.Behavior == "" && r.Respond.Body == nil {
 				return fmt.Errorf("manifest: service %q rule[%d] has no respond (status/body/behavior)", n, i)

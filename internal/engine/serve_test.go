@@ -20,7 +20,10 @@ func TestServeMultipleServices(t *testing.T) {
 			"b": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200, Body: &rules.Body{Inline: "B"}}}}},
 		},
 	}
-	e := New(m)
+	e, err := New(m)
+	if err != nil {
+		t.Fatal(err)
+	}
 	addrs, cancel, err := e.ServeForTest(context.Background())
 	if err != nil {
 		t.Fatal(err)

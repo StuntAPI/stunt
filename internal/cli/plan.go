@@ -26,7 +26,11 @@ func newPlanCmd() *cobra.Command {
 			out := cmd.OutOrStdout()
 			fmt.Fprintf(out, "stunt.yaml OK — %d service(s):\n", len(m.Services))
 			for name, svc := range m.Services {
-				fmt.Fprintf(out, "  %s  ->  127.0.0.1:%d  (%d rules)\n", name, port, len(svc.Rules))
+				if svc.Adapter != "" {
+					fmt.Fprintf(out, "  %s  ->  127.0.0.1:%d  (adapter: %s, %d rules)\n", name, port, svc.Adapter, len(svc.Rules))
+				} else {
+					fmt.Fprintf(out, "  %s  ->  127.0.0.1:%d  (%d rules)\n", name, port, len(svc.Rules))
+				}
 				port++
 			}
 			return nil

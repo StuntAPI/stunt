@@ -1,0 +1,251 @@
+package engine
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/stunt-adapters/stunt/internal/adapter"
+	"github.com/stunt-adapters/stunt/internal/manifest"
+	"github.com/stunt-adapters/stunt/internal/rules"
+	"github.com/stunt-adapters/stunt/internal/starlark"
+)
+
+// dispatchAdapter attempts to handle a request via the adapter's endpoints.
+// It first tries to match a handler-backed endpoint (Starlark). If no handler
+// endpoint matches, it falls through to the rules engine over endpoint rules,
+// service-level rules, and adapter top-level rules.
+//
+// Returns true if the request was fully handled (a response was written).
+// Returns false if nothing matched, so the caller can try rules-only dispatch.
+func (e *Engine) dispatchAdapter(
+	w http.ResponseWriter,
+	r *http.Request,
+	st *serviceState,
+	body []byte,
+	rng *rules.RNG,
+	fk *rules.Faker,
+	baseDir string,
+	serviceRules []rules.Rule,
+) bool {
+	a := st.adapter
+
+	// 1. Try handler-backed endpoints first.
+	for _, ep := range a.Endpoints {
+		if ep.Handler == "" {
+			continue
+		}
+		if !methodMatches(ep.Method, r.Method) {
+			continue
+		}
+		params, ok := matchRoute(ep.Route, r.URL.Path)
+		if !ok {
+			continue
+		}
+		e.runHandler(w, r, st, ep, body, params)
+		return true
+	}
+
+	// 2. Build the combined rules list and evaluate.
+	//    Order: matched endpoint rules → service rules overlay → adapter rules.
+	combined := combinedRules(a, serviceRules, r.Method, r.URL.Path)
+	if len(combined) > 0 {
+		req := rules.Request{Method: r.Method, Path: r.URL.Path, Headers: headerMap(r.Header), Body: body}
+		d := rules.Evaluate(req, combined, rng, fk, baseDir)
+		if d.Matched {
+			applyDecision(w, r, d)
+			return true
+		}
+	}
+
+	return false // nothing matched — caller will 404
+}
+
+// combinedRules assembles the rule list for rules-based dispatch: endpoint
+// rules (from endpoints without handlers that match the request), service
+// overlay rules, then adapter top-level rules.
+func combinedRules(a *adapter.Adapter, serviceRules []rules.Rule, method, path string) []rules.Rule {
+	var out []rules.Rule
+
+	// Endpoint rules for rules-only endpoints matching this request.
+	for _, ep := range a.Endpoints {
+		if ep.Handler != "" {
+			continue
+		}
+		if methodMatches(ep.Method, method) {
+			if _, ok := matchRoute(ep.Route, path); ok {
+				out = append(out, ep.Rules...)
+			}
+		}
+	}
+
+	// Service-level rules overlay.
+	out = append(out, serviceRules...)
+
+	// Adapter top-level rules (catch-all, etc.).
+	out = append(out, a.Rules...)
+
+	return out
+}
+
+// runHandler loads (or retrieves cached) the Starlark VM for the endpoint's
+// handler script, invokes the handler function, and writes the response.
+func (e *Engine) runHandler(
+	w http.ResponseWriter,
+	r *http.Request,
+	st *serviceState,
+	ep adapter.Endpoint,
+	body []byte,
+	params map[string]string,
+) {
+	scriptPath, fnName := splitHandlerRef(ep.Handler)
+
+	vm, err := st.getOrLoadVM(scriptPath)
+	if err != nil {
+		writeError(w, 500, fmt.Sprintf("failed to load handler script: %v", err))
+		return
+	}
+
+	var bodyMap map[string]any
+	if len(body) > 0 {
+		if err := json.Unmarshal(body, &bodyMap); err != nil {
+			bodyMap = nil // non-JSON body; handler gets empty body
+		}
+	}
+
+	req := starlark.Request{
+		Method:  r.Method,
+		Path:    r.URL.Path,
+		Headers: headerMap(r.Header),
+		Body:    bodyMap,
+		Params:  params,
+	}
+
+	resp, err := vm.Call(fnName, req)
+	if err != nil {
+		writeError(w, 500, fmt.Sprintf("handler error: %v", err))
+		return
+	}
+
+	// Write headers.
+	for k, v := range resp.Headers {
+		w.Header().Set(k, v)
+	}
+	// Default content type for JSON bodies.
+	if resp.Body != nil && w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "application/json")
+	}
+
+	status := resp.Status
+	if status == 0 {
+		status = 200
+	}
+	w.WriteHeader(status)
+
+	if resp.Body != nil {
+		data, err := json.Marshal(resp.Body)
+		if err != nil {
+			// Shouldn't happen, but don't crash.
+			writeError(w, 500, fmt.Sprintf("marshal response body: %v", err))
+			return
+		}
+		_, _ = w.Write(data)
+	}
+}
+
+// getOrLoadVM returns the cached VM for scriptPath, or loads it on first use.
+func (st *serviceState) getOrLoadVM(scriptPath string) (*starlark.VM, error) {
+	st.mu.Lock()
+	defer st.mu.Unlock()
+
+	if vm, ok := st.vms[scriptPath]; ok {
+		return vm, nil
+	}
+
+	src, err := os.ReadFile(scriptPath)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", scriptPath, err)
+	}
+
+	vm, err := starlark.Load(string(src), st.builtins)
+	if err != nil {
+		return nil, fmt.Errorf("load %s: %w", scriptPath, err)
+	}
+
+	st.vms[scriptPath] = vm
+	return vm, nil
+}
+
+// --- route matching ---
+
+// matchRoute matches a path against a route pattern. The pattern may contain
+// {param} segments which match exactly one path segment and capture its value.
+// Returns the captured params and true on match, or nil/false on mismatch.
+//
+// Examples:
+//
+//	/charges               matches /charges
+//	/charges/{id}          matches /charges/abc123 (params={id:abc123})
+//	/charges/{id}/refund   matches /charges/abc123/refund
+func matchRoute(pattern, path string) (map[string]string, bool) {
+	patSegs := splitPathSegments(pattern)
+	pathSegs := splitPathSegments(path)
+	if len(patSegs) != len(pathSegs) {
+		return nil, false
+	}
+	params := map[string]string{}
+	for i, ps := range patSegs {
+		if len(ps) >= 2 && ps[0] == '{' && ps[len(ps)-1] == '}' {
+			name := ps[1 : len(ps)-1]
+			params[name] = pathSegs[i]
+		} else if ps != pathSegs[i] {
+			return nil, false
+		}
+	}
+	return params, true
+}
+
+// splitPathSegments splits a path on '/', trimming leading/trailing slashes.
+func splitPathSegments(s string) []string {
+	s = strings.Trim(s, "/")
+	if s == "" {
+		return nil
+	}
+	return strings.Split(s, "/")
+}
+
+// methodMatches reports whether the endpoint method accepts the request method.
+// An empty endpoint method matches any method.
+func methodMatches(epMethod, reqMethod string) bool {
+	if epMethod == "" {
+		return true
+	}
+	return strings.EqualFold(epMethod, reqMethod)
+}
+
+// splitHandlerRef splits "/abs/scripts/x.star#on_post" into path and func.
+func splitHandlerRef(ref string) (path, fn string) {
+	idx := strings.Index(ref, "#")
+	if idx < 0 {
+		return ref, ""
+	}
+	return ref[:idx], ref[idx+1:]
+}
+
+// defaultStateDir returns the directory for per-service SQLite databases.
+// It is derived from the manifest location: <manifest-dir>/.stunt/state/.
+func defaultStateDir(m *manifest.Manifest) string {
+	dir := filepath.Dir(m.Path)
+	return filepath.Join(dir, ".stunt", "state")
+}
+
+// writeError writes a JSON error response.
+func writeError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	data, _ := json.Marshal(map[string]string{"error": msg})
+	_, _ = w.Write(data)
+}
