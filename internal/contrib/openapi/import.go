@@ -222,12 +222,10 @@ type jsonSchema struct {
 // schema → synthetic template
 // ---------------------------------------------------------------------------
 
-// Sentinel placeholders used during JSON marshaling. After marshaling they
-// are replaced with the actual template expressions. The sentinels are valid
-// JSON strings so json.MarshalIndent succeeds.
-const (
-	intSentinel = "\u0001INT\u0001" // replaced with {{ faker.Int 1 999 }}
-)
+// Sentinel placeholder used during JSON marshaling. After marshaling it is
+// replaced with the actual unquoted template expression. The sentinel is a
+// valid JSON string so json.MarshalIndent succeeds and does not escape it.
+const intSentinel = "@@STUNT_INT@@"
 
 // schemaToTemplate produces a pretty-printed JSON string with faker template
 // expressions for all leaf values.
@@ -241,7 +239,7 @@ func schemaToTemplate(s *jsonSchema) string {
 		return "{\n  \"message\": \"{{ faker.Word }}\"\n}\n"
 	}
 	result := string(data)
-	// Replace quoted sentinels with unquoted template expressions.
+	// Replace the quoted sentinel with an unquoted template expression.
 	result = strings.ReplaceAll(result, "\""+intSentinel+"\"", "{{ faker.Int 1 999 }}")
 	return result + "\n"
 }
