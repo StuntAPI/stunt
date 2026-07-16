@@ -12,7 +12,7 @@ func TestRenderTemplateRequestAndFaker(t *testing.T) {
 		Body:   []byte(`{"amount": 5000, "name": "Sam"}`),
 	}
 	fk := NewFaker(1)
-	out, err := renderTemplate(`hi {{ request.body.name }} amount={{ request.body.amount }} {{ faker.Email }} {{ uuid }}`, req, fk)
+	out, err := renderTemplate(`hi {{ .Request.Body.name }} amount={{ .Request.Body.amount }} {{ faker.Email }} {{ uuid }}`, req, fk)
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}

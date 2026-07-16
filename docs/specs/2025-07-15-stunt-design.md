@@ -148,7 +148,7 @@ rules:
 
 **Overlay semantics:** for a service, the engine evaluates **project rules first**, then the **adapter's own rules** as the fallback chain. This lets a project inject faults or pin specific responses without forking the adapter.
 
-**Templating:** templates are JSON/YAML files supporting a small expression language: `{{ request.body.amount }}`, `{{ request.headers["Idempotency-Key"] }}`, `{{ faker.id("ch") }}`, `{{ now() }}`, `{{ uuid() }}`, and access to store state for stateful adapters (`{{ store.charges.last.id }}`).
+**Templating:** templates are JSON/YAML files supporting a small expression language: `{{ .Request.Body.amount }}`, `{{ .Request.headers["Idempotency-Key"] }}`, `{{ faker.id("ch") }}`, `{{ now() }}`, `{{ uuid() }}`, and access to store state for stateful adapters (`{{ store.charges.last.id }}`).
 
 ### 6.3 Core primitives (the toolbox adapters compose)
 
