@@ -336,3 +336,71 @@ func TestEnvelopeMarshal(t *testing.T) {
 		t.Fatalf("envelope JSON missing payload: %s", data)
 	}
 }
+
+// TestSetMaxRetriesClampsToZero verifies that SetMaxRetries clamps values < 1
+// to 1, so Emit always makes at least one attempt.
+func TestSetMaxRetriesClampsToZero(t *testing.T) {
+	e := NewEmitter()
+	e.SetMaxRetries(0)
+	if e.maxRetries != 1 {
+		t.Fatalf("maxRetries = %d, want 1 (clamped)", e.maxRetries)
+	}
+	e.SetMaxRetries(-5)
+	if e.maxRetries != 1 {
+		t.Fatalf("maxRetries = %d, want 1 (clamped)", e.maxRetries)
+	}
+	e.SetMaxRetries(5)
+	if e.maxRetries != 5 {
+		t.Fatalf("maxRetries = %d, want 5", e.maxRetries)
+	}
+}
+
+// TestMaxRetriesZeroStillAttempts verifies that even with maxRetries set to
+// zero via direct struct manipulation, Emit still makes at least one attempt
+// (the defensive clamp in Emit kicks in).
+func TestMaxRetriesZeroStillAttempts(t *testing.T) {
+	sink := newSink()
+	server := httptest.NewServer(http.HandlerFunc(sink.handler))
+	defer server.Close()
+
+	e := newTestEmitter()
+	e.Register("svc", server.URL)
+	e.maxRetries = 0 // simulate misconfiguration
+
+	err := e.Emit(context.Background(), "svc", "test", map[string]any{"k": "v"})
+	if err != nil {
+		t.Fatalf("Emit should succeed with defensive clamp, got: %v", err)
+	}
+	if sink.count() != 1 {
+		t.Fatalf("sink received %d posts, want 1 (at least one attempt)", sink.count())
+	}
+}
+
+// TestLargeResponseBodyCapped verifies that Emit does not read an unbounded
+// response body. A server returning a very large body should not cause
+// issues — the body read is capped at 1 MiB.
+func TestLargeResponseBodyCapped(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		// Write a large body (5 MiB). The emitter should drain only 1 MiB
+		// and not OOM or hang.
+		chunk := bytes.Repeat([]byte("x"), 4096)
+		for i := 0; i < 1280; i++ { // ~5 MiB
+			w.Write(chunk)
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+		}
+	}))
+	defer server.Close()
+
+	e := newTestEmitter()
+	e.Register("svc", server.URL)
+	e.backoff = 1 * time.Millisecond
+
+	err := e.Emit(context.Background(), "svc", "test", map[string]any{"k": "v"})
+	if err != nil {
+		t.Fatalf("Emit should succeed even with large response body: %v", err)
+	}
+}

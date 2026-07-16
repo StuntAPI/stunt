@@ -44,8 +44,11 @@ type scheduled struct {
 // Ticker represents a repeating callback that can be stopped.
 type Ticker struct {
 	clock   *Clock
-	id      int        // virtual mode: scheduled timer id
+	id      int           // virtual mode: scheduled timer id
 	stopCh  chan struct{} // real mode: closed to signal stop
+	stopOnce sync.Once    // guards close(stopCh) against double-close
+	stopMu   sync.Mutex   // guards the stopped flag in virtual mode
+	stopped  bool         // virtual mode: whether Stop was called
 }
 
 // NewClock creates a real-time clock. Now returns time.Now and callbacks
@@ -198,19 +201,25 @@ func (c *Clock) Tick(d time.Duration, fn func()) *Ticker {
 }
 
 // Stop stops the ticker. After Stop returns, the callback will not fire again.
-// Calling Stop more than once is a no-op.
+// Calling Stop more than once is a no-op and is safe for concurrent use.
 func (t *Ticker) Stop() {
 	if t.stopCh != nil {
-		// Real mode.
-		select {
-		case <-t.stopCh:
-			return // already closed
-		default:
-		}
-		close(t.stopCh)
+		// Real mode: sync.Once ensures we close exactly once even under
+		// concurrent Stop calls (close of closed channel panics).
+		t.stopOnce.Do(func() {
+			close(t.stopCh)
+		})
 		return
 	}
-	// Virtual mode.
+	// Virtual mode: guard against concurrent Stop with the ticker's own mutex.
+	t.stopMu.Lock()
+	if t.stopped {
+		t.stopMu.Unlock()
+		return
+	}
+	t.stopped = true
+	t.stopMu.Unlock()
+
 	c := t.clock
 	c.mu.Lock()
 	defer c.mu.Unlock()

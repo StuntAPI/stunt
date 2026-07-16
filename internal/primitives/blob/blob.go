@@ -85,27 +85,25 @@ func (s *Store) PutWith(ns, name, contentType string, r io.Reader) (string, erro
 	contentPath := s.contentPath(ns, id)
 	metaPath := s.metaPath(ns, id)
 
-	// Write content to a temporary file first, then rename for atomicity.
-	tmp, err := os.CreateTemp(nsDir, ".tmp-*")
+	// Write content to a temporary file first.
+	contentTmp, err := os.CreateTemp(nsDir, ".tmp-content-*")
 	if err != nil {
 		return "", fmt.Errorf("blob: create temp: %w", err)
 	}
-	tmpPath := tmp.Name()
-	defer os.Remove(tmpPath) // no-op if rename succeeded
+	contentTmpPath := contentTmp.Name()
 
-	size, err := io.Copy(tmp, r)
+	size, err := io.Copy(contentTmp, r)
 	if err != nil {
-		tmp.Close()
+		contentTmp.Close()
+		os.Remove(contentTmpPath)
 		return "", fmt.Errorf("blob: write content: %w", err)
 	}
-	if err := tmp.Close(); err != nil {
+	if err := contentTmp.Close(); err != nil {
+		os.Remove(contentTmpPath)
 		return "", fmt.Errorf("blob: close temp: %w", err)
 	}
-	if err := os.Rename(tmpPath, contentPath); err != nil {
-		return "", fmt.Errorf("blob: rename content: %w", err)
-	}
 
-	// Write metadata.
+	// Prepare metadata in a temporary file too (atomic write).
 	meta := metadata{
 		Name:        name,
 		Size:        size,
@@ -114,10 +112,42 @@ func (s *Store) PutWith(ns, name, contentType string, r io.Reader) (string, erro
 	}
 	data, err := json.Marshal(meta)
 	if err != nil {
+		os.Remove(contentTmpPath)
 		return "", fmt.Errorf("blob: marshal meta: %w", err)
 	}
-	if err := os.WriteFile(metaPath, data, 0o644); err != nil {
-		return "", fmt.Errorf("blob: write meta: %w", err)
+	metaTmp, err := os.CreateTemp(nsDir, ".tmp-meta-*")
+	if err != nil {
+		os.Remove(contentTmpPath)
+		return "", fmt.Errorf("blob: create meta temp: %w", err)
+	}
+	metaTmpPath := metaTmp.Name()
+	if _, err := metaTmp.Write(data); err != nil {
+		metaTmp.Close()
+		os.Remove(metaTmpPath)
+		os.Remove(contentTmpPath)
+		return "", fmt.Errorf("blob: write meta temp: %w", err)
+	}
+	if err := metaTmp.Close(); err != nil {
+		os.Remove(metaTmpPath)
+		os.Remove(contentTmpPath)
+		return "", fmt.Errorf("blob: close meta temp: %w", err)
+	}
+
+	// Rename meta first, then content. This ordering guarantees that
+	// if the content file is present, the metadata file is already present
+	// too (so List/Stat never miss a blob whose content exists). If the
+	// content rename fails after meta was renamed, we clean up the meta
+	// to avoid leaving an orphan.
+	if err := os.Rename(metaTmpPath, metaPath); err != nil {
+		os.Remove(metaTmpPath)
+		os.Remove(contentTmpPath)
+		return "", fmt.Errorf("blob: rename meta: %w", err)
+	}
+	if err := os.Rename(contentTmpPath, contentPath); err != nil {
+		// Meta was already renamed; roll it back so we don't leave an orphan.
+		os.Remove(metaPath)
+		os.Remove(contentTmpPath)
+		return "", fmt.Errorf("blob: rename content: %w", err)
 	}
 
 	return id, nil

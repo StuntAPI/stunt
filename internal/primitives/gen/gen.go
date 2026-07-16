@@ -36,8 +36,13 @@ type Registry struct {
 }
 
 // NewRegistry creates a Registry backed by the given faker and
-// pre-registers the "uuid" and "timestamp" builtins.
+// pre-registers the "uuid" and "timestamp" builtins. Panics if fk is nil,
+// since a nil faker would cause a nil-pointer panic on the first Generate
+// call.
 func NewRegistry(fk *rules.Faker) *Registry {
+	if fk == nil {
+		panic("gen: NewRegistry requires a non-nil faker")
+	}
 	r := &Registry{
 		faker:   fk,
 		genFunc: make(map[string]Producer),
@@ -92,6 +97,12 @@ func (r *Registry) registerBuiltins() {
 	r.genFunc["uuid"] = func(_ map[string]any) (any, error) {
 		return r.faker.ID(""), nil
 	}
+	// timestamp returns the current wall-clock time as Unix seconds.
+	// Unlike the "uuid" builtin (which is derived from the seeded faker and
+	// therefore deterministic), timestamp uses time.Now() and is inherently
+	// non-deterministic. This is acceptable for its semantic meaning ("the
+	// time this value was generated") but callers should not rely on it for
+	// reproducible output.
 	r.genFunc["timestamp"] = func(_ map[string]any) (any, error) {
 		return time.Now().Unix(), nil
 	}
