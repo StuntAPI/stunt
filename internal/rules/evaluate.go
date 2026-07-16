@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/expr-lang/expr"
 )
 
 // Evaluate applies rules in order. The first rule whose Match matches AND
@@ -16,11 +18,19 @@ func Evaluate(req Request, rules []Rule, rng *RNG, faker *Faker, baseDir string)
 			continue
 		}
 		if r.When != nil {
-			if !rng.RollChance(r.When.Chance) {
-				continue
-			}
-			if r.When.Expr != "" && !evalExpr(r.When.Expr, req) {
-				continue
+			if r.When.Expr != "" {
+				// Expr mode: chance is optional (0 = no chance gate).
+				if r.When.Chance > 0 && !rng.RollChance(r.When.Chance) {
+					continue
+				}
+				if !evalExpr(r.When.Expr, req) {
+					continue
+				}
+			} else {
+				// Chance-only mode: 0% = never fires.
+				if !rng.RollChance(r.When.Chance) {
+					continue
+				}
 			}
 		}
 		return toDecision(r.Respond, baseDir, req, faker)
@@ -76,5 +86,21 @@ func bodyBytes(b *Body, baseDir string, req Request, fk *Faker) []byte {
 	return nil
 }
 
-// evalExpr is a temporary stub; replaced in Task 4.
-func evalExpr(expr string, req Request) bool { return true }
+// evalExpr evaluates a boolean expression over a request.* environment.
+// request = { method, path, headers, body } (body parsed from JSON).
+func evalExpr(e string, req Request) bool {
+	env := map[string]any{
+		"request": map[string]any{
+			"method":  req.Method,
+			"path":    req.Path,
+			"headers": req.Headers,
+			"body":    parseJSON(req.Body),
+		},
+	}
+	out, err := expr.Eval(e, env)
+	if err != nil {
+		return false
+	}
+	b, _ := out.(bool)
+	return b
+}
