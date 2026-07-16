@@ -2,6 +2,8 @@ package engine
 
 import (
 	"testing"
+
+	"github.com/stunt-adapters/stunt/internal/adapter"
 )
 
 func TestMatchRoute(t *testing.T) {
@@ -61,14 +63,14 @@ func TestMethodMatches(t *testing.T) {
 	}
 }
 
-func TestSplitHandlerRef(t *testing.T) {
-	path, fn := splitHandlerRef("/abs/scripts/x.star#on_post")
+func TestSplitHandler(t *testing.T) {
+	path, fn := adapter.SplitHandler("/abs/scripts/x.star#on_post")
 	if path != "/abs/scripts/x.star" || fn != "on_post" {
-		t.Fatalf("splitHandlerRef = (%q, %q)", path, fn)
+		t.Fatalf("SplitHandler = (%q, %q)", path, fn)
 	}
 	// No fragment
-	path, fn = splitHandlerRef("/abs/scripts/x.star")
+	path, fn = adapter.SplitHandler("/abs/scripts/x.star")
 	if path != "/abs/scripts/x.star" || fn != "" {
-		t.Fatalf("splitHandlerRef (no fn) = (%q, %q)", path, fn)
+		t.Fatalf("SplitHandler (no fn) = (%q, %q)", path, fn)
 	}
 }

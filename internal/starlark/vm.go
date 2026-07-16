@@ -6,6 +6,10 @@ import (
 	sk "go.starlark.net/starlark"
 )
 
+// maxExecutionSteps bounds the number of Starlark VM steps per handler call
+// to prevent infinite loops from blocking the server indefinitely (I5).
+const maxExecutionSteps = 1_000_000
+
 // Request is the Go-friendly representation of an incoming HTTP request
 // passed into a Starlark handler.
 type Request struct {
@@ -24,11 +28,12 @@ type Response struct {
 	Body    map[string]any
 }
 
-// VM wraps a Starlark thread plus the globals defined by a loaded script.
-// Each Load call produces a fresh VM; handlers are invoked via Call.
+// VM wraps the globals defined by a loaded script. Each Load call produces
+// a fresh VM; handlers are invoked via Call, which creates a fresh thread
+// per invocation so the VM is safe for concurrent use. The globals dict is
+// frozen after load to prevent handlers from mutating shared state.
 type VM struct {
 	globals sk.StringDict
-	thread  *sk.Thread
 }
 
 // Load parses and executes src at top-level, capturing the global bindings
@@ -46,16 +51,22 @@ func Load(src string, builtins sk.StringDict) (*VM, error) {
 		predeclared[k] = v
 	}
 
-	thread := &sk.Thread{
-		Name: "stunt",
+	loadThread := &sk.Thread{
+		Name: "stunt-load",
 	}
 
-	globals, err := sk.ExecFile(thread, "handler.star", src, predeclared)
+	globals, err := sk.ExecFile(loadThread, "handler.star", src, predeclared)
 	if err != nil {
 		return nil, fmt.Errorf("starlark load: %w", err)
 	}
 
-	return &VM{globals: globals, thread: thread}, nil
+	// Freeze all globals so handlers cannot mutate shared state, preventing
+	// fatal concurrent-map-write panics under concurrent requests (I1).
+	for _, v := range globals {
+		v.Freeze()
+	}
+
+	return &VM{globals: globals}, nil
 }
 
 // Call invokes the named handler function with a Request and converts the
@@ -79,7 +90,14 @@ func (vm *VM) Call(handlerName string, req Request) (Response, error) {
 		"params":  req.Params,
 	})
 
-	result, err := sk.Call(vm.thread, fn, sk.Tuple{reqVal}, nil)
+	// Create a fresh thread per Call so concurrent requests don't share
+	// mutable state (C1). Enforce a step limit to prevent infinite loops (I5).
+	thread := &sk.Thread{
+		Name: "stunt",
+	}
+	thread.SetMaxExecutionSteps(maxExecutionSteps)
+
+	result, err := sk.Call(thread, fn, sk.Tuple{reqVal}, nil)
 	if err != nil {
 		return Response{}, fmt.Errorf("starlark: call %q: %w", handlerName, err)
 	}
@@ -122,9 +140,11 @@ func starlarkToResponse(v sk.Value) (Response, error) {
 
 		switch key {
 		case "status":
-			if status, err := sk.AsInt32(val); err == nil {
-				resp.Status = status
+			status, err := sk.AsInt32(val)
+			if err != nil {
+				return Response{}, fmt.Errorf("starlark: status must be an int, got %s", val.Type())
 			}
+			resp.Status = status
 		case "body":
 			if bd, ok := val.(*sk.Dict); ok {
 				resp.Body = StarlarkToGo(bd)

@@ -176,6 +176,10 @@ func (e *Engine) serviceHandler(name string, svc manifest.Service) http.Handler 
 	baseDir := filepath.Dir(e.manifest.Path)
 	st := e.states[name] // nil for rules-only services
 
+	// rng and faker are shared across goroutines; math/rand.Rand and gofakeit
+	// are not concurrency-safe. Guard all access with a mutex (I2).
+	var rulesMu sync.Mutex
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body []byte
 		if r.Body != nil {
@@ -184,14 +188,21 @@ func (e *Engine) serviceHandler(name string, svc manifest.Service) http.Handler 
 
 		// --- adapter-backed dispatch ---
 		if st != nil && st.adapter != nil {
-			if handled := e.dispatchAdapter(w, r, st, body, rng, fk, baseDir, svc.Rules); handled {
+			if e.dispatchAdapter(w, r, st, body, rng, fk, baseDir, svc.Rules, &rulesMu) {
 				return
 			}
+			// dispatchAdapter already evaluated combined rules (endpoint +
+			// service + adapter). Nothing matched, so 404 directly without
+			// redundantly re-evaluating svc.Rules (M4).
+			writeStatus(w, 404, `{"error":"no matching rule"}`)
+			return
 		}
 
 		// --- rules-only dispatch (existing behavior) ---
 		req := rules.Request{Method: r.Method, Path: r.URL.Path, Headers: headerMap(r.Header), Body: body}
+		rulesMu.Lock()
 		d := rules.Evaluate(req, svc.Rules, rng, fk, baseDir)
+		rulesMu.Unlock()
 		if !d.Matched {
 			writeStatus(w, 404, `{"error":"no matching rule"}`)
 			return

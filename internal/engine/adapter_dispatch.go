@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/stunt-adapters/stunt/internal/adapter"
 	"github.com/stunt-adapters/stunt/internal/manifest"
@@ -30,6 +31,7 @@ func (e *Engine) dispatchAdapter(
 	fk *rules.Faker,
 	baseDir string,
 	serviceRules []rules.Rule,
+	rulesMu *sync.Mutex,
 ) bool {
 	a := st.adapter
 
@@ -54,7 +56,9 @@ func (e *Engine) dispatchAdapter(
 	combined := combinedRules(a, serviceRules, r.Method, r.URL.Path)
 	if len(combined) > 0 {
 		req := rules.Request{Method: r.Method, Path: r.URL.Path, Headers: headerMap(r.Header), Body: body}
+		rulesMu.Lock()
 		d := rules.Evaluate(req, combined, rng, fk, baseDir)
+		rulesMu.Unlock()
 		if d.Matched {
 			applyDecision(w, r, d)
 			return true
@@ -101,7 +105,7 @@ func (e *Engine) runHandler(
 	body []byte,
 	params map[string]string,
 ) {
-	scriptPath, fnName := splitHandlerRef(ep.Handler)
+	scriptPath, fnName := adapter.SplitHandler(ep.Handler)
 
 	vm, err := st.getOrLoadVM(scriptPath)
 	if err != nil {
@@ -143,16 +147,22 @@ func (e *Engine) runHandler(
 	if status == 0 {
 		status = 200
 	}
-	w.WriteHeader(status)
 
+	// Marshal the body BEFORE writing the header so that a marshal failure
+	// produces a clean 500 error instead of a superfluous WriteHeader (I3).
+	var respBody []byte
 	if resp.Body != nil {
 		data, err := json.Marshal(resp.Body)
 		if err != nil {
-			// Shouldn't happen, but don't crash.
 			writeError(w, 500, fmt.Sprintf("marshal response body: %v", err))
 			return
 		}
-		_, _ = w.Write(data)
+		respBody = data
+	}
+
+	w.WriteHeader(status)
+	if respBody != nil {
+		_, _ = w.Write(respBody)
 	}
 }
 
@@ -224,15 +234,6 @@ func methodMatches(epMethod, reqMethod string) bool {
 		return true
 	}
 	return strings.EqualFold(epMethod, reqMethod)
-}
-
-// splitHandlerRef splits "/abs/scripts/x.star#on_post" into path and func.
-func splitHandlerRef(ref string) (path, fn string) {
-	idx := strings.Index(ref, "#")
-	if idx < 0 {
-		return ref, ""
-	}
-	return ref[:idx], ref[idx+1:]
 }
 
 // defaultStateDir returns the directory for per-service SQLite databases.
