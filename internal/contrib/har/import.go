@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -60,7 +61,12 @@ func Import(harBytes []byte, dir string) error {
 	var endpoints []adapter.Endpoint
 	for _, k := range keys {
 		entry := seen[k]
-		name := contrib.SafeName(k.method, k.path)
+
+		// Parameterize the path so real IDs/tokens in the recorded URL never
+		// leak into routes, match paths, or filenames.
+		paramPath := parameterizePath(k.path)
+		name := contrib.SafeName(k.method, paramPath)
+		matchPath := contrib.GlobPath(paramPath)
 
 		tmpl := synthesizeBody(entry.Response.Content)
 
@@ -75,11 +81,11 @@ func Import(harBytes []byte, dir string) error {
 		}
 
 		ep := adapter.Endpoint{
-			Route:  k.path,
+			Route:  paramPath,
 			Method: k.method,
 			Rules: []rules.Rule{{
 				Name:  name + "-ok",
-				Match: rules.Match{Method: k.method, Path: k.path},
+				Match: rules.Match{Method: k.method, Path: matchPath},
 				Respond: rules.Respond{
 					Status:  status,
 					Headers: map[string]string{"Content-Type": "application/json"},
@@ -103,6 +109,107 @@ func Import(harBytes []byte, dir string) error {
 		return nil
 	}
 	return contrib.MergeEndpoints(dir, endpoints)
+}
+
+// ---------------------------------------------------------------------------
+// path parameterization
+// ---------------------------------------------------------------------------
+
+// reNumericSegment matches a purely numeric path segment (e.g. "42").
+var reNumericSegment = regexp.MustCompile(`^[0-9]+$`)
+
+// reUUIDSegment matches canonical UUIDs (8-4-4-4-12 hex).
+var reUUIDSegment = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+// reLongAlphaNum matches long alphanumeric strings (16+ chars) that are
+// characteristic of opaque API IDs/tokens (e.g. "1a2b3c4d5e6f7a8b9c").
+var reLongAlphaNum = regexp.MustCompile(`^[A-Za-z0-9]{16,}$`)
+
+// reVersionSegment matches simple version path segments like "v1", "v2".
+var reVersionSegment = regexp.MustCompile(`(?i)^v[0-9]+$`)
+
+// reHasLetter / reHasDigit test for the presence of at least one letter or
+// digit respectively. Used to detect mixed alphanumeric IDs.
+var reHasLetter = regexp.MustCompile(`[A-Za-z]`)
+var reHasDigit = regexp.MustCompile(`[0-9]`)
+
+// providerPrefixes are known provider-specific ID prefixes. A path segment
+// starting with one of these (followed by alphanumeric content) is treated as
+// a real ID.
+var providerPrefixes = []string{
+	"cus_", "ch_", "pi_", "sub_", "txn_", "acct_", // Stripe (partial)
+	"ghp_", "gho_", "ghu_", "ghs_",                   // GitHub tokens
+	"sk_", "rk_",                                   // Stripe secret/restricted keys
+	"AKIA",                                         // AWS access key IDs
+	"xox",                                          // Slack tokens (xox[bpoa]-)
+	"AIza",                                         // Google API keys
+}
+
+// looksLikeID reports whether a single path segment looks like a real
+// identifier/token that should be parameterized rather than embedded verbatim
+// in a route or filename. Returns true for numeric IDs, UUIDs, long opaque
+// alphanumeric strings, known provider-prefixed IDs, and mixed alphanumeric
+// segments that are not simple version segments (v1, v2).
+func looksLikeID(seg string) bool {
+	if seg == "" {
+		return false
+	}
+	// Pure numeric segment (e.g. "42", "12345").
+	if reNumericSegment.MatchString(seg) {
+		return true
+	}
+	// UUID segment.
+	if reUUIDSegment.MatchString(seg) {
+		return true
+	}
+	// Known provider-prefixed ID.
+	for _, p := range providerPrefixes {
+		if strings.HasPrefix(seg, p) && len(seg) > len(p) {
+			return true
+		}
+	}
+	// Long opaque alphanumeric string (16+ chars, no separators).
+	// This catches opaque API IDs/tokens without known prefixes.
+	if reLongAlphaNum.MatchString(seg) {
+		return true
+	}
+	// Mixed alphanumeric segment (contains both letters and digits) that is
+	// not a simple version segment like "v1". This catches IDs like
+	// "real-user-42", "item-001", "abc123", etc.
+	if reHasLetter.MatchString(seg) && reHasDigit.MatchString(seg) && !reVersionSegment.MatchString(seg) {
+		return true
+	}
+	return false
+}
+
+// parameterizePath replaces path segments that look like real IDs/tokens with
+// a generic {id} placeholder. Segments that are already {param} placeholders
+// (e.g. from OpenAPI) are preserved. This ensures real values in recorded URLs
+// never leak into routes, match paths, or filenames.
+//
+// Example:
+//
+//	/users/real-user-42/orders    -> /users/{id}/orders
+//	/v1/charges/ch_realtoken      -> /v1/charges/{id}
+//	/users/550e8400-.../profile   -> /users/{id}/profile
+//	/users/{userId}/orders        -> /users/{userId}/orders  (preserved)
+func parameterizePath(path string) string {
+	segs := strings.Split(strings.Trim(path, "/"), "/")
+	for i, seg := range segs {
+		// Preserve existing OpenAPI-style placeholders.
+		if strings.HasPrefix(seg, "{") && strings.HasSuffix(seg, "}") {
+			continue
+		}
+		if looksLikeID(seg) {
+			segs[i] = "{id}"
+		}
+	}
+	result := "/" + strings.Join(segs, "/")
+	// Preserve trailing slash from original path (rare but deterministic).
+	if strings.HasSuffix(path, "/") && result != "/" {
+		result += "/"
+	}
+	return result
 }
 
 // ---------------------------------------------------------------------------

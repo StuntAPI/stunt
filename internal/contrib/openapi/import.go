@@ -38,11 +38,14 @@ func Import(specBytes []byte, dir string) error {
 	var endpoints []adapter.Endpoint
 	for _, path := range spec.sortedPaths() {
 		item := spec.Paths[path]
+		if item == nil {
+			continue
+		}
 		for _, op := range item.operations() {
-			name := contrib.SafeName(op.method, path)
+		name := contrib.SafeName(op.method, path)
 			matchPath := contrib.GlobPath(path)
 
-			tmpl := schemaToTemplate(op.op.firstSchema())
+			tmpl := spec.schemaToTemplate(op.op.firstSchema())
 
 			// Write template file.
 			if err := contrib.WriteAdapterFile(dir, "templates/"+name+".json", tmpl); err != nil {
@@ -92,7 +95,8 @@ func buildEndpoint(name, route, method, matchPath, tmpl string) adapter.Endpoint
 // ---------------------------------------------------------------------------
 
 type openapiSpec struct {
-	Paths map[string]*pathItem `yaml:"paths"`
+	Paths      map[string]*pathItem      `yaml:"paths"`
+	Components *components               `yaml:"components"`
 }
 
 // sortedPaths returns paths in lexicographic order for deterministic output.
@@ -213,9 +217,53 @@ type mediaType struct {
 }
 
 type jsonSchema struct {
-	Type       string             `yaml:"type"`
+	Type       string                  `yaml:"type"`
 	Properties map[string]*jsonSchema `yaml:"properties"`
-	Items      *jsonSchema        `yaml:"items"`
+	Items      *jsonSchema             `yaml:"items"`
+	Ref        string                  `yaml:"$ref"`
+}
+
+// components holds reusable schema definitions under components/schemas.
+type components struct {
+	Schemas map[string]*jsonSchema `yaml:"schemas"`
+}
+
+// resolveRef dereferences a $ref pointer against the spec's components/schemas.
+// A ref looks like "#/components/schemas/Pet". If the ref cannot be resolved,
+// nil is returned.
+func (s *openapiSpec) resolveRef(ref string) *jsonSchema {
+	const prefix = "#/components/schemas/"
+	if !strings.HasPrefix(ref, prefix) {
+		return nil
+	}
+	name := strings.TrimPrefix(ref, prefix)
+	if s.Components == nil || s.Components.Schemas == nil {
+		return nil
+	}
+	return s.Components.Schemas[name]
+}
+
+// resolve returns the schema with all top-level $ref pointers resolved.
+// If the schema itself is a $ref, it is dereferenced. Nested refs inside
+// properties/items are resolved recursively during schemaValue. If a ref
+// chain is unresolvable, nil is returned so the caller can emit a generic body.
+func (s *openapiSpec) resolve(schema *jsonSchema) *jsonSchema {
+	if schema == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	for schema.Ref != "" {
+		if seen[schema.Ref] {
+			return nil // circular ref
+		}
+		seen[schema.Ref] = true
+		resolved := s.resolveRef(schema.Ref)
+		if resolved == nil {
+			return nil
+		}
+		schema = resolved
+	}
+	return schema
 }
 
 // ---------------------------------------------------------------------------
@@ -228,12 +276,15 @@ type jsonSchema struct {
 const intSentinel = "@@STUNT_INT@@"
 
 // schemaToTemplate produces a pretty-printed JSON string with faker template
-// expressions for all leaf values.
-func schemaToTemplate(s *jsonSchema) string {
-	if s == nil {
+// expressions for all leaf values. It resolves $ref pointers against the
+// spec's components/schemas. If the root schema is an unresolvable $ref, a
+// generic synthetic body is produced.
+func (s *openapiSpec) schemaToTemplate(schema *jsonSchema) string {
+	resolved := s.resolve(schema)
+	if resolved == nil {
 		return "{\n  \"message\": \"{{ faker.Word }}\"\n}\n"
 	}
-	v := schemaValue(s)
+	v := s.schemaValue(resolved)
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return "{\n  \"message\": \"{{ faker.Word }}\"\n}\n"
@@ -247,9 +298,15 @@ func schemaToTemplate(s *jsonSchema) string {
 // schemaValue converts a JSON schema into a Go value tree where strings are
 // faker template expressions (quoted) and objects/arrays recurse. Integer
 // values use a sentinel that is replaced post-marshal with an unquoted
-// template expression.
-func schemaValue(s *jsonSchema) any {
-	switch s.Type {
+// template expression. $ref pointers in nested schemas are resolved against
+// the spec's components/schemas.
+func (s *openapiSpec) schemaValue(sc *jsonSchema) any {
+	// Resolve top-level ref.
+	resolved := s.resolve(sc)
+	if resolved == nil {
+		return "{{ faker.Word }}"
+	}
+	switch resolved.Type {
 	case "string":
 		return "{{ faker.Word }}"
 	case "integer", "number":
@@ -257,20 +314,20 @@ func schemaValue(s *jsonSchema) any {
 	case "boolean":
 		return false
 	case "array":
-		if s.Items != nil {
-			return []any{schemaValue(s.Items)}
+		if resolved.Items != nil {
+			return []any{s.schemaValue(resolved.Items)}
 		}
 		return []any{}
 	default: // "object" or unspecified
-		if len(s.Properties) == 0 {
+		if len(resolved.Properties) == 0 {
 			return "{{ faker.Word }}"
 		}
-		obj := make(map[string]any, len(s.Properties))
-		for k, prop := range s.Properties {
+		obj := make(map[string]any, len(resolved.Properties))
+		for k, prop := range resolved.Properties {
 			if prop == nil {
 				obj[k] = "{{ faker.Word }}"
 			} else {
-				obj[k] = schemaValue(prop)
+				obj[k] = s.schemaValue(prop)
 			}
 		}
 		return obj

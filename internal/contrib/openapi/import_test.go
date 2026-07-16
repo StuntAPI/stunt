@@ -202,3 +202,143 @@ func TestImportParameterizedPathConversion(t *testing.T) {
 	}
 	t.Fatal("parameterized endpoint /users/{userId} not found")
 }
+
+// --- I1: null path item does not panic ---
+
+func TestImportNullPathItemNoPanic(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapterYAML(t, dir, "null-path-test")
+
+	// A spec where /users has a valid operation but /products is explicitly null.
+	spec := []byte(`{
+  "openapi": "3.0.0",
+  "info": {"title": "Null Path", "version": "1.0.0"},
+  "paths": {
+    "/users": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "name": { "type": "string" } } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/products": null
+  }
+}`)
+
+	// Must not panic.
+	if err := openapi.Import(spec, dir); err != nil {
+		t.Fatalf("Import with null path item: %v", err)
+	}
+
+	// /users endpoint should still be generated.
+	if _, err := os.Stat(filepath.Join(dir, "endpoints", "get_users.yaml")); err != nil {
+		t.Errorf("expected get_users.yaml endpoint: %v", err)
+	}
+}
+
+// --- I4: $ref in response schemas is resolved ---
+
+func TestImportResolvesRefResponseSchema(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapterYAML(t, dir, "ref-test")
+
+	spec := []byte(`{
+  "openapi": "3.0.0",
+  "info": {"title": "Ref API", "version": "1.0.0"},
+  "paths": {
+    "/pets": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Pet" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Pet": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "species": { "type": "string" }
+        }
+      }
+    }
+  }
+}`)
+
+	if err := openapi.Import(spec, dir); err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+
+	tmpl, err := os.ReadFile(filepath.Join(dir, "templates", "get_pets.json"))
+	if err != nil {
+		t.Fatalf("read template: %v", err)
+	}
+	s := string(tmpl)
+
+	// The body should match the referenced schema's structure.
+	for _, key := range []string{"id", "name", "species"} {
+		if !strings.Contains(s, key) {
+			t.Errorf("template should contain key %q from $ref-resolved schema, got: %s", key, s)
+		}
+	}
+	// Should not be a generic fallback body.
+	if strings.Contains(s, "message") {
+		t.Errorf("template should not be generic fallback, got: %s", s)
+	}
+}
+
+// --- I4: unresolvable $ref produces generic body, not panic ---
+
+func TestImportUnresolvableRefProducesGenericBody(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapterYAML(t, dir, "bad-ref-test")
+
+	spec := []byte(`{
+  "openapi": "3.0.0",
+  "info": {"title": "Bad Ref API", "version": "1.0.0"},
+  "paths": {
+    "/things": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/NonExistent" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`)
+
+	if err := openapi.Import(spec, dir); err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+
+	tmpl, err := os.ReadFile(filepath.Join(dir, "templates", "get_things.json"))
+	if err != nil {
+		t.Fatalf("read template: %v", err)
+	}
+	s := string(tmpl)
+	// Should produce a generic synthetic body, not panic or crash.
+	if !strings.Contains(s, "faker") {
+		t.Errorf("template should contain faker expression even for unresolvable ref, got: %s", s)
+	}
+}

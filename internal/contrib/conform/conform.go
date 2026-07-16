@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/stunt-adapters/stunt/internal/engine"
 	"github.com/stunt-adapters/stunt/internal/manifest"
@@ -35,6 +36,10 @@ type Options struct {
 	// default (false), only the JSON shape (keys, nesting, types) is compared
 	// since the simulator produces synthetic values.
 	Strict bool
+	// ClientTimeout is the per-request timeout. If zero, a default of 10s is
+	// used. This prevents a hanging handler from blocking the conform run
+	// indefinitely.
+	ClientTimeout time.Duration
 }
 
 // Trace is a single recorded request/response pair from a real session.
@@ -117,9 +122,13 @@ func Run(ctx context.Context, adapterDir, tracesPath string, opts Options) (*Rep
 	baseURL := addrs["sut"]
 
 	report := &Report{Total: len(traces)}
-	client := &http.Client{}
+	timeout := opts.ClientTimeout
+	if timeout == 0 {
+		timeout = 10 * time.Second
+	}
+	client := &http.Client{Timeout: timeout}
 	for _, tr := range traces {
-		mismatch := replay(client, baseURL, tr, opts)
+		mismatch := replay(ctx, client, baseURL, tr, opts)
 		if mismatch == nil {
 			report.Matched++
 		} else {
@@ -130,7 +139,7 @@ func Run(ctx context.Context, adapterDir, tracesPath string, opts Options) (*Rep
 }
 
 // replay fires a single trace's request at baseURL and compares the response.
-func replay(client *http.Client, baseURL string, tr Trace, opts Options) *Mismatch {
+func replay(ctx context.Context, client *http.Client, baseURL string, tr Trace, opts Options) *Mismatch {
 	reqDesc := fmt.Sprintf("%s %s", tr.Request.Method, tr.Request.Path)
 
 	url := baseURL + tr.Request.Path
@@ -144,7 +153,7 @@ func replay(client *http.Client, baseURL string, tr Trace, opts Options) *Mismat
 		bodyReader = bytes.NewReader(tr.Request.Body)
 	}
 
-	req, err := http.NewRequest(method, url, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
 	if err != nil {
 		return &Mismatch{Request: reqDesc, Reason: fmt.Sprintf("build request: %v", err)}
 	}

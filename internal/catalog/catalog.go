@@ -151,7 +151,9 @@ func (r *RemoteIndex) fetch(ctx context.Context) ([]Entry, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("catalog: HTTP %d from %s", resp.StatusCode, r.url)
 	}
-	body, err := io.ReadAll(resp.Body)
+	// Cap the response body at 10 MiB to prevent unbounded memory use from a
+	// malicious or buggy index endpoint.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20))
 	if err != nil {
 		return nil, err
 	}

@@ -14,8 +14,11 @@ import (
 
 // SafeName generates a filesystem-safe name from an HTTP method and path.
 // Example: ("GET", "/users/{userId}") -> "get_users_userid".
+// Path separators (forward and back slashes) are replaced with underscores
+// to prevent directory traversal in derived filenames on any OS.
 func SafeName(method, path string) string {
 	p := strings.Trim(path, "/")
+	p = strings.ReplaceAll(p, "\\", "_") // sanitize backslashes (Windows path traversal)
 	p = strings.ReplaceAll(p, "/", "_")
 	p = strings.ReplaceAll(p, "{", "")
 	p = strings.ReplaceAll(p, "}", "")
