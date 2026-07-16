@@ -11,7 +11,9 @@ func NewRootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	root.PersistentFlags().String("manifest", defaultManifestPath, "path to stunt.yaml")
 	root.AddCommand(newVersionCmd())
+	root.AddCommand(newPlanCmd())
 	return root
 }
 
