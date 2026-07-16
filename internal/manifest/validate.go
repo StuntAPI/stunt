@@ -2,8 +2,14 @@ package manifest
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 )
+
+// validNameRe matches safe DNS-label-like names: letters, digits, dots,
+// underscores, and hyphens. This prevents injection of newlines or other
+// special characters into hosts files and generated configs (C1).
+var validNameRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 
 // Validate checks structural invariants. Returns a multi-line error on failure.
 func Validate(m *Manifest) error {
@@ -30,6 +36,17 @@ func Validate(m *Manifest) error {
 	default:
 		return fmt.Errorf("manifest: network.mode %q not supported (use 'port' or 'subdomain')", m.Network.Mode)
 	}
+	// Validate TLD for subdomain mode (C1: prevent injection).
+	if m.Network.Mode == "subdomain" {
+		tld := m.Network.TLD
+		if tld == "" {
+			tld = "localhost"
+		}
+		if !validNameRe.MatchString(tld) {
+			return fmt.Errorf("manifest: network.tld %q contains invalid characters (allowed: letters, digits, dots, underscores, hyphens)", tld)
+		}
+	}
+
 	// Deterministic order for stable errors.
 	names := make([]string, 0, len(m.Services))
 	for n := range m.Services {
@@ -37,6 +54,10 @@ func Validate(m *Manifest) error {
 	}
 	sort.Strings(names)
 	for _, n := range names {
+		// Validate service name (C1: prevent injection into hosts/configs).
+		if !validNameRe.MatchString(n) {
+			return fmt.Errorf("manifest: service name %q contains invalid characters (allowed: letters, digits, dots, underscores, hyphens)", n)
+		}
 		s := m.Services[n]
 		// A service must declare at least one of an adapter or rules.
 		if s.Adapter == "" && len(s.Rules) == 0 {

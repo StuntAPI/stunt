@@ -2,9 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/stunt-adapters/stunt/internal/netutil"
@@ -150,6 +152,7 @@ func generateServiceUnit(name, exe, manifestPath string) (ServiceUnit, error) {
 }
 
 // generateLaunchdPlist builds a macOS launchd plist for the stunt proxy.
+// Paths are XML-escaped to prevent injection (I4).
 func generateLaunchdPlist(label, exe, manifestPath string) string {
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -172,10 +175,11 @@ func generateLaunchdPlist(label, exe, manifestPath string) string {
     <true/>
 </dict>
 </plist>
-`, label, exe, manifestPath)
+`, html.EscapeString(label), html.EscapeString(exe), html.EscapeString(manifestPath))
 }
 
 // generateSystemdUnit builds a systemd unit file for the stunt proxy.
+// Paths are quoted for systemd ExecStart parsing (I3).
 func generateSystemdUnit(label, exe, manifestPath string) string {
 	return fmt.Sprintf(`[Unit]
 Description=stunt TLS proxy
@@ -187,11 +191,19 @@ Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
-`, exe, manifestPath)
+`, systemdQuote(exe), systemdQuote(manifestPath))
+}
+
+// systemdQuote wraps a path in double quotes and escapes backslashes and
+// double quotes, following systemd ExecStart quoting rules (I3).
+func systemdQuote(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "\"", "\\\"")
+	return "\"" + s + "\""
 }
 
 // generateWindowsService builds a Windows Task Scheduler XML for the stunt
-// proxy.
+// proxy. Paths are XML-escaped to prevent injection (I4).
 func generateWindowsService(label, exe, manifestPath string) string {
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-16"?>
 <Task xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
@@ -211,7 +223,7 @@ func generateWindowsService(label, exe, manifestPath string) string {
     </RestartOnFailure>
   </Settings>
 </Task>
-`, exe, manifestPath)
+`, html.EscapeString(exe), html.EscapeString(manifestPath))
 }
 
 // installServiceUnit writes the unit file to the target directory.

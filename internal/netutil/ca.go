@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -58,14 +59,28 @@ const (
 // <dir>/ca-key.pem. The generated root is mkcert-style: a single local CA
 // trusted manually by the developer via `stunt trust`.
 //
+// If only one of the cert/key files exists (partial state), EnsureCA returns
+// an error rather than silently regenerating — a regenerated cert would
+// orphan the old, possibly-trusted certificate. The user should run
+// `stunt clean` to remove the partial state first (I6).
+//
 // ECDSA P-256 is chosen for small, modern certs with fast signing/verification.
 func EnsureCA(dir string) (*CA, error) {
 	certPath := filepath.Join(dir, caCertFile)
 	keyPath := filepath.Join(dir, caKeyFile)
 
+	certExists := fileExists(certPath)
+	keyExists := fileExists(keyPath)
+
 	// If both files exist, load them.
-	if fileExists(certPath) && fileExists(keyPath) {
+	if certExists && keyExists {
 		return loadCA(certPath, keyPath)
+	}
+
+	// Partial state: one file exists without the other. Do NOT silently
+	// regenerate — that would orphan a possibly-trusted cert (I6).
+	if certExists || keyExists {
+		return nil, fmt.Errorf("netutil: partial CA state in %s (cert exists: %v, key exists: %v); run 'stunt clean' to remove the orphaned files and regenerate", dir, certExists, keyExists)
 	}
 
 	return generateCA(certPath, keyPath)
@@ -287,11 +302,11 @@ func trustCommandFor(platform, caPath string) (*exec.Cmd, error) {
 		), nil
 	case "linux-debian":
 		target := "/usr/local/share/ca-certificates/stunt.crt"
-		script := fmt.Sprintf("cp %q %q && update-ca-certificates", caPath, target)
+		script := fmt.Sprintf("cp %s %s && update-ca-certificates", shellQuote(caPath), shellQuote(target))
 		return exec.Command("sh", "-c", script), nil
 	case "linux-rhel":
 		target := "/etc/pki/ca-trust/source/anchors/stunt.crt"
-		script := fmt.Sprintf("cp %q %q && update-ca-trust extract", caPath, target)
+		script := fmt.Sprintf("cp %s %s && update-ca-trust extract", shellQuote(caPath), shellQuote(target))
 		return exec.Command("sh", "-c", script), nil
 	case "windows":
 		return exec.Command("certutil", "-addstore", "-f", "Root", caPath), nil
@@ -317,11 +332,11 @@ func untrustCommandFor(platform, caPath string) (*exec.Cmd, error) {
 		), nil
 	case "linux-debian":
 		target := "/usr/local/share/ca-certificates/stunt.crt"
-		script := fmt.Sprintf("rm -f %q && update-ca-certificates --fresh", target)
+		script := fmt.Sprintf("rm -f %s && update-ca-certificates --fresh", shellQuote(target))
 		return exec.Command("sh", "-c", script), nil
 	case "linux-rhel":
 		target := "/etc/pki/ca-trust/source/anchors/stunt.crt"
-		script := fmt.Sprintf("rm -f %q && update-ca-trust extract", target)
+		script := fmt.Sprintf("rm -f %s && update-ca-trust extract", shellQuote(target))
 		return exec.Command("sh", "-c", script), nil
 	case "windows":
 		return exec.Command("certutil", "-delstore", "Root", caOrg+" Local CA"), nil
@@ -333,6 +348,14 @@ func untrustCommandFor(platform, caPath string) (*exec.Cmd, error) {
 }
 
 // --- internal helpers ---
+
+// shellQuote wraps a string in single quotes for safe use in a POSIX shell
+// command, escaping any embedded single quotes. This prevents command
+// substitution ($(...)), backticks, and other shell metacharacters inside
+// the string from being executed (I1).
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
+}
 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)

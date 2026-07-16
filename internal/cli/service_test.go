@@ -156,3 +156,59 @@ func unitFileNameFor(platform, label string) string {
 		return label
 	}
 }
+
+// --- I3: systemd ExecStart quoting tests ---
+
+func TestSystemdUnitQuoteSpacesInPath(t *testing.T) {
+	unit, err := generateServiceUnitFor("linux-debian", "proxy", "/path with space/stunt", "/home/user with space/stunt.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The ExecStart line should properly quote paths containing spaces.
+	if !strings.Contains(unit.Content, `ExecStart="/path with space/stunt" proxy start --foreground --manifest "/home/user with space/stunt.yaml"`) {
+		t.Errorf("systemd unit should quote paths with spaces:\n%s", unit.Content)
+	}
+}
+
+// --- I4: XML escaping tests ---
+
+func TestLaunchdPlistEscapesXML(t *testing.T) {
+	unit, err := generateServiceUnitFor("darwin", "proxy", "/path<evil/stunt", "/home/user</string><evil/stunt.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The XML should escape < and > characters.
+	if strings.Contains(unit.Content, "<evil") {
+		// This would mean unescaped < in the exe path broke the XML
+		t.Errorf("launchd plist should escape < in paths:\n%s", unit.Content)
+	}
+	// Verify the escaped form is present.
+	if !strings.Contains(unit.Content, "&lt;") {
+		t.Errorf("launchd plist should contain escaped &lt;:\n%s", unit.Content)
+	}
+	// Verify it's still valid XML (try parsing it).
+	if !strings.Contains(unit.Content, "<plist") {
+		t.Errorf("launchd plist should still have <plist> root:\n%s", unit.Content)
+	}
+}
+
+func TestWindowsServiceEscapesXML(t *testing.T) {
+	unit, err := generateServiceUnitFor("windows", "proxy", `C:\path<evil\stunt.exe`, `C:\user</string><evil\stunt.yaml`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The XML should escape < characters.
+	if strings.Contains(unit.Content, "<evil") {
+		t.Errorf("windows XML should escape < in paths:\n%s", unit.Content)
+	}
+	if !strings.Contains(unit.Content, "&lt;") {
+		t.Errorf("windows XML should contain escaped &lt;:\n%s", unit.Content)
+	}
+	// Verify it still has the Task root.
+	if !strings.Contains(unit.Content, "<Task") {
+		t.Errorf("windows XML should still have <Task> root:\n%s", unit.Content)
+	}
+}

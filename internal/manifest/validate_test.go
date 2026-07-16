@@ -39,6 +39,10 @@ func TestValidateErrors(t *testing.T) {
 		{"empty mode", &Manifest{Version: 1, Network: Network{BasePort: 9000}, Services: map[string]Service{"x": {}}}},
 		{"zero base_port", &Manifest{Version: 1, Network: Network{Mode: "port"}, Services: map[string]Service{"x": {}}}},
 		{"service without adapter or rules", &Manifest{Version: 1, Network: Network{Mode: "port", BasePort: 9000}, Services: map[string]Service{"x": {}}}},
+		{"bad service name (newline)", &Manifest{Version: 1, Network: Network{Mode: "port", BasePort: 9000}, Services: map[string]Service{"ev\nil": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}}},
+		{"bad service name (space)", &Manifest{Version: 1, Network: Network{Mode: "port", BasePort: 9000}, Services: map[string]Service{"ev il": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}}},
+		{"bad TLD (newline)", &Manifest{Version: 1, Network: Network{Mode: "subdomain", TLD: "ev\nil"}, Services: map[string]Service{"x": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}}},
+		{"bad TLD (space)", &Manifest{Version: 1, Network: Network{Mode: "subdomain", TLD: "ev il"}, Services: map[string]Service{"x": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
