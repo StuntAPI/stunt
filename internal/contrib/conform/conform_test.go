@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func writeFile(t *testing.T, dir, rel, content string) {
@@ -305,5 +306,64 @@ endpoints:
 	}
 	if report.Matched != 1 {
 		t.Fatalf("Matched = %d, want 1; mismatches: %+v", report.Matched, report.Mismatched)
+	}
+}
+
+// --- I5: client timeout prevents a hanging handler from blocking forever ---
+
+func TestRunClientTimeoutBounded(t *testing.T) {
+	adapterDir := t.TempDir()
+	writeFile(t, adapterDir, "adapter.yaml", `
+id: slow-endpoint
+name: Slow Endpoint
+endpoints:
+  - route: /slow
+    method: GET
+    rules:
+      - name: slow-ok
+        match: { method: GET, path: /slow }
+        respond:
+          behavior: timeout
+          latency_ms: 10000
+`)
+
+	traces := []byte(
+		`{"request":{"method":"GET","path":"/slow"},"response":{"status":200,"body":{"ok":true}}}` + "\n",
+	)
+	tracesPath := filepath.Join(t.TempDir(), "traces.jsonl")
+	if err := os.WriteFile(tracesPath, traces, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Use a very short client timeout (200ms). The handler sleeps 10s.
+	// Without the timeout, this test would hang for 10s. With the timeout,
+	// Run should return in well under 5s.
+	done := make(chan struct{})
+	var report *Report
+	var runErr error
+	go func() {
+		defer close(done)
+		report, runErr = Run(context.Background(), adapterDir, tracesPath, Options{ClientTimeout: 200 * time.Millisecond})
+	}()
+
+	select {
+	case <-done:
+		// Good — Run returned.
+	case <-time.After(5 * time.Second):
+		t.Fatal("Run did not return within 5s — client timeout not working")
+	}
+
+	if runErr != nil {
+		t.Fatalf("Run: %v", runErr)
+	}
+	if report.Total != 1 {
+		t.Fatalf("Total = %d, want 1", report.Total)
+	}
+	// The slow endpoint should produce a mismatch (request failed due to timeout).
+	if report.Matched != 0 {
+		t.Fatalf("Matched = %d, want 0 (slow endpoint should timeout)", report.Matched)
+	}
+	if len(report.Mismatched) != 1 {
+		t.Fatalf("Mismatches = %d, want 1", len(report.Mismatched))
 	}
 }

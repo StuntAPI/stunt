@@ -50,40 +50,72 @@ func ExitCode(findings []Finding) int {
 	return 0
 }
 
-// Lint scans the adapter directory's fixtures/ and templates/ for content
-// that looks like real recorded data. It returns all findings (which may be
-// empty). A nil error with findings is a successful scan that found issues.
+// Lint scans the adapter directory's fixtures/, templates/, and endpoints/
+// directories (recursively) plus the root adapter.yaml for content that looks
+// like real recorded data. It returns all findings (which may be empty). A
+// nil error with findings is a successful scan that found issues.
 func Lint(dir string) ([]Finding, error) {
 	var findings []Finding
+
+	// Scan convention directories recursively.
 	for _, sub := range scanDirs {
 		subDir := filepath.Join(dir, sub)
-		entries, err := os.ReadDir(subDir)
+		ff, err := scanDirRecursive(dir, subDir)
 		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return nil, fmt.Errorf("lint: read %s: %w", subDir, err)
+			return nil, err
 		}
-		for _, entry := range entries {
-			if entry.IsDir() {
-				continue
-			}
-			if !shouldScan(entry.Name()) {
-				continue
-			}
-			rel := filepath.Join(sub, entry.Name())
-			ff, err := scanFile(rel, filepath.Join(subDir, entry.Name()))
-			if err != nil {
-				return nil, err
-			}
-			findings = append(findings, ff...)
+		findings = append(findings, ff...)
+	}
+
+	// Scan the root adapter.yaml.
+	manifestPath := filepath.Join(dir, "adapter.yaml")
+	if entries, err := os.Stat(manifestPath); err == nil && !entries.IsDir() {
+		ff, err := scanFile("adapter.yaml", manifestPath)
+		if err != nil {
+			return nil, err
 		}
+		findings = append(findings, ff...)
+	}
+
+	return findings, nil
+}
+
+// scanDirRecursive walks dir recursively, scanning all files whose
+// extensions match shouldScan. Findings use paths relative to root.
+func scanDirRecursive(root, dir string) ([]Finding, error) {
+	var findings []Finding
+	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, wErr error) error {
+		if wErr != nil {
+			if os.IsNotExist(wErr) {
+				return nil
+			}
+			return wErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if !shouldScan(path) {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			rel = path
+		}
+		ff, err := scanFile(rel, path)
+		if err != nil {
+			return err
+		}
+		findings = append(findings, ff...)
+		return nil
+	})
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("lint: walk %s: %w", dir, err)
 	}
 	return findings, nil
 }
 
 // scanDirs lists the convention directories Lint inspects.
-var scanDirs = []string{"fixtures", "templates"}
+var scanDirs = []string{"fixtures", "templates", "endpoints"}
 
 // shouldScan reports whether a file should be scanned based on its extension.
 func shouldScan(name string) bool {
@@ -133,6 +165,13 @@ func scanLine(file string, lineNum int, line string) []Finding {
 	findings = append(findings, matchPattern(file, lineNum, literal, reUUID, "literal UUID — use {{ uuid }} instead", SeverityError)...)
 	findings = append(findings, matchPattern(file, lineNum, literal, reProviderID, "provider-style ID — use a faker placeholder instead", SeverityError)...)
 	findings = append(findings, matchPattern(file, lineNum, literal, reCreditCard, "credit-card pattern", SeverityError)...)
+	findings = append(findings, matchPattern(file, lineNum, literal, reGitHubToken, "GitHub token — looks like real data", SeverityError)...)
+	findings = append(findings, matchPattern(file, lineNum, literal, reStripeKey, "Stripe secret key — looks like real data", SeverityError)...)
+	findings = append(findings, matchPattern(file, lineNum, literal, reAWSKey, "AWS access key ID — looks like real data", SeverityError)...)
+	findings = append(findings, matchPattern(file, lineNum, literal, reSlackToken, "Slack token — looks like real data", SeverityError)...)
+	findings = append(findings, matchPattern(file, lineNum, literal, reGoogleKey, "Google API key — looks like real data", SeverityError)...)
+	findings = append(findings, matchPattern(file, lineNum, literal, reJWT, "JWT token — looks like real data", SeverityError)...)
+	findings = append(findings, matchPattern(file, lineNum, literal, rePhone, "phone number — looks like real data", SeverityError)...)
 	findings = append(findings, matchPattern(file, lineNum, literal, reBase64, "long base64 blob — looks like real encoded data", SeverityError)...)
 
 	// JSON-aware checks (PII field names, long string values).
@@ -227,6 +266,7 @@ var piiFields = []string{
 	"token", "access_token", "refresh_token",
 	"private_key",
 	"credit_card", "card_number", "card_cvc", "cvv",
+	"email", "phone", "phone_number",
 }
 
 // truncate shortens s to at most n runes, appending "…" if truncated.
@@ -261,6 +301,31 @@ var reProviderID = regexp.MustCompile(
 // (spaces or hyphens), characteristic of card numbers.
 var reCreditCard = regexp.MustCompile(`\b(?:\d[ \-]?){13,19}\b`)
 
-// reBase64 matches long base64-encoded blobs (60+ chars), characteristic of
+// reGitHubToken matches GitHub personal access tokens and other GitHub tokens.
+// Prefixes: ghp_ (classic PAT), gho_ (OAuth), ghu_ (user-to-server),
+// ghs_ (server-to-server).
+var reGitHubToken = regexp.MustCompile(`\bgh[posu]_[A-Za-z0-9]{16,}\b`)
+
+// reStripeKey matches Stripe secret keys and restricted keys.
+var reStripeKey = regexp.MustCompile(`\bsk_(?:live|test)_[A-Za-z0-9]{16,}\b|\brk_(?:live|test)_[A-Za-z0-9]{16,}\b`)
+
+// reAWSKey matches AWS access key IDs (20 uppercase alphanumeric chars
+// starting with AKIA).
+var reAWSKey = regexp.MustCompile(`\bAKIA[A-Z0-9]{12,}\b`)
+
+// reSlackToken matches Slack tokens (xox[bpoa]-...).
+var reSlackToken = regexp.MustCompile(`\bxox[bpoa]-[A-Za-z0-9-]{10,}\b`)
+
+// reGoogleKey matches Google API keys (AIza...).
+var reGoogleKey = regexp.MustCompile(`\bAIza[A-Za-z0-9_\-]{20,}\b`)
+
+// reJWT matches JWT tokens (header.payload.signature base64 segments).
+var reJWT = regexp.MustCompile(`\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b`)
+
+// rePhone matches phone numbers: sequences of digits with optional + prefix
+// and separators (spaces, hyphens, dots, parentheses), 7–15 digits total.
+var rePhone = regexp.MustCompile(`\+?\(?\d{1,4}\)?[ .\-]?\(?\d{1,4}\)?[ .\-]?\d{3,4}[ .\-]?\d{0,4}`)
+
+// reBase64 matches long base64-encoded blobs (40+ chars), characteristic of
 // real encoded payloads (JWT bodies, certificates, binary blobs).
-var reBase64 = regexp.MustCompile(`[A-Za-z0-9+/]{60,}={0,2}`)
+var reBase64 = regexp.MustCompile(`[A-Za-z0-9+/]{40,}={0,2}`)

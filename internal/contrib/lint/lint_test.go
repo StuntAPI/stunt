@@ -215,6 +215,212 @@ func TestEmptyDir(t *testing.T) {
 		t.Fatalf("Lint on empty dir: %v", err)
 	}
 	if len(findings) != 0 {
-		t.Errorf("expected no findings, got %d", len(findings))
+		t.Errorf("expected no findings, got %d: %+v", len(findings), findings)
+	}
+}
+
+// --- C2: lint scans endpoints/ and adapter.yaml ---
+
+func TestRealDataInEndpointFile(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "endpoints/leaky.yaml",
+		`route: /users
+class: GET
+rules:
+  - name: ok
+    respond:
+      body:
+        inline:
+          email: admin@real-company.com
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "email") {
+		t.Errorf("expected an email finding from endpoints/ file, got: %+v", findings)
+	}
+	if !hasError(findings) {
+		t.Errorf("expected error-severity finding: %+v", findings)
+	}
+}
+
+func TestRealDataInAdapterYAML(t *testing.T) {
+	dir := scaffold(t)
+	// Overwrite adapter.yaml with one containing a real email.
+	writeFile(t, dir, "adapter.yaml",
+		`id: leaky
+name: Leaky
+version: "0.1.0"
+endpoints:
+  - route: /whoami
+    method: GET
+    rules:
+      - name: whoami-ok
+        match: { method: GET, path: /whoami }
+        respond:
+          status: 200
+          body:
+            inline:
+              email: root@realdomain.com
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "email") {
+		t.Errorf("expected an email finding from adapter.yaml, got: %+v", findings)
+	}
+}
+
+// --- I2: lint recurses into subdirectories ---
+
+func TestLintRecursesIntoSubdirs(t *testing.T) {
+	dir := scaffold(t)
+	// A fixture nested in a subdirectory.
+	writeFile(t, dir, "fixtures/v1/users.jsonl",
+		`{"id":"item-1","email":"deep@nested.com"}`+"\n")
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "email") {
+		t.Errorf("expected an email finding from nested fixture, got: %+v", findings)
+	}
+}
+
+// --- I3: common token patterns detected ---
+
+func TestGitHubTokenDetected(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "fixtures/real.jsonl",
+		`{"token":"ghp_1234567890abcdefABCD1234567890abcd"}`+"\n")
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasError(findings) {
+		t.Errorf("expected an error finding for GitHub token, got: %+v", findings)
+	}
+}
+
+func TestStripeKeyDetected(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "fixtures/real.jsonl",
+		`{"secret":"sk_live_1234567890abcdefABCDEF1234567890"}`+"\n")
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasError(findings) {
+		t.Errorf("expected an error finding for Stripe key, got: %+v", findings)
+	}
+}
+
+func TestAWSKeyDetected(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "fixtures/real.jsonl",
+		`{"key":"AKIA1234567890ABCD"}`+"\n")
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasError(findings) {
+		t.Errorf("expected an error finding for AWS key, got: %+v", findings)
+	}
+}
+
+func TestSlackTokenDetected(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "fixtures/real.jsonl",
+		`{"token":"xoxb-1234567890-abcdefghij"}`+"\n")
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasError(findings) {
+		t.Errorf("expected an error finding for Slack token, got: %+v", findings)
+	}
+}
+
+func TestGoogleKeyDetected(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "fixtures/real.jsonl",
+		`{"key":"AIzaSyABCDEFGHIJKLMN0123456789abcd"}`+"\n")
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasError(findings) {
+		t.Errorf("expected an error finding for Google key, got: %+v", findings)
+	}
+}
+
+func TestJWTDetected(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "fixtures/real.jsonl",
+		`{"token":"eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"}`+"\n")
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasError(findings) {
+		t.Errorf("expected an error finding for JWT, got: %+v", findings)
+	}
+}
+
+func TestPhoneNumberDetected(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "fixtures/real.jsonl",
+		`{"phone":"+1-555-123-4567"}`+"\n")
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasError(findings) {
+		t.Errorf("expected an error finding for phone number, got: %+v", findings)
+	}
+}
+
+func TestEmailPIIFieldDetected(t *testing.T) {
+	dir := scaffold(t)
+	// A JSON field named "email" with a literal value (not caught by email
+	// regex because the value is not an email address, but caught by PII
+	// field check).
+	writeFile(t, dir, "fixtures/real.jsonl",
+		`{"email":"some-literal-value"}`+"\n")
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "email") {
+		t.Errorf("expected a PII email field finding, got: %+v", findings)
+	}
+}
+
+func TestPlaceholdersStillNotFlagged(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "fixtures/safe.jsonl",
+		`{"token":"{{ faker.ID "tok" }}","email":"{{ faker.Email }}","id":"{{ uuid }}"}`+"\n")
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	for _, f := range findings {
+		if f.Severity == SeverityError {
+			t.Errorf("placeholder should not be flagged as error: %s:%d %s", f.File, f.Line, f.Message)
+		}
 	}
 }

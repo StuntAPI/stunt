@@ -257,3 +257,28 @@ func TestCacheExpiresAndRefetches(t *testing.T) {
 		t.Errorf("expected 2 server hits after TTL expiry, got %d", hits)
 	}
 }
+
+// --- M2: response body is capped at 10 MiB ---
+
+func TestRemoteFetchCapsLargeBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		// Send more than 10 MiB of data. The fetch should cap it, fail to
+		// parse the truncated JSON, and fall back to the bundled index.
+		w.Write([]byte("["))
+		chunk := []byte(strings.Repeat("x", 4096))
+		for i := 0; i < 3000; i++ {
+			w.Write(chunk)
+		}
+	}))
+	defer srv.Close()
+
+	idx := NewRemoteIndexWithClient(srv.URL, srv.Client(), time.Minute)
+	results, err := idx.Search(context.Background(), "")
+	if err != nil {
+		t.Fatalf("Search should fall back to bundled on truncated body: %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("expected bundled entries as fallback after truncated fetch")
+	}
+}

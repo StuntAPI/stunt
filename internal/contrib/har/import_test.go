@@ -152,3 +152,132 @@ func TestImportHARResponseStatusPreserved(t *testing.T) {
 	}
 	t.Fatal("POST /users endpoint not found")
 }
+
+// --- C1: path parameterization prevents real ID/token leakage ---
+
+// harWithRealIDs returns a HAR with URLs containing real-looking IDs/tokens
+// in the path: a numeric segment, a Stripe-style charge ID, and a UUID.
+func harWithRealIDs() []byte {
+	return []byte(`{
+  "log": {
+    "version": "1.2",
+    "entries": [
+      {
+        "request": {
+          "method": "GET",
+          "url": "https://api.example.com/users/real-user-42/orders"
+        },
+        "response": {
+          "status": 200,
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"ok\":true}"
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "url": "https://api.example.com/v1/charges/ch_realtoken"
+        },
+        "response": {
+          "status": 200,
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"amount\":5000}"
+          }
+        }
+      },
+      {
+        "request": {
+          "method": "GET",
+          "url": "https://api.example.com/users/550e8400-e29b-41d4-a716-446655440000/profile"
+        },
+        "response": {
+          "status": 200,
+          "content": {
+            "mimeType": "application/json",
+            "text": "{\"name\":\"x\"}"
+          }
+        }
+      }
+    ]
+  }
+}`)
+}
+
+func TestImportHARParameterizesRealPathIDs(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapterYAML(t, dir, "har-param")
+
+	if err := har.Import(harWithRealIDs(), dir); err != nil {
+		t.Fatalf("Import: %v", err)
+	}
+
+	// Load the adapter and verify routes are parameterized.
+	a, err := adapter.Load(dir)
+	if err != nil {
+		t.Fatalf("adapter.Load: %v", err)
+	}
+
+	wantRoutes := map[string]bool{
+		"/users/{id}/orders":     false,
+		"/v1/charges/{id}":      false,
+		"/users/{id}/profile":   false,
+	}
+	for _, ep := range a.Endpoints {
+		if _, ok := wantRoutes[ep.Route]; ok {
+			wantRoutes[ep.Route] = true
+		}
+	}
+	for route, found := range wantRoutes {
+		if !found {
+			t.Errorf("expected parameterized route %q in endpoints", route)
+		}
+	}
+
+	// Collect ALL files under dir recursively.
+	var allFiles []string
+	err = filepath.WalkDir(dir, func(path string, d os.DirEntry, wErr error) error {
+		if wErr != nil {
+			return wErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		allFiles = append(allFiles, path)
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk: %v", err)
+	}
+
+	// The real IDs/tokens must NOT appear in ANY file content.
+	realValues := []string{
+		"real-user-42",
+		"ch_realtoken",
+		"550e8400-e29b-41d4-a716-446655440000",
+	}
+	for _, real := range realValues {
+		for _, fpath := range allFiles {
+			data, rErr := os.ReadFile(fpath)
+			if rErr != nil {
+				t.Fatalf("read %s: %v", fpath, rErr)
+			}
+			if strings.Contains(string(data), real) {
+				rel, _ := filepath.Rel(dir, fpath)
+				t.Errorf("real value %q found in file %s — must be parameterized", real, rel)
+			}
+		}
+	}
+
+	// The real IDs must NOT appear in any filename (path).
+	for _, real := range realValues {
+		for _, fpath := range allFiles {
+			rel, _ := filepath.Rel(dir, fpath)
+			if strings.Contains(rel, real) {
+				t.Errorf("real value %q found in filename %s — must be parameterized", real, rel)
+			}
+		}
+	}
+}
