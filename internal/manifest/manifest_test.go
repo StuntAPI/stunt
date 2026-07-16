@@ -30,3 +30,27 @@ func TestLoadBasic(t *testing.T) {
 		t.Fatal("rule[0] body.inline missing")
 	}
 }
+
+func TestNetworkDefaults(t *testing.T) {
+	t.Run("subdomain defaults tld", func(t *testing.T) {
+		n := &Network{Mode: "subdomain"}
+		n.Defaults()
+		if n.TLD != "localhost" {
+			t.Errorf("TLD = %q, want %q", n.TLD, "localhost")
+		}
+	})
+	t.Run("subdomain keeps explicit tld", func(t *testing.T) {
+		n := &Network{Mode: "subdomain", TLD: "test"}
+		n.Defaults()
+		if n.TLD != "test" {
+			t.Errorf("TLD = %q, want %q", n.TLD, "test")
+		}
+	})
+	t.Run("port mode no defaults", func(t *testing.T) {
+		n := &Network{Mode: "port", BasePort: 8000}
+		n.Defaults()
+		if n.TLD != "" {
+			t.Errorf("TLD = %q, want empty for port mode", n.TLD)
+		}
+	})
+}

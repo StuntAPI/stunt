@@ -19,11 +19,16 @@ func Validate(m *Manifest) error {
 	if m.Network.Mode == "" {
 		return fmt.Errorf("manifest: network.mode is required")
 	}
-	if m.Network.Mode != "port" {
-		return fmt.Errorf("manifest: network.mode %q not supported in this build (use 'port')", m.Network.Mode)
-	}
-	if m.Network.BasePort <= 0 {
-		return fmt.Errorf("manifest: network.base_port must be > 0")
+	switch m.Network.Mode {
+	case "port":
+		if m.Network.BasePort <= 0 {
+			return fmt.Errorf("manifest: network.base_port must be > 0 for port mode")
+		}
+	case "subdomain":
+		// base_port is optional in subdomain mode; the engine auto-binds to
+		// a free high port and the proxy listens on the configured --port.
+	default:
+		return fmt.Errorf("manifest: network.mode %q not supported (use 'port' or 'subdomain')", m.Network.Mode)
 	}
 	// Deterministic order for stable errors.
 	names := make([]string, 0, len(m.Services))
