@@ -2,14 +2,16 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/stunt-adapters/stunt/internal/contrib"
+	"github.com/stunt-adapters/stunt/internal/contrib/openapi"
 )
 
-// newAdapterCmd creates the "adapter" parent command group. Future subcommands
-// (import, lint, test) are added under here.
+// newAdapterCmd creates the "adapter" parent command group. Subcommands:
+// new (scaffold), import (openapi, har).
 func newAdapterCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "adapter",
@@ -21,7 +23,51 @@ adapter.yaml manifest plus convention directories (endpoints/, templates/,
 fixtures/, scripts/, schemas/).`,
 	}
 	cmd.AddCommand(newAdapterNewCmd())
+	cmd.AddCommand(newAdapterImportCmd())
 	return cmd
+}
+
+func newAdapterImportCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "import",
+		Short: "Import API specs into an adapter",
+		Long: `Import external API specifications (OpenAPI, HAR) into an existing stunt
+adapter. All imported data is synthesized — no real API data is copied.`,
+	}
+	cmd.PersistentFlags().String("dir", ".", "adapter directory to import into")
+	cmd.AddCommand(newAdapterImportOpenapiCmd())
+	return cmd
+}
+
+func newAdapterImportOpenapiCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "openapi <spec.yaml|json>",
+		Short: "Import an OpenAPI 3.x spec",
+		Long: `Import an OpenAPI 3.x specification (JSON or YAML). For each operation a
+synthetic endpoint and template are generated. Response bodies use faker
+expressions — no real API data is included.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir, _ := cmd.Flags().GetString("dir")
+			return runImportOpenapi(cmd.OutOrStdout(), args[0], dir)
+		},
+	}
+}
+
+func runImportOpenapi(out interface{ Write([]byte) (int, error) }, specPath, dir string) error {
+	data, err := os.ReadFile(specPath)
+	if err != nil {
+		return fmt.Errorf("read spec %s: %w", specPath, err)
+	}
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("resolve dir: %w", err)
+	}
+	if err := openapi.Import(data, absDir); err != nil {
+		return err
+	}
+	fmt.Fprintf(out, "imported OpenAPI spec into %s\n", absDir)
+	return nil
 }
 
 func newAdapterNewCmd() *cobra.Command {

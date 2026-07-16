@@ -76,6 +76,63 @@ func TestNewAdapterNewCmdForce(t *testing.T) {
 	}
 }
 
+func TestAdapterImportOpenapiCmd(t *testing.T) {
+	dir := t.TempDir()
+
+	// Scaffold an adapter first.
+	if err := runAdapterNew(&bytes.Buffer{}, dir, "myapi", false); err != nil {
+		t.Fatalf("scaffold: %v", err)
+	}
+	adapterDir := filepath.Join(dir, "myapi")
+
+	// Write a small OpenAPI spec.
+	specPath := filepath.Join(dir, "spec.json")
+	spec := `{"openapi":"3.0.0","paths":{"/users":{"get":{"responses":{"200":{"content":{"application/json":{"schema":{"type":"object","properties":{"name":{"type":"string"}}}}}}}}}}}`
+	if err := os.WriteFile(specPath, []byte(spec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := runImportOpenapi(&out, specPath, adapterDir); err != nil {
+		t.Fatalf("runImportOpenapi: %v", err)
+	}
+
+	// Endpoint and template files should exist.
+	if _, err := os.Stat(filepath.Join(adapterDir, "endpoints", "get_users.yaml")); err != nil {
+		t.Errorf("endpoint file not created: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(adapterDir, "templates", "get_users.json")); err != nil {
+		t.Errorf("template file not created: %v", err)
+	}
+
+	// adapter.yaml should load with the imported endpoint.
+	a, err := adapter.Load(adapterDir)
+	if err != nil {
+		t.Fatalf("adapter.Load: %v", err)
+	}
+	found := false
+	for _, ep := range a.Endpoints {
+		if ep.Route == "/users" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("imported endpoint /users not found in adapter.yaml")
+	}
+}
+
+func TestAdapterImportSubcommandRegistered(t *testing.T) {
+	root := NewRootCmd()
+	cmd, _, err := root.Find([]string{"adapter", "import", "openapi"})
+	if err != nil {
+		t.Fatalf("could not find 'adapter import openapi': %v", err)
+	}
+	if cmd.Name() != "openapi" {
+		t.Fatalf("command name = %q, want %q", cmd.Name(), "openapi")
+	}
+}
+
 func TestAdapterParentCommandHasSubcommands(t *testing.T) {
 	root := NewRootCmd()
 	adapterCmd, _, err := root.Find([]string{"adapter"})
