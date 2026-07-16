@@ -74,3 +74,37 @@ func TestEvaluateBodyTemplate(t *testing.T) {
 		t.Fatalf("template not rendered into body: %q", s)
 	}
 }
+
+func TestEvaluateWhenExprTrue(t *testing.T) {
+	rules := []Rule{
+		{Match: Match{Path: "/x"}, When: &When{Expr: "request.body.amount > 1000"}, Respond: Respond{Status: 200, Body: &Body{Inline: "big"}}},
+		{Match: Match{Path: "/x"}, Respond: Respond{Status: 200, Body: &Body{Inline: "small"}}},
+	}
+	d := Evaluate(Request{Path: "/x", Body: []byte(`{"amount":5000}`)}, rules, NewRNG(1), NewFaker(1), "")
+	if string(d.BodyBytes) != `"big"` {
+		t.Fatalf("expr-true should match first rule; got %q", d.BodyBytes)
+	}
+}
+
+func TestEvaluateWhenExprFalse(t *testing.T) {
+	rules := []Rule{
+		{Match: Match{Path: "/x"}, When: &When{Expr: "request.body.amount > 1000"}, Respond: Respond{Status: 200, Body: &Body{Inline: "big"}}},
+		{Match: Match{Path: "/x"}, Respond: Respond{Status: 200, Body: &Body{Inline: "small"}}},
+	}
+	d := Evaluate(Request{Path: "/x", Body: []byte(`{"amount":50}`)}, rules, NewRNG(1), NewFaker(1), "")
+	if string(d.BodyBytes) != `"small"` {
+		t.Fatalf("expr-false should fall through; got %q", d.BodyBytes)
+	}
+}
+
+func TestEvaluateChanceAndExprCombine(t *testing.T) {
+	// chance 100 + expr true -> fires
+	rules := []Rule{
+		{Match: Match{Path: "/x"}, When: &When{Chance: 100, Expr: "request.method == \"POST\""}, Respond: Respond{Status: 200, Body: &Body{Inline: "hit"}}},
+		{Match: Match{Path: "/x"}, Respond: Respond{Status: 200, Body: &Body{Inline: "miss"}}},
+	}
+	d := Evaluate(Request{Method: "POST", Path: "/x"}, rules, NewRNG(1), NewFaker(1), "")
+	if string(d.BodyBytes) != `"hit"` {
+		t.Fatalf("chance+expr both pass should fire; got %q", d.BodyBytes)
+	}
+}
