@@ -230,6 +230,65 @@ func TestAdapterLintSubcommandRegistered(t *testing.T) {
 	}
 }
 
+func TestAdapterTestSubcommandRegistered(t *testing.T) {
+	root := NewRootCmd()
+	cmd, _, err := root.Find([]string{"adapter", "test"})
+	if err != nil {
+		t.Fatalf("could not find 'adapter test': %v", err)
+	}
+	if cmd.Name() != "test" {
+		t.Fatalf("command name = %q, want %q", cmd.Name(), "test")
+	}
+}
+
+func TestRunAdapterTestHighScore(t *testing.T) {
+	// Scaffold a clean adapter.
+	root := filepath.Join(t.TempDir(), "conf")
+	if err := runAdapterNew(&bytes.Buffer{}, filepath.Dir(root), filepath.Base(root), false); err != nil {
+		t.Fatalf("scaffold: %v", err)
+	}
+
+	// Write traces that match the scaffolded /hello endpoint.
+	tracesPath := filepath.Join(t.TempDir(), "traces.jsonl")
+	traces := `{"request":{"method":"GET","path":"/hello"},"response":{"status":200,"body":{"message":"hello from stunt"}}}` + "\n"
+	if err := os.WriteFile(tracesPath, []byte(traces), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := runAdapterTest(&out, root, tracesPath, false); err != nil {
+		t.Fatalf("runAdapterTest: %v", err)
+	}
+	outStr := out.String()
+	if !strings.Contains(outStr, "100%") {
+		t.Errorf("expected 100%% score, got: %q", outStr)
+	}
+}
+
+func TestRunAdapterTestLowScore(t *testing.T) {
+	// Scaffold a clean adapter.
+	root := filepath.Join(t.TempDir(), "conf")
+	if err := runAdapterNew(&bytes.Buffer{}, filepath.Dir(root), filepath.Base(root), false); err != nil {
+		t.Fatalf("scaffold: %v", err)
+	}
+
+	// Write a trace that hits an unimplemented endpoint.
+	tracesPath := filepath.Join(t.TempDir(), "traces.jsonl")
+	traces := `{"request":{"method":"GET","path":"/missing"},"response":{"status":200,"body":{"data":"ok"}}}` + "\n"
+	if err := os.WriteFile(tracesPath, []byte(traces), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := runAdapterTest(&out, root, tracesPath, false); err != nil {
+		t.Fatalf("runAdapterTest: %v", err)
+	}
+	outStr := out.String()
+	if !strings.Contains(outStr, "0%") {
+		t.Errorf("expected 0%% score, got: %q", outStr)
+	}
+}
+
 func TestRunAdapterLintClean(t *testing.T) {
 	// Scaffold a clean adapter.
 	root := filepath.Join(t.TempDir(), "clean")

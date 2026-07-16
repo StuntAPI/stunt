@@ -1,19 +1,21 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/stunt-adapters/stunt/internal/contrib"
+	"github.com/stunt-adapters/stunt/internal/contrib/conform"
 	"github.com/stunt-adapters/stunt/internal/contrib/har"
 	"github.com/stunt-adapters/stunt/internal/contrib/lint"
 	"github.com/stunt-adapters/stunt/internal/contrib/openapi"
 )
 
 // newAdapterCmd creates the "adapter" parent command group. Subcommands:
-// new (scaffold), import (openapi, har).
+// new (scaffold), import (openapi, har), lint, test.
 func newAdapterCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "adapter",
@@ -27,6 +29,7 @@ fixtures/, scripts/, schemas/).`,
 	cmd.AddCommand(newAdapterNewCmd())
 	cmd.AddCommand(newAdapterImportCmd())
 	cmd.AddCommand(newAdapterLintCmd())
+	cmd.AddCommand(newAdapterTestCmd())
 	return cmd
 }
 
@@ -99,6 +102,41 @@ If no directory is given, the current directory is used.`,
 	return cmd
 }
 
+func newAdapterTestCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "test [dir]",
+		Short: "Replay local traces against the adapter and check conformance",
+		Long: `Test replays recorded real traces against a locally-running instance of the
+adapter and compares the simulator's responses to the recorded expected
+responses. By default only the JSON structure (keys, nesting, types) is
+compared — values may differ since the simulator produces synthetic data.
+Use --strict to compare exact values.
+
+The traces file is a JSONL of {"request":{method,path,headers,body},
+"response":{status,body}} pairs from your own real session. The traces stay
+local — they are NOT added to the adapter.
+
+If no directory is given, the current directory is used. If --traces is not
+given, the default is traces.jsonl in the adapter directory.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir := "."
+			if len(args) > 0 {
+				dir = args[0]
+			}
+			traces, _ := cmd.Flags().GetString("traces")
+			strict, _ := cmd.Flags().GetBool("strict")
+			return runAdapterTest(cmd.OutOrStdout(), dir, traces, strict)
+		},
+	}
+	cmd.Flags().String("traces", "", "path to traces JSONL file (default: <dir>/traces.jsonl)")
+	cmd.Flags().Bool("strict", false, "compare exact values instead of structure")
+	return cmd
+}
+
+// runAdapterLint scans an adapter dir for real data and prints findings.
+// Returns a non-nil error (with a clear message) when error-severity findings
+// are detected, so the CLI exits non-zero.
 func runAdapterLint(out interface{ Write([]byte) (int, error) }, dir string) error {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
@@ -119,6 +157,30 @@ func runAdapterLint(out interface{ Write([]byte) (int, error) }, dir string) err
 		return fmt.Errorf("lint found real data — fix the errors above before committing")
 	default:
 		fmt.Fprintf(out, "\n%d warning(s) — review to confirm data is synthetic\n", len(findings))
+	}
+	return nil
+}
+
+// runAdapterTest replays traces against the adapter and prints a conformance
+// report with a score.
+func runAdapterTest(out interface{ Write([]byte) (int, error) }, dir, tracesPath string, strict bool) error {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("resolve dir: %w", err)
+	}
+	if tracesPath == "" {
+		tracesPath = filepath.Join(absDir, "traces.jsonl")
+	}
+
+	report, err := conform.Run(context.Background(), absDir, tracesPath, conform.Options{Strict: strict})
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(out, "conformance: %d/%d traces matched (%.0f%%)\n", report.Matched, report.Total, report.Score())
+	for _, m := range report.Mismatched {
+		fmt.Fprintf(out, "  MISMATCH %s\n    expected: %s\n    got:      %s\n    reason:   %s\n",
+			m.Request, m.Expected, m.Got, m.Reason)
 	}
 	return nil
 }
