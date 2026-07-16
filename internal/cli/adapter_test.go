@@ -133,6 +133,72 @@ func TestAdapterImportSubcommandRegistered(t *testing.T) {
 	}
 }
 
+func TestAdapterImportHarCmd(t *testing.T) {
+	dir := t.TempDir()
+
+	// Scaffold an adapter first.
+	if err := runAdapterNew(&bytes.Buffer{}, dir, "myapi", false); err != nil {
+		t.Fatalf("scaffold: %v", err)
+	}
+	adapterDir := filepath.Join(dir, "myapi")
+
+	// Write a minimal HAR file.
+	harPath := filepath.Join(dir, "capture.har")
+	harData := `{"log":{"entries":[{"request":{"method":"GET","url":"https://api.example.com/items"},"response":{"status":200,"content":{"mimeType":"application/json","text":"{\"name\":\"Real Product\"}"}}}]}}`
+	if err := os.WriteFile(harPath, []byte(harData), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := runImportHar(&out, harPath, adapterDir); err != nil {
+		t.Fatalf("runImportHar: %v", err)
+	}
+
+	// Endpoint and template files should exist.
+	if _, err := os.Stat(filepath.Join(adapterDir, "endpoints", "get_items.yaml")); err != nil {
+		t.Errorf("endpoint file not created: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(adapterDir, "templates", "get_items.json")); err != nil {
+		t.Errorf("template file not created: %v", err)
+	}
+
+	// Verify no real data leaked.
+	tmpl, err := os.ReadFile(filepath.Join(adapterDir, "templates", "get_items.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(tmpl, []byte("Real Product")) {
+		t.Error("real data leaked into template")
+	}
+
+	// adapter.yaml should load with the imported endpoint.
+	a, err := adapter.Load(adapterDir)
+	if err != nil {
+		t.Fatalf("adapter.Load: %v", err)
+	}
+	found := false
+	for _, ep := range a.Endpoints {
+		if ep.Route == "/items" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("imported endpoint /items not found in adapter.yaml")
+	}
+}
+
+func TestAdapterImportHarSubcommandRegistered(t *testing.T) {
+	root := NewRootCmd()
+	cmd, _, err := root.Find([]string{"adapter", "import", "har"})
+	if err != nil {
+		t.Fatalf("could not find 'adapter import har': %v", err)
+	}
+	if cmd.Name() != "har" {
+		t.Fatalf("command name = %q, want %q", cmd.Name(), "har")
+	}
+}
+
 func TestAdapterParentCommandHasSubcommands(t *testing.T) {
 	root := NewRootCmd()
 	adapterCmd, _, err := root.Find([]string{"adapter"})

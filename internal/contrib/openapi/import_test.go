@@ -129,6 +129,13 @@ func TestImportSyntheticBodies(t *testing.T) {
 	if !strings.Contains(s, "false") {
 		t.Error("template should contain false for boolean values")
 	}
+	// Integer property -> faker.Int expression (not a sentinel).
+	if strings.Contains(s, "STUNT_INT") {
+		t.Error("integer sentinel was not replaced with faker expression")
+	}
+	if !strings.Contains(s, "faker.Int") {
+		t.Error("template should contain faker.Int for integer values")
+	}
 	// No real API data — the spec summary "Get user" should NOT appear as a value.
 	if strings.Contains(s, "Get user") {
 		t.Error("template should not contain real data from spec")
