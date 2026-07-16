@@ -49,11 +49,17 @@ curl http://127.0.0.1:8000/hello
 Rules are evaluated first-match-wins, top-to-bottom.
 
 - **match**: `method`, `path` (globs: `*` one segment, `**` zero+ segments), `headers`.
-- **when.chance**: percent probability the rule fires; otherwise evaluation
-  falls through to the next rule (deterministic via `rng_seed`).
-- **respond**: `status`, `headers`, `body` (`inline` literal or `file` path,
-  relative to the manifest), `latency_ms`, and `behavior: timeout`
-  (hold then close the connection to simulate a timeout).
+- **when**: gates whether a matched rule fires. Both may be combined (both must pass):
+  - `when.chance`: percent probability the rule fires; otherwise evaluation falls through.
+  - `when.expr`: a boolean expression over `request.*` (`method`, `path`, `headers`, `body`), e.g. `request.body.amount > 1000`.
+- **respond**: `status`, `headers`, `latency_ms`, `behavior: timeout`, and `body`:
+  - `body.inline`: a literal value (rendered as JSON).
+  - `body.file`: a static file path (relative to the manifest).
+  - `body.template`: a `text/template` string rendered with `{{ .Request.* }}`,
+    `{{ faker.ID "ch" }}` / `{{ faker.Email }}` / `{{ faker.Name }}`,
+    `{{ uuid }}`, and `{{ now }}`. Deterministic via `rng_seed`.
+
+Everything is deterministic given `rng_seed`.
 
 ## Roadmap
 
