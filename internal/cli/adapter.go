@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/stunt-adapters/stunt/internal/contrib"
 	"github.com/stunt-adapters/stunt/internal/contrib/har"
+	"github.com/stunt-adapters/stunt/internal/contrib/lint"
 	"github.com/stunt-adapters/stunt/internal/contrib/openapi"
 )
 
@@ -25,6 +26,7 @@ fixtures/, scripts/, schemas/).`,
 	}
 	cmd.AddCommand(newAdapterNewCmd())
 	cmd.AddCommand(newAdapterImportCmd())
+	cmd.AddCommand(newAdapterLintCmd())
 	return cmd
 }
 
@@ -69,6 +71,56 @@ replaced with faker expressions — no real data is copied.`,
 			return runImportHar(cmd.OutOrStdout(), args[0], dir)
 		},
 	}
+}
+
+func newAdapterLintCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "lint [dir]",
+		Short: "Scan adapter fixtures and templates for real (non-synthetic) data",
+		Long: `Lint scans an adapter's fixtures/ and templates/ for content that looks like
+real recorded data rather than synthetic data: real-looking emails, UUIDs,
+provider-style IDs (cus_, ch_, …), credit-card numbers, long base64 blobs,
+and PII field names with literal values.
+
+Template placeholders ({{ faker.Email }}, {{ uuid }}) are recognized and NOT
+flagged. The command exits non-zero if any error-severity finding is
+detected, so it can be used as a pre-commit/CI guard.
+
+If no directory is given, the current directory is used.`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir := "."
+			if len(args) > 0 {
+				dir = args[0]
+			}
+			return runAdapterLint(cmd.OutOrStdout(), dir)
+		},
+	}
+	return cmd
+}
+
+func runAdapterLint(out interface{ Write([]byte) (int, error) }, dir string) error {
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("resolve dir: %w", err)
+	}
+	findings, err := lint.Lint(absDir)
+	if err != nil {
+		return err
+	}
+	for _, f := range findings {
+		fmt.Fprintf(out, "  %s  %s:%d  %s\n", f.Severity, f.File, f.Line, f.Message)
+	}
+	switch {
+	case len(findings) == 0:
+		fmt.Fprintf(out, "no findings — adapter fixtures and templates look synthetic\n")
+	case lint.ExitCode(findings) != 0:
+		fmt.Fprintf(out, "\n%d finding(s): real data detected — replace with faker placeholders\n", len(findings))
+		return fmt.Errorf("lint found real data — fix the errors above before committing")
+	default:
+		fmt.Fprintf(out, "\n%d warning(s) — review to confirm data is synthetic\n", len(findings))
+	}
+	return nil
 }
 
 func runImportOpenapi(out interface{ Write([]byte) (int, error) }, specPath, dir string) error {

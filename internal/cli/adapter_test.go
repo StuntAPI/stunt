@@ -219,6 +219,62 @@ func TestAdapterParentCommandHasSubcommands(t *testing.T) {
 	}
 }
 
+func TestAdapterLintSubcommandRegistered(t *testing.T) {
+	root := NewRootCmd()
+	cmd, _, err := root.Find([]string{"adapter", "lint"})
+	if err != nil {
+		t.Fatalf("could not find 'adapter lint': %v", err)
+	}
+	if cmd.Name() != "lint" {
+		t.Fatalf("command name = %q, want %q", cmd.Name(), "lint")
+	}
+}
+
+func TestRunAdapterLintClean(t *testing.T) {
+	// Scaffold a clean adapter.
+	root := filepath.Join(t.TempDir(), "clean")
+	if err := runAdapterNew(&bytes.Buffer{}, filepath.Dir(root), filepath.Base(root), false); err != nil {
+		t.Fatalf("scaffold: %v", err)
+	}
+
+	var out bytes.Buffer
+	if err := runAdapterLint(&out, root); err != nil {
+		t.Fatalf("runAdapterLint on clean adapter: %v", err)
+	}
+	outStr := out.String()
+	if !strings.Contains(outStr, "no findings") {
+		t.Errorf("expected 'no findings' message, got: %q", outStr)
+	}
+}
+
+func TestRunAdapterLintDirty(t *testing.T) {
+	// Scaffold a clean adapter then inject a real-looking email.
+	root := filepath.Join(t.TempDir(), "dirty")
+	if err := runAdapterNew(&bytes.Buffer{}, filepath.Dir(root), filepath.Base(root), false); err != nil {
+		t.Fatalf("scaffold: %v", err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(root, "fixtures", "leaked.jsonl"),
+		[]byte(`{"email":"john.doe@acme-corp.com"}`+"\n"),
+		0o644,
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	err := runAdapterLint(&out, root)
+	if err == nil {
+		t.Fatal("expected error from lint on dirty adapter, got nil")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "real data") {
+		t.Errorf("error should mention real data: %v", err)
+	}
+	outStr := out.String()
+	if !strings.Contains(outStr, "email") {
+		t.Errorf("output should mention the email finding: %q", outStr)
+	}
+}
+
 func TestAdapterNewRequiresName(t *testing.T) {
 	root := NewRootCmd()
 	root.SetArgs([]string{"adapter", "new"})
