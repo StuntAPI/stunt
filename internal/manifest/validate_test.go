@@ -13,6 +13,21 @@ func TestValidateOK(t *testing.T) {
 	}
 }
 
+func TestValidateSubdomainOK(t *testing.T) {
+	m := &Manifest{Version: 1, Network: Network{Mode: "subdomain", TLD: "localhost"}, Services: map[string]Service{"x": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}}
+	if err := Validate(m); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateSubdomainBasePortOptional(t *testing.T) {
+	// base_port not required for subdomain mode
+	m := &Manifest{Version: 1, Network: Network{Mode: "subdomain"}, Services: map[string]Service{"x": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}}
+	if err := Validate(m); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateErrors(t *testing.T) {
 	cases := []struct {
 		name string
