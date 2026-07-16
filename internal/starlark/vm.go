@@ -70,7 +70,7 @@ func (vm *VM) Call(handlerName string, req Request) (Response, error) {
 		return Response{}, fmt.Errorf("starlark: %q is not callable", handlerName)
 	}
 
-	reqVal := goToStarlark(map[string]any{
+	reqVal := GoToStarlark(map[string]any{
 		"method":  req.Method,
 		"path":    req.Path,
 		"headers": req.Headers,
@@ -125,7 +125,7 @@ func starlarkToResponse(v sk.Value) (Response, error) {
 			}
 		case "body":
 			if bd, ok := val.(*sk.Dict); ok {
-				resp.Body = starlarkToGo(bd)
+				resp.Body = StarlarkToGo(bd)
 			}
 		case "headers":
 			if hd, ok := val.(*sk.Dict); ok {
@@ -139,10 +139,10 @@ func starlarkToResponse(v sk.Value) (Response, error) {
 
 // --- conversion helpers: Go → Starlark ---
 
-// goToStarlark converts a Go value into the equivalent Starlark value.
+// GoToStarlark converts a Go value into the equivalent Starlark value.
 // Supports string, int, int64, float64, bool, nil, map[string]any, and
 // slices of any of these.
-func goToStarlark(v any) sk.Value {
+func GoToStarlark(v any) sk.Value {
 	switch x := v.(type) {
 	case nil:
 		return sk.None
@@ -159,7 +159,7 @@ func goToStarlark(v any) sk.Value {
 	case map[string]any:
 		d := sk.NewDict(len(x))
 		for k, val := range x {
-			d.SetKey(sk.String(k), goToStarlark(val))
+			d.SetKey(sk.String(k), GoToStarlark(val))
 		}
 		return d
 	case map[string]string:
@@ -171,7 +171,7 @@ func goToStarlark(v any) sk.Value {
 	case []any:
 		elems := make([]sk.Value, len(x))
 		for i, val := range x {
-			elems[i] = goToStarlark(val)
+			elems[i] = GoToStarlark(val)
 		}
 		return sk.NewList(elems)
 	default:
@@ -181,8 +181,8 @@ func goToStarlark(v any) sk.Value {
 
 // --- conversion helpers: Starlark → Go ---
 
-// starlarkToGo converts a Starlark dict into a Go map[string]any.
-func starlarkToGo(d *sk.Dict) map[string]any {
+// StarlarkToGo converts a Starlark dict into a Go map[string]any.
+func StarlarkToGo(d *sk.Dict) map[string]any {
 	out := make(map[string]any, d.Len())
 	for _, item := range d.Items() {
 		key, _ := sk.AsString(item[0])
@@ -206,7 +206,7 @@ func starlarkValueToGo(v sk.Value) any {
 	case sk.Float:
 		return float64(x)
 	case *sk.Dict:
-		return starlarkToGo(x)
+		return StarlarkToGo(x)
 	case *sk.List:
 		out := make([]any, x.Len())
 		for i := range out {
