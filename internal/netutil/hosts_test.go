@@ -433,3 +433,208 @@ func TestSyncHostsSortedEntries(t *testing.T) {
 		t.Errorf("entries not sorted in output:\n%s", content)
 	}
 }
+
+// --- C1: injection validation tests ---
+
+func TestSyncHostsRejectsNewlineInjection(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hosts")
+	writeSeedFile(t, path, "127.0.0.1 localhost\n")
+
+	// A hostname that tries to inject content outside the managed block.
+	evil := "evil\n# END stunt\n0.0.0.0 attacker"
+	err := SyncHosts(path, []HostEntry{{Host: evil}})
+	if err == nil {
+		t.Fatal("SyncHosts should reject hostname with newlines")
+	}
+
+	// The file should be unchanged (nothing written).
+	content := readFile(t, path)
+	if strings.Contains(content, "attacker") {
+		t.Error("injected content leaked into hosts file")
+	}
+	if strings.Contains(content, beginMarker) {
+		t.Error("managed block should not have been written")
+	}
+}
+
+func TestSyncHostsRejectsSpaceInHost(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hosts")
+	writeSeedFile(t, path, "127.0.0.1 localhost\n")
+
+	err := SyncHosts(path, []HostEntry{{Host: "evil host"}})
+	if err == nil {
+		t.Fatal("SyncHosts should reject hostname with spaces")
+	}
+}
+
+func TestSyncHostsRejectsTabInHost(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hosts")
+	err := SyncHosts(path, []HostEntry{{Host: "evil\thost"}})
+	if err == nil {
+		t.Fatal("SyncHosts should reject hostname with tabs")
+	}
+}
+
+func TestSyncHostsValidMultiSegmentHost(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hosts")
+
+	err := SyncHosts(path, []HostEntry{{Host: "api.v2.stripe.localhost"}})
+	if err != nil {
+		t.Fatalf("SyncHosts should accept multi-segment host: %v", err)
+	}
+	content := readFile(t, path)
+	if !strings.Contains(content, "127.0.0.1 api.v2.stripe.localhost") {
+		t.Errorf("missing valid multi-segment entry:\n%s", content)
+	}
+}
+
+func TestSpoofHostsRejectsNewlineInHost(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hosts")
+	writeSeedFile(t, path, "127.0.0.1 localhost\n")
+
+	err := SpoofHosts(path, map[string]string{
+		"evil\n# END stunt\n0.0.0.0 attacker": "127.0.0.1",
+	})
+	if err == nil {
+		t.Fatal("SpoofHosts should reject hostname with newlines")
+	}
+	content := readFile(t, path)
+	if strings.Contains(content, "attacker") {
+		t.Error("injected content leaked into hosts file")
+	}
+}
+
+func TestSpoofHostsRejectsNewlineInIP(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hosts")
+	writeSeedFile(t, path, "127.0.0.1 localhost\n")
+
+	err := SpoofHosts(path, map[string]string{
+		"api.example.com": "127.0.0.1\n# END stunt\n0.0.0.0 attacker",
+	})
+	if err == nil {
+		t.Fatal("SpoofHosts should reject IP with newlines")
+	}
+	content := readFile(t, path)
+	if strings.Contains(content, "attacker") {
+		t.Error("injected content leaked into hosts file")
+	}
+}
+
+// --- I2: atomic write tests ---
+
+func TestAtomicWritePreservesContent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hosts")
+
+	// Write, then read back and verify exact content.
+	entries := []HostEntry{{Host: "svc1.localhost"}, {Host: "svc2.localhost"}}
+	if err := SyncHosts(path, entries); err != nil {
+		t.Fatalf("SyncHosts: %v", err)
+	}
+	content := readFile(t, path)
+
+	// The content should contain both entries and both markers exactly once.
+	if strings.Count(content, beginMarker) != 1 {
+		t.Errorf("expected 1 BEGIN marker, got %d", strings.Count(content, beginMarker))
+	}
+	if strings.Count(content, endMarker) != 1 {
+		t.Errorf("expected 1 END marker, got %d", strings.Count(content, endMarker))
+	}
+
+	// No leftover temp files in the directory.
+	dir := filepath.Dir(path)
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	for _, f := range files {
+		name := f.Name()
+		if strings.HasPrefix(name, ".stunt-hosts-") {
+			t.Errorf("leftover temp file: %s", name)
+		}
+	}
+}
+
+func TestCleanHostsAtomicWrite(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "hosts")
+	writeSeedFile(t, path, "127.0.0.1 localhost\n")
+
+	if err := SyncHosts(path, []HostEntry{{Host: "svc.localhost"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := CleanHosts(path); err != nil {
+		t.Fatal(err)
+	}
+
+	content := readFile(t, path)
+	if strings.Contains(content, "svc.localhost") {
+		t.Error("managed entry survived CleanHosts")
+	}
+	if !strings.Contains(content, "127.0.0.1 localhost") {
+		t.Error("original content lost after CleanHosts")
+	}
+
+	// No leftover temp files.
+	dir := filepath.Dir(path)
+	files, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	for _, f := range files {
+		if strings.HasPrefix(f.Name(), ".stunt-hosts-") {
+			t.Errorf("leftover temp file: %s", f.Name())
+		}
+	}
+}
+
+func TestValidateHost(t *testing.T) {
+	cases := []struct {
+		name    string
+		host    string
+		wantErr bool
+	}{
+		{"empty", "", true},
+		{"space", "foo bar", true},
+		{"tab", "foo\tbar", true},
+		{"newline", "foo\nbar", true},
+		{"carriage-return", "foo\rbar", true},
+		{"valid-simple", "localhost", false},
+		{"valid-dotted", "api.stripe.com", false},
+		{"valid-wildcard", "*.localhost", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := validateHost(c.host)
+			if c.wantErr && err == nil {
+				t.Errorf("validateHost(%q) should have returned error", c.host)
+			}
+			if !c.wantErr && err != nil {
+				t.Errorf("validateHost(%q) returned unexpected error: %v", c.host, err)
+			}
+		})
+	}
+}
+
+func TestValidateIP(t *testing.T) {
+	cases := []struct {
+		name    string
+		ip      string
+		wantErr bool
+	}{
+		{"empty", "", true},
+		{"space", "127.0.0.1 evil", true},
+		{"newline", "127.0.0.1\nevil", true},
+		{"valid-ipv4", "127.0.0.1", false},
+		{"valid-ipv6", "::1", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			err := validateIP(c.ip)
+			if c.wantErr && err == nil {
+				t.Errorf("validateIP(%q) should have returned error", c.ip)
+			}
+			if !c.wantErr && err != nil {
+				t.Errorf("validateIP(%q) returned unexpected error: %v", c.ip, err)
+			}
+		})
+	}
+}

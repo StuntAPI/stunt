@@ -3,9 +3,11 @@ package cli
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"os/signal"
 	"sort"
+	"strconv"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -21,7 +23,7 @@ func newUpCmd() *cobra.Command {
 		Short: "Start all configured services (foreground)",
 		RunE:  runUp,
 	}
-	cmd.Flags().Int("proxy-port", 0, "proxy listen port (subdomain mode only; 0 = use :443 or OS-assigned)")
+	cmd.Flags().Int("proxy-port", 0, "proxy listen port (subdomain mode only; 0 = OS-assigned high port; use stunt setup/service for :443)")
 	cmd.Flags().Bool("no-tls", false, "disable TLS in subdomain mode")
 	return cmd
 }
@@ -96,6 +98,10 @@ func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifes
 	if err != nil {
 		return err
 	}
+	// M9: defer engineShutdown after the error check so the engine is
+	// always closed even on early return.
+	defer engineShutdown()
+
 	// Strip the "http://" prefix to get host:port.
 	engineBackend := engineAddr
 	if len(engineBackend) > 7 && engineBackend[:7] == "http://" {
@@ -110,7 +116,10 @@ func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifes
 	}
 
 	// Determine proxy address.
-	proxyAddr := ":443"
+	// I5: default to ":0" (OS-assigned high port) instead of ":443" so a
+	// non-root user doesn't get a cryptic permission-denied. Using :443
+	// requires `stunt setup`/service.
+	proxyAddr := ":0"
 	if proxyPort > 0 {
 		proxyAddr = fmt.Sprintf(":%d", proxyPort)
 	}
@@ -128,8 +137,22 @@ func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifes
 		Backends: backends,
 	})
 	if err != nil {
-		engineShutdown()
 		return err
+	}
+
+	// Create the listener ourselves so we can learn the actual port (I5).
+	ln, err := net.Listen("tcp", proxyAddr)
+	if err != nil {
+		return fmt.Errorf("subdomain: listen: %w", err)
+	}
+	actualPort := portFromListener(ln)
+
+	// M5: if sync_hosts is enabled, write *.tld entries to the hosts file.
+	// Uses the hostsPath indirection so tests can override it.
+	if m.Network.SyncHosts {
+		if err := maybeSyncHosts(out, m, hostsPath, actualPort); err != nil {
+			fmt.Fprintf(out, "warning: %v\n", err)
+		}
 	}
 
 	// Print service URLs.
@@ -143,10 +166,32 @@ func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifes
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		fmt.Fprintf(out, "  %s  ->  %s://%s.%s\n", name, scheme, name, tld)
+		fmt.Fprintf(out, "  %s  ->  %s://%s.%s:%s\n", name, scheme, name, tld, actualPort)
 	}
 	fmt.Fprintln(out, "stunt up (subdomain mode) — Ctrl-C to stop")
 
 	// Start the proxy (blocks until ctx is canceled).
-	return p.ListenAndServe(ctx)
+	return p.Serve(ctx, ln)
+}
+
+// maybeSyncHosts writes <service>.<tld> entries to the hosts file pointing
+// at 127.0.0.1, using the hostsPath indirection for testability (M5).
+func maybeSyncHosts(out interface{ Write([]byte) (int, error) }, m *manifest.Manifest, hostsFile string, port string) error {
+	entries := make([]netutil.HostEntry, 0, len(m.Services))
+	for name := range m.Services {
+		entries = append(entries, netutil.HostEntry{Host: name + "." + m.Network.TLD})
+	}
+	if err := netutil.SyncHosts(hostsFile, entries); err != nil {
+		return fmt.Errorf("hosts sync: %w", err)
+	}
+	fmt.Fprintf(out, "synced %d host(s) to %s\n", len(entries), hostsFile)
+	return nil
+}
+
+// portFromListener extracts the port string from a net.Listener.
+func portFromListener(ln net.Listener) string {
+	if addr, ok := ln.Addr().(*net.TCPAddr); ok {
+		return strconv.Itoa(addr.Port)
+	}
+	return ""
 }

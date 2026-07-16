@@ -116,6 +116,14 @@ func (p *Proxy) ListenAndServe(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("proxy: listen %s: %w", p.opts.Addr, err)
 	}
+	return p.Serve(ctx, ln)
+}
+
+// Serve accepts connections on the given listener and serves until ctx is
+// canceled. In TLS mode it terminates TLS (with HTTP/2 via ALPN) and mints
+// a leaf certificate per SNI from the CA. This allows the caller to create
+// the listener themselves (e.g. to learn the OS-assigned port).
+func (p *Proxy) Serve(ctx context.Context, ln net.Listener) error {
 
 	handler := p.handler()
 	srv := &http.Server{
@@ -142,6 +150,7 @@ func (p *Proxy) ListenAndServe(ctx context.Context) error {
 	// In TLS mode, ServeTLS wraps the listener with TLS and configures HTTP/2
 	// automatically (via ALPN h2). GetCertificate satisfies the cert
 	// requirement, so no cert/key files are needed.
+	var err error
 	if p.opts.TLS {
 		err = srv.ServeTLS(ln, "", "")
 	} else {

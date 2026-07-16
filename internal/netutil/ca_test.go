@@ -524,3 +524,136 @@ func contains(slice []string, s string) bool {
 	}
 	return false
 }
+
+// --- I1: shell injection tests ---
+
+func TestShellQuote(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"simple", "'simple'"},
+		{"/path/to/file", "'/path/to/file'"},
+		{"path with space", "'path with space'"},
+		{"it's", "'it'\\''s'"},
+	}
+	for _, c := range cases {
+		got := shellQuote(c.input)
+		if got != c.want {
+			t.Errorf("shellQuote(%q) = %q, want %q", c.input, got, c.want)
+		}
+	}
+}
+
+func TestTrustCommandLinuxNoShellInjection(t *testing.T) {
+	// A malicious CA path containing command substitution.
+	evilPath := "$(touch /tmp/stunt-pwned)"
+
+	// Debian
+	cmd, err := trustCommandFor("linux-debian", evilPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := cmd.Args[2]
+	// The path must be single-quoted so $() is literal, not executed.
+	if !strings.Contains(script, "'"+evilPath+"'") {
+		t.Errorf("debian trust script should single-quote the path: %q", script)
+	}
+
+	// RHEL
+	cmd, err = trustCommandFor("linux-rhel", evilPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	script = cmd.Args[2]
+	if !strings.Contains(script, "'"+evilPath+"'") {
+		t.Errorf("rhel trust script should single-quote the path: %q", script)
+	}
+}
+
+func TestTrustCommandLinuxBacktickNoShellInjection(t *testing.T) {
+	evilPath := "`touch /tmp/stunt-pwned`"
+
+	cmd, err := trustCommandFor("linux-debian", evilPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := cmd.Args[2]
+	// The backtick path must be single-quoted.
+	if !strings.Contains(script, "'"+evilPath+"'") {
+		t.Errorf("debian trust script should single-quote backtick path: %q", script)
+	}
+}
+
+func TestUntrustCommandLinuxNoShellInjection(t *testing.T) {
+	evilPath := "$(touch /tmp/stunt-pwned)"
+
+	cmd, err := untrustCommandFor("linux-debian", evilPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := cmd.Args[2]
+	// The path may appear in the command but must be safely quoted.
+	// In the untrust case, the target is a fixed path, so we verify
+	// the script uses shellQuote on the fixed target.
+	if !strings.Contains(script, "'") {
+		t.Errorf("debian untrust script should use single quotes: %q", script)
+	}
+}
+
+// --- I6: partial CA state tests ---
+
+func TestEnsureCAErrorOnMissingKey(t *testing.T) {
+	dir := t.TempDir()
+
+	// First create a full CA.
+	ca, err := EnsureCA(dir)
+	if err != nil {
+		t.Fatalf("first EnsureCA: %v", err)
+	}
+
+	// Delete the key file, leaving only the cert.
+	if err := os.Remove(ca.KeyPath); err != nil {
+		t.Fatalf("remove key: %v", err)
+	}
+
+	// EnsureCA should now error instead of silently regenerating.
+	ca2, err := EnsureCA(dir)
+	if err == nil {
+		t.Fatal("EnsureCA should error when key is missing but cert exists")
+	}
+	if ca2 != nil {
+		t.Fatal("EnsureCA should return nil CA on partial state")
+	}
+
+	// Verify the cert file still exists (not orphaned/overwritten).
+	if _, err := os.Stat(ca.CertPath); err != nil {
+		t.Error("cert file should still exist")
+	}
+}
+
+func TestEnsureCAErrorOnMissingCert(t *testing.T) {
+	dir := t.TempDir()
+
+	// First create a full CA.
+	ca, err := EnsureCA(dir)
+	if err != nil {
+		t.Fatalf("first EnsureCA: %v", err)
+	}
+
+	// Delete the cert file, leaving only the key.
+	if err := os.Remove(ca.CertPath); err != nil {
+		t.Fatalf("remove cert: %v", err)
+	}
+
+	// EnsureCA should now error.
+	_, err = EnsureCA(dir)
+	if err == nil {
+		t.Fatal("EnsureCA should error when cert is missing but key exists")
+	}
+
+	// Verify the key file still exists (not orphaned/overwritten).
+	if _, err := os.Stat(ca.KeyPath); err != nil {
+		t.Error("key file should still exist")
+	}
+}
