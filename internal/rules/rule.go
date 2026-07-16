@@ -9,14 +9,16 @@ type Match struct {
 
 // When gates whether a matched rule actually fires.
 type When struct {
-	Chance int `yaml:"chance,omitempty"` // percent 0..100
+	Chance int    `yaml:"chance,omitempty"` // percent 0..100
+	Expr   string `yaml:"expr,omitempty"`   // boolean expression over request.*
 }
 
 // Body selects how a response body is produced.
-// Plan 1 supports inline literal and static file. template/generate arrive later.
+// Plan 1: inline literal, static file. Plan 2 adds: template (rendered text).
 type Body struct {
-	Inline any    `yaml:"inline,omitempty"`
-	File   string `yaml:"file,omitempty"`
+	Inline   any    `yaml:"inline,omitempty"`
+	File     string `yaml:"file,omitempty"`
+	Template string `yaml:"template,omitempty"`
 }
 
 // Respond describes what to return when a rule fires.
