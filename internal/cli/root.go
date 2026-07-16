@@ -16,6 +16,12 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newPlanCmd())
 	root.AddCommand(newUpCmd())
 	root.AddCommand(newInitCmd())
+	root.AddCommand(newProxyCmd())
+	root.AddCommand(newTrustCmd())
+	root.AddCommand(newHostsCmd())
+	root.AddCommand(newDoctorCmd())
+	root.AddCommand(newCleanCmd())
+	root.AddCommand(newServiceCmd())
 	return root
 }
 

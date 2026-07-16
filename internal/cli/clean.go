@@ -1,0 +1,64 @@
+package cli
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/spf13/cobra"
+	"github.com/stunt-adapters/stunt/internal/netutil"
+)
+
+func newCleanCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "clean",
+		Short: "Remove stunt state, CA files, and hosts block",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			path, _ := cmd.Flags().GetString("manifest")
+			mdir := manifestDir(path)
+			out := cmd.OutOrStdout()
+			return runClean(out, mdir, hostsPath)
+		},
+	}
+}
+
+// runClean removes state, CA files, and the hosts managed block. It is
+// best-effort: errors are reported but do not abort remaining steps.
+// The untrust command for the CA trust store is constructed but NOT
+// executed here — it requires privilege. The user can run `stunt untrust`
+// or the platform-specific command separately.
+func runClean(out interface{ Write([]byte) (int, error) }, mdir, hostsFile string) error {
+	// 1. Remove state directory.
+	sp := statePath(mdir)
+	if err := os.RemoveAll(sp); err != nil {
+		fmt.Fprintf(out, "warning: could not remove state dir %s: %v\n", sp, err)
+	} else {
+		fmt.Fprintf(out, "removed state: %s\n", sp)
+	}
+
+	// 2. Remove CA directory (cert files). The trust-store entry requires
+	//    privilege and is handled separately via `stunt trust`/untrust.
+	caDir := caPath(mdir)
+	certPath := filepath.Join(caDir, "ca.pem")
+	if fileExistsCLI(certPath) {
+		fmt.Fprintf(out, "note: CA trust-store entry is not removed (requires privilege)\n")
+		// Construct the untrust command so the user knows what to run.
+		if untrust, err := netutil.UntrustCommand(certPath); err == nil {
+			fmt.Fprintf(out, "  untrust: %s\n", untrust)
+		}
+	}
+	if err := os.RemoveAll(caDir); err != nil {
+		fmt.Fprintf(out, "warning: could not remove CA dir %s: %v\n", caDir, err)
+	} else {
+		fmt.Fprintf(out, "removed CA: %s\n", caDir)
+	}
+
+	// 3. Clean hosts block.
+	if err := netutil.CleanHosts(hostsFile); err != nil {
+		fmt.Fprintf(out, "warning: could not clean hosts: %v\n", err)
+	} else {
+		fmt.Fprintf(out, "cleaned hosts: %s\n", hostsFile)
+	}
+
+	return nil
+}
