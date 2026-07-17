@@ -1,10 +1,17 @@
 # stunt
 
-Local API simulators — test against real APIs, locally, without remote accounts.
+**Local API simulators — test against real APIs, locally, without remote accounts.**
 
-> **Status:** foundation only. This build supports inline, stateless,
-> rule-driven mock servers defined in `stunt.yaml`. Adapters, Starlark,
-> state stores, TLS, and `*.localhost` subdomains arrive in later plans.
+`stunt` reads a `stunt.yaml` manifest and serves local, runnable stand-ins for real APIs.
+Stateful behavior comes from sandboxed Starlark adapters backed by SQLite/blob primitives;
+declarative behavior comes from a rules engine (templated responses, probabilistic faults,
+conditional expressions). Optionally front everything with a portless.dev-style TLS proxy on
+`*.localhost`. Everything is deterministic via `rng_seed`.
+
+> **Status:** pre-1.0 MVP. The core is built and self-tested; see **Known limitations** below.
+> Unofficial, not affiliated with any provider whose API style an adapter mimics.
+
+---
 
 ## Install
 
@@ -12,15 +19,18 @@ Local API simulators — test against real APIs, locally, without remote account
 go install github.com/stunt-adapters/stunt/cmd/stunt@latest
 ```
 
+> This machine note (dev only): if `go` commands fail with a stdlib version mismatch, prefix
+> them with `env -u GOROOT` (a local `GOROOT`/toolchain misconfiguration).
+
 ## Quickstart
 
 ```bash
-stunt init       # writes a sample stunt.yaml
-stunt plan       # validates the manifest and shows what would run
-stunt up         # serves all services (Ctrl-C to stop)
+stunt init            # writes a sample stunt.yaml
+stunt plan            # validate + show what will run
+stunt up              # serve all services (Ctrl-C to stop)
 ```
 
-Example `stunt.yaml`:
+Inline, declarative service (no adapter needed):
 
 ```yaml
 version: 1
@@ -32,36 +42,112 @@ services:
   example:
     rules:
       - match: { method: GET, path: /hello }
-        respond: { status: 200, body: { inline: { message: hi } } }
+        respond: { status: 200, body: { template: '{"message":"hi","id":"{{ faker.ID "k" }}"}' } }
       - match: { method: GET, path: /hello }
-        when: { chance: 20 }            # 20% of replies error
+        when: { chance: 20 }                       # 20% of replies error
         respond: { status: 503, body: { inline: { error: boom } } }
 ```
 
-Then:
+Stateful adapter service (e.g. the bundled Stripe-style adapter):
 
-```bash
-curl http://127.0.0.1:8000/hello
+```yaml
+version: 1
+rng_seed: 42
+network:
+  mode: port
+  base_port: 8000
+services:
+  stripe:
+    adapter: ./adapters/stripe-style
 ```
 
-## Rules
+Then `curl http://127.0.0.1:8000/v1/charges -d '{"amount":1000,"currency":"usd"}'`.
 
-Rules are evaluated first-match-wins, top-to-bottom.
+## Rules engine
 
-- **match**: `method`, `path` (globs: `*` one segment, `**` zero+ segments), `headers`.
-- **when**: gates whether a matched rule fires. Both may be combined (both must pass):
-  - `when.chance`: percent probability the rule fires; otherwise evaluation falls through.
-  - `when.expr`: a boolean expression over `request.*` (`method`, `path`, `headers`, `body`), e.g. `request.body.amount > 1000`.
+First-match-wins, top-to-bottom.
+
+- **match**: `method`, `path` (globs `*` one segment, `**` zero+), `headers`.
+- **when** (both must pass to fire):
+  - `when.chance`: percent probability; otherwise fall through.
+  - `when.expr`: boolean expression over `request.*` (`method`, `path`, `headers`, `body`), e.g. `request.body.amount > 1000`.
 - **respond**: `status`, `headers`, `latency_ms`, `behavior: timeout`, and `body`:
-  - `body.inline`: a literal value (rendered as JSON).
-  - `body.file`: a static file path (relative to the manifest).
-  - `body.template`: a `text/template` string rendered with `{{ .Request.* }}`,
-    `{{ faker.ID "ch" }}` / `{{ faker.Email }}` / `{{ faker.Name }}`,
-    `{{ uuid }}`, and `{{ now }}`. Deterministic via `rng_seed`.
+  - `body.inline` — literal (rendered as JSON).
+  - `body.file` — static file (relative to the manifest).
+  - `body.template` — `text/template` with `{{ .Request.* }}`, `{{ faker.ID/Email/Name }}`, `{{ uuid }}`, `{{ now }}`.
 
-Everything is deterministic given `rng_seed`.
+## Adapters
 
-## Roadmap
+An adapter is a directory (later: a git repo) describing how to simulate one API:
+`adapter.yaml` + `endpoints/` + `templates/` + `fixtures/` + `scripts/*.star` + `schemas/`.
+Endpoints are either rules-based or backed by **sandboxed Starlark** handlers with access to
+stateful primitives. Build your own with the contributor workflow:
 
-See `docs/specs/2025-07-15-stunt-design.md` and
-`docs/plans/2025-07-15-stunt-foundation.md`.
+```bash
+stunt adapter new myapi               # scaffold a synthetic adapter
+stunt adapter import openapi spec.yaml # generate endpoints/templates from an OpenAPI doc
+stunt adapter import har session.har   # infer endpoints + synthetic fixtures from a HAR
+stunt adapter lint ./adapters/myapi     # enforce SYNTHETIC data only (the safety guard)
+stunt adapter test ./adapters/myapi     # conformance vs your local real traces
+stunt catalog search stripe            # browse the adapter registry
+```
+
+Starlark handlers are sandboxed (no host I/O, no network) and can use the primitive builtins:
+`store_collection(name)` (insert/get/list/update/delete), `store_kv_get/set/delete/incr`,
+`store_blob(name)` (put/get/stat/delete/list).
+
+### Reference adapters (in this repo)
+
+All unofficial, synthetic-data-only, with a DISCLAIMER. See `adapters/README.md`.
+
+| Adapter | Simulates | Backing |
+|---|---|---|
+| `adapters/stripe-style` | payments API — charges (create/retrieve/list/capture/refund), customers (CRUD), balance | Collection + Starlark |
+| `adapters/drive-style` | files API — upload/get/download/list/patch/delete, folders, about/quota | Blob + Collection |
+| `adapters/twitter-style` | X.com/Twitter-style — mock OAuth, tweets (CRUD), users, timeline | Collection (pure-mock reads) |
+| `adapters/dropbox-style` | files API (RPC-style) — upload/download/list_folder/get_metadata/create_folder/delete | Blob + Collection |
+
+## Networking (`*.localhost`, TLS)
+
+`network.mode: subdomain` runs the engine on a high port behind a portless.dev-style TLS proxy:
+
+```yaml
+network:
+  mode: subdomain
+  tld: localhost
+  tls: true
+```
+
+Then services are reachable at `https://<service>.localhost` (HTTP/2, local CA auto-trusted via
+`stunt setup`). The privileged listener forwards to an **unprivileged** engine (so adapter code
+never runs as root). CLI: `stunt proxy start|stop`, `stunt service install|status|uninstall`,
+`stunt trust`, `stunt hosts sync|clean`, `stunt doctor`, `stunt clean`.
+
+## Primitives
+
+`Collection` (SQLite), `KV`, `Blob` (FS), `Clock+scheduler` (deterministic), `Identity` (HMAC tokens),
+`Events` (webhooks), `Generator`, `Validator` (JSON-Schema).
+
+## Known limitations (MVP)
+
+- Adapters load from **local paths**; git-repo distribution + the remote catalog index are stubbed
+  (`stunt catalog` works offline via a bundled fallback).
+- `Identity`/`Events` primitives exist in Go but are **not yet wired into Starlark handlers** —
+  adapters can't mint tokens or emit webhooks from a handler yet (token validation is mock-only).
+- The privileged `:443` bind requires `stunt setup`/`stunt service install` (one-time); without it,
+  subdomain mode uses an OS-assigned high port (the URL includes the port).
+- No gRPC/GraphQL/WebSocket (REST only).
+- Concurrency is tested with `-race`; the design is single-process per `stunt up`.
+
+## Project layout
+
+`internal/{rules,manifest,engine,adapter,adapter/runtime,starlark}`,
+`internal/primitives{,/blob,/clock,/events,/gen,/identity,/kv,/validator}`,
+`internal/netutil{,/proxy}`, `internal/contrib{,/openapi,/har,/lint,/conform}`, `internal/catalog`,
+`internal/cli`, `cmd/stunt`, `adapters/`.
+
+## Design & roadmap
+
+- Spec: `docs/specs/2025-07-15-stunt-design.md`
+- Plans: `docs/plans/`
+- Issue tracking: `bd` (beads) — `bd ready`, `bd list`, `bd epic status`
