@@ -1,0 +1,9 @@
+{
+  "id": "{{ faker.ID "file" }}",
+  "name": "{{ faker.Word }}.txt",
+  "mimeType": "text/plain",
+  "size": {{ faker.Int 10 99999 }},
+  "createdTime": "{{ now.Format \"2006-01-02T15:04:05.000Z07:00\" }}",
+  "modifiedTime": "{{ now.Format \"2006-01-02T15:04:05.000Z07:00\" }}",
+  "trashed": false
+}

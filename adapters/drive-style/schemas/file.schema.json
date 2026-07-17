@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stunt.local/schemas/file.schema.json",
+  "title": "File",
+  "description": "Synthetic file object for the Google-Drive-style adapter",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the file"
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the file"
+    },
+    "mimeType": {
+      "type": "string",
+      "description": "MIME type of the file content"
+    },
+    "size": {
+      "type": "integer",
+      "description": "Size of file content in bytes (0 for folders)"
+    },
+    "createdTime": {
+      "type": "string",
+      "description": "ISO-8601 creation timestamp"
+    },
+    "modifiedTime": {
+      "type": "string",
+      "description": "ISO-8601 last modification timestamp"
+    },
+    "trashed": {
+      "type": "boolean",
+      "description": "Whether the file has been moved to trash"
+    }
+  },
+  "required": ["id", "name", "mimeType", "createdTime", "modifiedTime"]
+}

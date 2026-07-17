@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -126,6 +127,7 @@ func (e *Engine) runHandler(
 		Headers: headerMap(r.Header),
 		Body:    bodyMap,
 		Params:  params,
+		Query:   queryMap(r.URL.Query()),
 	}
 
 	resp, err := vm.Call(fnName, req)
@@ -138,14 +140,26 @@ func (e *Engine) runHandler(
 	for k, v := range resp.Headers {
 		w.Header().Set(k, v)
 	}
-	// Default content type for JSON bodies.
-	if resp.Body != nil && w.Header().Get("Content-Type") == "" {
-		w.Header().Set("Content-Type", "application/json")
-	}
 
 	status := resp.Status
 	if status == 0 {
 		status = 200
+	}
+
+	// Raw text body takes precedence over JSON body — used for content
+	// download endpoints (e.g., alt=media) that return raw file content.
+	if resp.RawBody != "" {
+		if w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", "text/plain")
+		}
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(resp.RawBody))
+		return
+	}
+
+	// Default content type for JSON bodies.
+	if resp.Body != nil && w.Header().Get("Content-Type") == "" {
+		w.Header().Set("Content-Type", "application/json")
 	}
 
 	// Marshal the body BEFORE writing the header so that a marshal failure
@@ -234,6 +248,21 @@ func methodMatches(epMethod, reqMethod string) bool {
 		return true
 	}
 	return strings.EqualFold(epMethod, reqMethod)
+}
+
+// queryMap converts a url.Values into a map[string]string taking the first
+// value of each key. This mirrors how headerMap handles multi-value headers.
+func queryMap(v url.Values) map[string]string {
+	if len(v) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(v))
+	for k, vals := range v {
+		if len(vals) > 0 {
+			out[k] = vals[0]
+		}
+	}
+	return out
 }
 
 // defaultStateDir returns the directory for per-service SQLite databases.
