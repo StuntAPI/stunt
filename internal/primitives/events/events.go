@@ -71,6 +71,13 @@ func (e *Emitter) Register(ns, url string) {
 	e.targets[ns] = url
 }
 
+// Close releases resources associated with the Emitter, including closing
+// idle HTTP connections from the underlying client's pool. After Close, the
+// Emitter should not be used.
+func (e *Emitter) Close() {
+	e.client.CloseIdleConnections()
+}
+
 // Emit sends an event of the given type with the given payload to the
 // registered webhook target for ns. The body is a JSON envelope:
 //
