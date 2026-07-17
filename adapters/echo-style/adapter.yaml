@@ -1,0 +1,28 @@
+# stunt adapter manifest — Echo gRPC example (generic, unbranded)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This is a generic gRPC reference adapter. It does NOT mimic a specific
+# company's API, so no DISCLAIMER is needed. All data is synthetic.
+id: echo-style
+name: "Echo gRPC example adapter"
+version: "0.1.0"
+
+# gRPC service — served from the compiled protobuf descriptor.
+# Each method is routed to a Starlark handler. The handler receives the
+# decoded request as req["body"] (a JSON-like map) and returns
+# respond(status, body) where body is the response map.
+grpc:
+  service: stunt.example.Echo
+  descriptor: schemas/echo.desc
+  methods:
+    - name: Say
+      handler: scripts/echo.star#on_say
+    - name: Add
+      handler: scripts/echo.star#on_add
+    - name: ListEchoes
+      handler: scripts/echo.star#on_list_echoes
+
+# Backing stores available to Starlark handlers.
+resources:
+  - name: echoes
+    kind: collection
