@@ -409,3 +409,68 @@ func TestDescriptorBytesNoGrpc(t *testing.T) {
 		t.Fatal("expected error when no grpc configured")
 	}
 }
+
+// TestDescriptorRejectsTraversal verifies that a gRPC descriptor path using
+// ".." traversal is rejected by Load (and DescriptorBytes) with the same
+// containment check used by ReadFile.
+func TestDescriptorRejectsTraversal(t *testing.T) {
+	// Create a secret file outside the adapter directory.
+	parent := t.TempDir()
+	secretPath := filepath.Join(parent, "secret.desc")
+	if err := os.WriteFile(secretPath, []byte("secret"), 0o644); err != nil {
+		t.Fatalf("write secret: %v", err)
+	}
+
+	// Adapter dir is a subdirectory of parent.
+	adapterDir := filepath.Join(parent, "adapter")
+	writeAdapter(t, adapterDir, map[string]string{
+		"adapter.yaml": `
+id: traversal-test
+name: Traversal Test
+grpc:
+  service: pkg.Svc
+  descriptor: ../secret.desc
+  methods:
+    - name: M
+      handler: scripts/x.star#f
+`,
+		"scripts/x.star": "def f(req):\n    return respond(200, {})\n",
+	})
+
+	_, err := Load(adapterDir)
+	if err == nil {
+		t.Fatal("expected Load to reject descriptor path with .. traversal")
+	}
+	if !strings.Contains(err.Error(), "escapes adapter directory") {
+		t.Errorf("error should mention directory escape, got: %v", err)
+	}
+}
+
+// TestHandlerScriptRejectsTraversal verifies that a handler script path using
+// ".." traversal is rejected by Load with the same containment check.
+func TestHandlerScriptRejectsTraversal(t *testing.T) {
+	parent := t.TempDir()
+	secretPath := filepath.Join(parent, "evil.star")
+	if err := os.WriteFile(secretPath, []byte("def f(req):\n    return respond(200, {})\n"), 0o644); err != nil {
+		t.Fatalf("write evil.star: %v", err)
+	}
+
+	adapterDir := filepath.Join(parent, "adapter")
+	writeAdapter(t, adapterDir, map[string]string{
+		"adapter.yaml": `
+id: traversal-test
+name: Traversal Test
+endpoints:
+  - route: /x
+    handler: ../evil.star#f
+`,
+	})
+
+	_, err := Load(adapterDir)
+	if err == nil {
+		t.Fatal("expected Load to reject handler script path with .. traversal")
+	}
+	if !strings.Contains(err.Error(), "escapes adapter directory") {
+		t.Errorf("error should mention directory escape, got: %v", err)
+	}
+}

@@ -244,10 +244,20 @@ func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir,
 	return st, nil
 }
 
-// Close releases all per-service stores and emitters, and stops any gRPC
-// servers started by serve(). Safe to call on a rules-only engine.
+// Close stops any gRPC servers started by serve(), then releases all
+// per-service stores and emitters. gRPC servers are stopped FIRST so that
+// in-flight RPCs finish against still-open stores rather than hitting a
+// closed SQLite handle. Safe to call on a rules-only engine.
 func (e *Engine) Close() error {
 	var firstErr error
+
+	// GracefulStop gRPC servers first — they may still be servicing in-flight
+	// RPCs that touch the stores below. This is safe even if serve() was
+	// never called (the slice is empty).
+	for _, srv := range e.grpcServers {
+		srv.GracefulStop()
+	}
+
 	for _, st := range e.states {
 		if st.store != nil {
 			if err := st.store.Close(); err != nil && firstErr == nil {
@@ -267,12 +277,6 @@ func (e *Engine) Close() error {
 		if st.emitter != nil {
 			st.emitter.Close()
 		}
-	}
-
-	// GracefulStop any gRPC servers started by serve(). This is safe to call
-	// even if serve() was never called (the slice is empty).
-	for _, srv := range e.grpcServers {
-		srv.GracefulStop()
 	}
 
 	return firstErr

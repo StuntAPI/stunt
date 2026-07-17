@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package stunt.test;
+
+option go_package = "github.com/stunt-adapters/stunt/internal/grpcsim/testdata;grpcsim_test";
+
+// EchoCount service has a field with snake_case name to verify that
+// protoToMap preserves proto field names (not camelCase).
+service EchoCount {
+  rpc Count(CountRequest) returns (CountReply);
+}
+
+message CountRequest {
+  string echo_count = 1; // snake_case field name
+}
+
+message CountReply {
+  string echo_count = 1; // snake_case field name
+}
