@@ -130,8 +130,8 @@ never runs as root). CLI: `stunt proxy start|stop`, `stunt service install|statu
 
 ## Known limitations (MVP)
 
-- Adapters load from **local paths**; git-repo distribution + the remote catalog index are stubbed
-  (`stunt catalog` works offline via a bundled fallback).
+- Adapters load from **local paths or git refs** (`stunt adapter add git:host/user/repo@ref`, cached under `~/.stunt/adapters`, pinned tags/sha/head).
+  The remote catalog index URL is a placeholder (`stunt catalog` works offline via a bundled fallback).
 - Adapters can `identity_mint`/`identity_validate` tokens and `events_emit` webhooks from Starlark
   (the stripe-style adapter demonstrates real bearer-token validation + `charge.*` webhook emission).
 - The privileged `:443` bind requires `stunt setup`/`stunt service install` (one-time); without it,
