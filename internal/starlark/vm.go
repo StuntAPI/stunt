@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	sk "go.starlark.net/starlark"
+	"go.starlark.net/syntax"
 )
 
 // maxExecutionSteps bounds the number of Starlark VM steps per handler call
@@ -57,7 +58,20 @@ func Load(src string, builtins sk.StringDict) (*VM, error) {
 		Name: "stunt-load",
 	}
 
-	globals, err := sk.ExecFile(loadThread, "handler.star", src, predeclared)
+	// Enable while-loops (a non-standard Starlark extension) so that
+	// streaming handlers can drain inbound streams naturally:
+	//
+	//   while True:
+	//       m = stream.recv()
+	//       if m == None: break
+	//
+	// Recursion remains disabled to preserve the compile-time recursion
+	// check that prevents unbounded stack growth. While-loops are safe
+	// because each iteration is bounded by SetMaxExecutionSteps.
+	opts := &syntax.FileOptions{
+		While: true,
+	}
+	globals, err := sk.ExecFileOptions(opts, loadThread, "handler.star", src, predeclared)
 	if err != nil {
 		return nil, fmt.Errorf("starlark load: %w", err)
 	}
@@ -103,6 +117,41 @@ func (vm *VM) Call(handlerName string, req Request) (Response, error) {
 	result, err := sk.Call(thread, fn, sk.Tuple{reqVal}, nil)
 	if err != nil {
 		return Response{}, fmt.Errorf("starlark: call %q: %w", handlerName, err)
+	}
+
+	return starlarkToResponse(result)
+}
+
+// CallWith invokes the named handler with a pre-built Starlark value as its
+// sole argument and returns the result as a Response. This is used by
+// streaming gRPC handlers that receive a stream object rather than a
+// Request. A None return (implicit when the handler has no return statement)
+// is treated as a 200 OK with no body — the streaming convention.
+func (vm *VM) CallWith(handlerName string, arg sk.Value) (Response, error) {
+	fn, ok := vm.globals[handlerName]
+	if !ok {
+		return Response{}, fmt.Errorf("starlark: handler %q is not defined", handlerName)
+	}
+
+	if _, ok := fn.(sk.Callable); !ok {
+		return Response{}, fmt.Errorf("starlark: %q is not callable", handlerName)
+	}
+
+	thread := &sk.Thread{
+		Name: "stunt",
+	}
+	thread.SetMaxExecutionSteps(maxExecutionSteps)
+
+	result, err := sk.Call(thread, fn, sk.Tuple{arg}, nil)
+	if err != nil {
+		return Response{}, fmt.Errorf("starlark: call %q: %w", handlerName, err)
+	}
+
+	// A None return (implicit) means the handler completed successfully
+	// without a trailing response body — common for server/bidi streaming
+	// where all messages were sent via stream.send().
+	if _, ok := result.(sk.NoneType); ok {
+		return Response{Status: 200}, nil
 	}
 
 	return starlarkToResponse(result)
