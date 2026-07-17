@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package stunt.test;
+
+option go_package = "github.com/stunt-adapters/stunt/internal/grpcsim/testdata;grpcsim_test";
+
+// Streamer exercises server-streaming, client-streaming, and bidi methods.
+service Streamer {
+  rpc StreamMany(StreamManyRequest) returns (stream StreamItem);
+  rpc Accumulate(stream DataChunk) returns (AccumulateReply);
+  rpc EchoStream(stream EchoRequest) returns (stream EchoReply);
+}
+
+message StreamManyRequest {
+  int32 count = 1;
+  string prefix = 2;
+}
+
+message StreamItem {
+  int32 index = 1;
+  string text = 2;
+}
+
+message DataChunk {
+  string data = 1;
+}
+
+message AccumulateReply {
+  string data = 1;
+  int32 count = 2;
+}
+
+message EchoRequest {
+  int32 seq = 1;
+  string text = 2;
+}
+
+message EchoReply {
+  int32 seq = 1;
+  string text = 2;
+}

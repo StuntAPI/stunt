@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package stunt.test;
+
+option go_package = "github.com/stunt-adapters/stunt/internal/grpcsim/testdata;grpcsim_test";
+
+// Mixed has both a unary and a streaming method to verify that
+// BuildServiceDesc routes each to its correct handler type.
+service Mixed {
+  rpc Ping(PingRequest) returns (PingReply);
+  rpc StreamPings(PingRequest) returns (stream PingReply);
+}
+
+message PingRequest {
+  string msg = 1;
+}
+
+message PingReply {
+  string msg = 1;
+  int32 n = 2;
+}
