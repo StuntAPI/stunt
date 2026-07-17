@@ -7,11 +7,13 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/stunt-adapters/stunt/internal/adapter"
 	"github.com/stunt-adapters/stunt/internal/contrib"
 	"github.com/stunt-adapters/stunt/internal/contrib/conform"
 	"github.com/stunt-adapters/stunt/internal/contrib/har"
 	"github.com/stunt-adapters/stunt/internal/contrib/lint"
 	"github.com/stunt-adapters/stunt/internal/contrib/openapi"
+	"github.com/stunt-adapters/stunt/internal/contrib/proto"
 )
 
 // newAdapterCmd creates the "adapter" parent command group. Subcommands:
@@ -50,6 +52,7 @@ adapter. All imported data is synthesized — no real API data is copied.`,
 	cmd.PersistentFlags().String("dir", ".", "adapter directory to import into")
 	cmd.AddCommand(newAdapterImportOpenapiCmd())
 	cmd.AddCommand(newAdapterImportHarCmd())
+	cmd.AddCommand(newAdapterImportProtoCmd())
 	return cmd
 }
 
@@ -79,6 +82,25 @@ replaced with faker expressions — no real data is copied.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, _ := cmd.Flags().GetString("dir")
 			return runImportHar(cmd.OutOrStdout(), args[0], dir)
+		},
+	}
+}
+
+func newAdapterImportProtoCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "proto <file.proto>",
+		Short: "Import a Protocol Buffer .proto definition",
+		Long: `Import a .proto file and generate a gRPC adapter skeleton: a compiled
+FileDescriptorSet (.desc), a grpc: section in adapter.yaml, and synthetic
+Starlark stub handlers — one per RPC.
+
+The .proto is compiled in-process (no external protoc required). All handler
+response bodies are synthesized from the output message types — no real data
+is included.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir, _ := cmd.Flags().GetString("dir")
+			return runImportProto(cmd.OutOrStdout(), args[0], dir)
 		},
 	}
 }
@@ -221,6 +243,36 @@ func runImportHar(out interface{ Write([]byte) (int, error) }, harPath, dir stri
 		return err
 	}
 	fmt.Fprintf(out, "imported HAR file into %s\n", absDir)
+	return nil
+}
+
+func runImportProto(out interface{ Write([]byte) (int, error) }, protoPath, dir string) error {
+	data, err := os.ReadFile(protoPath)
+	if err != nil {
+		return fmt.Errorf("read proto %s: %w", protoPath, err)
+	}
+	absDir, err := filepath.Abs(dir)
+	if err != nil {
+		return fmt.Errorf("resolve dir: %w", err)
+	}
+	if err := proto.ImportProto(data, absDir); err != nil {
+		return err
+	}
+
+	// Load the adapter to print what was generated.
+	a, err := adapter.Load(absDir)
+	if err != nil {
+		return fmt.Errorf("reload adapter: %w", err)
+	}
+	if a.Grpc != nil {
+		fmt.Fprintf(out, "imported proto: service %s with %d method(s) into %s\n",
+			a.Grpc.Service, len(a.Grpc.Methods), absDir)
+		for _, m := range a.Grpc.Methods {
+			fmt.Fprintf(out, "  %s\n", m.Name)
+		}
+	} else {
+		fmt.Fprintf(out, "imported proto into %s\n", absDir)
+	}
 	return nil
 }
 

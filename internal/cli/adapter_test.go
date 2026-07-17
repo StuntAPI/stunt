@@ -199,6 +199,89 @@ func TestAdapterImportHarSubcommandRegistered(t *testing.T) {
 	}
 }
 
+func TestAdapterImportProtoSubcommandRegistered(t *testing.T) {
+	root := NewRootCmd()
+	cmd, _, err := root.Find([]string{"adapter", "import", "proto"})
+	if err != nil {
+		t.Fatalf("could not find 'adapter import proto': %v", err)
+	}
+	if cmd.Name() != "proto" {
+		t.Fatalf("command name = %q, want %q", cmd.Name(), "proto")
+	}
+}
+
+const sampleProtoSpec = `syntax = "proto3";
+
+package stunt.demo;
+
+service Demo {
+  rpc Echo(EchoRequest) returns (EchoReply);
+}
+
+message EchoRequest {
+  string name = 1;
+}
+
+message EchoReply {
+  string message = 1;
+}
+`
+
+func TestAdapterImportProtoCmd(t *testing.T) {
+	// Scaffold an adapter first.
+	parent := t.TempDir()
+	if err := runAdapterNew(&bytes.Buffer{}, parent, "myapi", false); err != nil {
+		t.Fatalf("scaffold: %v", err)
+	}
+	adapterDir := filepath.Join(parent, "myapi")
+
+	// Write a small proto file.
+	protoPath := filepath.Join(parent, "demo.proto")
+	if err := os.WriteFile(protoPath, []byte(sampleProtoSpec), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var out bytes.Buffer
+	if err := runImportProto(&out, protoPath, adapterDir); err != nil {
+		t.Fatalf("runImportProto: %v", err)
+	}
+
+	// Output should mention service name and method.
+	outStr := out.String()
+	if !strings.Contains(outStr, "stunt.demo.Demo") {
+		t.Errorf("output should mention service name: %q", outStr)
+	}
+	if !strings.Contains(outStr, "Echo") {
+		t.Errorf("output should mention method Echo: %q", outStr)
+	}
+
+	// Descriptor and script files should exist.
+	if _, err := os.Stat(filepath.Join(adapterDir, "schemas", "demo.desc")); err != nil {
+		t.Errorf("descriptor file not created: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(adapterDir, "scripts", "demo.star")); err != nil {
+		t.Errorf("handler script not created: %v", err)
+	}
+
+	// adapter.yaml should load with the grpc section.
+	a, err := adapter.Load(adapterDir)
+	if err != nil {
+		t.Fatalf("adapter.Load: %v", err)
+	}
+	if a.Grpc == nil {
+		t.Fatal("Grpc is nil")
+	}
+	if a.Grpc.Service != "stunt.demo.Demo" {
+		t.Errorf("Service = %q, want stunt.demo.Demo", a.Grpc.Service)
+	}
+	if len(a.Grpc.Methods) != 1 {
+		t.Fatalf("Methods: %d, want 1", len(a.Grpc.Methods))
+	}
+	if a.Grpc.Methods[0].Name != "Echo" {
+		t.Errorf("method name = %q, want Echo", a.Grpc.Methods[0].Name)
+	}
+}
+
 func TestAdapterParentCommandHasSubcommands(t *testing.T) {
 	root := NewRootCmd()
 	adapterCmd, _, err := root.Find([]string{"adapter"})
