@@ -6,6 +6,7 @@ import (
 
 	"github.com/stunt-adapters/stunt/internal/adapter/runtime"
 	"github.com/stunt-adapters/stunt/internal/primitives"
+	"github.com/stunt-adapters/stunt/internal/primitives/blob"
 	"github.com/stunt-adapters/stunt/internal/primitives/kv"
 	"github.com/stunt-adapters/stunt/internal/starlark"
 )
@@ -34,7 +35,7 @@ func newStores(t *testing.T) (*primitives.Store, *kv.KV) {
 // into a collection and receive back the generated id.
 func TestCollectionInsert(t *testing.T) {
 	store, _ := newStores(t)
-	builtins := runtime.BuildBuiltins(store, nil)
+	builtins := runtime.BuildBuiltins(store, nil, nil)
 
 	src := `
 def on_post(req):
@@ -68,7 +69,7 @@ def on_post(req):
 // calls within one VM: an insert in one call is readable by a get in another.
 func TestCollectionGetStateful(t *testing.T) {
 	store, _ := newStores(t)
-	builtins := runtime.BuildBuiltins(store, nil)
+	builtins := runtime.BuildBuiltins(store, nil, nil)
 
 	// First handler: insert and capture the id.
 	insertSrc := `
@@ -123,7 +124,7 @@ def on_get(req):
 // TestCollectionListUpdateDelete exercises the remaining collection methods.
 func TestCollectionListUpdateDelete(t *testing.T) {
 	store, _ := newStores(t)
-	builtins := runtime.BuildBuiltins(store, nil)
+	builtins := runtime.BuildBuiltins(store, nil, nil)
 
 	src := `
 def on_post(req):
@@ -194,7 +195,7 @@ def on_post(req):
 // TestKVSetGet proves that KV set in one handler call is readable in another.
 func TestKVSetGet(t *testing.T) {
 	_, kvStore := newStores(t)
-	builtins := runtime.BuildBuiltins(nil, kvStore)
+	builtins := runtime.BuildBuiltins(nil, kvStore, nil)
 
 	src := `
 def on_post(req):
@@ -219,7 +220,7 @@ def on_post(req):
 // TestKVCrossCall proves state persists across separate handler calls/VMs.
 func TestKVCrossCall(t *testing.T) {
 	_, kvStore := newStores(t)
-	builtins := runtime.BuildBuiltins(nil, kvStore)
+	builtins := runtime.BuildBuiltins(nil, kvStore, nil)
 
 	setSrc := `
 def on_post(req):
@@ -256,7 +257,7 @@ def on_get(req):
 // TestKVDelete proves store_kv_delete removes a key.
 func TestKVDelete(t *testing.T) {
 	_, kvStore := newStores(t)
-	builtins := runtime.BuildBuiltins(nil, kvStore)
+	builtins := runtime.BuildBuiltins(nil, kvStore, nil)
 
 	src := `
 def on_post(req):
@@ -281,7 +282,7 @@ def on_post(req):
 // TestKVGetMissing returns None to the script (not an error).
 func TestKVGetMissing(t *testing.T) {
 	_, kvStore := newStores(t)
-	builtins := runtime.BuildBuiltins(nil, kvStore)
+	builtins := runtime.BuildBuiltins(nil, kvStore, nil)
 
 	src := `
 def on_get(req):
@@ -300,5 +301,201 @@ def on_get(req):
 	}
 	if resp.Body["found"] != false {
 		t.Fatalf("found = %v, want false", resp.Body["found"])
+	}
+}
+
+// --- Blob store tests ---
+
+// newBlobStore creates a temp-file-backed blob store for a test and registers
+// cleanup.
+func newBlobStore(t *testing.T) *blob.Store {
+	t.Helper()
+	dir := t.TempDir()
+	bs, err := blob.Open(filepath.Join(dir, "blobs"))
+	if err != nil {
+		t.Fatalf("blob.Open: %v", err)
+	}
+	t.Cleanup(func() { bs.Close() })
+	return bs
+}
+
+// TestBlobPutGetRoundtrip proves a Starlark handler can put a blob and read
+// it back via get.
+func TestBlobPutGetRoundtrip(t *testing.T) {
+	bs := newBlobStore(t)
+	builtins := runtime.BuildBuiltins(nil, nil, bs)
+
+	src := `
+def on_post(req):
+    b = store_blob("drive")
+    id = b.put("report.txt", "hello blob world")
+    content = b.get(id)
+    return respond(200, {"id": id, "content": content})
+`
+	vm, err := starlark.Load(src, builtins)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	resp, err := vm.Call("on_post", starlark.Request{Method: "POST"})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if resp.Body["id"] != "report.txt" {
+		t.Fatalf("id = %v, want report.txt", resp.Body["id"])
+	}
+	if resp.Body["content"] != "hello blob world" {
+		t.Fatalf("content = %v, want hello blob world", resp.Body["content"])
+	}
+}
+
+// TestBlobGetStateful proves blob content persists across separate handler
+// calls/VMs.
+func TestBlobGetStateful(t *testing.T) {
+	bs := newBlobStore(t)
+	builtins := runtime.BuildBuiltins(nil, nil, bs)
+
+	putSrc := `
+def on_post(req):
+    b = store_blob("drive")
+    b.put("persist.txt", "persisted content")
+    return respond(201, {"ok": True})
+`
+	vm, err := starlark.Load(putSrc, builtins)
+	if err != nil {
+		t.Fatalf("Load put: %v", err)
+	}
+	_, err = vm.Call("on_post", starlark.Request{Method: "POST"})
+	if err != nil {
+		t.Fatalf("Call put: %v", err)
+	}
+
+	getSrc := `
+def on_get(req):
+    b = store_blob("drive")
+    content = b.get("persist.txt")
+    return respond(200, {"content": content})
+`
+	vm2, err := starlark.Load(getSrc, builtins)
+	if err != nil {
+		t.Fatalf("Load get: %v", err)
+	}
+	resp, err := vm2.Call("on_get", starlark.Request{Method: "GET"})
+	if err != nil {
+		t.Fatalf("Call get: %v", err)
+	}
+	if resp.Body["content"] != "persisted content" {
+		t.Fatalf("content = %v, want persisted content", resp.Body["content"])
+	}
+}
+
+// TestBlobList proves list returns all blobs in the namespace.
+func TestBlobList(t *testing.T) {
+	bs := newBlobStore(t)
+	builtins := runtime.BuildBuiltins(nil, nil, bs)
+
+	src := `
+def on_post(req):
+    b = store_blob("drive")
+    b.put("a.txt", "aaa")
+    b.put("b.txt", "bbb")
+    infos = b.list()
+    return respond(200, {"count": len(infos)})
+`
+	vm, err := starlark.Load(src, builtins)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	resp, err := vm.Call("on_post", starlark.Request{Method: "POST"})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if resp.Body["count"] != int64(2) {
+		t.Fatalf("count = %v, want 2", resp.Body["count"])
+	}
+}
+
+// TestBlobDelete proves delete removes a blob so a subsequent get returns None.
+func TestBlobDelete(t *testing.T) {
+	bs := newBlobStore(t)
+	builtins := runtime.BuildBuiltins(nil, nil, bs)
+
+	src := `
+def on_post(req):
+    b = store_blob("drive")
+    b.put("temp.txt", "temporary")
+    b.delete("temp.txt")
+    content = b.get("temp.txt")
+    if content == None:
+        return respond(200, {"deleted": True})
+    return respond(200, {"deleted": False, "content": content})
+`
+	vm, err := starlark.Load(src, builtins)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	resp, err := vm.Call("on_post", starlark.Request{Method: "POST"})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if resp.Body["deleted"] != true {
+		t.Fatalf("deleted = %v, want true", resp.Body["deleted"])
+	}
+}
+
+// TestBlobGetNotFound proves get returns None for a missing blob.
+func TestBlobGetNotFound(t *testing.T) {
+	bs := newBlobStore(t)
+	builtins := runtime.BuildBuiltins(nil, nil, bs)
+
+	src := `
+def on_get(req):
+    b = store_blob("drive")
+    content = b.get("missing.txt")
+    if content == None:
+        return respond(200, {"found": False})
+    return respond(200, {"found": True})
+`
+	vm, err := starlark.Load(src, builtins)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	resp, err := vm.Call("on_get", starlark.Request{Method: "GET"})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if resp.Body["found"] != false {
+		t.Fatalf("found = %v, want false", resp.Body["found"])
+	}
+}
+
+// TestBlobStat proves stat returns metadata about a blob.
+func TestBlobStat(t *testing.T) {
+	bs := newBlobStore(t)
+	builtins := runtime.BuildBuiltins(nil, nil, bs)
+
+	src := `
+def on_post(req):
+    b = store_blob("drive")
+    b.put("data.bin", "1234567890", content_type="application/octet-stream")
+    info = b.stat("data.bin")
+    return respond(200, info)
+`
+	vm, err := starlark.Load(src, builtins)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	resp, err := vm.Call("on_post", starlark.Request{Method: "POST"})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if resp.Body["name"] != "data.bin" {
+		t.Fatalf("name = %v, want data.bin", resp.Body["name"])
+	}
+	if resp.Body["size"] != int64(10) {
+		t.Fatalf("size = %v, want 10", resp.Body["size"])
+	}
+	if resp.Body["content_type"] != "application/octet-stream" {
+		t.Fatalf("content_type = %v, want application/octet-stream", resp.Body["content_type"])
 	}
 }
