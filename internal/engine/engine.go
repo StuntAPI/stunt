@@ -13,6 +13,7 @@ import (
 
 	"github.com/stunt-adapters/stunt/internal/adapter"
 	"github.com/stunt-adapters/stunt/internal/adapter/runtime"
+	"github.com/stunt-adapters/stunt/internal/adapterdist"
 	"github.com/stunt-adapters/stunt/internal/manifest"
 	"github.com/stunt-adapters/stunt/internal/primitives"
 	"github.com/stunt-adapters/stunt/internal/primitives/blob"
@@ -29,8 +30,9 @@ import (
 // parsed, per-service state stores (SQLite) are opened, and Starlark VMs are
 // cached for handler dispatch.
 type Engine struct {
-	manifest *manifest.Manifest
-	states   map[string]*serviceState // keyed by service name
+	manifest  *manifest.Manifest
+	states    map[string]*serviceState // keyed by service name
+	cacheRoot string                 // adapter cache root for git sources
 }
 
 // serviceState holds the per-service runtime for an adapter-backed service:
@@ -49,17 +51,31 @@ type serviceState struct {
 	vms map[string]*starlark.VM // script path → VM (loaded once)
 }
 
+// New creates an Engine from a manifest. Git adapter sources are resolved
+// (cloned/fetched if missing) against the adapter cache directory. The cache
+// root defaults to ~/.stunt/adapters and can be overridden with the
+// STUNT_ADAPTER_CACHE environment variable.
 func New(m *manifest.Manifest) (*Engine, error) {
-	e := &Engine{manifest: m, states: make(map[string]*serviceState)}
+	return newEngine(m, defaultAdapterCacheRoot())
+}
+
+// newEngine is the testable constructor that accepts an explicit cache root.
+func newEngine(m *manifest.Manifest, cacheRoot string) (*Engine, error) {
+	e := &Engine{
+		manifest:  m,
+		states:    make(map[string]*serviceState),
+		cacheRoot: cacheRoot,
+	}
 
 	// Derive a state directory next to the manifest.
 	stateDir := defaultStateDir(m)
+	manifestDir := filepath.Dir(m.Path)
 
 	for name, svc := range m.Services {
 		if svc.Adapter == "" {
 			continue // rules-only service — no state needed
 		}
-		st, err := buildServiceState(name, svc, stateDir, m.RNGSeed)
+		st, err := buildServiceState(name, svc, stateDir, manifestDir, cacheRoot, m.RNGSeed)
 		if err != nil {
 			// Clean up any states we already built.
 			e.Close()
@@ -71,6 +87,53 @@ func New(m *manifest.Manifest) (*Engine, error) {
 	return e, nil
 }
 
+// defaultAdapterCacheRoot returns the adapter cache root, honoring the
+// STUNT_ADAPTER_CACHE environment variable, falling back to
+// ~/.stunt/adapters.
+func defaultAdapterCacheRoot() string {
+	if root := os.Getenv("STUNT_ADAPTER_CACHE"); root != "" {
+		return root
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return filepath.Join(os.TempDir(), ".stunt", "adapters")
+	}
+	return filepath.Join(home, ".stunt", "adapters")
+}
+
+// resolveAdapterDir resolves an adapter source spec to a local directory
+// ready for adapter.Load. Git sources are fetched into the cache (cloning if
+// missing). Local sources are resolved to an absolute path relative to the
+// manifest directory. An empty spec returns "" (no adapter / inline rules).
+func resolveAdapterDir(spec, cacheRoot, manifestDir string) (string, error) {
+	if spec == "" {
+		return "", nil
+	}
+
+	src, err := adapterdist.ParseSource(spec)
+	if err != nil {
+		return "", fmt.Errorf("engine: parse adapter source %q: %w", spec, err)
+	}
+
+	if src.Kind == "git" {
+		cache, err := adapterdist.OpenCache(cacheRoot)
+		if err != nil {
+			return "", fmt.Errorf("engine: open adapter cache: %w", err)
+		}
+		localDir, _, err := cache.Ensure(src)
+		if err != nil {
+			return "", fmt.Errorf("engine: fetch adapter %q: %w", spec, err)
+		}
+		return localDir, nil
+	}
+
+	// Local path: resolve relative to manifest dir.
+	if !filepath.IsAbs(src.URL) {
+		return filepath.Join(manifestDir, src.URL), nil
+	}
+	return src.URL, nil
+}
+
 // buildServiceState loads an adapter, opens per-service stores, seeds
 // collections, creates identity + events primitives, and prepares the
 // Starlark builtins.
@@ -78,8 +141,13 @@ func New(m *manifest.Manifest) (*Engine, error) {
 // The per-service issuer secret is derived deterministically from
 // sha256(rngSeed:serviceName) so that restarting the engine with the same
 // seed produces a compatible issuer (tokens survive restarts).
-func buildServiceState(name string, svc manifest.Service, stateDir string, rngSeed int64) (*serviceState, error) {
-	a, err := adapter.Load(svc.Adapter)
+func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir, cacheRoot string, rngSeed int64) (*serviceState, error) {
+	dir, err := resolveAdapterDir(svc.Adapter, cacheRoot, manifestDir)
+	if err != nil {
+		return nil, err
+	}
+
+	a, err := adapter.Load(dir)
 	if err != nil {
 		return nil, err
 	}

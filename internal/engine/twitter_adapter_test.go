@@ -18,6 +18,10 @@ import (
 // the session.
 func TestTwitterStyleAdapter(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "twitter-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	stateDir := t.TempDir()
 	manifestPath := filepath.Join(stateDir, "stunt.yaml")
@@ -27,7 +31,7 @@ func TestTwitterStyleAdapter(t *testing.T) {
 		Version: 1,
 		Network: manifest.Network{Mode: "port", BasePort: 0},
 		Services: map[string]manifest.Service{
-			"twitter": {Adapter: adapterDir},
+			"twitter": {Adapter: absAdapterDir},
 		},
 	}
 

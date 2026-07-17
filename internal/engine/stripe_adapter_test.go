@@ -105,6 +105,10 @@ const devToken = "sk_test_local"
 // All authenticated requests use the sk_test dev bypass token.
 func TestStripeStyleAdapter(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "stripe-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	stateDir := t.TempDir()
 	manifestPath := filepath.Join(stateDir, "stunt.yaml")
@@ -114,7 +118,7 @@ func TestStripeStyleAdapter(t *testing.T) {
 		Version: 1,
 		Network: manifest.Network{Mode: "port", BasePort: 0},
 		Services: map[string]manifest.Service{
-			"stripe": {Adapter: adapterDir},
+			"stripe": {Adapter: absAdapterDir},
 		},
 	}
 
@@ -351,6 +355,10 @@ func TestStripeStyleAdapter(t *testing.T) {
 //   - Webhook delivery: charge.created is emitted to a configured sink.
 func TestStripeStyleAuthAndWebhooks(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "stripe-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Set up a webhook sink.
 	var mu sync.Mutex
@@ -376,7 +384,7 @@ func TestStripeStyleAuthAndWebhooks(t *testing.T) {
 		Network: manifest.Network{Mode: "port", BasePort: 0},
 		Services: map[string]manifest.Service{
 			"stripe": {
-				Adapter: adapterDir,
+				Adapter: absAdapterDir,
 				Config:  map[string]any{"webhook_url": sink.URL},
 			},
 		},
