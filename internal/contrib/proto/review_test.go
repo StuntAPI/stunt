@@ -235,7 +235,7 @@ func TestStreamingRPCsGenerated(t *testing.T) {
 	}
 	if !strings.Contains(string(src), "stream.send(") {
 		t.Error("streaming handlers should use stream.send()")
-	 }
+	}
 
 	// Type comments are present.
 	if !strings.Contains(string(src), "server-streaming") {

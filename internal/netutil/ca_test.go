@@ -341,8 +341,8 @@ func TestPlatformNonEmpty(t *testing.T) {
 func TestPlatformKnownValue(t *testing.T) {
 	p := Platform()
 	known := map[string]bool{
-		"darwin":      true,
-		"windows":     true,
+		"darwin":       true,
+		"windows":      true,
 		"linux-debian": true,
 		"linux-rhel":   true,
 		"linux-other":  true,

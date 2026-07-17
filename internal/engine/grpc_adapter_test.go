@@ -17,8 +17,8 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protodesc"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
 
@@ -326,4 +326,3 @@ func invokeGRPCRaw(t *testing.T, fds *descriptorpb.FileDescriptorSet, target, fu
 	}
 	return respMap, nil
 }
-

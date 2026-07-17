@@ -285,5 +285,3 @@ func stripSuffix(name, suffix string) (string, bool) {
 	}
 	return name[:len(name)-len(suffix)], true
 }
-
-

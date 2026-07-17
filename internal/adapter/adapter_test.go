@@ -53,8 +53,8 @@ rules:
 func TestLoad(t *testing.T) {
 	dir := t.TempDir()
 	writeAdapter(t, dir, map[string]string{
-		"adapter.yaml":       validAdapterYAML,
-		"scripts/charges.star": "def on_post(req):\n    return respond(201, {})\n",
+		"adapter.yaml":           validAdapterYAML,
+		"scripts/charges.star":   "def on_post(req):\n    return respond(201, {})\n",
 		"fixtures/charges.jsonl": `{"id":"ch_1","amount":1000}` + "\n" + `{"id":"ch_2","amount":2000}` + "\n",
 	})
 
@@ -142,7 +142,7 @@ func TestLoad(t *testing.T) {
 func TestReadFile(t *testing.T) {
 	dir := t.TempDir()
 	writeAdapter(t, dir, map[string]string{
-		"adapter.yaml":          "id: test\n",
+		"adapter.yaml":           "id: test\n",
 		"fixtures/charges.jsonl": "{\"id\":\"ch_1\"}\n",
 	})
 	a, err := Load(dir)
@@ -187,7 +187,7 @@ func TestReadFileRejectsTraversal(t *testing.T) {
 func TestReadFileAllowsSubdirs(t *testing.T) {
 	dir := t.TempDir()
 	writeAdapter(t, dir, map[string]string{
-		"adapter.yaml": "id: test\n",
+		"adapter.yaml":         "id: test\n",
 		"templates/email.tmpl": "Hello {{.name}}\n",
 	})
 	a, err := Load(dir)
@@ -268,9 +268,9 @@ grpc:
 func TestLoadGrpcSpec(t *testing.T) {
 	dir := t.TempDir()
 	writeAdapter(t, dir, map[string]string{
-		"adapter.yaml":           grpcAdapterYAML,
-		"scripts/greeter.star":   "def on_say_hello(req):\n    return respond(200, {})\n",
-		"schemas/greeter.desc":   "\x0a\x00", // minimal placeholder
+		"adapter.yaml":         grpcAdapterYAML,
+		"scripts/greeter.star": "def on_say_hello(req):\n    return respond(200, {})\n",
+		"schemas/greeter.desc": "\x0a\x00", // minimal placeholder
 	})
 
 	a, err := Load(dir)

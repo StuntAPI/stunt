@@ -437,3 +437,68 @@ func TestGRPCStreamingUnaryRegression(t *testing.T) {
 		t.Errorf("Ping msg = %q, want %q", got, "pong: hello")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Context cancellation: cancelling the client ctx mid-stream causes the
+// server handler to terminate promptly (via recv/send erroring out) rather
+// than running to its step limit.
+// ---------------------------------------------------------------------------
+
+func TestGRPCStreamingClientCancelTerminates(t *testing.T) {
+	e, fds := setupStreamingEngine(t)
+	target := e.GrpcTarget("streamer")
+
+	client := newStreamingClient(t, fds, target, "Echo")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := client.conn.NewStream(ctx, &grpc.StreamDesc{
+		StreamName:    "Echo",
+		ClientStreams: true,
+		ServerStreams: true,
+	}, "/stunt.test.Streamer/Echo")
+	if err != nil {
+		t.Fatalf("NewStream: %v", err)
+	}
+
+	// Send one message and receive the echo so we know the handler is live.
+	if err := stream.SendMsg(client.mapToMsg(map[string]any{"v": "before-cancel"})); err != nil {
+		t.Fatalf("SendMsg: %v", err)
+	}
+	resp := client.newRespMsg()
+	if err := stream.RecvMsg(resp); err != nil {
+		t.Fatalf("RecvMsg (echo): %v", err)
+	}
+
+	// Cancel mid-stream.
+	cancel()
+
+	// After cancellation, RecvMsg should return promptly (codes.Canceled)
+	// rather than hanging.
+	done := make(chan error, 1)
+	go func() {
+		resp := client.newRespMsg()
+		done <- stream.RecvMsg(resp)
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			// Some gRPC implementations return nil EOF on cancel; either way,
+			// the important thing is that it returns promptly.
+			return
+		}
+		st, ok := status.FromError(err)
+		if !ok {
+			// io.EOF is also acceptable.
+			if err == io.EOF {
+				return
+			}
+			t.Fatalf("error is not a grpc status: %v", err)
+		}
+		if st.Code() == codes.Internal {
+			t.Errorf("code = Internal, want Canceled — transport error was masked as Internal")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("RecvMsg did not return within 5s after cancel — handler did not terminate promptly")
+	}
+}

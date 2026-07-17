@@ -223,12 +223,12 @@ func TestCollectionInvalidName(t *testing.T) {
 	s := newTestStore(t)
 
 	invalidNames := []string{
-		`foo"bar`,     // embedded double-quote
+		`foo"bar`,         // embedded double-quote
 		`'; DROP TABLE--`, // SQL injection
-		"123abc",        // starts with digit
-		`has space`,      // space
-		``,               // empty
-		"has-dash",      // dash
+		"123abc",          // starts with digit
+		`has space`,       // space
+		``,                // empty
+		"has-dash",        // dash
 	}
 	for _, name := range invalidNames {
 		_, err := s.Collection(name)

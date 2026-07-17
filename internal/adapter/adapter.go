@@ -18,15 +18,15 @@ type Adapter struct {
 	// Dir is the absolute path to the adapter directory on disk (set by Load).
 	Dir string `yaml:"-"`
 
-	ID        string        `yaml:"id"`
-	Name      string        `yaml:"name"`
-	RealHosts []string      `yaml:"real_hosts"`
-	Version   string        `yaml:"version"`
-	Endpoints []Endpoint    `yaml:"endpoints"`
-	Resources []Resource    `yaml:"resources"`
-	Rules     []rules.Rule  `yaml:"rules"`
-	Identity  *Identity     `yaml:"identity"`
-	Grpc      *GrpcSpec     `yaml:"grpc"`
+	ID        string       `yaml:"id"`
+	Name      string       `yaml:"name"`
+	RealHosts []string     `yaml:"real_hosts"`
+	Version   string       `yaml:"version"`
+	Endpoints []Endpoint   `yaml:"endpoints"`
+	Resources []Resource   `yaml:"resources"`
+	Rules     []rules.Rule `yaml:"rules"`
+	Identity  *Identity    `yaml:"identity"`
+	Grpc      *GrpcSpec    `yaml:"grpc"`
 }
 
 // GrpcSpec declares an optional gRPC service served from a protobuf
@@ -57,7 +57,7 @@ type GrpcMethod struct {
 // (rules overlay) — or both.
 type Endpoint struct {
 	Route   string       `yaml:"route"`
-	Method  string       `yaml:"method"` // HTTP verb, or "" for any
+	Method  string       `yaml:"method"`  // HTTP verb, or "" for any
 	Handler string       `yaml:"handler"` // "scripts/x.star#on_post"
 	Rules   []rules.Rule `yaml:"rules"`
 }

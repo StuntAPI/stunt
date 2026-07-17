@@ -138,11 +138,11 @@ var reHasDigit = regexp.MustCompile(`[0-9]`)
 // a real ID.
 var providerPrefixes = []string{
 	"cus_", "ch_", "pi_", "sub_", "txn_", "acct_", // Stripe (partial)
-	"ghp_", "gho_", "ghu_", "ghs_",                   // GitHub tokens
-	"sk_", "rk_",                                   // Stripe secret/restricted keys
-	"AKIA",                                         // AWS access key IDs
-	"xox",                                          // Slack tokens (xox[bpoa]-)
-	"AIza",                                         // Google API keys
+	"ghp_", "gho_", "ghu_", "ghs_", // GitHub tokens
+	"sk_", "rk_", // Stripe secret/restricted keys
+	"AKIA", // AWS access key IDs
+	"xox",  // Slack tokens (xox[bpoa]-)
+	"AIza", // Google API keys
 }
 
 // looksLikeID reports whether a single path segment looks like a real

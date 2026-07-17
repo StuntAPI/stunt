@@ -10,7 +10,7 @@ func TestParameterizePath(t *testing.T) {
 		{"/users/42/orders", "/users/{id}/orders"},
 		{"/v1/charges/ch_abc123def", "/v1/charges/{id}"},
 		{"/users/550e8400-e29b-41d4-a716-446655440000", "/users/{id}"},
-		{"/repos/abc123def456ghi789jklmno", "/repos/{id}"}, // 24-char opaque id
+		{"/repos/abc123def456ghi789jklmno", "/repos/{id}"},   // 24-char opaque id
 		{"/users/{userId}/orders", "/users/{userId}/orders"}, // preserved
 		{"/api/v1/users", "/api/v1/users"},                   // no IDs
 		{"/", "/"},

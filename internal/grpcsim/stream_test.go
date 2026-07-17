@@ -9,7 +9,9 @@ import (
 	"testing"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -435,6 +437,114 @@ func TestMixedUnaryAndStreaming(t *testing.T) {
 	}
 	if got[0]["msg"] != "pong: loop" {
 		t.Errorf("stream msg[0] = %v, want %q", got[0]["msg"], "pong: loop")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Status propagation: handler returning a wrapped gRPC status error should
+// propagate the ORIGINAL code, not codes.Internal.
+// ---------------------------------------------------------------------------
+
+// TestStreamPropagatesStatusError verifies that when a StreamHandler returns an
+// error that wraps a real gRPC status (e.g. a transport error from
+// stream.recv()), the original status code is propagated to the client instead
+// of being masked as codes.Internal.
+func TestStreamPropagatesStatusError(t *testing.T) {
+	addr, cleanup := startStreamServer(t, map[string]grpcsim.StreamHandler{
+		"EchoStream": func(ctx context.Context, fullMethod string, stream grpcsim.Stream) error {
+			// Simulate a transport error wrapping a gRPC status, exactly as
+			// would surface from stream.Recv() when the client cancels.
+			return fmt.Errorf("handler error: %w", status.Error(codes.Canceled, "client cancelled"))
+		},
+	})
+	defer cleanup()
+
+	client, svcDesc := newStreamDynClient(t, "streaming.proto", addr)
+	md := svcDesc.Methods().ByName("EchoStream")
+
+	stream, err := client.conn.NewStream(context.Background(), &grpc.StreamDesc{
+		StreamName:    "EchoStream",
+		ClientStreams: true,
+		ServerStreams: true,
+	}, "/stunt.test.Streamer/EchoStream")
+	if err != nil {
+		t.Fatalf("NewStream: %v", err)
+	}
+
+	req := mapToDynamic(t, map[string]any{"seq": float64(1), "text": "hi"}, md.Input())
+	if err := stream.SendMsg(req); err != nil {
+		t.Fatalf("SendMsg: %v", err)
+	}
+
+	resp := dynamicpb.NewMessage(md.Output())
+	err = stream.RecvMsg(resp)
+	if err == nil {
+		t.Fatal("expected gRPC error from handler, got nil")
+	}
+
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("error is not a grpc status: %v", err)
+	}
+	if st.Code() != codes.Canceled {
+		t.Errorf("code = %v, want Canceled (should not be masked as Internal)", st.Code())
+	}
+}
+
+// TestStreamClientCancelPropagatesCanceled verifies that a real client cancel
+// mid-stream surfaces as codes.Canceled on the client side, not codes.Internal.
+// The handler calls stream.Recv() in a loop; when the client cancels, Recv
+// returns a transport error that propagates through the handler.
+func TestStreamClientCancelPropagatesCanceled(t *testing.T) {
+	addr, cleanup := startStreamServer(t, map[string]grpcsim.StreamHandler{
+		"EchoStream": func(ctx context.Context, fullMethod string, stream grpcsim.Stream) error {
+			for {
+				_, err := stream.Recv()
+				if err == io.EOF {
+					return nil
+				}
+				if err != nil {
+					return err // propagate transport error directly
+				}
+			}
+		},
+	})
+	defer cleanup()
+
+	client, svcDesc := newStreamDynClient(t, "streaming.proto", addr)
+	md := svcDesc.Methods().ByName("EchoStream")
+
+	ctx, cancel := context.WithCancel(context.Background())
+	stream, err := client.conn.NewStream(ctx, &grpc.StreamDesc{
+		StreamName:    "EchoStream",
+		ClientStreams: true,
+		ServerStreams: true,
+	}, "/stunt.test.Streamer/EchoStream")
+	if err != nil {
+		t.Fatalf("NewStream: %v", err)
+	}
+
+	// Send a message, then cancel mid-stream.
+	req := mapToDynamic(t, map[string]any{"seq": float64(1), "text": "hi"}, md.Input())
+	if err := stream.SendMsg(req); err != nil {
+		t.Fatalf("SendMsg: %v", err)
+	}
+
+	cancel()
+
+	// After cancellation, RecvMsg should return a gRPC error.
+	resp := dynamicpb.NewMessage(md.Output())
+	err = stream.RecvMsg(resp)
+	if err == nil {
+		t.Fatal("expected error after cancel, got nil")
+	}
+
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("error is not a grpc status: %v", err)
+	}
+	if st.Code() != codes.Canceled {
+		t.Errorf("code = %v, want Canceled", st.Code())
 	}
 }
 

@@ -50,10 +50,10 @@ type Trace struct {
 
 // TraceRequest is the recorded request to replay.
 type TraceRequest struct {
-	Method  string          `json:"method"`
-	Path    string          `json:"path"`
+	Method  string            `json:"method"`
+	Path    string            `json:"path"`
 	Headers map[string]string `json:"headers"`
-	Body    json.RawMessage `json:"body"`
+	Body    json.RawMessage   `json:"body"`
 }
 
 // TraceResponse is the recorded response to compare against.
@@ -64,9 +64,9 @@ type TraceResponse struct {
 
 // Report summarizes a conformance run.
 type Report struct {
-	Total      int         // total traces replayed
-	Matched    int         // traces that matched
-	Mismatched []Mismatch  // traces that did not match
+	Total      int        // total traces replayed
+	Matched    int        // traces that matched
+	Mismatched []Mismatch // traces that did not match
 }
 
 // Score returns the conformance percentage (matched/total * 100).
@@ -226,7 +226,7 @@ func loadTraces(path string) ([]Trace, error) {
 		}
 		var tr Trace
 		if err := json.Unmarshal([]byte(line), &tr); err != nil {
-		return nil, fmt.Errorf("conform: parse trace line %d: %w", lineNum+1, err)
+			return nil, fmt.Errorf("conform: parse trace line %d: %w", lineNum+1, err)
 		}
 		traces = append(traces, tr)
 	}

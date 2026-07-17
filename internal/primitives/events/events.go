@@ -29,11 +29,11 @@ const (
 // Emitter manages webhook target registrations and event delivery.
 // It is safe for concurrent use by multiple goroutines.
 type Emitter struct {
-	mu        sync.RWMutex
-	targets   map[string]string
-	client    *http.Client
+	mu         sync.RWMutex
+	targets    map[string]string
+	client     *http.Client
 	maxRetries int
-	backoff   time.Duration
+	backoff    time.Duration
 }
 
 // envelope is the JSON body sent to webhook targets.

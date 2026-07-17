@@ -88,4 +88,3 @@ func MergeEndpoints(dir string, endpoints []adapter.Endpoint) error {
 	}
 	return nil
 }
-

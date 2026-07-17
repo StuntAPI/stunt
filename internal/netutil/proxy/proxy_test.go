@@ -91,7 +91,7 @@ func TestProxyTLS_RoutesToBackend(t *testing.T) {
 	backend := startBackend(t, "hello-from-backend")
 
 	p, err := New(Options{
-		TLS: true,
+		TLS:  true,
 		Addr: freeAddr(t),
 		CA:   ca,
 		Backends: map[string]string{
@@ -127,7 +127,7 @@ func TestProxyTLS_H2Negotiated(t *testing.T) {
 	backend := startBackend(t, "h2-test")
 
 	p, err := New(Options{
-		TLS: true,
+		TLS:  true,
 		Addr: freeAddr(t),
 		CA:   ca,
 		Backends: map[string]string{
@@ -163,7 +163,7 @@ func TestProxyTLS_AddBackendAtRuntime(t *testing.T) {
 	backend2 := startBackend(t, "backend-two")
 
 	p, err := New(Options{
-		TLS: true,
+		TLS:  true,
 		Addr: freeAddr(t),
 		CA:   ca,
 		Backends: map[string]string{
@@ -222,7 +222,7 @@ func TestProxyTLS_UnknownHost_502(t *testing.T) {
 	ca := newTestCA(t)
 
 	p, err := New(Options{
-		TLS: true,
+		TLS:  true,
 		Addr: freeAddr(t),
 		CA:   ca,
 		Backends: map[string]string{
@@ -257,7 +257,7 @@ func TestProxyTLS_RemoveBackend(t *testing.T) {
 	backend := startBackend(t, "removable")
 
 	p, err := New(Options{
-		TLS: true,
+		TLS:  true,
 		Addr: freeAddr(t),
 		CA:   ca,
 		Backends: map[string]string{
@@ -303,7 +303,7 @@ func TestProxyHTTP_PlainNoTLS(t *testing.T) {
 	backend := startBackend(t, "plaintext-ok")
 
 	p, err := New(Options{
-		TLS: false,
+		TLS:  false,
 		Addr: freeAddr(t),
 		Backends: map[string]string{
 			"plain.localhost": backend,
@@ -337,7 +337,7 @@ func TestProxyHTTP_XForwardedHeaders(t *testing.T) {
 	backendAddr := strings.TrimPrefix(srv.URL, "http://")
 
 	p, err := New(Options{
-		TLS: false,
+		TLS:  false,
 		Addr: freeAddr(t),
 		Backends: map[string]string{
 			"fwd.localhost": backendAddr,
@@ -369,7 +369,7 @@ func TestProxyEphemeralCA(t *testing.T) {
 	backend := startBackend(t, "ephemeral")
 
 	p, err := New(Options{
-		TLS: true,
+		TLS:  true,
 		Addr: freeAddr(t),
 		Backends: map[string]string{
 			"eph.localhost": backend,
@@ -404,7 +404,7 @@ func TestProxyTLS_HostStripsPort(t *testing.T) {
 	backend := startBackend(t, "port-stripped")
 
 	p, err := New(Options{
-		TLS: true,
+		TLS:  true,
 		Addr: freeAddr(t),
 		CA:   ca,
 		Backends: map[string]string{

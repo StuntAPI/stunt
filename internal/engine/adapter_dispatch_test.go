@@ -52,7 +52,7 @@ func TestMethodMatches(t *testing.T) {
 		{"GET", "get", true},
 		{"POST", "POST", true},
 		{"GET", "POST", false},
-		{"", "GET", true},  // empty endpoint method matches anything
+		{"", "GET", true}, // empty endpoint method matches anything
 		{"", "DELETE", true},
 	}
 	for _, c := range cases {

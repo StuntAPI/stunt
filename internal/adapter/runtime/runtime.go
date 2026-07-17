@@ -2,7 +2,7 @@
 // Starlark handler scripts as builtins, enabling stateful adapters that
 // persist data across requests.
 //
-// Script API
+// # Script API
 //
 // Collections — store_collection(name) returns a collection object with methods:
 //
@@ -335,11 +335,11 @@ type collectionValue struct {
 	col *primitives.Collection
 }
 
-func (c *collectionValue) String() string  { return "collection" }
-func (c *collectionValue) Type() string    { return "collection" }
-func (c *collectionValue) Freeze()         {}
+func (c *collectionValue) String() string        { return "collection" }
+func (c *collectionValue) Type() string          { return "collection" }
+func (c *collectionValue) Freeze()               {}
 func (c *collectionValue) Hash() (uint32, error) { return 0, nil }
-func (c *collectionValue) Truth() sk.Bool  { return sk.True }
+func (c *collectionValue) Truth() sk.Bool        { return sk.True }
 
 func (c *collectionValue) CompareSameType(_ syntax.Token, _ sk.Value, _ int) (bool, error) {
 	return false, fmt.Errorf("collection does not support comparison")
@@ -450,11 +450,11 @@ type blobValue struct {
 	ns    string
 }
 
-func (b *blobValue) String() string         { return "blob:" + b.ns }
-func (b *blobValue) Type() string           { return "blob" }
-func (b *blobValue) Freeze()                {}
-func (b *blobValue) Hash() (uint32, error)  { return 0, nil }
-func (b *blobValue) Truth() sk.Bool         { return sk.True }
+func (b *blobValue) String() string        { return "blob:" + b.ns }
+func (b *blobValue) Type() string          { return "blob" }
+func (b *blobValue) Freeze()               {}
+func (b *blobValue) Hash() (uint32, error) { return 0, nil }
+func (b *blobValue) Truth() sk.Bool        { return sk.True }
 
 func (b *blobValue) CompareSameType(_ syntax.Token, _ sk.Value, _ int) (bool, error) {
 	return false, fmt.Errorf("blob does not support comparison")
