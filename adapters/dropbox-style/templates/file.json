@@ -1,0 +1,10 @@
+{
+  ".tag": "file",
+  "id": "id_{{ faker.Int 1 9999 }}",
+  "name": "{{ faker.Word }}.txt",
+  "path_lower": "/{{ faker.Word }}/{{ faker.Word }}.txt",
+  "path_display": "/{{ faker.Word }}/{{ faker.Word }}.txt",
+  "size": {{ faker.Int 10 99999 }},
+  "client_modified": "{{ now.Format \"2006-01-02T15:04:05.000Z07:00\" }}",
+  "server_modified": "{{ now.Format \"2006-01-02T15:04:05.000Z07:00\" }}"
+}

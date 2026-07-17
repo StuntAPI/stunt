@@ -1,0 +1,61 @@
+# stunt adapter manifest — Dropbox-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of a Dropbox-style files API for
+# LOCAL TESTING ONLY. It does not call the real Dropbox API. All data is
+# synthetic. See DISCLAIMER.
+id: dropbox-style
+name: "Dropbox-style API simulator (unofficial)"
+version: "0.1.0"
+
+# Dropbox uses RPC-style endpoints: POST /2/files/{action} with JSON bodies.
+# This is distinct from REST-style adapters (e.g., drive-style) and provides
+# useful adapter-pattern variety for local testing.
+endpoints:
+  # --- Files (upload, download, list, metadata, folder, delete, temp link) ---
+  - route: /2/files/upload
+    method: POST
+    handler: scripts/files.star#on_upload
+  - route: /2/files/download
+    method: POST
+    handler: scripts/files.star#on_download
+  - route: /2/files/list_folder
+    method: POST
+    handler: scripts/files.star#on_list_folder
+  - route: /2/files/get_metadata
+    method: POST
+    handler: scripts/files.star#on_get_metadata
+  - route: /2/files/create_folder
+    method: POST
+    handler: scripts/files.star#on_create_folder
+  - route: /2/files/delete
+    method: POST
+    handler: scripts/files.star#on_delete
+  - route: /2/files/get_temporary_link
+    method: POST
+    handler: scripts/files.star#on_get_temporary_link
+
+  # --- Users (synthetic account info) ---
+  - route: /2/users/get_current_account
+    method: POST
+    handler: scripts/users.star#on_get_current_account
+
+# Backing stores available to Starlark handlers.
+resources:
+  - name: entries
+    kind: collection
+    seed: fixtures/entries.jsonl
+
+# Auth scheme metadata (mock: any bearer token is accepted; not enforced).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: resource_not_found
