@@ -1,0 +1,2 @@
+{"id":"seed-tweet-alpha","text":"Hello from the local simulator","author_id":"seed-user-alpha","created_at":"2024-01-15T12:00:00Z"}
+{"id":"seed-tweet-beta","text":"Synthetic data for local testing only","author_id":"seed-user-beta","created_at":"2024-01-16T09:15:00Z"}

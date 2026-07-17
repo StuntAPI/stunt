@@ -1,0 +1,71 @@
+# stunt adapter manifest — X.com / Twitter-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of an X.com / Twitter-style API for
+# LOCAL TESTING ONLY. It does not call the real X.com API. All data is
+# synthetic. See DISCLAIMER.
+id: twitter-style
+name: "X.com / Twitter-style API simulator (unofficial)"
+version: "0.1.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: specific literal routes (e.g. /2/users/me) must come BEFORE
+# parameterized routes (e.g. /2/users/{id}) so they are matched first.
+endpoints:
+  # --- Auth (mock OAuth2 token endpoint) ---
+  - route: /2/oauth2/token
+    method: POST
+    handler: scripts/auth.star#on_token
+
+  # --- Users (literal routes first, then parameterized) ---
+  - route: /2/users/me
+    method: GET
+    handler: scripts/users.star#on_me
+  - route: /2/users/by/username/{username}
+    method: GET
+    handler: scripts/users.star#on_lookup
+  - route: /2/users/{id}
+    method: GET
+    handler: scripts/users.star#on_show
+
+  # --- Tweets (stateful CRUD via store_collection) ---
+  - route: /2/tweets
+    method: POST
+    handler: scripts/tweets.star#on_create
+  - route: /2/tweets/{id}
+    method: GET
+    handler: scripts/tweets.star#on_retrieve
+  - route: /2/tweets
+    method: GET
+    handler: scripts/tweets.star#on_list
+  - route: /2/tweets/{id}
+    method: DELETE
+    handler: scripts/tweets.star#on_delete
+
+  # --- Timeline (reverse-chronological feed) ---
+  - route: /2/users/{id}/timelines/reverse_chronological
+    method: GET
+    handler: scripts/timeline.star#on_timeline
+
+# Backing stores available to Starlark handlers via store_collection.
+resources:
+  - name: tweets
+    kind: collection
+    seed: fixtures/tweets.jsonl
+  - name: users
+    kind: collection
+    seed: fixtures/users.jsonl
+
+# Auth scheme metadata (mock: any bearer token is accepted; not enforced).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: resource_not_found
