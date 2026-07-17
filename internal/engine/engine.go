@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"io"
@@ -120,7 +121,7 @@ func resolveAdapterDir(spec, cacheRoot, manifestDir string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("engine: open adapter cache: %w", err)
 		}
-		localDir, _, err := cache.Ensure(src)
+		localDir, _, err := cache.Ensure(context.Background(), src)
 		if err != nil {
 			return "", fmt.Errorf("engine: fetch adapter %q: %w", spec, err)
 		}

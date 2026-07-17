@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -137,7 +138,7 @@ func runAdapterAdd(out interface{ Write([]byte) (int, error) }, manifestPath, ca
 	}
 
 	// Ensure the source is fetchable (git: clone+checkout; local: resolve path).
-	if _, _, err := cache.Ensure(src); err != nil {
+	if _, _, err := cache.Ensure(context.Background(), src); err != nil {
 		return fmt.Errorf("adapter add: fetch %s: %w", src.String(), err)
 	}
 
@@ -303,7 +304,7 @@ func runAdapterUpdate(out interface{ Write([]byte) (int, error) }, manifestPath,
 			fmt.Fprintf(out, "  %-20s  skipped (local path)\n", tgt.name)
 			continue
 		}
-		if err := cache.Reconcile(tgt.src); err != nil {
+		if err := cache.Reconcile(context.Background(), tgt.src); err != nil {
 			fmt.Fprintf(out, "  %-20s  error: %v\n", tgt.name, err)
 			continue
 		}

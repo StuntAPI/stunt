@@ -3,6 +3,7 @@ package manifest
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/stunt-adapters/stunt/internal/rules"
 	"gopkg.in/yaml.v3"
@@ -61,11 +62,15 @@ func Load(path string) (*Manifest, error) {
 	return m, nil
 }
 
-// Save marshals the manifest to YAML and writes it to path. The Path field
-// is updated to reflect the destination. Note: this is a full re-marshal;
-// comments and manual formatting from the original file are not preserved
-// (acceptable for MVP — the manifest is small and machine-managed by the
-// adapter commands).
+// Save marshals the manifest to YAML and writes it to path atomically: the
+// data is written to a temporary file in the same directory and then renamed
+// over the destination. This prevents corruption if the process is killed
+// mid-write (a crash during os.WriteFile would leave a truncated file). The
+// Path field is updated to reflect the destination.
+//
+// Note: this is a full re-marshal; comments and manual formatting from the
+// original file are not preserved (acceptable for MVP — the manifest is small
+// and machine-managed by the adapter commands).
 func Save(m *Manifest, path string) error {
 	// Ensure version is set for newly-created manifests.
 	if m.Version == 0 {
@@ -75,9 +80,36 @@ func Save(m *Manifest, path string) error {
 	if err != nil {
 		return fmt.Errorf("manifest: marshal: %w", err)
 	}
-	if err := os.WriteFile(path, out, 0o644); err != nil {
-		return fmt.Errorf("manifest: write %s: %w", path, err)
+	dir := filepath.Dir(path)
+	if dir == "" {
+		dir = "."
 	}
+	tmp, err := os.CreateTemp(dir, ".stunt-*.tmp")
+	if err != nil {
+		return fmt.Errorf("manifest: create temp file in %s: %w", dir, err)
+	}
+	tmpName := tmp.Name()
+	defer func() {
+		// Clean up the temp file if the rename didn't happen (any error path).
+		if _, statErr := os.Stat(tmpName); statErr == nil {
+			_ = os.Remove(tmpName)
+		}
+	}()
+
+	if _, err := tmp.Write(out); err != nil {
+		tmp.Close()
+		return fmt.Errorf("manifest: write temp file %s: %w", tmpName, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("manifest: close temp file %s: %w", tmpName, err)
+	}
+	if err := os.Chmod(tmpName, 0o644); err != nil {
+		return fmt.Errorf("manifest: chmod temp file %s: %w", tmpName, err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("manifest: rename %s → %s: %w", tmpName, path, err)
+	}
+
 	m.Path = path
 	return nil
 }

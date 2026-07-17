@@ -114,3 +114,103 @@ func TestSaveWritesVersionFirst(t *testing.T) {
 func osReadFileManifest(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
+
+// --- I1: atomic save ---
+
+// TestSaveAtomicRoundTrip verifies the basic write+read roundtrip works.
+func TestSaveAtomicRoundTrip(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Network: Network{Mode: "port", BasePort: 9000},
+		Services: map[string]Service{
+			"hello": {Adapter: "git:github.com/user/repo@v1.0"},
+			"world": {Adapter: "/local/path"},
+		},
+	}
+	path := filepath.Join(t.TempDir(), "stunt.yaml")
+	if err := Save(m, path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	m2, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if m2.Version != 1 {
+		t.Errorf("Version = %d, want 1", m2.Version)
+	}
+	if len(m2.Services) != 2 {
+		t.Fatalf("Services = %d, want 2", len(m2.Services))
+	}
+	if m2.Services["hello"].Adapter != "git:github.com/user/repo@v1.0" {
+		t.Errorf("hello adapter = %q", m2.Services["hello"].Adapter)
+	}
+	if m2.Services["world"].Adapter != "/local/path" {
+		t.Errorf("world adapter = %q", m2.Services["world"].Adapter)
+	}
+}
+
+// TestSaveDoesNotLeaveTempFile verifies that after a successful save, no
+// temporary file is left behind in the directory.
+func TestSaveDoesNotLeaveTempFile(t *testing.T) {
+	absDir := t.TempDir()
+	path := filepath.Join(absDir, "stunt.yaml")
+	m := &Manifest{
+		Version:  1,
+		Network:  Network{Mode: "port", BasePort: 8000},
+		Services: map[string]Service{"hello": {Adapter: "/local"}},
+	}
+	if err := Save(m, path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	entries, err := os.ReadDir(absDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".stunt-") {
+			t.Errorf("temp file left behind: %s", e.Name())
+		}
+	}
+}
+
+// TestSaveOverwritesExistingFile verifies that saving over an existing file
+// replaces it atomically (the old content is gone, new content is present).
+func TestSaveOverwritesExistingFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "stunt.yaml")
+
+	// Write initial.
+	m1 := &Manifest{
+		Version:  1,
+		Network:  Network{Mode: "port", BasePort: 8000},
+		Services: map[string]Service{"svc1": {Adapter: "/old"}},
+	}
+	if err := Save(m1, path); err != nil {
+		t.Fatalf("first Save: %v", err)
+	}
+
+	// Overwrite.
+	m2 := &Manifest{
+		Version:  1,
+		Network:  Network{Mode: "port", BasePort: 9000},
+		Services: map[string]Service{"svc2": {Adapter: "/new"}},
+	}
+	if err := Save(m2, path); err != nil {
+		t.Fatalf("second Save: %v", err)
+	}
+
+	loaded, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if _, exists := loaded.Services["svc1"]; exists {
+		t.Error("old service should be gone after overwrite")
+	}
+	if loaded.Services["svc2"].Adapter != "/new" {
+		t.Errorf("svc2 adapter = %q, want /new", loaded.Services["svc2"].Adapter)
+	}
+	if loaded.Network.BasePort != 9000 {
+		t.Errorf("BasePort = %d, want 9000", loaded.Network.BasePort)
+	}
+}

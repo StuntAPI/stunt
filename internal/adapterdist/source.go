@@ -201,7 +201,15 @@ func stripUserinfo(authority string) string {
 }
 
 // newGitSource constructs a git [Source] and validates host/path/ref.
+// It rejects URLs starting with "-" to prevent git option injection (C1):
+// the SSH shorthand "git:user@host:path" can yield a URL like
+// "--upload-pack=evil@host:path" which git would parse as a flag, not a
+// URL. This is a defense-in-depth measure — cloneFresh also inserts "--"
+// before the URL in the clone argv.
 func newGitSource(url, host, path, ref string) (*Source, error) {
+	if strings.HasPrefix(url, "-") {
+		return nil, fmt.Errorf("adapterdist: unsafe URL %q (must not start with -)", url)
+	}
 	if err := validateHostPath(host, path); err != nil {
 		return nil, err
 	}
