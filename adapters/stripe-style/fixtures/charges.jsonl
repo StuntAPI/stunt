@@ -1,0 +1,2 @@
+{"id":"seed-charge-alpha","object":"charge","amount":2000,"currency":"usd","status":"succeeded","customer":"seed-customer-alpha","description":"First seed charge","captured":true,"refunded":false}
+{"id":"seed-charge-beta","object":"charge","amount":4500,"currency":"usd","status":"pending","customer":"seed-customer-alpha","description":"Second seed charge","captured":false,"refunded":false}

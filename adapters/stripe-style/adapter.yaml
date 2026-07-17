@@ -1,0 +1,73 @@
+# stunt adapter manifest — Stripe-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of a Stripe-style payments API for
+# LOCAL TESTING ONLY. It does not call the real Stripe API. All data is
+# synthetic. See DISCLAIMER.
+id: stripe-style
+name: "Stripe-style API simulator (unofficial)"
+version: "0.1.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+endpoints:
+  # --- Charges ---
+  - route: /v1/charges
+    method: POST
+    handler: scripts/charges.star#on_create
+  - route: /v1/charges/{id}
+    method: GET
+    handler: scripts/charges.star#on_retrieve
+  - route: /v1/charges
+    method: GET
+    handler: scripts/charges.star#on_list
+  - route: /v1/charges/{id}/capture
+    method: POST
+    handler: scripts/charges.star#on_capture
+  - route: /v1/charges/{id}/refund
+    method: POST
+    handler: scripts/charges.star#on_refund
+
+  # --- Customers ---
+  - route: /v1/customers
+    method: POST
+    handler: scripts/customers.star#on_create
+  - route: /v1/customers/{id}
+    method: GET
+    handler: scripts/customers.star#on_retrieve
+  - route: /v1/customers
+    method: GET
+    handler: scripts/customers.star#on_list
+  - route: /v1/customers/{id}
+    method: POST
+    handler: scripts/customers.star#on_update
+  - route: /v1/customers/{id}
+    method: DELETE
+    handler: scripts/customers.star#on_delete
+
+  # --- Balance ---
+  - route: /v1/balance
+    method: GET
+    handler: scripts/balance.star#on_get
+
+# Backing stores available to Starlark handlers via store_collection.
+resources:
+  - name: charges
+    kind: collection
+    seed: fixtures/charges.jsonl
+  - name: customers
+    kind: collection
+    seed: fixtures/customers.jsonl
+
+# Auth scheme metadata (mock: any bearer token is accepted; not enforced).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: resource_not_found

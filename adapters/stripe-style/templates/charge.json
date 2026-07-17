@@ -1,0 +1,12 @@
+{
+  "id": "{{ faker.ID "ch" }}",
+  "object": "charge",
+  "amount": {{ faker.Int 100 99999 }},
+  "currency": "usd",
+  "status": "succeeded",
+  "customer": "{{ faker.ID "cus" }}",
+  "description": "Payment for {{ faker.Word }}",
+  "captured": true,
+  "refunded": false,
+  "created": {{ faker.Int 1700000000 1799999999 }}
+}
