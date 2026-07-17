@@ -5,8 +5,9 @@
 `stunt` reads a `stunt.yaml` manifest and serves local, runnable stand-ins for real APIs.
 Stateful behavior comes from sandboxed Starlark adapters backed by SQLite/blob primitives;
 declarative behavior comes from a rules engine (templated responses, probabilistic faults,
-conditional expressions). Optionally front everything with a portless.dev-style TLS proxy on
-`*.localhost`. Everything is deterministic via `rng_seed`.
+conditional expressions). Both REST and gRPC (unary) services are supported. Optionally front
+everything with a portless.dev-style TLS proxy on `*.localhost`. Everything is deterministic via
+`rng_seed`.
 
 > **Status:** pre-1.0 MVP. The core is built and self-tested; see **Known limitations** below.
 > Unofficial, not affiliated with any provider whose API style an adapter mimics.
@@ -105,6 +106,7 @@ All unofficial, synthetic-data-only, with a DISCLAIMER. See `adapters/README.md`
 | `adapters/stripe-style` | payments API — charges (create/retrieve/list/capture/refund), customers (CRUD), balance | Collection + Starlark |
 | `adapters/drive-style` | files API — upload/get/download/list/patch/delete, folders, about/quota | Blob + Collection |
 | `adapters/twitter-style` | X.com/Twitter-style — mock OAuth, tweets (CRUD), users, timeline | Collection (pure-mock reads) |
+| `adapters/echo-style` | generic gRPC service (Say, Add, ListEchoes) — gRPC reference example | Collection + KV + Starlark |
 | `adapters/dropbox-style` | files API (RPC-style) — upload/download/list_folder/get_metadata/create_folder/delete | Blob + Collection |
 
 ## Networking (`*.localhost`, TLS)
@@ -136,7 +138,9 @@ never runs as root). CLI: `stunt proxy start|stop`, `stunt service install|statu
   (the stripe-style adapter demonstrates real bearer-token validation + `charge.*` webhook emission).
 - The privileged `:443` bind requires `stunt setup`/`stunt service install` (one-time); without it,
   subdomain mode uses an OS-assigned high port (the URL includes the port).
-- No gRPC/GraphQL/WebSocket (REST only).
+- **gRPC unary** RPCs are supported via the `grpc:` adapter section (served dynamically from a
+  compiled protobuf descriptor set). **gRPC streaming is not yet supported.** GraphQL and WebSocket
+  are also not yet supported.
 - Concurrency is tested with `-race`; the design is single-process per `stunt up`.
 
 ## Project layout

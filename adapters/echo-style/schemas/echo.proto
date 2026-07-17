@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package stunt.example;
+
+option go_package = "github.com/stunt-adapters/stunt/adapters/echo-style/schemas;echostyle";
+
+// Echo is a trivial stateful service used to demonstrate stunt gRPC adapters.
+service Echo {
+  // Say echoes the request message back and records it in the echo log.
+  rpc Say(EchoRequest) returns (EchoReply);
+  // Add accumulates integer values and returns the running total + count.
+  rpc Add(AddRequest) returns (AddReply);
+  // ListEchoes returns all messages previously echoed by Say.
+  rpc ListEchoes(ListEchoesRequest) returns (ListEchoesReply);
+}
+
+message EchoRequest {
+  string message = 1;
+}
+
+message EchoReply {
+  string message = 1;
+  int32 echo_count = 2; // total number of Say calls (including this one)
+}
+
+message AddRequest {
+  int32 value = 1;
+}
+
+message AddReply {
+  int32 total = 1;  // running total across all Add calls
+  int32 count = 2;  // number of Add calls (including this one)
+}
+
+message ListEchoesRequest {} // empty — lists all recorded echoes
+
+message EchoRecord {
+  string message = 1;
+}
+
+message ListEchoesReply {
+  repeated EchoRecord echoes = 1;
+}

@@ -279,7 +279,11 @@ func invokeGRPCRaw(t *testing.T, fds *descriptorpb.FileDescriptorSet, target, fu
 	}
 	t.Cleanup(func() { conn.Close() })
 
-	desc, err := files.FindDescriptorByName(protoreflect.FullName("stunt.test.Greeter"))
+	// Derive the fully-qualified service name from the full method path:
+	// "/pkg.Svc/Method" → "pkg.Svc". This makes the helper generic across
+	// services rather than hardcoding a single service name.
+	svcFullName := protoreflect.FullName(fullMethod[1:strings.LastIndex(fullMethod, "/")])
+	desc, err := files.FindDescriptorByName(svcFullName)
 	if err != nil {
 		return nil, fmt.Errorf("find service: %w", err)
 	}
