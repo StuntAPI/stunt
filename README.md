@@ -132,8 +132,8 @@ never runs as root). CLI: `stunt proxy start|stop`, `stunt service install|statu
 
 - Adapters load from **local paths**; git-repo distribution + the remote catalog index are stubbed
   (`stunt catalog` works offline via a bundled fallback).
-- `Identity`/`Events` primitives exist in Go but are **not yet wired into Starlark handlers** —
-  adapters can't mint tokens or emit webhooks from a handler yet (token validation is mock-only).
+- Adapters can `identity_mint`/`identity_validate` tokens and `events_emit` webhooks from Starlark
+  (the stripe-style adapter demonstrates real bearer-token validation + `charge.*` webhook emission).
 - The privileged `:443` bind requires `stunt setup`/`stunt service install` (one-time); without it,
   subdomain mode uses an OS-assigned high port (the URL includes the port).
 - No gRPC/GraphQL/WebSocket (REST only).
