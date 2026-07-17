@@ -41,5 +41,13 @@ func Load(dir string) (*Adapter, error) {
 	}
 
 	a.resolveHandlerPaths()
+
+	// Resolve the gRPC descriptor path to absolute (like handler scripts).
+	if a.Grpc != nil && a.Grpc.Descriptor != "" {
+		if !filepath.IsAbs(a.Grpc.Descriptor) {
+			a.Grpc.Descriptor = filepath.Join(a.Dir, a.Grpc.Descriptor)
+		}
+	}
+
 	return a, nil
 }

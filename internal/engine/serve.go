@@ -36,6 +36,7 @@ func (e *Engine) serve(ctx context.Context, freePorts bool) (map[string]string, 
 	sort.Strings(names)
 
 	addrs := make(map[string]string, len(names))
+	e.grpcTargets = make(map[string]string)
 	var servers []*http.Server
 	port := e.manifest.Network.BasePort
 
@@ -50,6 +51,9 @@ func (e *Engine) serve(ctx context.Context, freePorts bool) (map[string]string, 
 			for _, s := range servers {
 				_ = s.Close()
 			}
+			for _, gs := range e.grpcServers {
+				gs.GracefulStop()
+			}
 			return nil, nil, fmt.Errorf("listen for %s: %w", name, err)
 		}
 		svc := e.manifest.Services[name]
@@ -62,6 +66,22 @@ func (e *Engine) serve(ctx context.Context, freePorts bool) (map[string]string, 
 		addrs[name] = "http://" + ln.Addr().String()
 		if !freePorts {
 			port++
+		}
+
+		// Start a gRPC server if the adapter declares one.
+		if st, ok := e.states[name]; ok && st.adapter != nil && st.adapter.Grpc != nil {
+			target, grpcSrv, err := e.startGRPC(ctx, st)
+			if err != nil {
+				for _, s := range servers {
+					_ = s.Close()
+				}
+				for _, gs := range e.grpcServers {
+					gs.GracefulStop()
+				}
+				return nil, nil, fmt.Errorf("grpc for %s: %w", name, err)
+			}
+			e.grpcServers = append(e.grpcServers, grpcSrv)
+			e.grpcTargets[name] = target
 		}
 	}
 

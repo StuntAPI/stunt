@@ -244,6 +244,168 @@ func TestLoadEmptyID(t *testing.T) {
 	})
 	_, err := Load(dir)
 	if err == nil {
-		t.Fatal("expected error for empty ID")
+		t.Fatal("expected error for empty id")
+	}
+}
+
+// --- gRPC spec ---
+
+const grpcAdapterYAML = `
+id: greeter
+name: Greeter
+endpoints:
+  - route: /health
+    method: GET
+    handler: scripts/greeter.star#on_health
+grpc:
+  service: stunt.test.Greeter
+  descriptor: schemas/greeter.desc
+  methods:
+    - name: SayHello
+      handler: scripts/greeter.star#on_say_hello
+`
+
+func TestLoadGrpcSpec(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapter(t, dir, map[string]string{
+		"adapter.yaml":           grpcAdapterYAML,
+		"scripts/greeter.star":   "def on_say_hello(req):\n    return respond(200, {})\n",
+		"schemas/greeter.desc":   "\x0a\x00", // minimal placeholder
+	})
+
+	a, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	if a.Grpc == nil {
+		t.Fatal("Grpc is nil")
+	}
+	if a.Grpc.Service != "stunt.test.Greeter" {
+		t.Errorf("Service = %q", a.Grpc.Service)
+	}
+
+	// Descriptor path should be resolved to absolute.
+	if !filepath.IsAbs(a.Grpc.Descriptor) {
+		t.Errorf("Descriptor not absolute: %q", a.Grpc.Descriptor)
+	}
+	if !strings.HasSuffix(a.Grpc.Descriptor, "schemas/greeter.desc") {
+		t.Errorf("Descriptor path unexpected: %q", a.Grpc.Descriptor)
+	}
+
+	// Method handler paths should be resolved to absolute.
+	if len(a.Grpc.Methods) != 1 {
+		t.Fatalf("Methods: %d, want 1", len(a.Grpc.Methods))
+	}
+	m := a.Grpc.Methods[0]
+	if m.Name != "SayHello" {
+		t.Errorf("method name = %q", m.Name)
+	}
+	scriptPath := strings.SplitN(m.Handler, "#", 2)[0]
+	if !filepath.IsAbs(scriptPath) {
+		t.Errorf("handler script not absolute: %q", m.Handler)
+	}
+	if _, err := os.Stat(scriptPath); err != nil {
+		t.Errorf("handler script does not exist: %v", err)
+	}
+	if !strings.HasSuffix(m.Handler, "#on_say_hello") {
+		t.Errorf("handler missing #on_say_hello: %q", m.Handler)
+	}
+}
+
+func TestLoadGrpcValidation(t *testing.T) {
+	cases := []struct {
+		name string
+		yaml string
+		err  string
+	}{
+		{
+			name: "missing service",
+			yaml: `id: g
+name: G
+grpc:
+  descriptor: schemas/x.desc
+  methods:
+    - name: M
+      handler: scripts/x.star#f
+`,
+			err: "grpc.service",
+		},
+		{
+			name: "missing descriptor",
+			yaml: `id: g
+name: G
+grpc:
+  service: pkg.Svc
+  methods:
+    - name: M
+      handler: scripts/x.star#f
+`,
+			err: "grpc.descriptor",
+		},
+		{
+			name: "missing method name",
+			yaml: `id: g
+name: G
+grpc:
+  service: pkg.Svc
+  descriptor: schemas/x.desc
+  methods:
+    - handler: scripts/x.star#f
+`,
+			err: "grpc.methods[0].name",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeAdapter(t, dir, map[string]string{"adapter.yaml": c.yaml})
+			_, err := Load(dir)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), c.err) {
+				t.Errorf("error %q does not contain %q", err.Error(), c.err)
+			}
+		})
+	}
+}
+
+func TestDescriptorBytes(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapter(t, dir, map[string]string{
+		"adapter.yaml":         grpcAdapterYAML,
+		"scripts/greeter.star": "def on_say_hello(req):\n    return respond(200, {})\n",
+		"schemas/greeter.desc": "descriptor-bytes",
+	})
+
+	a, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	data, err := a.DescriptorBytes()
+	if err != nil {
+		t.Fatalf("DescriptorBytes: %v", err)
+	}
+	if string(data) != "descriptor-bytes" {
+		t.Errorf("got %q, want %q", data, "descriptor-bytes")
+	}
+}
+
+func TestDescriptorBytesNoGrpc(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapter(t, dir, map[string]string{
+		"adapter.yaml": "id: plain\nname: Plain\n",
+	})
+
+	a, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	_, err = a.DescriptorBytes()
+	if err == nil {
+		t.Fatal("expected error when no grpc configured")
 	}
 }
