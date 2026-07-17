@@ -38,6 +38,10 @@ func patchJSON(t *testing.T, url string, body map[string]any) (string, int) {
 // State persists across requests within the session.
 func TestDriveStyleAdapter(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "drive-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	stateDir := t.TempDir()
 	manifestPath := filepath.Join(stateDir, "stunt.yaml")
@@ -47,7 +51,7 @@ func TestDriveStyleAdapter(t *testing.T) {
 		Version: 1,
 		Network: manifest.Network{Mode: "port", BasePort: 0},
 		Services: map[string]manifest.Service{
-			"drive": {Adapter: adapterDir},
+			"drive": {Adapter: absAdapterDir},
 		},
 	}
 

@@ -62,7 +62,9 @@ type Source struct {
 }
 
 // gitProtocols are the URL scheme prefixes recognized as git sources.
-var gitProtocols = []string{"https://", "ssh://", "git://"}
+// file:// is included so that local git repositories (e.g. for offline
+// testing or LAN-hosted repos) can be used as adapter sources.
+var gitProtocols = []string{"https://", "ssh://", "git://", "file://"}
 
 // Character-class validation regexes (security: prevent cache-dir escape
 // and git-argument injection — see the package security model comment).
@@ -117,6 +119,14 @@ func parseGitShorthand(rest string) (*Source, error) {
 		return nil, fmt.Errorf("adapterdist: empty git source after 'git:' prefix")
 	}
 
+	// If the rest starts with a known protocol (e.g. "git:file:///tmp/repo"),
+	// delegate to the protocol URL parser so the URL is preserved correctly.
+	for _, proto := range gitProtocols {
+		if strings.HasPrefix(rest, proto) {
+			return parseProtocolURL(rest, proto)
+		}
+	}
+
 	// SSH shorthand: user@host:path[@ref].
 	// Detect by a ':' that has an '@' before it (scp-like syntax).
 	if colonIdx := strings.Index(rest, ":"); colonIdx > 0 {
@@ -160,6 +170,14 @@ func parseProtocolURL(spec, scheme string) (*Source, error) {
 	path, ref := splitRef(pathRef)
 	host := stripUserinfo(authority)
 	url := scheme + authority + "/" + path
+
+	// For file:// URLs with an empty authority (e.g. "file:///tmp/repo"),
+	// default host to "localhost" — this is the standard semantics for
+	// file URLs and keeps the cache layout valid (<root>/git/localhost/...).
+	if host == "" && scheme == "file://" {
+		host = "localhost"
+	}
+
 	return newGitSource(url, host, path, ref)
 }
 

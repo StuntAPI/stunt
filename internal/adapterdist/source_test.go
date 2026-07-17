@@ -194,6 +194,27 @@ func TestParseProtocolURLs(t *testing.T) {
 			host: "codeberg.org",
 			path: "org/repo",
 		},
+		{
+			spec: "file:///tmp/repo@v1.0",
+			url:  "file:///tmp/repo",
+			ref:  "v1.0",
+			host: "localhost",
+			path: "tmp/repo",
+		},
+		{
+			spec: "file://localhost/tmp/repo",
+			url:  "file://localhost/tmp/repo",
+			ref:  "",
+			host: "localhost",
+			path: "tmp/repo",
+		},
+		{
+			spec: "git:file:///tmp/repo@v1.0",
+			url:  "file:///tmp/repo",
+			ref:  "v1.0",
+			host: "localhost",
+			path: "tmp/repo",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.spec, func(t *testing.T) {
@@ -392,6 +413,8 @@ func TestStringRoundTrip(t *testing.T) {
 		"https://github.com/user/repo@v1.0",
 		"https://github.com/user/repo",
 		"ssh://git@github.com/user/repo@v1.0",
+		"file:///tmp/repo@v1.0",
+		"git:file:///tmp/repo@v1.0",
 		"/local/abs/path",
 		"./relative/path",
 	}
