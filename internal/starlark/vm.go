@@ -18,6 +18,7 @@ type Request struct {
 	Headers map[string]string
 	Body    map[string]any
 	Params  map[string]string // path params extracted from route match
+	Query   map[string]string // query parameters (first value of each key)
 }
 
 // Response is the Go-friendly representation of the HTTP response produced
@@ -26,6 +27,7 @@ type Response struct {
 	Status  int
 	Headers map[string]string
 	Body    map[string]any
+	RawBody string // raw text body (when handler returns a string body)
 }
 
 // VM wraps the globals defined by a loaded script. Each Load call produces
@@ -88,6 +90,7 @@ func (vm *VM) Call(handlerName string, req Request) (Response, error) {
 		"headers": req.Headers,
 		"body":    req.Body,
 		"params":  req.Params,
+		"query":   req.Query,
 	})
 
 	// Create a fresh thread per Call so concurrent requests don't share
@@ -148,6 +151,8 @@ func starlarkToResponse(v sk.Value) (Response, error) {
 		case "body":
 			if bd, ok := val.(*sk.Dict); ok {
 				resp.Body = StarlarkToGo(bd)
+			} else if ss, ok := sk.AsString(val); ok && val.Type() == "string" {
+				resp.RawBody = ss
 			}
 		case "headers":
 			if hd, ok := val.(*sk.Dict); ok {

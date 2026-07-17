@@ -1,0 +1,58 @@
+# stunt adapter manifest — Google-Drive-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of a Google-Drive-style files API for
+# LOCAL TESTING ONLY. It does not call the real Google Drive API. All data is
+# synthetic. See DISCLAIMER.
+id: drive-style
+name: "Google-Drive-style API simulator (unofficial)"
+version: "0.1.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+endpoints:
+  # --- Files (upload, metadata, download, list, patch, delete) ---
+  - route: /upload/drive/v3/files
+    method: POST
+    handler: scripts/files.star#on_upload
+  - route: /drive/v3/files/{id}
+    method: GET
+    handler: scripts/files.star#on_get
+  - route: /drive/v3/files
+    method: GET
+    handler: scripts/files.star#on_list
+  - route: /drive/v3/files/{id}
+    method: PATCH
+    handler: scripts/files.star#on_patch
+  - route: /drive/v3/files/{id}
+    method: DELETE
+    handler: scripts/files.star#on_delete
+
+  # --- About / quota ---
+  - route: /drive/v3/about
+    method: GET
+    handler: scripts/misc.star#on_about
+
+  # --- Changes (synthetic, minimal) ---
+  - route: /drive/v3/changes
+    method: GET
+    handler: scripts/misc.star#on_changes
+
+# Backing stores available to Starlark handlers.
+resources:
+  - name: files
+    kind: collection
+    seed: fixtures/files.jsonl
+
+# Auth scheme metadata (mock: any bearer token is accepted; not enforced).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: resource_not_found
