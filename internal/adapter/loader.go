@@ -40,13 +40,18 @@ func Load(dir string) (*Adapter, error) {
 		return nil, err
 	}
 
-	a.resolveHandlerPaths()
+	if err := a.resolveHandlerPaths(); err != nil {
+		return nil, err
+	}
 
-	// Resolve the gRPC descriptor path to absolute (like handler scripts).
+	// Resolve the gRPC descriptor path to absolute (like handler scripts),
+	// applying the same directory-containment check.
 	if a.Grpc != nil && a.Grpc.Descriptor != "" {
-		if !filepath.IsAbs(a.Grpc.Descriptor) {
-			a.Grpc.Descriptor = filepath.Join(a.Dir, a.Grpc.Descriptor)
+		resolved, err := a.resolveContainedPath(a.Grpc.Descriptor)
+		if err != nil {
+			return nil, err
 		}
+		a.Grpc.Descriptor = resolved
 	}
 
 	return a, nil

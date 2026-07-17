@@ -13,6 +13,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"reflect"
+	"sync/atomic"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -86,12 +88,12 @@ func BuildServiceDesc(svc *Service) (*grpc.ServiceDesc, error) {
 
 	desc := &grpc.ServiceDesc{
 		ServiceName: svc.FullName,
-		// HandlerType is a unique placeholder interface pointer. It exists
-		// only so that two dynamically-built services with the same method
-		// names do not collide inside grpc.Server. The method-handler
-		// closures ignore srv, so no real implementation is needed; Serve
-		// registers a nil impl, which skips grpc's type-check.
-		HandlerType: (*serviceKey)(nil),
+		// HandlerType is a placeholder used internally by grpc.Server for
+		// type-checking when a non-nil impl is registered. We pass nil impl
+		// in Serve so the type-check is skipped, but we still generate a
+		// distinct reflect.Type per ServiceDesc via newUniqueHandlerType()
+		// so that multi-service-per-server registration can never collide.
+		HandlerType: newUniqueHandlerType(),
 		Metadata:    svc.Descriptor,
 	}
 
@@ -120,9 +122,19 @@ func BuildServiceDesc(svc *Service) (*grpc.ServiceDesc, error) {
 	return desc, nil
 }
 
-// serviceKey is a private placeholder type used solely as a unique HandlerType
-// pointer for each dynamically built ServiceDesc.
-type serviceKey struct{}
+// handlerTypeCounter is a monotonically increasing counter used to generate
+// a unique reflect.Type for each ServiceDesc's HandlerType.
+var handlerTypeCounter atomic.Int64
+
+// newUniqueHandlerType returns a value whose reflect.Type is distinct from
+// every other call. It uses reflect.ArrayOf with an incrementing size to
+// create a genuinely unique type (*[N]int) per invocation, so that two
+// dynamic ServiceDescs registered on the same grpc.Server can never share a
+// HandlerType even if multi-service-per-server is used in the future.
+func newUniqueHandlerType() any {
+	n := int(handlerTypeCounter.Add(1))
+	return reflect.New(reflect.ArrayOf(n, reflect.TypeOf(int(0)))).Interface()
+}
 
 // methodHandler builds the grpc.MethodHandler closure for a single method. It
 // decodes the incoming protobuf bytes into a dynamic message, converts that to
@@ -164,10 +176,11 @@ func toStatusError(err error) error {
 }
 
 // protoToMap converts a protobuf message to a Go map by marshalling via
-// protojson then unmarshalling the JSON into map[string]any. This preserves
-// field names and nested structures in a JSON-like form.
+// protojson then unmarshalling the JSON into map[string]any. UseProtoNames
+// is set so that keys are the proto field names (snake_case) rather than
+// the default camelCase — handlers and documentation expect snake_case.
 func protoToMap(msg *dynamicpb.Message) (map[string]any, error) {
-	b, err := protojson.Marshal(msg)
+	b, err := protojson.MarshalOptions{UseProtoNames: true}.Marshal(msg)
 	if err != nil {
 		return nil, err
 	}
@@ -192,10 +205,14 @@ func mapToProto(m map[string]any, msg *dynamicpb.Message) error {
 // derived from svc, and serves on lis. Serving happens in a goroutine; the
 // returned server can be stopped via GracefulStop (the caller should also
 // cancel ctx).
-func Serve(ctx context.Context, svc *Service, lis net.Listener) (*grpc.Server, error) {
+//
+// The returned ServeResult provides a Wait method that blocks until serving
+// stops and returns the serve error (if any). This lets callers detect a
+// failed bind/accept promptly rather than silently holding a dead server.
+func Serve(ctx context.Context, svc *Service, lis net.Listener) (*grpc.Server, *ServeResult, error) {
 	desc, err := BuildServiceDesc(svc)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	server := grpc.NewServer()
@@ -204,12 +221,35 @@ func Serve(ctx context.Context, svc *Service, lis net.Listener) (*grpc.Server, e
 	// method-handler closures ignore srv entirely.
 	server.RegisterService(desc, nil)
 
-	go server.Serve(lis)
+	// Channel to surface the first error from Serve (e.g. a bad listener).
+	// Buffered so the goroutine never blocks if the caller ignores it.
+	serveErr := make(chan error, 1)
+
+	go func() {
+		err := server.Serve(lis)
+		select {
+		case serveErr <- err:
+		default:
+		}
+	}()
 
 	go func() {
 		<-ctx.Done()
 		server.GracefulStop()
 	}()
 
-	return server, nil
+	return server, &ServeResult{errCh: serveErr}, nil
+}
+
+// ServeResult surfaces the asynchronous serve error from a [Serve] call.
+// Callers can use Wait to block until serving stops and retrieve the error.
+type ServeResult struct {
+	errCh chan error
+}
+
+// Wait blocks until the server stops serving and returns the error reported
+// by grpc.Server.Serve (typically nil on GracefulStop, or a listener error).
+// It is safe to call Wait after GracefulStop has already completed.
+func (r *ServeResult) Wait() error {
+	return <-r.errCh
 }

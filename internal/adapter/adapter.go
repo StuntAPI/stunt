@@ -93,12 +93,14 @@ func (a *Adapter) ReadFile(rel string) ([]byte, error) {
 
 // DescriptorBytes reads the compiled protobuf FileDescriptorSet (.desc) file
 // referenced by the gRPC spec. Returns an error if no gRPC spec is declared
-// or the descriptor file cannot be read.
+// or the descriptor file cannot be read. The path is validated against the
+// same directory-containment check used by ReadFile to reject traversal
+// attacks (e.g. ../../etc/passwd).
 func (a *Adapter) DescriptorBytes() ([]byte, error) {
 	if a.Grpc == nil || a.Grpc.Descriptor == "" {
 		return nil, fmt.Errorf("adapter: no grpc descriptor configured")
 	}
-	return os.ReadFile(a.Grpc.Descriptor)
+	return a.ReadFile(a.Grpc.Descriptor)
 }
 
 // validate checks basic structural invariants after parsing.
@@ -126,8 +128,10 @@ func (a *Adapter) validate() error {
 }
 
 // resolveHandlerPaths converts any endpoint handler script path from relative
-// (to the adapter dir) to absolute, preserving the "#function" fragment.
-func (a *Adapter) resolveHandlerPaths() {
+// (to the adapter dir) to absolute, preserving the "#function" fragment. It
+// rejects paths that escape the adapter directory via traversal (e.g.
+// ../../etc/passwd), applying the same containment check as ReadFile.
+func (a *Adapter) resolveHandlerPaths() error {
 	for i := range a.Endpoints {
 		h := a.Endpoints[i].Handler
 		if h == "" {
@@ -137,10 +141,11 @@ func (a *Adapter) resolveHandlerPaths() {
 		if path == "" {
 			continue
 		}
-		if !filepath.IsAbs(path) {
-			path = filepath.Join(a.Dir, path)
+		resolved, err := a.resolveContainedPath(path)
+		if err != nil {
+			return err
 		}
-		a.Endpoints[i].Handler = path
+		a.Endpoints[i].Handler = resolved
 		if fn != "" {
 			a.Endpoints[i].Handler += "#" + fn
 		}
@@ -157,15 +162,32 @@ func (a *Adapter) resolveHandlerPaths() {
 			if path == "" {
 				continue
 			}
-			if !filepath.IsAbs(path) {
-				path = filepath.Join(a.Dir, path)
+			resolved, err := a.resolveContainedPath(path)
+			if err != nil {
+				return err
 			}
-			a.Grpc.Methods[i].Handler = path
+			a.Grpc.Methods[i].Handler = resolved
 			if fn != "" {
 				a.Grpc.Methods[i].Handler += "#" + fn
 			}
 		}
 	}
+	return nil
+}
+
+// resolveContainedPath resolves a relative path to an absolute path within
+// a.Dir, rejecting paths that escape the adapter directory via traversal.
+func (a *Adapter) resolveContainedPath(path string) (string, error) {
+	full := path
+	if !filepath.IsAbs(path) {
+		full = filepath.Join(a.Dir, path)
+	}
+	cleanPath := filepath.Clean(full)
+	rel, err := filepath.Rel(a.Dir, cleanPath)
+	if err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("adapter: handler script path %q escapes adapter directory", path)
+	}
+	return cleanPath, nil
 }
 
 // splitHandler splits "scripts/x.star#on_post" into ("scripts/x.star", "on_post").

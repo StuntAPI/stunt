@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/stunt-adapters/stunt/internal/adapter"
 	"github.com/stunt-adapters/stunt/internal/grpcsim"
@@ -73,11 +74,20 @@ func (e *Engine) startGRPC(ctx context.Context, st *serviceState) (string, *grpc
 		return "", nil, fmt.Errorf("engine: grpc listen: %w", err)
 	}
 
-	srv, err := grpcsim.Serve(ctx, svc, lis)
+	srv, result, err := grpcsim.Serve(ctx, svc, lis)
 	if err != nil {
 		lis.Close()
 		return "", nil, fmt.Errorf("engine: grpc serve: %w", err)
 	}
+
+	// Surface serve errors (e.g. listener failure) so they are not silently
+	// swallowed. We check asynchronously to avoid blocking the start path.
+	go func() {
+		if serveErr := result.Wait(); serveErr != nil {
+			// The server has stopped; the engine's Close() handles cleanup.
+			fmt.Fprintf(os.Stderr, "engine: grpc serve error: %v\n", serveErr)
+		}
+	}()
 
 	return lis.Addr().String(), srv, nil
 }
