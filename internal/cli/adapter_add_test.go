@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -86,7 +87,7 @@ func seedGitCache(t *testing.T, cacheDir, cloneURL, host, path string) string {
 		Host: host,
 		Path: path,
 	}
-	if _, _, err := cache.Ensure(src); err != nil {
+	if _, _, err := cache.Ensure(context.Background(), src); err != nil {
 		t.Fatalf("seed cache Ensure: %v", err)
 	}
 	// Return a spec that ParseSource can re-parse to the same Host/Path.
@@ -656,7 +657,7 @@ func TestAdapterUpdateGitPinnedRef(t *testing.T) {
 		t.Fatal(err)
 	}
 	src := &adapterdist.Source{Kind: "git", URL: cloneURL, Host: "localhost", Path: "pinned", Ref: "v1.0"}
-	if _, _, err := cache.Ensure(src); err != nil {
+	if _, _, err := cache.Ensure(context.Background(), src); err != nil {
 		t.Fatalf("Ensure: %v", err)
 	}
 
@@ -676,7 +677,7 @@ func TestAdapterUpdateGitPinnedRef(t *testing.T) {
 	}
 
 	// After reconcile, HEAD should still be at the tag.
-	cacheDir2 := filepath.Join(cacheDir, "git", "localhost", "pinned")
+	cacheDir2 := filepath.Join(cacheDir, "git", "localhost", "pinned@v1.0")
 	sha := runGitCmdOut(t, cacheDir2, "rev-parse", "HEAD")
 	tagSha := runGitCmdOut(t, dir, "rev-parse", "v1.0")
 	if sha != tagSha {

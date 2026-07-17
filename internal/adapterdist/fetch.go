@@ -2,17 +2,32 @@ package adapterdist
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
+)
+
+// Default timeouts for git subprocesses. These prevent a slow or
+// unresponsive remote from hanging `stunt adapter add/up/update`.
+// Callers may pass a context with a shorter deadline to override.
+const (
+	cloneTimeout = 60 * time.Second // git clone (potentially large transfer)
+	opTimeout    = 30 * time.Second // fetch, checkout, pull, merge, rev-parse
 )
 
 // Cache manages a local cache of adapter sources under a root directory.
-// Git sources are cloned into <root>/git/<host>/<path>. The cache is
+// Git sources are cloned into <root>/git/<host>/<path>[@<ref>]. The cache is
 // concurrency-safe: all git operations are serialized by a mutex.
+//
+// The cache path is ref-stable: sources pinned to different refs for the
+// same URL get distinct cache directories (e.g. <root>/git/host/repo@v1.0
+// vs <root>/git/host/repo@v2.0). This prevents ref thrashing when two
+// services reference the same repository at different refs.
 type Cache struct {
 	root string
 	mu   sync.Mutex
@@ -41,13 +56,28 @@ func (c *Cache) Root() string {
 }
 
 // PathFor returns the cache directory for a source without fetching it.
-// For git sources: <root>/git/<host>/<path>.
+// For git sources with a pinned ref: <root>/git/<host>/<path>@<ref>.
+// For git sources at head-at-install: <root>/git/<host>/<path>.
 // For local sources: the source's URL (the local path as given).
+//
+// The ref is sanitized for use as a filesystem component (slashes are
+// replaced with underscores) so that branch refs like "release/2.0"
+// produce a single directory name rather than a nested path.
 func (c *Cache) PathFor(s *Source) string {
 	if s.Kind == "local" {
 		return s.URL
 	}
-	return filepath.Join(c.root, "git", s.Host, s.Path)
+	base := filepath.Join(c.root, "git", s.Host, s.Path)
+	if s.Ref == "" {
+		return base
+	}
+	return base + "@" + refToDirName(s.Ref)
+}
+
+// refToDirName converts a git ref into a filesystem-safe directory name
+// component. Slashes (e.g. in "release/2.0") are replaced with underscores.
+func refToDirName(ref string) string {
+	return strings.ReplaceAll(ref, "/", "_")
 }
 
 // Ensure clones the source into the cache (if not already present) and
@@ -60,7 +90,11 @@ func (c *Cache) PathFor(s *Source) string {
 // For local sources, Ensure returns the resolved absolute path (no copy).
 //
 // Ensure is idempotent: calling it multiple times yields the same result.
-func (c *Cache) Ensure(s *Source) (localDir, resolvedRef string, err error) {
+//
+// The ctx parameter is used for all git subprocesses; internal timeouts
+// are applied on top (clone: 60s, other ops: 30s) so a hung remote does
+// not block indefinitely. A shorter caller deadline takes precedence.
+func (c *Cache) Ensure(ctx context.Context, s *Source) (localDir, resolvedRef string, err error) {
 	if s.Kind == "local" {
 		abs, err := filepath.Abs(s.URL)
 		if err != nil {
@@ -81,13 +115,13 @@ func (c *Cache) Ensure(s *Source) (localDir, resolvedRef string, err error) {
 	dir := c.PathFor(s)
 
 	if !fileExists(dir) {
-		return c.cloneFresh(s, dir)
+		return c.cloneFresh(ctx, s, dir)
 	}
 
 	// Cache exists.
 	if s.Ref == "" {
 		// Head-at-install: return the current HEAD sha.
-		sha, err := c.revParse(dir, "HEAD")
+		sha, err := c.revParse(ctx, dir, "HEAD")
 		if err != nil {
 			return "", "", err
 		}
@@ -95,17 +129,19 @@ func (c *Cache) Ensure(s *Source) (localDir, resolvedRef string, err error) {
 	}
 
 	// Pinned ref: check if already there (fast path — no fetch/checkout).
-	headSha, _ := c.revParse(dir, "HEAD")
-	refSha, _ := c.revParse(dir, s.Ref)
+	headSha, _ := c.revParse(ctx, dir, "HEAD")
+	refSha, _ := c.revParse(ctx, dir, s.Ref)
 	if headSha != "" && headSha == refSha {
 		return dir, headSha, nil
 	}
 
 	// Checkout the pinned ref.
-	if err := c.git(dir, "checkout", s.Ref); err != nil {
+	octx, cancel := context.WithTimeout(ctx, opTimeout)
+	defer cancel()
+	if err := c.git(octx, dir, "checkout", s.Ref); err != nil {
 		return "", "", fmt.Errorf("adapterdist: checkout %s %s: %w", s.URL, s.Ref, err)
 	}
-	sha, err := c.revParse(dir, "HEAD")
+	sha, err := c.revParse(ctx, dir, "HEAD")
 	if err != nil {
 		return "", "", err
 	}
@@ -119,7 +155,10 @@ func (c *Cache) Ensure(s *Source) (localDir, resolvedRef string, err error) {
 //
 // For tags and SHAs the checkout is effectively a no-op (they don't move).
 // For branches the local branch is fast-forwarded to the remote tip.
-func (c *Cache) Reconcile(s *Source) error {
+//
+// The ctx parameter is used for all git subprocesses; internal timeouts
+// are applied on top (fetch/checkout/pull/merge: 30s, clone: 60s).
+func (c *Cache) Reconcile(ctx context.Context, s *Source) error {
 	if s.Kind == "local" {
 		return nil
 	}
@@ -134,55 +173,81 @@ func (c *Cache) Reconcile(s *Source) error {
 	dir := c.PathFor(s)
 
 	if !fileExists(dir) {
-		_, _, err := c.cloneFresh(s, dir)
+		_, _, err := c.cloneFresh(ctx, s, dir)
 		return err
 	}
 
 	// Fetch all refs from origin.
-	if err := c.git(dir, "fetch", "origin"); err != nil {
+	fctx, cancel := context.WithTimeout(ctx, opTimeout)
+	defer cancel()
+	if err := c.git(fctx, dir, "fetch", "origin"); err != nil {
 		return fmt.Errorf("adapterdist: fetch %s: %w", s.URL, err)
 	}
 
 	if s.Ref == "" {
 		// Head-at-install: pull the current branch (ff-only).
-		if err := c.git(dir, "pull", "--ff-only"); err != nil {
+		pctx, cancel := context.WithTimeout(ctx, opTimeout)
+		defer cancel()
+		if err := c.git(pctx, dir, "pull", "--ff-only"); err != nil {
 			return fmt.Errorf("adapterdist: pull %s: %w", s.URL, err)
 		}
 		return nil
 	}
 
 	// Checkout the pinned ref.
-	if err := c.git(dir, "checkout", s.Ref); err != nil {
+	cctx, cancel := context.WithTimeout(ctx, opTimeout)
+	defer cancel()
+	if err := c.git(cctx, dir, "checkout", s.Ref); err != nil {
 		return fmt.Errorf("adapterdist: checkout %s %s: %w", s.URL, s.Ref, err)
 	}
 
 	// If the ref is a remote-tracking branch, fast-forward to its latest.
-	// For tags/SHAs, origin/<ref> does not resolve and the error is ignored.
-	if _, err := c.revParse(dir, "origin/"+s.Ref); err == nil {
-		_ = c.git(dir, "merge", "--ff-only", "origin/"+s.Ref)
+	// For tags/SHAs, origin/<ref> does not resolve and the checkout above
+	// is the final state.
+	if _, err := c.revParse(ctx, dir, "origin/"+s.Ref); err == nil {
+		mctx, cancel := context.WithTimeout(ctx, opTimeout)
+		defer cancel()
+		if err := c.git(mctx, dir, "merge", "--ff-only", "origin/"+s.Ref); err != nil {
+			return fmt.Errorf("adapterdist: merge %s: %w", s.URL, err)
+		}
 	}
 
 	return nil
 }
 
 // cloneFresh clones the source URL into dir and checks out the ref.
-// The parent directory is created if needed.
-func (c *Cache) cloneFresh(s *Source, dir string) (string, string, error) {
+// The parent directory is created if needed. On any error the partially
+// created directory is removed so a subsequent Ensure retries cleanly.
+func (c *Cache) cloneFresh(ctx context.Context, s *Source, dir string) (localDir, resolvedRef string, err error) {
+	// On any error, remove the partial clone directory so the next Ensure
+	// attempt starts fresh instead of seeing a corrupt half-cloned repo.
+	defer func() {
+		if err != nil {
+			_ = os.RemoveAll(dir)
+		}
+	}()
+
 	if err := os.MkdirAll(filepath.Dir(dir), 0o755); err != nil {
 		return "", "", fmt.Errorf("adapterdist: mkdir %s: %w", filepath.Dir(dir), err)
 	}
 
-	if err := c.git("", "clone", s.URL, dir); err != nil {
+	// The "--" terminates git's option parsing so the URL cannot be
+	// interpreted as a flag (option-injection defense, C1).
+	cctx, cancel := context.WithTimeout(ctx, cloneTimeout)
+	defer cancel()
+	if err := c.git(cctx, "", "clone", "--", s.URL, dir); err != nil {
 		return "", "", fmt.Errorf("adapterdist: clone %s: %w", s.URL, err)
 	}
 
 	if s.Ref != "" {
-		if err := c.git(dir, "checkout", s.Ref); err != nil {
+		rctx, cancel := context.WithTimeout(ctx, opTimeout)
+		defer cancel()
+		if err := c.git(rctx, dir, "checkout", s.Ref); err != nil {
 			return "", "", fmt.Errorf("adapterdist: checkout %s %s: %w", s.URL, s.Ref, err)
 		}
 	}
 
-	sha, err := c.revParse(dir, "HEAD")
+	sha, err := c.revParse(ctx, dir, "HEAD")
 	if err != nil {
 		return "", "", err
 	}
@@ -191,14 +256,16 @@ func (c *Cache) cloneFresh(s *Source, dir string) (string, string, error) {
 
 // --- git command helpers ---
 //
-// All git invocations use [exec.Command] with explicit argv — no shell.
-// This makes command injection impossible by construction. Ref validation
-// (validateRef) is an additional defense-in-depth layer.
+// All git invocations use [exec.CommandContext] with explicit argv — no
+// shell. This makes command injection impossible by construction. Ref
+// validation (validateRef) and the "--" separator before URLs are
+// additional defense-in-depth layers.
 
 // git runs a git command with explicit argv and returns an error on
 // non-zero exit. If dir is non-empty, it is used as the working directory.
-func (c *Cache) git(dir string, args ...string) error {
-	cmd := exec.Command("git", args...)
+// The ctx is used to enforce timeouts and cancellation.
+func (c *Cache) git(ctx context.Context, dir string, args ...string) error {
+	cmd := exec.CommandContext(ctx, "git", args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
@@ -211,8 +278,8 @@ func (c *Cache) git(dir string, args ...string) error {
 }
 
 // gitOutput runs a git command and returns its stdout.
-func (c *Cache) gitOutput(dir string, args ...string) (string, error) {
-	cmd := exec.Command("git", args...)
+func (c *Cache) gitOutput(ctx context.Context, dir string, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", args...)
 	if dir != "" {
 		cmd.Dir = dir
 	}
@@ -226,8 +293,8 @@ func (c *Cache) gitOutput(dir string, args ...string) (string, error) {
 }
 
 // revParse runs `git -C dir rev-parse <ref>` and returns the trimmed output.
-func (c *Cache) revParse(dir, ref string) (string, error) {
-	out, err := c.gitOutput(dir, "rev-parse", ref)
+func (c *Cache) revParse(ctx context.Context, dir, ref string) (string, error) {
+	out, err := c.gitOutput(ctx, dir, "rev-parse", ref)
 	if err != nil {
 		return "", err
 	}
