@@ -88,6 +88,7 @@ stateful primitives. Build your own with the contributor workflow:
 stunt adapter new myapi               # scaffold a synthetic adapter
 stunt adapter import openapi spec.yaml # generate endpoints/templates from an OpenAPI doc
 stunt adapter import har session.har   # infer endpoints + synthetic fixtures from a HAR
+stunt adapter import proto api.proto    # scaffold a gRPC adapter from a .proto (descriptor + handlers)
 stunt adapter lint ./adapters/myapi     # enforce SYNTHETIC data only (the safety guard)
 stunt adapter test ./adapters/myapi     # conformance vs your local real traces
 stunt catalog search stripe            # browse the adapter registry
