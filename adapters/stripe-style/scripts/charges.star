@@ -6,13 +6,8 @@
 # _next_id returns a monotonically-increasing provider-style ID using the
 # KV store as a sequence counter. Produces ids like "ch_1", "ch_2", ...
 def _next_id(prefix):
-    seq_str = store_kv_get("stripe", prefix + "_seq")
-    if seq_str == None:
-        seq = 1
-    else:
-        seq = int(seq_str) + 1
-    store_kv_set("stripe", prefix + "_seq", str(seq))
-    return prefix + "_" + str(seq)
+    # Atomic increment via store_kv_incr (race-free under concurrent requests).
+    return prefix + "_" + str(store_kv_incr("stripe", prefix + "_seq"))
 
 # POST /v1/charges — create a charge (status starts as "pending").
 def on_create(req):

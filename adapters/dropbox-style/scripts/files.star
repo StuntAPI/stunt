@@ -8,13 +8,8 @@
 # _next_id returns a monotonically-increasing synthetic ID using the KV store
 # as a sequence counter. Produces ids like "id_1", "id_2", ...
 def _next_id():
-    seq_str = store_kv_get("dropbox", "id_seq")
-    if seq_str == None:
-        seq = 1
-    else:
-        seq = int(seq_str) + 1
-    store_kv_set("dropbox", "id_seq", str(seq))
-    return "id_" + str(seq)
+    # Atomic increment via store_kv_incr (race-free under concurrent requests).
+    return "id_" + str(store_kv_incr("dropbox", "id_seq"))
 
 # _now returns a synthetic ISO-8601 timestamp. The value is fixed for
 # determinism in local testing.
