@@ -24,6 +24,8 @@ import (
 	"github.com/stunt-adapters/stunt/internal/rules"
 	"github.com/stunt-adapters/stunt/internal/starlark"
 	sk "go.starlark.net/starlark"
+
+	"google.golang.org/grpc"
 )
 
 // Engine turns a manifest into runnable HTTP servers, one per service.
@@ -34,6 +36,9 @@ type Engine struct {
 	manifest  *manifest.Manifest
 	states    map[string]*serviceState // keyed by service name
 	cacheRoot string                 // adapter cache root for git sources
+
+	grpcServers []*grpc.Server       // started by serve(), stopped by Close()
+	grpcTargets map[string]string    // service name → grpc target (set by serve())
 }
 
 // serviceState holds the per-service runtime for an adapter-backed service:
@@ -239,8 +244,8 @@ func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir,
 	return st, nil
 }
 
-// Close releases all per-service stores and emitters. Safe to call on a
-// rules-only engine.
+// Close releases all per-service stores and emitters, and stops any gRPC
+// servers started by serve(). Safe to call on a rules-only engine.
 func (e *Engine) Close() error {
 	var firstErr error
 	for _, st := range e.states {
@@ -263,6 +268,13 @@ func (e *Engine) Close() error {
 			st.emitter.Close()
 		}
 	}
+
+	// GracefulStop any gRPC servers started by serve(). This is safe to call
+	// even if serve() was never called (the slice is empty).
+	for _, srv := range e.grpcServers {
+		srv.GracefulStop()
+	}
+
 	return firstErr
 }
 
@@ -381,4 +393,14 @@ func headerMap(h http.Header) map[string]string {
 // netListen grabs a free TCP port on the loopback interface.
 func netListen() (net.Listener, error) {
 	return net.Listen("tcp", "127.0.0.1:0")
+}
+
+// GrpcTarget returns the gRPC dial target ("host:port") for the named
+// service, or "" if the service has no gRPC server. Must be called after
+// ServeForTest (or Serve) has started servers.
+func (e *Engine) GrpcTarget(name string) string {
+	if e.grpcTargets == nil {
+		return ""
+	}
+	return e.grpcTargets[name]
 }
