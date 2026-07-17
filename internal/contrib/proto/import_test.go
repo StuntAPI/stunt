@@ -176,9 +176,9 @@ func TestImportProtoStarHandlers(t *testing.T) {
 		t.Errorf("expected 2 respond(200, ...) calls, got %d", strings.Count(src, "respond(200,"))
 	}
 
-	// String field -> faker.Word placeholder.
-	if !strings.Contains(src, "{{ faker.Word }}") {
-		t.Error("handler should contain {{ faker.Word }} for string fields")
+	// String field -> concrete synthetic word (NOT a {{ faker.Word }} placeholder).
+	if strings.Contains(src, "{{ faker.Word }}") {
+		t.Error("handler should contain concrete values, not {{ faker.Word }} placeholders")
 	}
 
 	// Repeated field -> list.

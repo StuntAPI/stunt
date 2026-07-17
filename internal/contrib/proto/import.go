@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -237,14 +238,59 @@ func normalizeTypeName(tn string) string {
 // Starlark handler generation
 // ---------------------------------------------------------------------------
 
-// generateStar produces the .star file content with one handler per method.
+// isStreamingMethod reports whether a method is client-streaming,
+// server-streaming, or bidi-streaming — all of which require special
+// transport handling that synthetic stub handlers cannot provide.
+func isStreamingMethod(m *descriptorpb.MethodDescriptorProto) bool {
+	return m.GetClientStreaming() || m.GetServerStreaming()
+}
+
+// streamingKind returns a human-readable description of the streaming mode.
+func streamingKind(m *descriptorpb.MethodDescriptorProto) string {
+	switch {
+	case m.GetClientStreaming() && m.GetServerStreaming():
+		return "bidi-streaming"
+	case m.GetClientStreaming():
+		return "client-streaming"
+	case m.GetServerStreaming():
+		return "server-streaming"
+	default:
+		return ""
+	}
+}
+
+// methodHandlerName generates a unique snake_case handler name for a method,
+// disambiguating collisions (e.g. CreateFoo vs createFoo both produce
+// create_foo) by appending a numeric suffix (_2, _3, …).
+func methodHandlerName(m *descriptorpb.MethodDescriptorProto, used map[string]int) string {
+	base := toSnakeCase(m.GetName())
+	name := base
+	if n, exists := used[base]; exists {
+		name = fmt.Sprintf("%s_%d", base, n+1)
+		used[base] = n + 1
+	} else {
+		used[base] = 1
+	}
+	return name
+}
+
+// generateStar produces the .star file content with one handler per unary
+// method. Streaming methods are skipped (with a comment) because synthetic
+// stub handlers cannot model stream semantics.
 func generateStar(svc *descriptorpb.ServiceDescriptorProto, st *symbolTable) string {
 	var b strings.Builder
 	b.WriteString("# Synthetic gRPC handlers generated from .proto definitions.\n")
 	b.WriteString("# All values are placeholders — customize as needed.\n\n")
+
+	used := make(map[string]int)
 	for _, method := range svc.Method {
-		snake := toSnakeCase(method.GetName())
-		b.WriteString(fmt.Sprintf("def on_%s(req):\n", snake))
+		if isStreamingMethod(method) {
+			b.WriteString(fmt.Sprintf("# Skipping %s: %s RPCs are not supported.\n\n",
+				method.GetName(), streamingKind(method)))
+			continue
+		}
+		name := methodHandlerName(method, used)
+		b.WriteString(fmt.Sprintf("def on_%s(req):\n", name))
 		body := synthesizeMessageBody(method.GetOutputType(), st, map[string]bool{})
 		b.WriteString(fmt.Sprintf("    return respond(200, %s)\n\n", body))
 	}
@@ -263,6 +309,11 @@ func synthesizeMessageBody(typeName string, st *symbolTable, seen map[string]boo
 	if !ok {
 		return "{}"
 	}
+	// Copy the seen-set so additions are scoped to THIS path only. Without
+	// the copy, a message type appearing on two independent sibling paths
+	// (a diamond: Top→Left→Shared AND Top→Right→Shared) would be expanded
+	// on the first path then collapsed to {} on the second.
+	seen = copyStringBool(seen)
 	seen[tn] = true
 
 	var pairs []string
@@ -271,6 +322,15 @@ func synthesizeMessageBody(typeName string, st *symbolTable, seen map[string]boo
 		pairs = append(pairs, fmt.Sprintf("%q: %s", field.GetName(), val))
 	}
 	return "{" + strings.Join(pairs, ", ") + "}"
+}
+
+// copyStringBool returns a shallow copy of a map[string]bool.
+func copyStringBool(m map[string]bool) map[string]bool {
+	out := make(map[string]bool, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }
 
 // synthesizeFieldValue produces a Starlark expression for a single field.
@@ -295,14 +355,14 @@ func synthesizeFieldValue(field *descriptorpb.FieldDescriptorProto, st *symbolTa
 func synthesizeScalar(field *descriptorpb.FieldDescriptorProto, st *symbolTable, seen map[string]bool) string {
 	switch field.GetType() {
 	case descriptorpb.FieldDescriptorProto_TYPE_STRING:
-		return `"{{ faker.Word }}"`
+		return fmt.Sprintf("%q", syntheticWord())
 	case descriptorpb.FieldDescriptorProto_TYPE_INT32, descriptorpb.FieldDescriptorProto_TYPE_INT64,
 		descriptorpb.FieldDescriptorProto_TYPE_UINT32, descriptorpb.FieldDescriptorProto_TYPE_UINT64,
 		descriptorpb.FieldDescriptorProto_TYPE_SINT32, descriptorpb.FieldDescriptorProto_TYPE_SINT64,
 		descriptorpb.FieldDescriptorProto_TYPE_FIXED32, descriptorpb.FieldDescriptorProto_TYPE_FIXED64,
 		descriptorpb.FieldDescriptorProto_TYPE_SFIXED32, descriptorpb.FieldDescriptorProto_TYPE_SFIXED64,
 		descriptorpb.FieldDescriptorProto_TYPE_DOUBLE, descriptorpb.FieldDescriptorProto_TYPE_FLOAT:
-		return "0"
+		return syntheticIntExpr()
 	case descriptorpb.FieldDescriptorProto_TYPE_BOOL:
 		return "False"
 	case descriptorpb.FieldDescriptorProto_TYPE_BYTES:
@@ -310,20 +370,26 @@ func synthesizeScalar(field *descriptorpb.FieldDescriptorProto, st *symbolTable,
 	case descriptorpb.FieldDescriptorProto_TYPE_ENUM:
 		return synthesizeEnumValue(field.GetTypeName(), st)
 	case descriptorpb.FieldDescriptorProto_TYPE_MESSAGE:
+		// Check for well-known types (google.protobuf.*) before falling back
+		// to the symbol table — well-known types are not in the symbol table
+		// and would otherwise synthesize to {}.
+		if wkt := synthesizeWellKnownType(field.GetTypeName()); wkt != "" {
+			return wkt
+		}
 		return synthesizeMessageBody(field.GetTypeName(), st, seen)
 	default:
-		return `"{{ faker.Word }}"`
+		return fmt.Sprintf("%q", syntheticWord())
 	}
 }
 
 // synthesizeEnumValue returns the first enum value name as a quoted string,
-// or a faker placeholder if the enum type can't be resolved.
+// or a concrete synthetic word if the enum type can't be resolved.
 func synthesizeEnumValue(typeName string, st *symbolTable) string {
 	tn := normalizeTypeName(typeName)
 	if enum, ok := st.enums[tn]; ok && len(enum.Value) > 0 {
 		return fmt.Sprintf("%q", enum.Value[0].GetName())
 	}
-	return `"{{ faker.Word }}"`
+	return fmt.Sprintf("%q", syntheticWord())
 }
 
 // synthesizeMapValue produces a one-entry Starlark dict for a map field.
@@ -338,10 +404,10 @@ func synthesizeMapValue(msg *descriptorpb.DescriptorProto, st *symbolTable, seen
 		}
 	}
 	if keyExpr == "" {
-		keyExpr = `"{{ faker.Word }}"`
+		keyExpr = fmt.Sprintf("%q", syntheticWord())
 	}
 	if valExpr == "" {
-		valExpr = `"{{ faker.Word }}"`
+		valExpr = fmt.Sprintf("%q", syntheticWord())
 	}
 	return "{" + keyExpr + ": " + valExpr + "}"
 }
@@ -349,6 +415,70 @@ func synthesizeMapValue(msg *descriptorpb.DescriptorProto, st *symbolTable, seen
 // isMapEntry reports whether msg is a synthetic map_entry message.
 func isMapEntry(msg *descriptorpb.DescriptorProto) bool {
 	return msg.GetOptions().GetMapEntry()
+}
+
+// ---------------------------------------------------------------------------
+// synthetic value generation (concrete, not placeholder templates)
+// ---------------------------------------------------------------------------
+
+// syntheticWords is a small vocabulary used to produce concrete synthetic
+// string values at import time. These are baked into the generated .star
+// handlers so that gRPC responses return real (fake) values — not literal
+// "{{ faker.Word }}" strings that the Starlark VM cannot expand.
+var syntheticWords = []string{
+	"alpha", "bravo", "charlie", "delta", "echo", "foxtrot",
+	"gamma", "helix", "iris", "juno", "kilo", "lambda",
+	"sample", "synthetic", "test", "mock", "stub", "placeholder",
+	"quartz", "river", "sigma", "theta", "umber", "vortex",
+}
+
+// syntheticWord returns a random concrete word from the word list.
+func syntheticWord() string {
+	return syntheticWords[rand.Intn(len(syntheticWords))]
+}
+
+// syntheticIntExpr returns a random non-negative integer as a Starlark literal.
+func syntheticIntExpr() string {
+	return fmt.Sprintf("%d", rand.Intn(1000))
+}
+
+// synthesizeWellKnownType returns a Starlark dict literal for common
+// google.protobuf well-known types. Returns "" if typeName is not a
+// recognised well-known type, so the caller can fall back to the symbol
+// table.
+func synthesizeWellKnownType(typeName string) string {
+	switch normalizeTypeName(typeName) {
+	case "google.protobuf.Timestamp":
+		return fmt.Sprintf(`{"seconds": %d, "nanos": 0}`, rand.Intn(1_000_000))
+	case "google.protobuf.Duration":
+		return fmt.Sprintf(`{"seconds": %d, "nanos": 0}`, rand.Intn(3600))
+	case "google.protobuf.Empty":
+		return "{}"
+	case "google.protobuf.Struct":
+		return "{}"
+	case "google.protobuf.Value":
+		return fmt.Sprintf("%q", syntheticWord())
+	case "google.protobuf.ListValue":
+		return "[]"
+	case "google.protobuf.NullValue":
+		return "None"
+	case "google.protobuf.StringValue":
+		return fmt.Sprintf("%q", syntheticWord())
+	case "google.protobuf.Int32Value", "google.protobuf.Int64Value",
+		"google.protobuf.UInt32Value", "google.protobuf.UInt64Value":
+		return syntheticIntExpr()
+	case "google.protobuf.BoolValue":
+		return "False"
+	case "google.protobuf.DoubleValue", "google.protobuf.FloatValue":
+		return "0.0"
+	case "google.protobuf.BytesValue":
+		return `"c3ludGhldGlj"` // base64 of "synthetic"
+	case "google.protobuf.FieldMask":
+		return `["sampleField"]`
+	case "google.protobuf.Any":
+		return fmt.Sprintf(`{"@type": %q, "value": %q}`, "type.googleapis.com/google.protobuf.StringValue", syntheticWord())
+	}
+	return "" // not a well-known type
 }
 
 // ---------------------------------------------------------------------------
@@ -422,14 +552,19 @@ func mergeGrpcSection(dir, fullName, descRel, starRel string, svc *descriptorpb.
 		return fmt.Errorf("proto: read adapter.yaml: %w", err)
 	}
 
-	// Build the methods list.
-	methods := make([]adapter.GrpcMethod, len(svc.Method))
-	for i, method := range svc.Method {
-		snake := toSnakeCase(method.GetName())
-		methods[i] = adapter.GrpcMethod{
-			Name:    method.GetName(),
-			Handler: starRel + "#on_" + snake,
+	// Build the methods list — streaming methods are skipped because the
+	// engine only registers unary handlers.
+	var methods []adapter.GrpcMethod
+	used := make(map[string]int)
+	for _, method := range svc.Method {
+		if isStreamingMethod(method) {
+			continue
 		}
+		name := methodHandlerName(method, used)
+		methods = append(methods, adapter.GrpcMethod{
+			Name:    method.GetName(),
+			Handler: starRel + "#on_" + name,
+		})
 	}
 
 	m.Grpc = &adapter.GrpcSpec{
