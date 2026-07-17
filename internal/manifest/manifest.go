@@ -10,8 +10,8 @@ import (
 )
 
 type Network struct {
-	Mode           string `yaml:"mode"`                      // "port" or "subdomain"
-	BasePort       int    `yaml:"base_port,omitempty"`       // sequential ports (port mode)
+	Mode           string `yaml:"mode"`                       // "port" or "subdomain"
+	BasePort       int    `yaml:"base_port,omitempty"`        // sequential ports (port mode)
 	TLD            string `yaml:"tld,omitempty"`              // TLD for subdomain mode (default: "localhost")
 	TLS            bool   `yaml:"tls,omitempty"`              // enable TLS in subdomain mode (default: true)
 	SyncHosts      bool   `yaml:"sync_hosts,omitempty"`       // sync /etc/hosts for *.tld
@@ -113,4 +113,3 @@ func Save(m *Manifest, path string) error {
 	m.Path = path
 	return nil
 }
-

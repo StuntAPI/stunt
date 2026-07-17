@@ -156,9 +156,9 @@ func generateCA(certPath, keyPath string) (*CA, error) {
 			Organization: []string{caOrg},
 			CommonName:   caOrg + " Local CA",
 		},
-		NotBefore: time.Now().Add(-time.Hour),
-		NotAfter:  time.Now().Add(caValidity),
-		KeyUsage:  x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(caValidity),
+		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
 		BasicConstraintsValid: true,
 		IsCA:                  true,
 		MaxPathLen:            0, // this CA can only sign leaf certs, not sub-CAs

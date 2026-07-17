@@ -221,9 +221,9 @@ func TestImportHARParameterizesRealPathIDs(t *testing.T) {
 	}
 
 	wantRoutes := map[string]bool{
-		"/users/{id}/orders":     false,
-		"/v1/charges/{id}":      false,
-		"/users/{id}/profile":   false,
+		"/users/{id}/orders":  false,
+		"/v1/charges/{id}":    false,
+		"/users/{id}/profile": false,
 	}
 	for _, ep := range a.Endpoints {
 		if _, ok := wantRoutes[ep.Route]; ok {

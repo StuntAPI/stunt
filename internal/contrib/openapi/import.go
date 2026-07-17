@@ -42,7 +42,7 @@ func Import(specBytes []byte, dir string) error {
 			continue
 		}
 		for _, op := range item.operations() {
-		name := contrib.SafeName(op.method, path)
+			name := contrib.SafeName(op.method, path)
 			matchPath := contrib.GlobPath(path)
 
 			tmpl := spec.schemaToTemplate(op.op.firstSchema())
@@ -95,8 +95,8 @@ func buildEndpoint(name, route, method, matchPath, tmpl string) adapter.Endpoint
 // ---------------------------------------------------------------------------
 
 type openapiSpec struct {
-	Paths      map[string]*pathItem      `yaml:"paths"`
-	Components *components               `yaml:"components"`
+	Paths      map[string]*pathItem `yaml:"paths"`
+	Components *components          `yaml:"components"`
 }
 
 // sortedPaths returns paths in lexicographic order for deterministic output.
@@ -217,10 +217,10 @@ type mediaType struct {
 }
 
 type jsonSchema struct {
-	Type       string                  `yaml:"type"`
+	Type       string                 `yaml:"type"`
 	Properties map[string]*jsonSchema `yaml:"properties"`
-	Items      *jsonSchema             `yaml:"items"`
-	Ref        string                  `yaml:"$ref"`
+	Items      *jsonSchema            `yaml:"items"`
+	Ref        string                 `yaml:"$ref"`
 }
 
 // components holds reusable schema definitions under components/schemas.

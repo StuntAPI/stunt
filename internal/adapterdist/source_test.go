@@ -310,21 +310,21 @@ func TestIdentityDedup(t *testing.T) {
 
 func TestParseRejectsUnsafeHostPath(t *testing.T) {
 	bad := []string{
-		"git:../etc/passwd",           // path traversal
+		"git:../etc/passwd",            // path traversal
 		"git:github.com/../etc/passwd", // path traversal in path
-		"git:github.com/../../etc",    // path traversal
-		"git:host/repo/../../escape",  // path traversal
-		"git:..%2f..%2f/etc",          // encoded traversal (not in charset)
-		"git:/abs/path",               // leading slash
-		"git:-option/repo",            // leading dash in path
-		"git:host;a=b/repo",           // semicolon in host
-		"git:host/repo;rm",            // semicolon in path
-		"git:host/repo|pipe",          // pipe in path
-		"git:host/repo$var",           // dollar in path
-		"git:host/repo`cmd`",          // backtick in path
-		"git:(host)/repo",             // parens
-		"git: host/repo",              // space in host
-		"git:git@host:user/repo;bad",  // SSH with bad char
+		"git:github.com/../../etc",     // path traversal
+		"git:host/repo/../../escape",   // path traversal
+		"git:..%2f..%2f/etc",           // encoded traversal (not in charset)
+		"git:/abs/path",                // leading slash
+		"git:-option/repo",             // leading dash in path
+		"git:host;a=b/repo",            // semicolon in host
+		"git:host/repo;rm",             // semicolon in path
+		"git:host/repo|pipe",           // pipe in path
+		"git:host/repo$var",            // dollar in path
+		"git:host/repo`cmd`",           // backtick in path
+		"git:(host)/repo",              // parens
+		"git: host/repo",               // space in host
+		"git:git@host:user/repo;bad",   // SSH with bad char
 	}
 	for _, spec := range bad {
 		t.Run(spec, func(t *testing.T) {

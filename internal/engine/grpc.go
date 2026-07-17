@@ -15,6 +15,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -140,6 +141,12 @@ func (e *Engine) buildGRPCHandler(st *serviceState, handlerSpec string) grpcsim.
 
 		result, err := vm.Call(fnName, starReq)
 		if err != nil {
+			// If the error wraps a real gRPC status (e.g. a transport error
+			// from a cancelled stream), propagate the original status code
+			// instead of masking it as Internal.
+			if st, ok := status.FromError(err); ok && st.Code() != codes.OK {
+				return nil, grpcsim.Error(st.Code(), st.Message())
+			}
 			return nil, grpcsim.Error(codes.Internal, fmt.Sprintf("handler error: %v", err))
 		}
 
@@ -224,6 +231,13 @@ func (e *Engine) buildGRPCStreamHandler(st *serviceState, handlerSpec string) gr
 		sv := &streamValue{stream: stream}
 		result, err := vm.CallWith(fnName, sv)
 		if err != nil {
+			// If the error wraps a real gRPC status (e.g. a client cancel
+			// mid-stream surfacing as a transport error through
+			// stream.recv()), propagate the original status code instead
+			// of masking it as Internal.
+			if st, ok := status.FromError(err); ok && st.Code() != codes.OK {
+				return grpcsim.Error(st.Code(), st.Message())
+			}
 			return grpcsim.Error(codes.Internal, fmt.Sprintf("handler error: %v", err))
 		}
 
@@ -249,6 +263,13 @@ func (e *Engine) buildGRPCStreamHandler(st *serviceState, handlerSpec string) gr
 // streaming gRPC handler script. It wraps a grpcsim.Stream, converting between
 // Go maps and Starlark dicts.
 //
+// Context handling: the underlying grpc.ServerStream ties RecvMsg/SendMsg to
+// the transport context. When the client cancels or the deadline expires, the
+// next recv() or send() returns a transport error (wrapping a gRPC status)
+// that propagates through the Starlark VM and terminates the handler promptly.
+// The step-limit (1M steps) additionally bounds any handler that loops without
+// calling recv/send.
+//
 // In Starlark:
 //
 //	msg = stream.recv()   # returns a dict, or None on client half-close
@@ -258,10 +279,10 @@ type streamValue struct {
 }
 
 // String implements sk.Value.
-func (s *streamValue) String() string  { return "stream" }
+func (s *streamValue) String() string { return "stream" }
 
 // Type implements sk.Value.
-func (s *streamValue) Type() string  { return "stream" }
+func (s *streamValue) Type() string { return "stream" }
 
 // Freeze implements sk.Value. The stream is inherently per-call and not
 // frozen — handlers operate on it within a single invocation.

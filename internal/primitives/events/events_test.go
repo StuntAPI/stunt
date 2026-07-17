@@ -17,9 +17,9 @@ import (
 // countingSink is an httptest server that counts received posts and can
 // be configured to fail the first N requests.
 type countingSink struct {
-	mu          sync.Mutex
-	requests    []receivedReq
-	failCount   int32 // number of requests to fail (decremented)
+	mu           sync.Mutex
+	requests     []receivedReq
+	failCount    int32 // number of requests to fail (decremented)
 	statusOnFail int   // status code to return when failing
 }
 
@@ -83,7 +83,7 @@ func TestEmitReachesSink(t *testing.T) {
 	e.Register("stripe", server.URL)
 
 	err := e.Emit(context.Background(), "stripe", "payment.created", map[string]any{
-		"amount": 1000,
+		"amount":   1000,
 		"currency": "usd",
 	})
 	if err != nil {

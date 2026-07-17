@@ -320,4 +320,3 @@ func TestDropboxStyleAdapter(t *testing.T) {
 		t.Fatalf("GET unmatched route -> status %d, want 404", resp.StatusCode)
 	}
 }
-

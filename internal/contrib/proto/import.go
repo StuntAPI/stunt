@@ -544,7 +544,7 @@ func toSnakeCase(s string) string {
 	return b.String()
 }
 
-func isUpper(r rune) bool       { return r >= 'A' && r <= 'Z' }
+func isUpper(r rune) bool { return r >= 'A' && r <= 'Z' }
 func toLower(r rune) rune {
 	if r >= 'A' && r <= 'Z' {
 		return r + ('a' - 'A')
@@ -619,4 +619,3 @@ func mergeGrpcSection(dir, fullName, descRel, starRel string, svc *descriptorpb.
 	}
 	return nil
 }
-

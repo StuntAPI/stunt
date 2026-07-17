@@ -426,4 +426,3 @@ func TestAdapterNewRequiresName(t *testing.T) {
 		t.Fatal("expected error for 'adapter new' without name")
 	}
 }
-

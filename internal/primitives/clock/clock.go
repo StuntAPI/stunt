@@ -43,12 +43,12 @@ type scheduled struct {
 
 // Ticker represents a repeating callback that can be stopped.
 type Ticker struct {
-	clock   *Clock
-	id      int           // virtual mode: scheduled timer id
-	stopCh  chan struct{} // real mode: closed to signal stop
-	stopOnce sync.Once    // guards close(stopCh) against double-close
-	stopMu   sync.Mutex   // guards the stopped flag in virtual mode
-	stopped  bool         // virtual mode: whether Stop was called
+	clock    *Clock
+	id       int           // virtual mode: scheduled timer id
+	stopCh   chan struct{} // real mode: closed to signal stop
+	stopOnce sync.Once     // guards close(stopCh) against double-close
+	stopMu   sync.Mutex    // guards the stopped flag in virtual mode
+	stopped  bool          // virtual mode: whether Stop was called
 }
 
 // NewClock creates a real-time clock. Now returns time.Now and callbacks

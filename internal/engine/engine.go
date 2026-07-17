@@ -35,10 +35,10 @@ import (
 type Engine struct {
 	manifest  *manifest.Manifest
 	states    map[string]*serviceState // keyed by service name
-	cacheRoot string                 // adapter cache root for git sources
+	cacheRoot string                   // adapter cache root for git sources
 
-	grpcServers []*grpc.Server       // started by serve(), stopped by Close()
-	grpcTargets map[string]string    // service name → grpc target (set by serve())
+	grpcServers []*grpc.Server    // started by serve(), stopped by Close()
+	grpcTargets map[string]string // service name → grpc target (set by serve())
 }
 
 // serviceState holds the per-service runtime for an adapter-backed service:

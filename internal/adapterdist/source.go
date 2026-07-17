@@ -132,9 +132,9 @@ func parseGitShorthand(rest string) (*Source, error) {
 	if colonIdx := strings.Index(rest, ":"); colonIdx > 0 {
 		beforeColon := rest[:colonIdx]
 		if atIdx := strings.Index(beforeColon, "@"); atIdx >= 0 {
-			userAtHost := beforeColon              // e.g. "git@github.com"
-			host := userAtHost[atIdx+1:]           // e.g. "github.com"
-			pathRef := rest[colonIdx+1:]           // e.g. "user/repo" or "user/repo@v1"
+			userAtHost := beforeColon    // e.g. "git@github.com"
+			host := userAtHost[atIdx+1:] // e.g. "github.com"
+			pathRef := rest[colonIdx+1:] // e.g. "user/repo" or "user/repo@v1"
 			path, ref := splitRef(pathRef)
 			url := userAtHost + ":" + path
 			return newGitSource(url, host, path, ref)

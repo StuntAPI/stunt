@@ -159,6 +159,8 @@ def on_accumulate(stream):
   message (useful for client-streaming); a 4xx/5xx status maps to the corresponding gRPC error code.
 - `while` loops are allowed — the Starlark handler runs to completion within a single gRPC stream
   invocation.
+- Integer fields in streamed messages arrive as `float64` in Starlark (protojson round-trips numbers
+  via JSON), so use `int(x)` before arithmetic — e.g. `total += int(m["value"])`.
 - Unary methods on the same service continue to use the `on_<method>(req)` API unchanged.
 
 See `adapters/echo-style/` for a complete, working example.
