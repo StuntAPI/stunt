@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stunt.local/schemas/charge.schema.json",
+  "title": "Charge",
+  "description": "Synthetic charge object for the Stripe-style adapter",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the charge"
+    },
+    "object": {
+      "type": "string",
+      "const": "charge"
+    },
+    "amount": {
+      "type": "integer",
+      "description": "Amount intended to be charged in cents"
+    },
+    "currency": {
+      "type": "string",
+      "description": "Three-letter ISO currency code"
+    },
+    "customer": {
+      "type": ["string", "null"],
+      "description": "ID of the customer this charge belongs to"
+    },
+    "description": {
+      "type": ["string", "null"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "succeeded", "refunded", "failed"]
+    },
+    "captured": {
+      "type": "boolean"
+    },
+    "refunded": {
+      "type": "boolean"
+    },
+    "amount_refunded": {
+      "type": "integer"
+    },
+    "created": {
+      "type": "integer",
+      "description": "Unix timestamp of creation"
+    }
+  },
+  "required": ["id", "object", "amount", "currency", "status", "created"]
+}
