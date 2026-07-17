@@ -155,7 +155,7 @@ func TestGrpcHandlerReturnsConcreteValues(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// I3: skip streaming RPCs
+// I3: streaming RPCs generate stream-based stubs (not skipped)
 // ---------------------------------------------------------------------------
 
 func streamingProto() []byte {
@@ -183,14 +183,14 @@ message Thing {
 `)
 }
 
-func TestStreamingRPCsSkipped(t *testing.T) {
+func TestStreamingRPCsGenerated(t *testing.T) {
 	dir := t.TempDir()
 
 	if err := proto.ImportProto(streamingProto(), dir); err != nil {
 		t.Fatalf("ImportProto: %v", err)
 	}
 
-	// adapter.yaml: only the unary method should be in the methods list.
+	// adapter.yaml: all three methods should be present.
 	a, err := adapter.Load(dir)
 	if err != nil {
 		t.Fatalf("adapter.Load: %v", err)
@@ -204,37 +204,45 @@ func TestStreamingRPCsSkipped(t *testing.T) {
 		methodNames = append(methodNames, m.Name)
 	}
 
-	if len(a.Grpc.Methods) != 1 {
-		t.Fatalf("Methods: %d (%v), want 1 (only GetOne; streaming methods skipped)", len(a.Grpc.Methods), methodNames)
-	}
-	if a.Grpc.Methods[0].Name != "GetOne" {
-		t.Errorf("method[0] name = %q, want GetOne", a.Grpc.Methods[0].Name)
+	if len(a.Grpc.Methods) != 3 {
+		t.Fatalf("Methods: %d (%v), want 3 (GetOne + StreamThings + UploadThings)", len(a.Grpc.Methods), methodNames)
 	}
 
-	// .star: a comment noting which methods were skipped.
+	// .star: all three handlers present — unary uses on_<name>(req),
+	// streaming uses on_<name>(stream).
 	starPath := filepath.Join(dir, "scripts", "streamservice.star")
 	src, err := os.ReadFile(starPath)
 	if err != nil {
 		t.Fatalf("read star: %v", err)
 	}
 
-	// Only GetOne has a handler.
+	// Unary handler.
 	if !strings.Contains(string(src), "def on_get_one(req):") {
 		t.Error("missing on_get_one handler for unary method")
 	}
-	// StreamThings and UploadThings should NOT have handlers.
-	if strings.Contains(string(src), "def on_stream_things") {
-		t.Error("streaming method StreamThings should not have a handler")
+	// Server-streaming handler.
+	if !strings.Contains(string(src), "def on_stream_things(stream):") {
+		t.Error("missing on_stream_things streaming handler")
 	}
-	if strings.Contains(string(src), "def on_upload_things") {
-		t.Error("streaming method UploadThings should not have a handler")
+	// Client-streaming handler.
+	if !strings.Contains(string(src), "def on_upload_things(stream):") {
+		t.Error("missing on_upload_things streaming handler")
 	}
-	// A comment should note the skip.
-	if !strings.Contains(string(src), "StreamThings") || !strings.Contains(string(src), "stream") {
-		t.Error("generated star should contain a comment noting StreamThings was skipped (streaming)")
+
+	// Streaming handlers use the stream API.
+	if !strings.Contains(string(src), "stream.recv()") {
+		t.Error("streaming handlers should use stream.recv()")
 	}
-	if !strings.Contains(string(src), "UploadThings") {
-		t.Error("generated star should contain a comment noting UploadThings was skipped (streaming)")
+	if !strings.Contains(string(src), "stream.send(") {
+		t.Error("streaming handlers should use stream.send()")
+	 }
+
+	// Type comments are present.
+	if !strings.Contains(string(src), "server-streaming") {
+		t.Error("missing server-streaming type comment")
+	}
+	if !strings.Contains(string(src), "client-streaming") {
+		t.Error("missing client-streaming type comment")
 	}
 }
 

@@ -16,7 +16,9 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
-// sampleProto is a proto file with two RPCs, a nested message, a repeated
+// sampleProto is a proto file with two unary RPCs, a server-streaming RPC,
+// and a bidi-streaming RPC — exercising both the unary synthesis and the
+// streaming stub generation. It also has a nested message, a repeated
 // field, an enum, and a map field — exercising the synthetic-value generator.
 func sampleProto() []byte {
 	return []byte(`syntax = "proto3";
@@ -27,6 +29,8 @@ package stunt.example;
 service ChargeService {
   rpc CreateCharge(CreateChargeRequest) returns (CreateChargeReply);
   rpc GetCharge(GetChargeRequest) returns (GetChargeReply);
+  rpc StreamEvents(EventRequest) returns (stream Event);
+  rpc Chat(stream ChatMessage) returns (stream ChatMessage);
 }
 
 message CreateChargeRequest {
@@ -65,6 +69,19 @@ message Address {
   string line1 = 1;
   string city = 2;
 }
+
+message EventRequest {
+  string topic = 1;
+}
+
+message Event {
+  string id = 1;
+  string type = 2;
+}
+
+message ChatMessage {
+  string text = 1;
+}
 `)
 }
 
@@ -102,8 +119,8 @@ func TestImportProtoCreatesDescriptor(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected ServiceDescriptor, got %T", desc)
 	}
-	if svc.Methods().Len() != 2 {
-		t.Errorf("methods: %d, want 2", svc.Methods().Len())
+	if svc.Methods().Len() != 4 {
+		t.Errorf("methods: %d, want 4", svc.Methods().Len())
 	}
 }
 
@@ -128,8 +145,8 @@ func TestImportProtoGrpcSection(t *testing.T) {
 	if !strings.HasSuffix(a.Grpc.Descriptor, "schemas/chargeservice.desc") {
 		t.Errorf("Descriptor = %q, want suffix schemas/chargeservice.desc", a.Grpc.Descriptor)
 	}
-	if len(a.Grpc.Methods) != 2 {
-		t.Fatalf("Methods: %d, want 2", len(a.Grpc.Methods))
+	if len(a.Grpc.Methods) != 4 {
+		t.Fatalf("Methods: %d, want 4", len(a.Grpc.Methods))
 	}
 
 	m0 := a.Grpc.Methods[0]
@@ -147,6 +164,23 @@ func TestImportProtoGrpcSection(t *testing.T) {
 	if !strings.HasSuffix(m1.Handler, "scripts/chargeservice.star#on_get_charge") {
 		t.Errorf("method[1] handler = %q", m1.Handler)
 	}
+
+	// Streaming methods are now included (not skipped).
+	m2 := a.Grpc.Methods[2]
+	if m2.Name != "StreamEvents" {
+		t.Errorf("method[2] name = %q, want StreamEvents", m2.Name)
+	}
+	if !strings.HasSuffix(m2.Handler, "scripts/chargeservice.star#on_stream_events") {
+		t.Errorf("method[2] handler = %q", m2.Handler)
+	}
+
+	m3 := a.Grpc.Methods[3]
+	if m3.Name != "Chat" {
+		t.Errorf("method[3] name = %q, want Chat", m3.Name)
+	}
+	if !strings.HasSuffix(m3.Handler, "scripts/chargeservice.star#on_chat") {
+		t.Errorf("method[3] handler = %q", m3.Handler)
+	}
 }
 
 func TestImportProtoStarHandlers(t *testing.T) {
@@ -163,7 +197,7 @@ func TestImportProtoStarHandlers(t *testing.T) {
 	}
 	src := string(data)
 
-	// Both handlers present.
+	// Both unary handlers present.
 	if !strings.Contains(src, "def on_create_charge(req):") {
 		t.Error("missing on_create_charge handler")
 	}
@@ -171,9 +205,35 @@ func TestImportProtoStarHandlers(t *testing.T) {
 		t.Error("missing on_get_charge handler")
 	}
 
-	// respond(200, ...) in both.
-	if strings.Count(src, "respond(200,") != 2 {
-		t.Errorf("expected 2 respond(200, ...) calls, got %d", strings.Count(src, "respond(200,"))
+	// Streaming handlers present (not skipped).
+	if !strings.Contains(src, "def on_stream_events(stream):") {
+		t.Error("missing on_stream_events streaming handler")
+	}
+	if !strings.Contains(src, "def on_chat(stream):") {
+		t.Error("missing on_chat streaming handler")
+	}
+
+	// Server-streaming stub uses stream.send().
+	if !strings.Contains(src, "stream.send(") {
+		t.Error("streaming handler should use stream.send()")
+	}
+
+	// Bidi-streaming stub uses a while loop with stream.recv().
+	if !strings.Contains(src, "while True:") {
+		t.Error("bidi-streaming handler should use a while True loop")
+	}
+
+	// Streaming type comments present.
+	if !strings.Contains(src, "server-streaming") {
+		t.Error("missing server-streaming type comment")
+	}
+	if !strings.Contains(src, "bidi-streaming") {
+		t.Error("missing bidi-streaming type comment")
+	}
+
+	// Unary respond(200, ...) in the two unary handlers.
+	if strings.Count(src, "respond(200,") < 2 {
+		t.Errorf("expected at least 2 respond(200, ...) calls, got %d", strings.Count(src, "respond(200,"))
 	}
 
 	// String field -> concrete synthetic word (NOT a {{ faker.Word }} placeholder).

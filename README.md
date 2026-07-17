@@ -139,9 +139,9 @@ never runs as root). CLI: `stunt proxy start|stop`, `stunt service install|statu
   (the stripe-style adapter demonstrates real bearer-token validation + `charge.*` webhook emission).
 - The privileged `:443` bind requires `stunt setup`/`stunt service install` (one-time); without it,
   subdomain mode uses an OS-assigned high port (the URL includes the port).
-- **gRPC unary** RPCs are supported via the `grpc:` adapter section (served dynamically from a
-  compiled protobuf descriptor set). **gRPC streaming is not yet supported.** GraphQL and WebSocket
-  are also not yet supported.
+- **gRPC** unary and streaming RPCs are supported via the `grpc:` adapter section (served dynamically
+  from a compiled protobuf descriptor set). Streaming handlers use `stream.recv()`/`stream.send()`.
+  GraphQL and WebSocket are not yet supported.
 - Concurrency is tested with `-race`; the design is single-process per `stunt up`.
 
 ## Project layout

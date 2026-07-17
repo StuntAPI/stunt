@@ -56,3 +56,19 @@ def on_list_echoes(req):
         echoes.append({"message": doc.get("message", "")})
 
     return respond(200, {"echoes": echoes})
+
+# StreamEcho is a server-streaming RPC: it reads the request message and
+# streams back N synthetic replies. Uses the store_kv counter to track the
+# total number of StreamEcho calls (stateful).
+def on_stream_echo(stream):
+    req = stream.recv()
+    message = ""
+    if req != None and "message" in req:
+        message = req["message"]
+
+    # Count this StreamEcho call (stateful across all gRPC handlers).
+    echo_count = store_kv_incr("echo", "say_count")
+
+    # Stream back 3 synthetic replies.
+    for i in range(3):
+        stream.send({"message": message, "echo_count": echo_count + i})

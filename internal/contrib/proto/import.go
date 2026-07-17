@@ -239,8 +239,9 @@ func normalizeTypeName(tn string) string {
 // ---------------------------------------------------------------------------
 
 // isStreamingMethod reports whether a method is client-streaming,
-// server-streaming, or bidi-streaming — all of which require special
-// transport handling that synthetic stub handlers cannot provide.
+// server-streaming, or bidi-streaming — all of which use the stream-based
+// handler API (stream.recv() / stream.send()) rather than the unary
+// on_<method>(req) API.
 func isStreamingMethod(m *descriptorpb.MethodDescriptorProto) bool {
 	return m.GetClientStreaming() || m.GetServerStreaming()
 }
@@ -274,9 +275,10 @@ func methodHandlerName(m *descriptorpb.MethodDescriptorProto, used map[string]in
 	return name
 }
 
-// generateStar produces the .star file content with one handler per unary
-// method. Streaming methods are skipped (with a comment) because synthetic
-// stub handlers cannot model stream semantics.
+// generateStar produces the .star file content with one handler per method.
+// Unary methods get on_<method>(req) handlers that return a synthetic reply.
+// Streaming methods get on_<method>(stream) handlers that demonstrate the
+// stream.recv() / stream.send() API with synthetic messages.
 func generateStar(svc *descriptorpb.ServiceDescriptorProto, st *symbolTable) string {
 	var b strings.Builder
 	b.WriteString("# Synthetic gRPC handlers generated from .proto definitions.\n")
@@ -284,17 +286,55 @@ func generateStar(svc *descriptorpb.ServiceDescriptorProto, st *symbolTable) str
 
 	used := make(map[string]int)
 	for _, method := range svc.Method {
-		if isStreamingMethod(method) {
-			b.WriteString(fmt.Sprintf("# Skipping %s: %s RPCs are not supported.\n\n",
-				method.GetName(), streamingKind(method)))
-			continue
-		}
 		name := methodHandlerName(method, used)
-		b.WriteString(fmt.Sprintf("def on_%s(req):\n", name))
-		body := synthesizeMessageBody(method.GetOutputType(), st, map[string]bool{})
-		b.WriteString(fmt.Sprintf("    return respond(200, %s)\n\n", body))
+		if isStreamingMethod(method) {
+			generateStreamingStub(&b, name, method, st)
+		} else {
+			b.WriteString(fmt.Sprintf("def on_%s(req):\n", name))
+			body := synthesizeMessageBody(method.GetOutputType(), st, map[string]bool{})
+			b.WriteString(fmt.Sprintf("    return respond(200, %s)\n\n", body))
+		}
 	}
 	return b.String()
+}
+
+// generateStreamingStub writes a Starlark streaming handler stub for the
+// given method. The stub demonstrates the stream.recv()/stream.send() API
+// with synthetic messages. The exact shape depends on the streaming type:
+//
+//   - server-streaming: read one request, then send 2 synthetic replies.
+//   - client-streaming: loop recv until None, then return a single reply.
+//   - bidi-streaming:   loop recv until None, send one synthetic reply per
+//     inbound message.
+func generateStreamingStub(b *strings.Builder, name string, method *descriptorpb.MethodDescriptorProto, st *symbolTable) {
+	kind := streamingKind(method)
+	b.WriteString(fmt.Sprintf("# %s RPC.\n", kind))
+	b.WriteString(fmt.Sprintf("def on_%s(stream):\n", name))
+
+	outputBody := synthesizeMessageBody(method.GetOutputType(), st, map[string]bool{})
+
+	switch {
+	case method.GetClientStreaming() && method.GetServerStreaming():
+		// Bidi-streaming: echo-style loop.
+		b.WriteString("    while True:\n")
+		b.WriteString("        msg = stream.recv()\n")
+		b.WriteString("        if msg == None:\n")
+		b.WriteString("            break\n")
+		b.WriteString(fmt.Sprintf("        stream.send(%s)\n", outputBody))
+		b.WriteString("\n")
+	case method.GetClientStreaming():
+		// Client-streaming: drain inbound, return single response.
+		b.WriteString("    while True:\n")
+		b.WriteString("        msg = stream.recv()\n")
+		b.WriteString("        if msg == None:\n")
+		b.WriteString("            break\n")
+		b.WriteString(fmt.Sprintf("    return respond(200, %s)\n\n", outputBody))
+	case method.GetServerStreaming():
+		// Server-streaming: read one request, send 2 synthetic messages.
+		b.WriteString("    req = stream.recv()\n")
+		b.WriteString(fmt.Sprintf("    stream.send(%s)\n", outputBody))
+		b.WriteString(fmt.Sprintf("    stream.send(%s)\n\n", outputBody))
+	}
 }
 
 // synthesizeMessageBody produces a Starlark dict literal for the response
@@ -552,14 +592,11 @@ func mergeGrpcSection(dir, fullName, descRel, starRel string, svc *descriptorpb.
 		return fmt.Errorf("proto: read adapter.yaml: %w", err)
 	}
 
-	// Build the methods list — streaming methods are skipped because the
-	// engine only registers unary handlers.
+	// Build the methods list — all methods are included, both unary and
+	// streaming. The engine routes each to the appropriate handler type.
 	var methods []adapter.GrpcMethod
 	used := make(map[string]int)
 	for _, method := range svc.Method {
-		if isStreamingMethod(method) {
-			continue
-		}
 		name := methodHandlerName(method, used)
 		methods = append(methods, adapter.GrpcMethod{
 			Name:    method.GetName(),
