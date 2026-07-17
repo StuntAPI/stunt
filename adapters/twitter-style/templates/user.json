@@ -1,0 +1,6 @@
+{
+  "id": "{{ faker.ID "usr" }}",
+  "name": "{{ faker.Name }}",
+  "username": "{{ faker.Word }}",
+  "created_at": "{{ now.Format \"2006-01-02T15:04:05.000Z07:00\" }}"
+}

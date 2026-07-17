@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stunt.local/schemas/tweet.schema.json",
+  "title": "Tweet",
+  "description": "Synthetic tweet object for the X.com / Twitter-style adapter",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the tweet"
+    },
+    "text": {
+      "type": "string",
+      "description": "Text content of the tweet"
+    },
+    "author_id": {
+      "type": "string",
+      "description": "ID of the author of the tweet"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "ISO-8601 creation timestamp"
+    }
+  },
+  "required": ["id", "text"]
+}

@@ -1,0 +1,6 @@
+{
+  "id": "{{ faker.ID "twt" }}",
+  "text": "Synthetic {{ faker.Word }} for local testing",
+  "author_id": "{{ faker.ID "usr" }}",
+  "created_at": "{{ now.Format \"2006-01-02T15:04:05.000Z07:00\" }}"
+}
