@@ -67,6 +67,25 @@ func (k *KV) Set(ns, key, value string) error {
 	return nil
 }
 
+// Incr atomically increments the integer stored at ns/key (treating it as a
+// base-10 int; a missing/non-numeric value is treated as 0) and returns the
+// NEW value after incrementing. It is a single SQL statement (upsert +
+// RETURNING), so it is safe under concurrent callers — use this instead of a
+// Get-then-Set sequence for monotonic id/counters.
+func (k *KV) Incr(ns, key string) (int, error) {
+	var next int
+	err := k.db.QueryRow(
+		`INSERT INTO kv (namespace, key, value) VALUES (?, ?, '1')
+		 ON CONFLICT(namespace, key) DO UPDATE SET value = CAST(COALESCE(CAST(value AS INTEGER), 0) + 1 AS TEXT)
+		 RETURNING CAST(value AS INTEGER)`,
+		ns, key,
+	).Scan(&next)
+	if err != nil {
+		return 0, fmt.Errorf("kv incr %s/%s: %w", ns, key, err)
+	}
+	return next, nil
+}
+
 // Delete removes the entry for ns/key. No-op (nil error) if it doesn't exist.
 func (k *KV) Delete(ns, key string) error {
 	_, err := k.db.Exec(

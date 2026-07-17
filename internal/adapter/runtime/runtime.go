@@ -18,6 +18,7 @@
 //	store_kv_set("svc", "key", "value")
 //	v = store_kv_get("svc", "key")    # → str or None if missing
 //	store_kv_delete("svc", "key")
+//	n = store_kv_incr("svc", "counter") # → int (atomic; for monotonic ids)
 //
 // Blob store — store_blob(name) returns a blob object with methods:
 //
@@ -105,6 +106,20 @@ func BuildBuiltins(store *primitives.Store, kvStore *kv.KV, blobStore *blob.Stor
 				return nil, err
 			}
 			return sk.None, nil
+		}),
+		"store_kv_incr": sk.NewBuiltin("store_kv_incr", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			var ns, key string
+			if err := sk.UnpackArgs("store_kv_incr", args, kwargs, "ns", &ns, "key", &key); err != nil {
+				return nil, err
+			}
+			if kvStore == nil {
+				return nil, fmt.Errorf("store_kv_incr: no kv store configured")
+			}
+			next, err := kvStore.Incr(ns, key)
+			if err != nil {
+				return nil, err
+			}
+			return sk.MakeInt64(int64(next)), nil
 		}),
 		"store_blob": sk.NewBuiltin("store_blob", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
 			var name string

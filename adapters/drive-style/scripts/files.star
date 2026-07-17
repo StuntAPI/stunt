@@ -7,13 +7,8 @@
 # _next_id returns a monotonically-increasing provider-style ID using the
 # KV store as a sequence counter. Produces ids like "file_1", "file_2", ...
 def _next_id(prefix):
-    seq_str = store_kv_get("drive", prefix + "_seq")
-    if seq_str == None:
-        seq = 1
-    else:
-        seq = int(seq_str) + 1
-    store_kv_set("drive", prefix + "_seq", str(seq))
-    return prefix + "_" + str(seq)
+    # Atomic increment via store_kv_incr (race-free under concurrent requests).
+    return prefix + "_" + str(store_kv_incr("drive", prefix + "_seq"))
 
 # _now returns a synthetic ISO-8601 timestamp. The value is fixed for
 # determinism in local testing.
