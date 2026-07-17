@@ -11,7 +11,9 @@ package grpcsim
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"reflect"
 	"sync/atomic"
@@ -32,6 +34,30 @@ import (
 // error (which becomes a gRPC status — see [Error]).
 type Handler func(ctx context.Context, fullMethod string, req map[string]any) (resp map[string]any, err error)
 
+// Stream is the interface a streaming handler uses to interact with the
+// client side of a streaming RPC. Recv reads the next client message into a
+// Go map; it returns (nil, io.EOF) when the client has half-closed (no more
+// messages). Send writes a response map to the client.
+type Stream interface {
+	// Context returns the stream's context (for cancellation, deadlines, etc).
+	Context() context.Context
+
+	// Recv reads the next inbound message. The message is decoded into a
+	// JSON-like Go map using proto field names (snake_case). It returns
+	// (nil, io.EOF) when the client has half-closed the stream, so callers
+	// can treat EOF as a sentinel for "no more messages".
+	Recv() (map[string]any, error)
+
+	// Send writes an outbound message. The map is converted to a protobuf
+	// message using the method's output type descriptor.
+	Send(map[string]any) error
+}
+
+// StreamHandler is a Go function that processes a streaming gRPC RPC. It reads
+// from and writes to stream as needed, and returns nil on success or a
+// non-nil error (which becomes a gRPC status — see [Error]).
+type StreamHandler func(ctx context.Context, fullMethod string, stream Stream) error
+
 // Service describes a dynamically-served gRPC service. Methods is keyed by the
 // bare method name (e.g. "CreateCharge").
 type Service struct {
@@ -42,8 +68,12 @@ type Service struct {
 	// Descriptor is the FileDescriptorSet containing the service definition.
 	Descriptor *descriptorpb.FileDescriptorSet
 
-	// Methods maps a bare method name (e.g. "SayHello") to its Handler.
+	// Methods maps a bare method name (e.g. "SayHello") to its [Handler].
 	Methods map[string]Handler
+
+	// Streams maps a bare method name (e.g. "StreamMany") to its
+	// [StreamHandler]. A method appears in at most one of Methods or Streams.
+	Streams map[string]StreamHandler
 }
 
 // codedError carries an explicit gRPC code alongside a message so that handlers
@@ -100,22 +130,38 @@ func BuildServiceDesc(svc *Service) (*grpc.ServiceDesc, error) {
 	methods := service.Methods()
 	for i := 0; i < methods.Len(); i++ {
 		md := methods.Get(i)
+		methodKey := string(md.Name())
+		fullMethod := "/" + svc.FullName + "/" + methodKey
 
-		handler, ok := svc.Methods[string(md.Name())]
+		if md.IsStreamingClient() || md.IsStreamingServer() {
+			// Streaming method — route to the Streams map.
+			sh, ok := svc.Streams[methodKey]
+			if !ok {
+				continue
+			}
+			desc.Streams = append(desc.Streams, grpc.StreamDesc{
+				StreamName:    methodKey,
+				Handler:       streamDescHandler(fullMethod, md, sh),
+				ServerStreams: md.IsStreamingServer(),
+				ClientStreams: md.IsStreamingClient(),
+			})
+			continue
+		}
+
+		// Unary method — existing path.
+		handler, ok := svc.Methods[methodKey]
 		if !ok {
 			// Skip methods with no Go handler registered.
 			continue
 		}
 
-		fullMethod := "/" + svc.FullName + "/" + string(md.Name())
-
 		desc.Methods = append(desc.Methods, grpc.MethodDesc{
-			MethodName: string(md.Name()),
+			MethodName: methodKey,
 			Handler:    methodHandler(fullMethod, md, handler),
 		})
 	}
 
-	if len(desc.Methods) == 0 {
+	if len(desc.Methods) == 0 && len(desc.Streams) == 0 {
 		return nil, fmt.Errorf("grpcsim: no handlers matched methods on service %q", svc.FullName)
 	}
 
@@ -163,6 +209,49 @@ func methodHandler(fullMethod string, md protoreflect.MethodDescriptor, h Handle
 		}
 		return respMsg, nil
 	}
+}
+
+// streamDescHandler builds the grpc.StreamHandler closure for a single
+// streaming method. It adapts the grpc.ServerStream into our [Stream]
+// interface, converting between protobuf messages and Go maps.
+func streamDescHandler(fullMethod string, md protoreflect.MethodDescriptor, h StreamHandler) grpc.StreamHandler {
+	return func(_ any, ss grpc.ServerStream) error {
+		adapter := &serverStreamAdapter{ss: ss, md: md}
+		return h(ss.Context(), fullMethod, adapter)
+	}
+}
+
+// serverStreamAdapter adapts a grpc.ServerStream into our [Stream] interface.
+// RecvMsg reads a dynamic message and converts it to a Go map; SendMsg
+// converts a Go map to a dynamic message and sends it. io.EOF from RecvMsg
+// (client half-close) is returned as (nil, io.EOF) so handlers can distinguish
+// it from a real error.
+type serverStreamAdapter struct {
+	ss grpc.ServerStream
+	md protoreflect.MethodDescriptor
+}
+
+func (a *serverStreamAdapter) Context() context.Context {
+	return a.ss.Context()
+}
+
+func (a *serverStreamAdapter) Recv() (map[string]any, error) {
+	msg := dynamicpb.NewMessage(a.md.Input())
+	if err := a.ss.RecvMsg(msg); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil, io.EOF
+		}
+		return nil, err
+	}
+	return protoToMap(msg)
+}
+
+func (a *serverStreamAdapter) Send(m map[string]any) error {
+	msg := dynamicpb.NewMessage(a.md.Output())
+	if err := mapToProto(m, msg); err != nil {
+		return err
+	}
+	return a.ss.SendMsg(msg)
 }
 
 // toStatusError maps a handler error to a gRPC status error. If the error
