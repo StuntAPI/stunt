@@ -1,6 +1,6 @@
-// Package runtime wires the primitives (Collection + KV) stores into Starlark
-// handler scripts as builtins, enabling stateful adapters that persist data
-// across requests.
+// Package runtime wires the primitives (Collection + KV + Blob) stores into
+// Starlark handler scripts as builtins, enabling stateful adapters that
+// persist data across requests.
 //
 // Script API
 //
@@ -18,13 +18,25 @@
 //	store_kv_set("svc", "key", "value")
 //	v = store_kv_get("svc", "key")    # → str or None if missing
 //	store_kv_delete("svc", "key")
+//
+// Blob store — store_blob(name) returns a blob object with methods:
+//
+//	b = store_blob("drive")
+//	id = b.put("report.txt", "file content")             # → str
+//	content = b.get(id)                                   # → str or None
+//	info = b.stat(id)                                     # → dict or None
+//	b.delete(id)
+//	infos = b.list()                                      # → list[dict]
 package runtime
 
 import (
 	"database/sql"
 	"fmt"
+	"io"
+	"strings"
 
 	"github.com/stunt-adapters/stunt/internal/primitives"
+	"github.com/stunt-adapters/stunt/internal/primitives/blob"
 	"github.com/stunt-adapters/stunt/internal/primitives/kv"
 	"github.com/stunt-adapters/stunt/internal/starlark"
 	sk "go.starlark.net/starlark"
@@ -32,10 +44,10 @@ import (
 )
 
 // BuildBuiltins returns a Starlark StringDict exposing the given stores as
-// builtins ready to pass to starlark.Load. Either store may be nil; the
+// builtins ready to pass to starlark.Load. Any store may be nil; the
 // corresponding builtins will still be registered but will return an error if
 // called without a backing store.
-func BuildBuiltins(store *primitives.Store, kvStore *kv.KV) sk.StringDict {
+func BuildBuiltins(store *primitives.Store, kvStore *kv.KV, blobStore *blob.Store) sk.StringDict {
 	return sk.StringDict{
 		"store_collection": sk.NewBuiltin("store_collection", func(thread *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
 			var name string
@@ -93,6 +105,16 @@ func BuildBuiltins(store *primitives.Store, kvStore *kv.KV) sk.StringDict {
 				return nil, err
 			}
 			return sk.None, nil
+		}),
+		"store_blob": sk.NewBuiltin("store_blob", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			var name string
+			if err := sk.UnpackArgs("store_blob", args, kwargs, "name", &name); err != nil {
+				return nil, err
+			}
+			if blobStore == nil {
+				return nil, fmt.Errorf("store_blob: no blob store configured")
+			}
+			return &blobValue{store: blobStore, ns: name}, nil
 		}),
 	}
 }
@@ -209,6 +231,139 @@ func (c *collectionValue) delete(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwa
 		return nil, err
 	}
 	return sk.None, nil
+}
+
+// --- blob object (starlark.Value with methods) ---
+
+// blobValue wraps a *blob.Store bound to a namespace as a Starlark value
+// with methods: put, get, stat, delete, list.
+type blobValue struct {
+	store *blob.Store
+	ns    string
+}
+
+func (b *blobValue) String() string         { return "blob:" + b.ns }
+func (b *blobValue) Type() string           { return "blob" }
+func (b *blobValue) Freeze()                {}
+func (b *blobValue) Hash() (uint32, error)  { return 0, nil }
+func (b *blobValue) Truth() sk.Bool         { return sk.True }
+
+func (b *blobValue) CompareSameType(_ syntax.Token, _ sk.Value, _ int) (bool, error) {
+	return false, fmt.Errorf("blob does not support comparison")
+}
+
+// AttrNames returns the method names exposed to Starlark's dir().
+func (b *blobValue) AttrNames() []string {
+	return []string{"put", "get", "stat", "delete", "list"}
+}
+
+// Attr returns the named method as a Starlark callable, or nil if not found.
+func (b *blobValue) Attr(name string) (sk.Value, error) {
+	switch name {
+	case "put":
+		return sk.NewBuiltin("blob.put", b.put), nil
+	case "get":
+		return sk.NewBuiltin("blob.get", b.get), nil
+	case "stat":
+		return sk.NewBuiltin("blob.stat", b.stat), nil
+	case "delete":
+		return sk.NewBuiltin("blob.delete", b.delete), nil
+	case "list":
+		return sk.NewBuiltin("blob.list", b.list), nil
+	default:
+		return nil, nil // no such attribute
+	}
+}
+
+// put(name, content, content_type="") writes content as a blob and returns
+// the generated id (which equals name).
+func (b *blobValue) put(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	var name, content string
+	var contentType string // optional, defaults to ""
+	if err := sk.UnpackArgs("put", args, kwargs, "name", &name, "content", &content, "content_type?", &contentType); err != nil {
+		return nil, err
+	}
+	id, err := b.store.PutWith(b.ns, name, contentType, strings.NewReader(content))
+	if err != nil {
+		return nil, err
+	}
+	return sk.String(id), nil
+}
+
+// get(id) reads and returns the blob content as a string, or None if missing.
+func (b *blobValue) get(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	var id string
+	if err := sk.UnpackArgs("get", args, kwargs, "id", &id); err != nil {
+		return nil, err
+	}
+	rc, err := b.store.Get(b.ns, id)
+	if err == blob.ErrNotFound {
+		return sk.None, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rc.Close()
+	data, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, err
+	}
+	return sk.String(string(data)), nil
+}
+
+// stat(id) returns a dict with name, size, content_type, modified, or None.
+func (b *blobValue) stat(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	var id string
+	if err := sk.UnpackArgs("stat", args, kwargs, "id", &id); err != nil {
+		return nil, err
+	}
+	info, err := b.store.Stat(b.ns, id)
+	if err == blob.ErrNotFound {
+		return sk.None, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return blobInfoToDict(info), nil
+}
+
+// delete(id) removes a blob. Idempotent — returns None whether or not the
+// blob existed.
+func (b *blobValue) delete(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	var id string
+	if err := sk.UnpackArgs("delete", args, kwargs, "id", &id); err != nil {
+		return nil, err
+	}
+	if err := b.store.Delete(b.ns, id); err != nil {
+		return nil, err
+	}
+	return sk.None, nil
+}
+
+// list() returns all blobs in the namespace as a list of dicts.
+func (b *blobValue) list(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	if err := sk.UnpackArgs("list", args, kwargs); err != nil {
+		return nil, err
+	}
+	infos, err := b.store.List(b.ns)
+	if err != nil {
+		return nil, err
+	}
+	elems := make([]sk.Value, len(infos))
+	for i, info := range infos {
+		elems[i] = blobInfoToDict(info)
+	}
+	return sk.NewList(elems), nil
+}
+
+// blobInfoToDict converts a blob.Info into a Starlark dict.
+func blobInfoToDict(info blob.Info) sk.Value {
+	d := sk.NewDict(4)
+	d.SetKey(sk.String("name"), sk.String(info.Name))
+	d.SetKey(sk.String("size"), sk.MakeInt64(info.Size))
+	d.SetKey(sk.String("content_type"), sk.String(info.ContentType))
+	d.SetKey(sk.String("modified"), sk.String(info.Modified.Format("2006-01-02T15:04:05Z07:00")))
+	return d
 }
 
 // dictToGoMap converts a Starlark dict (or None) into a Go map[string]any.

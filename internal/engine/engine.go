@@ -14,6 +14,7 @@ import (
 	"github.com/stunt-adapters/stunt/internal/adapter/runtime"
 	"github.com/stunt-adapters/stunt/internal/manifest"
 	"github.com/stunt-adapters/stunt/internal/primitives"
+	"github.com/stunt-adapters/stunt/internal/primitives/blob"
 	"github.com/stunt-adapters/stunt/internal/primitives/kv"
 	"github.com/stunt-adapters/stunt/internal/rules"
 	"github.com/stunt-adapters/stunt/internal/starlark"
@@ -33,10 +34,11 @@ type Engine struct {
 // the loaded adapter, backing stores, and a cache of Starlark VMs keyed by
 // absolute script path.
 type serviceState struct {
-	adapter  *adapter.Adapter
-	store    *primitives.Store
-	kvStore  *kv.KV
-	builtins sk.StringDict
+	adapter   *adapter.Adapter
+	store     *primitives.Store
+	kvStore   *kv.KV
+	blobStore *blob.Store
+	builtins  sk.StringDict
 
 	mu  sync.Mutex
 	vms map[string]*starlark.VM // script path → VM (loaded once)
@@ -78,6 +80,7 @@ func buildServiceState(name string, svc manifest.Service, stateDir string) (*ser
 
 	dbPath := filepath.Join(stateDir, name+".db")
 	kvPath := filepath.Join(stateDir, name+".kv.db")
+	blobPath := filepath.Join(stateDir, name+".blobs")
 
 	store, err := primitives.Open(dbPath)
 	if err != nil {
@@ -90,6 +93,13 @@ func buildServiceState(name string, svc manifest.Service, stateDir string) (*ser
 		return nil, err
 	}
 
+	blobStore, err := blob.Open(blobPath)
+	if err != nil {
+		store.Close()
+		kvStore.Close()
+		return nil, err
+	}
+
 	// Seed declared collections.
 	for _, res := range a.Resources {
 		if res.Kind == "collection" {
@@ -97,6 +107,7 @@ func buildServiceState(name string, svc manifest.Service, stateDir string) (*ser
 			if err != nil {
 				store.Close()
 				kvStore.Close()
+				blobStore.Close()
 				return nil, fmt.Errorf("seed collection %s: %w", res.Name, err)
 			}
 			if res.Seed != "" {
@@ -107,6 +118,7 @@ func buildServiceState(name string, svc manifest.Service, stateDir string) (*ser
 				if err := col.Seed(seedPath); err != nil {
 					store.Close()
 					kvStore.Close()
+					blobStore.Close()
 					return nil, fmt.Errorf("seed collection %s from %s: %w", res.Name, res.Seed, err)
 				}
 			}
@@ -114,11 +126,12 @@ func buildServiceState(name string, svc manifest.Service, stateDir string) (*ser
 	}
 
 	st := &serviceState{
-		adapter:  a,
-		store:    store,
-		kvStore:  kvStore,
-		builtins: runtime.BuildBuiltins(store, kvStore),
-		vms:      make(map[string]*starlark.VM),
+		adapter:   a,
+		store:     store,
+		kvStore:   kvStore,
+		blobStore: blobStore,
+		builtins:  runtime.BuildBuiltins(store, kvStore, blobStore),
+		vms:       make(map[string]*starlark.VM),
 	}
 	return st, nil
 }
@@ -134,6 +147,11 @@ func (e *Engine) Close() error {
 		}
 		if st.kvStore != nil {
 			if err := st.kvStore.Close(); err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		if st.blobStore != nil {
+			if err := st.blobStore.Close(); err != nil && firstErr == nil {
 				firstErr = err
 			}
 		}
