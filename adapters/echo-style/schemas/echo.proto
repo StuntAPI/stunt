@@ -12,6 +12,8 @@ service Echo {
   rpc Add(AddRequest) returns (AddReply);
   // ListEchoes returns all messages previously echoed by Say.
   rpc ListEchoes(ListEchoesRequest) returns (ListEchoesReply);
+  // StreamEcho reads a request and streams back N synthetic replies.
+  rpc StreamEcho(EchoRequest) returns (stream EchoReply);
 }
 
 message EchoRequest {

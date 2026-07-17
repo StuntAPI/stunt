@@ -21,6 +21,8 @@ grpc:
       handler: scripts/echo.star#on_add
     - name: ListEchoes
       handler: scripts/echo.star#on_list_echoes
+    - name: StreamEcho
+      handler: scripts/echo.star#on_stream_echo
 
 # Backing stores available to Starlark handlers.
 resources:

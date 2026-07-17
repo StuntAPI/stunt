@@ -113,6 +113,52 @@ RPC method is routed to a Starlark handler, just like REST endpoints.
 
 - gRPC handlers use the same Starlark sandbox as REST handlers — no host I/O, no network.
 - A service can declare both `endpoints:` (REST) and `grpc:` simultaneously.
-- **Streaming RPCs are not yet supported** — only unary methods.
+
+### gRPC streaming
+
+Streaming RPCs (server-streaming, client-streaming, and bidi-streaming) are fully supported. A
+streaming method is routed to a Starlark handler `on_<method>(stream)` where `stream` is a special
+value exposing two methods:
+
+- **`stream.recv()`** — returns the next inbound message as a dict, or `None` when the client has
+  half-closed (no more messages).
+- **`stream.send(msg)`** — emits an outbound message. `msg` must be a dict.
+
+The three streaming modes work as follows:
+
+| Mode | Signature | Handler pattern |
+|---|---|---|
+| **Server-streaming** | `(EchoRequest) returns (stream EchoReply)` | `req = stream.recv()` once, then `stream.send(...)` for each reply |
+| **Client-streaming** | `(stream EchoRequest) returns (EchoReply)` | loop `stream.recv()` until `None`, then `return respond(status, msg)` |
+| **Bidi-streaming** | `(stream EchoRequest) returns (stream EchoReply)` | loop `stream.recv()` until `None`, calling `stream.send(...)` per message |
+
+Example server-streaming handler:
+
+```python
+def on_stream_echo(stream):
+    req = stream.recv()
+    message = req["message"] if req != None else ""
+    for i in range(3):
+        stream.send({"message": message, "echo_count": i + 1})
+```
+
+For client-streaming, the handler's return value is the single response:
+
+```python
+def on_accumulate(stream):
+    total = 0
+    while True:
+        m = stream.recv()
+        if m == None:
+            break
+        total += int(m["value"])
+    return respond(200, {"total": total})
+```
+
+- `return respond(status, msg)` sets the **trailing** gRPC status. A 2xx status sends `msg` as a final
+  message (useful for client-streaming); a 4xx/5xx status maps to the corresponding gRPC error code.
+- `while` loops are allowed — the Starlark handler runs to completion within a single gRPC stream
+  invocation.
+- Unary methods on the same service continue to use the `on_<method>(req)` API unchanged.
 
 See `adapters/echo-style/` for a complete, working example.
