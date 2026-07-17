@@ -1,7 +1,9 @@
 package manifest
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -53,4 +55,62 @@ func TestNetworkDefaults(t *testing.T) {
 			t.Errorf("TLD = %q, want empty for port mode", n.TLD)
 		}
 	})
+}
+
+// --- Save ---
+
+func TestSaveRoundTrip(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Network: Network{Mode: "port", BasePort: 8000},
+		Services: map[string]Service{
+			"hello": {Adapter: "git:github.com/user/repo@v1.0"},
+		},
+	}
+	path := filepath.Join(t.TempDir(), "stunt.yaml")
+	if err := Save(m, path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	m2, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if m2.Version != 1 {
+		t.Errorf("Version = %d, want 1", m2.Version)
+	}
+	svc, ok := m2.Services["hello"]
+	if !ok {
+		t.Fatal("missing service hello")
+	}
+	if svc.Adapter != "git:github.com/user/repo@v1.0" {
+		t.Errorf("Adapter = %q, want git source spec", svc.Adapter)
+	}
+}
+
+func TestSaveWritesVersionFirst(t *testing.T) {
+	m := &Manifest{
+		Version: 1,
+		Network: Network{Mode: "port", BasePort: 8000},
+		Services: map[string]Service{
+			"hello": {Adapter: "/local/path"},
+		},
+	}
+	path := filepath.Join(t.TempDir(), "stunt.yaml")
+	if err := Save(m, path); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	data, err := osReadFileManifest(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(string(data), "\n")
+	if len(lines) == 0 || !strings.HasPrefix(lines[0], "version:") {
+		t.Errorf("expected 'version:' as first line, got: %q", lines[0])
+	}
+}
+
+func osReadFileManifest(path string) ([]byte, error) {
+	return os.ReadFile(path)
 }

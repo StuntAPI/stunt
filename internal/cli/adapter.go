@@ -15,7 +15,7 @@ import (
 )
 
 // newAdapterCmd creates the "adapter" parent command group. Subcommands:
-// new (scaffold), import (openapi, har), lint, test.
+// new (scaffold), import (openapi, har), lint, test, add, remove, list, update.
 func newAdapterCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "adapter",
@@ -30,6 +30,13 @@ fixtures/, scripts/, schemas/).`,
 	cmd.AddCommand(newAdapterImportCmd())
 	cmd.AddCommand(newAdapterLintCmd())
 	cmd.AddCommand(newAdapterTestCmd())
+	cmd.AddCommand(newAdapterAddCmd())
+	cmd.AddCommand(newAdapterRemoveCmd())
+	cmd.AddCommand(newAdapterListCmd())
+	cmd.AddCommand(newAdapterUpdateCmd())
+	// --cache-dir is shared by add/list/update. The env STUNT_ADAPTER_CACHE
+	// provides the same override without a flag.
+	cmd.PersistentFlags().String("cache-dir", "", "adapter cache directory (env: STUNT_ADAPTER_CACHE, default: ~/.stunt/adapters)")
 	return cmd
 }
 
