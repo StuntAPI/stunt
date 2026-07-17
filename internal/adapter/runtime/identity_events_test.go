@@ -294,7 +294,9 @@ def on_post(req):
 // --- events_emit before register errors ---
 
 // TestEventsEmitBeforeRegister proves that calling events_emit without first
-// calling events_register returns an error to the handler.
+// calling events_register is silently skipped (fire-and-forget) — it must NOT
+// cause a handler error, because webhook failures must never break request
+// processing.
 func TestEventsEmitBeforeRegister(t *testing.T) {
 	emitter := events.NewEmitter()
 	defer emitter.Close()
@@ -313,9 +315,12 @@ def on_post(req):
 		t.Fatalf("Load: %v", err)
 	}
 
-	_, err = vm.Call("on_post", starlark.Request{Method: "POST"})
-	if err == nil {
-		t.Fatal("expected error from events_emit without register, got nil")
+	resp, err := vm.Call("on_post", starlark.Request{Method: "POST"})
+	if err != nil {
+		t.Fatalf("events_emit without register should be fire-and-forget, got error: %v", err)
+	}
+	if resp.Body["ok"] != true {
+		t.Fatalf("ok = %v, want true", resp.Body["ok"])
 	}
 }
 

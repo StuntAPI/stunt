@@ -16,13 +16,90 @@ State persists in an in-process SQLite-backed collection store, so data you
 create in one request is visible in subsequent requests within the same
 `stunt up` session.
 
-Webhook event emission on charge creation is **stubbed** — the `events`
-primitive is not yet wired into Starlark handler builtins.
+Webhook events are emitted on charge lifecycle transitions (created, updated,
+refunded) to a configurable webhook sink.
+
+## Auth
+
+All endpoints (except `/v1/tokens`) require a valid `Authorization: Bearer
+<token>` header.
+
+### Token validation
+
+The adapter validates bearer tokens via the identity primitive
+(`identity_validate`). If the token is missing or invalid, the adapter
+returns `401` with a JSON body:
+
+```json
+{"error": {"type": "authentication_error", "message": "..."}}
+```
+
+### Dev bypass (`sk_test`)
+
+For frictionless local testing, **any token starting with `sk_test`** is
+accepted **without** `identity_validate`. This lets you use a well-known dev
+token like `sk_test_local` in scripts, curl commands, and tests without
+needing to mint a real token first:
+
+```bash
+curl -H "Authorization: Bearer sk_test_local" http://localhost:PORT/v1/charges
+```
+
+This bypass exists **only** in the local simulator and never touches a real
+API.
+
+### Minting a real token
+
+For integration tests that need a real (validated) token, `POST /v1/tokens`
+mints one via the identity issuer:
+
+```bash
+curl -X POST http://localhost:PORT/v1/tokens
+# → {"token": "eyJhbGciOiJIUzI1NiIs..."}
+```
+
+The returned token can then be used as a Bearer token for subsequent
+requests. Optional body fields `subject` and `scopes` customise the claims
+(defaults: `subject="test_user"`, `scopes=["write"]`).
+
+## Webhooks
+
+The adapter emits webhook events on charge lifecycle transitions. Events are
+**fire-and-forget**: if no webhook sink is configured or the delivery fails,
+the charge operation still succeeds.
+
+| Trigger | Event type |
+|---------|-----------|
+| `POST /v1/charges` (create) | `charge.created` |
+| `POST /v1/charges/{id}/capture` | `charge.updated` |
+| `POST /v1/charges/{id}/refund` | `charge.refunded` |
+
+### Configuring the webhook sink
+
+Set `config.webhook_url` in the service definition to receive events:
+
+```yaml
+services:
+  stripe:
+    adapter: ./adapters/stripe-style
+    config:
+      webhook_url: http://localhost:9090/webhook
+```
+
+The webhook body is a JSON envelope:
+
+```json
+{
+  "type": "charge.created",
+  "payload": { "id": "ch_1", "amount": 5000, "currency": "usd", "status": "pending", ... }
+}
+```
 
 ## Endpoints
 
 | Method | Route | Handler | Description |
 |--------|-------|---------|-------------|
+| POST | `/v1/tokens` | `tokens.star#on_create` | Mint a test token (no auth required) |
 | POST | `/v1/charges` | `charges.star#on_create` | Create a charge (status → `pending`) |
 | GET | `/v1/charges/{id}` | `charges.star#on_retrieve` | Retrieve a charge |
 | GET | `/v1/charges` | `charges.star#on_list` | List all charges |
@@ -54,9 +131,10 @@ adapter.yaml              Manifest: endpoints, resources, rules, identity
 DISCLAIMER                Not affiliated / synthetic-only notice
 README.md                 This file
 scripts/
-  charges.star            Charge CRUD + capture/refund handlers
-  customers.star          Customer CRUD handlers
-  balance.star            Balance endpoint handler
+  tokens.star             Token mint endpoint (POST /v1/tokens)
+  charges.star            Charge CRUD + capture/refund + auth + webhooks
+  customers.star          Customer CRUD + auth
+  balance.star            Balance endpoint + auth
 fixtures/
   charges.jsonl           Seed data for the charges collection
   customers.jsonl         Seed data for the customers collection
@@ -67,12 +145,6 @@ schemas/
   charge.schema.json      JSON Schema for a charge object
 ```
 
-## Auth
-
-The adapter declares `identity.token_scheme: bearer` as metadata. Auth is **not
-enforced** — any (or no) `Authorization` header is accepted. This is intentional
-for local testing convenience.
-
 ## Usage
 
 Point a `stunt.yaml` service at this directory:
@@ -81,6 +153,8 @@ Point a `stunt.yaml` service at this directory:
 services:
   stripe:
     adapter: ./adapters/stripe-style
+    config:
+      webhook_url: http://localhost:9090/webhook   # optional
 ```
 
 Then `stunt up` and make requests to the served address.

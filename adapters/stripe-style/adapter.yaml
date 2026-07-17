@@ -10,6 +10,13 @@ version: "0.1.0"
 
 # Endpoints — each maps a route + method to a Starlark handler.
 endpoints:
+  # --- Tokens (test helper) ---
+  # Mints a real identity token for authenticated requests in tests/dev.
+  # Does NOT require auth — it is how callers obtain a valid bearer token.
+  - route: /v1/tokens
+    method: POST
+    handler: scripts/tokens.star#on_create
+
   # --- Charges ---
   - route: /v1/charges
     method: POST
@@ -58,7 +65,9 @@ resources:
     kind: collection
     seed: fixtures/customers.jsonl
 
-# Auth scheme metadata (mock: any bearer token is accepted; not enforced).
+# Auth scheme: bearer token validated via identity_validate.
+# Dev bypass: tokens starting with "sk_test" are accepted without validation.
+# Mint a real token via POST /v1/tokens.
 identity:
   token_scheme: bearer
 

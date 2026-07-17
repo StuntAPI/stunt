@@ -38,7 +38,7 @@
 // Events — standalone builtins:
 //
 //	events_register("http://localhost:9090/webhook")      # → None
-//	events_emit("order.created", {"id": "ord-123"})        # → None
+//	events_emit("order.created", {"id": "ord-123"})        # → None (fire-and-forget)
 package runtime
 
 import (
@@ -296,9 +296,9 @@ func buildEventsBuiltins(emitter *events.Emitter, serviceName string) sk.StringD
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), eventsEmitTimeout)
 			defer cancel()
-			if err := emitter.Emit(ctx, serviceName, eventType, payload); err != nil {
-				return nil, fmt.Errorf("events_emit: %w", err)
-			}
+			// Fire-and-forget: webhook delivery failures (including "not
+			// registered" and HTTP errors) must never break the handler.
+			_ = emitter.Emit(ctx, serviceName, eventType, payload)
 			return sk.None, nil
 		}),
 	}
