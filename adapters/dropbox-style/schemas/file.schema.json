@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://stunt.local/schemas/file.schema.json",
+  "title": "File",
+  "description": "Synthetic file/folder metadata object for the Dropbox-style adapter",
+  "type": "object",
+  "properties": {
+    ".tag": {
+      "type": "string",
+      "enum": ["file", "folder"],
+      "description": "Discriminator tag (file or folder)"
+    },
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the entry"
+    },
+    "name": {
+      "type": "string",
+      "description": "Name of the file or folder (last path component)"
+    },
+    "path_lower": {
+      "type": "string",
+      "description": "Lowercased full path to the entry"
+    },
+    "path_display": {
+      "type": "string",
+      "description": "Display path with original casing"
+    },
+    "size": {
+      "type": "integer",
+      "description": "Size of file content in bytes (omitted for folders)"
+    },
+    "client_modified": {
+      "type": "string",
+      "description": "ISO-8601 client-side modification timestamp (files only)"
+    },
+    "server_modified": {
+      "type": "string",
+      "description": "ISO-8601 server-side modification timestamp"
+    }
+  },
+  "required": [".tag", "id", "name", "path_lower", "path_display", "server_modified"]
+}
