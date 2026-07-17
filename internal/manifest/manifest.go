@@ -34,8 +34,9 @@ func (n *Network) Defaults() {
 }
 
 type Service struct {
-	Adapter string       `yaml:"adapter"` // path to an adapter dir (optional)
-	Rules   []rules.Rule `yaml:"rules"`
+	Adapter string            `yaml:"adapter"` // path to an adapter dir (optional)
+	Rules   []rules.Rule      `yaml:"rules"`
+	Config  map[string]any    `yaml:"config"` // optional per-service config (e.g. webhook_url)
 }
 
 type Manifest struct {

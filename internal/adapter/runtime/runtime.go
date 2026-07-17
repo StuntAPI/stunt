@@ -28,27 +28,84 @@
 //	info = b.stat(id)                                     # → dict or None
 //	b.delete(id)
 //	infos = b.list()                                      # → list[dict]
+//
+// Identity — standalone builtins:
+//
+//	token = identity_mint("user-1", ["read", "write"])     # → str
+//	claims = identity_validate(token)                      # → dict or None
+//	has = identity_has_scope(token, "read")                # → bool
+//
+// Events — standalone builtins:
+//
+//	events_register("http://localhost:9090/webhook")      # → None
+//	events_emit("order.created", {"id": "ord-123"})        # → None
 package runtime
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	"github.com/stunt-adapters/stunt/internal/primitives"
 	"github.com/stunt-adapters/stunt/internal/primitives/blob"
+	"github.com/stunt-adapters/stunt/internal/primitives/events"
+	"github.com/stunt-adapters/stunt/internal/primitives/identity"
 	"github.com/stunt-adapters/stunt/internal/primitives/kv"
 	"github.com/stunt-adapters/stunt/internal/starlark"
 	sk "go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 )
 
+// BuiltinOptions bundles all the primitives and services that
+// BuildAllBuiltins wires into Starlark handler builtins. Any field may be
+// nil; the corresponding builtins will still be registered but will return a
+// clear error if called without a backing primitive.
+type BuiltinOptions struct {
+	Store       *primitives.Store
+	KV          *kv.KV
+	Blob        *blob.Store
+	Issuer      *identity.Issuer
+	Emitter     *events.Emitter
+	ServiceName string
+}
+
+// eventsEmitTimeout is the maximum time allowed for a single events_emit
+// call (including retries) inside a handler.
+const eventsEmitTimeout = 10 * time.Second
+
+// BuildAllBuiltins returns a Starlark StringDict exposing store, identity, and
+// events primitives as builtins ready to pass to starlark.Load.
+func BuildAllBuiltins(opts BuiltinOptions) sk.StringDict {
+	dict := buildStoreBuiltins(opts.Store, opts.KV, opts.Blob)
+	for k, v := range buildIdentityBuiltins(opts.Issuer) {
+		dict[k] = v
+	}
+	for k, v := range buildEventsBuiltins(opts.Emitter, opts.ServiceName) {
+		dict[k] = v
+	}
+	return dict
+}
+
 // BuildBuiltins returns a Starlark StringDict exposing the given stores as
 // builtins ready to pass to starlark.Load. Any store may be nil; the
 // corresponding builtins will still be registered but will return an error if
 // called without a backing store.
+//
+// This is a convenience wrapper around BuildAllBuiltins that omits the
+// identity and events primitives.
 func BuildBuiltins(store *primitives.Store, kvStore *kv.KV, blobStore *blob.Store) sk.StringDict {
+	return BuildAllBuiltins(BuiltinOptions{
+		Store: store,
+		KV:    kvStore,
+		Blob:  blobStore,
+	})
+}
+
+// buildStoreBuiltins registers the collection / KV / blob builtins.
+func buildStoreBuiltins(store *primitives.Store, kvStore *kv.KV, blobStore *blob.Store) sk.StringDict {
 	return sk.StringDict{
 		"store_collection": sk.NewBuiltin("store_collection", func(thread *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
 			var name string
@@ -132,6 +189,142 @@ func BuildBuiltins(store *primitives.Store, kvStore *kv.KV, blobStore *blob.Stor
 			return &blobValue{store: blobStore, ns: name}, nil
 		}),
 	}
+}
+
+// --- identity builtins ---
+
+// buildIdentityBuiltins registers identity_mint, identity_validate, and
+// identity_has_scope. If issuer is nil, each builtin returns a clear error.
+func buildIdentityBuiltins(issuer *identity.Issuer) sk.StringDict {
+	return sk.StringDict{
+		"identity_mint": sk.NewBuiltin("identity_mint", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			var subject string
+			var scopesVal sk.Value = sk.NewList(nil)
+			if err := sk.UnpackArgs("identity_mint", args, kwargs, "subject", &subject, "scopes?", &scopesVal); err != nil {
+				return nil, err
+			}
+			if issuer == nil {
+				return nil, fmt.Errorf("identity_mint: no identity issuer configured")
+			}
+			scopes, err := starlarkListToStrings(scopesVal)
+			if err != nil {
+				return nil, fmt.Errorf("identity_mint: %w", err)
+			}
+			token, err := issuer.Mint(subject, scopes, defaultTokenTTL)
+			if err != nil {
+				return nil, fmt.Errorf("identity_mint: %w", err)
+			}
+			return sk.String(token), nil
+		}),
+		"identity_validate": sk.NewBuiltin("identity_validate", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			var token string
+			if err := sk.UnpackArgs("identity_validate", args, kwargs, "token", &token); err != nil {
+				return nil, err
+			}
+			if issuer == nil {
+				return nil, fmt.Errorf("identity_validate: no identity issuer configured")
+			}
+			claims, err := issuer.Validate(token)
+			if err != nil {
+				return sk.None, nil // invalid or expired → None
+			}
+			return claimsToDict(claims), nil
+		}),
+		"identity_has_scope": sk.NewBuiltin("identity_has_scope", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			var token, scope string
+			if err := sk.UnpackArgs("identity_has_scope", args, kwargs, "token", &token, "scope", &scope); err != nil {
+				return nil, err
+			}
+			if issuer == nil {
+				return nil, fmt.Errorf("identity_has_scope: no identity issuer configured")
+			}
+			claims, err := issuer.Validate(token)
+			if err != nil {
+				return sk.False, nil // invalid or expired → False
+			}
+			return sk.Bool(identity.HasScope(claims, scope)), nil
+		}),
+	}
+}
+
+// defaultTokenTTL is the lifetime of tokens minted via identity_mint.
+const defaultTokenTTL = time.Hour
+
+// claimsToDict converts identity.Claims into a Starlark dict with keys
+// subject, scopes, and expires_at (RFC3339).
+func claimsToDict(c *identity.Claims) sk.Value {
+	elems := make([]sk.Value, len(c.Scopes))
+	for i, s := range c.Scopes {
+		elems[i] = sk.String(s)
+	}
+	d := sk.NewDict(3)
+	d.SetKey(sk.String("subject"), sk.String(c.Subject))
+	d.SetKey(sk.String("scopes"), sk.NewList(elems))
+	d.SetKey(sk.String("expires_at"), sk.String(c.ExpiresAt.Format(time.RFC3339)))
+	return d
+}
+
+// --- events builtins ---
+
+// buildEventsBuiltins registers events_register and events_emit. If emitter
+// is nil, each builtin returns a clear error.
+func buildEventsBuiltins(emitter *events.Emitter, serviceName string) sk.StringDict {
+	return sk.StringDict{
+		"events_register": sk.NewBuiltin("events_register", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			var url string
+			if err := sk.UnpackArgs("events_register", args, kwargs, "url", &url); err != nil {
+				return nil, err
+			}
+			if emitter == nil {
+				return nil, fmt.Errorf("events_register: no events emitter configured")
+			}
+			emitter.Register(serviceName, url)
+			return sk.None, nil
+		}),
+		"events_emit": sk.NewBuiltin("events_emit", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			var eventType string
+			var payloadVal sk.Value = sk.None
+			if err := sk.UnpackArgs("events_emit", args, kwargs, "event_type", &eventType, "payload?", &payloadVal); err != nil {
+				return nil, err
+			}
+			if emitter == nil {
+				return nil, fmt.Errorf("events_emit: no events emitter configured")
+			}
+			payload := map[string]any{}
+			if d, ok := payloadVal.(*sk.Dict); ok {
+				payload = starlark.StarlarkToGo(d)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), eventsEmitTimeout)
+			defer cancel()
+			if err := emitter.Emit(ctx, serviceName, eventType, payload); err != nil {
+				return nil, fmt.Errorf("events_emit: %w", err)
+			}
+			return sk.None, nil
+		}),
+	}
+}
+
+// --- conversion helpers ---
+
+// starlarkListToStrings converts a Starlark list (or None) of strings into
+// a Go []string.
+func starlarkListToStrings(v sk.Value) ([]string, error) {
+	if v == sk.None {
+		return nil, nil
+	}
+	lst, ok := v.(*sk.List)
+	if !ok {
+		return nil, fmt.Errorf("expected list, got %s", v.Type())
+	}
+	out := make([]string, lst.Len())
+	for i := range out {
+		s, ok := sk.AsString(lst.Index(i))
+		if !ok {
+			return nil, fmt.Errorf("element %d is %s, not a string", i, lst.Index(i).Type())
+		}
+		out[i] = s
+	}
+	return out, nil
 }
 
 // --- collection object (starlark.Value with methods) ---

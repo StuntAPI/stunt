@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"net"
@@ -15,6 +16,8 @@ import (
 	"github.com/stunt-adapters/stunt/internal/manifest"
 	"github.com/stunt-adapters/stunt/internal/primitives"
 	"github.com/stunt-adapters/stunt/internal/primitives/blob"
+	"github.com/stunt-adapters/stunt/internal/primitives/events"
+	"github.com/stunt-adapters/stunt/internal/primitives/identity"
 	"github.com/stunt-adapters/stunt/internal/primitives/kv"
 	"github.com/stunt-adapters/stunt/internal/rules"
 	"github.com/stunt-adapters/stunt/internal/starlark"
@@ -31,13 +34,15 @@ type Engine struct {
 }
 
 // serviceState holds the per-service runtime for an adapter-backed service:
-// the loaded adapter, backing stores, and a cache of Starlark VMs keyed by
-// absolute script path.
+// the loaded adapter, backing stores, issuer, emitter, and a cache of
+// Starlark VMs keyed by absolute script path.
 type serviceState struct {
 	adapter   *adapter.Adapter
 	store     *primitives.Store
 	kvStore   *kv.KV
 	blobStore *blob.Store
+	issuer    *identity.Issuer
+	emitter   *events.Emitter
 	builtins  sk.StringDict
 
 	mu  sync.Mutex
@@ -54,7 +59,7 @@ func New(m *manifest.Manifest) (*Engine, error) {
 		if svc.Adapter == "" {
 			continue // rules-only service — no state needed
 		}
-		st, err := buildServiceState(name, svc, stateDir)
+		st, err := buildServiceState(name, svc, stateDir, m.RNGSeed)
 		if err != nil {
 			// Clean up any states we already built.
 			e.Close()
@@ -67,8 +72,13 @@ func New(m *manifest.Manifest) (*Engine, error) {
 }
 
 // buildServiceState loads an adapter, opens per-service stores, seeds
-// collections, and prepares the Starlark builtins.
-func buildServiceState(name string, svc manifest.Service, stateDir string) (*serviceState, error) {
+// collections, creates identity + events primitives, and prepares the
+// Starlark builtins.
+//
+// The per-service issuer secret is derived deterministically from
+// sha256(rngSeed:serviceName) so that restarting the engine with the same
+// seed produces a compatible issuer (tokens survive restarts).
+func buildServiceState(name string, svc manifest.Service, stateDir string, rngSeed int64) (*serviceState, error) {
 	a, err := adapter.Load(svc.Adapter)
 	if err != nil {
 		return nil, err
@@ -125,18 +135,43 @@ func buildServiceState(name string, svc manifest.Service, stateDir string) (*ser
 		}
 	}
 
+	// Derive a deterministic per-service issuer secret:
+	//   sha256("<rngSeed>:<serviceName>")
+	// This ensures tokens minted before a restart remain valid after.
+	secretHash := sha256.Sum256([]byte(fmt.Sprintf("%d:%s", rngSeed, name)))
+	issuer := identity.NewIssuer(secretHash[:])
+
+	// Create the per-service event emitter and register the webhook target
+	// if the service config provides one.
+	emitter := events.NewEmitter()
+	if svc.Config != nil {
+		if webhookURL, ok := svc.Config["webhook_url"].(string); ok && webhookURL != "" {
+			emitter.Register(name, webhookURL)
+		}
+	}
+
 	st := &serviceState{
 		adapter:   a,
 		store:     store,
 		kvStore:   kvStore,
 		blobStore: blobStore,
-		builtins:  runtime.BuildBuiltins(store, kvStore, blobStore),
-		vms:       make(map[string]*starlark.VM),
+		issuer:    issuer,
+		emitter:   emitter,
+		builtins: runtime.BuildAllBuiltins(runtime.BuiltinOptions{
+			Store:       store,
+			KV:          kvStore,
+			Blob:        blobStore,
+			Issuer:      issuer,
+			Emitter:     emitter,
+			ServiceName: name,
+		}),
+		vms: make(map[string]*starlark.VM),
 	}
 	return st, nil
 }
 
-// Close releases all per-service stores. Safe to call on a rules-only engine.
+// Close releases all per-service stores and emitters. Safe to call on a
+// rules-only engine.
 func (e *Engine) Close() error {
 	var firstErr error
 	for _, st := range e.states {
@@ -154,6 +189,9 @@ func (e *Engine) Close() error {
 			if err := st.blobStore.Close(); err != nil && firstErr == nil {
 				firstErr = err
 			}
+		}
+		if st.emitter != nil {
+			st.emitter.Close()
 		}
 	}
 	return firstErr
