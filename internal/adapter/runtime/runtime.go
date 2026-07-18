@@ -139,14 +139,16 @@ func buildStoreBuiltins(store *primitives.Store, kvStore *kv.KV, blobStore *blob
 			return sk.String(val), nil
 		}),
 		"store_kv_set": sk.NewBuiltin("store_kv_set", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
-			var ns, key, val string
+			var ns, key string
+			var val sk.Value
 			if err := sk.UnpackArgs("store_kv_set", args, kwargs, "ns", &ns, "key", &key, "value", &val); err != nil {
 				return nil, err
 			}
+			valStr := starlarkValueToString(val)
 			if kvStore == nil {
 				return nil, fmt.Errorf("store_kv_set: no kv store configured")
 			}
-			if err := kvStore.Set(ns, key, val); err != nil {
+			if err := kvStore.Set(ns, key, valStr); err != nil {
 				return nil, err
 			}
 			return sk.None, nil
@@ -584,4 +586,27 @@ func dictToGoMap(v sk.Value) (map[string]any, error) {
 		return nil, fmt.Errorf("expected dict, got %s", v.Type())
 	}
 	return starlark.StarlarkToGo(d), nil
+}
+
+// starlarkValueToString converts any Starlark value into its string
+// representation. Strings are returned as-is; booleans become "True"/
+// "False" (matching Starlark's str()); integers and floats are stringified
+// numerically; None becomes the empty string. This makes store_kv_set
+// forgiving — any value type is accepted and stored as a string.
+func starlarkValueToString(v sk.Value) string {
+	if v == nil || v == sk.None {
+		return ""
+	}
+	if s, ok := sk.AsString(v); ok {
+		return s
+	}
+	switch x := v.(type) {
+	case sk.Bool:
+		if x {
+			return "True"
+		}
+		return "False"
+	default:
+		return v.String()
+	}
 }

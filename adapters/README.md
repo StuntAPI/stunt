@@ -50,6 +50,153 @@ services:
 
 Then `stunt up` serves it (port mode by default; `mode: subdomain` for `https://stripe.localhost`).
 
+## Starlark Builtins Reference
+
+Starlark handlers (REST, gRPC, WebSocket) have access to the following builtins. Each is documented
+with its signature, argument types, and return type.
+
+### `respond(status?, body?, headers?)` → dict
+
+Returns a response dict suitable as a handler return value. All arguments are optional.
+
+| Argument | Type | Default | Description |
+|----------|------|---------|-------------|
+| `status` | int | `200` | HTTP status code |
+| `body` | dict or str | `None` | Response body — a dict is rendered as JSON; a str is sent as raw text |
+| `headers` | dict | `None` | Response headers (string → string) |
+
+```python
+def on_get(req):
+    return respond(200, {"message": "hello"}, {"Content-Type": "application/json"})
+```
+
+### `store_collection(name)` → collection object
+
+Returns a collection object backed by SQLite. Collections must be declared in `adapter.yaml`
+under `resources:` with `kind: collection`.
+
+The returned object has these methods:
+
+| Method | Signature | Returns | Notes |
+|--------|-----------|---------|-------|
+| `insert(doc)` | `insert(doc: dict)` | `str` (generated id) | Inserts a new document; auto-generates an id field |
+| `get(id)` | `get(id: str)` | `dict` or `None` | Returns the document, or `None` if not found |
+| `list()` | `list()` | `list[dict]` | Returns all documents (no filtering — filter in Starlark) |
+| `update(id, doc)` | `update(id: str, doc: dict)` | `None` | **Replaces the entire document** (PUT semantics, not PATCH/merge). To merge, `get`-then-update the full doc |
+| `delete(id)` | `delete(id: str)` | `None` | Deletes the document |
+
+```python
+def on_post(req):
+    items = store_collection("items")
+    id = items.insert({"name": "Widget", "price": 999})
+    return respond(201, {"id": id})
+```
+
+### `store_blob(name)` → blob object
+
+Returns a blob store object backed by the filesystem. Blob namespaces do not need to be declared
+in `resources:`.
+
+| Method | Signature | Returns | Notes |
+|--------|-----------|---------|-------|
+| `put(name, content, content_type?)` | `put(name: str, content: str, content_type: str="")` | `str` (name) | Writes content as a blob; `content_type` is optional |
+| `get(id)` | `get(id: str)` | `str` or `None` | Returns blob content as a string, or `None` if not found |
+| `stat(id)` | `stat(id: str)` | `dict` or `None` | Returns `{name, size, content_type, modified}`, or `None` |
+| `delete(id)` | `delete(id: str)` | `None` | Deletes the blob (idempotent) |
+| `list()` | `list()` | `list[dict]` | Returns all blobs as `[{name, size, content_type, modified}, ...]` |
+
+```python
+def on_upload(req):
+    blobs = store_blob("files")
+    id = blobs.put("report.txt", "file content", "text/plain")
+    return respond(201, {"id": id})
+```
+
+### KV store builtins
+
+The KV store is a simple string→string key-value store backed by SQLite. **All values are stored
+and returned as strings** — `set` accepts any type and stringifies it; `get` always returns a string;
+`incr` returns an `int`.
+
+| Builtin | Signature | Returns | Notes |
+|---------|-----------|---------|-------|
+| `store_kv_set(ns, key, value)` | `(ns: str, key: str, value: any)` | `None` | Stores value as its string representation (int, bool, str all accepted) |
+| `store_kv_get(ns, key)` | `(ns: str, key: str)` | `str` or `None` | Returns the stored string, or `None` if key doesn't exist |
+| `store_kv_delete(ns, key)` | `(ns: str, key: str)` | `None` | Deletes the key |
+| `store_kv_incr(ns, key)` | `(ns: str, key: str)` | `int` | Atomically increments and returns the new value (starts at 1). Useful for monotonic ID generation |
+
+```python
+def on_create(req):
+    next_id = store_kv_incr("svc", "counter")  # returns int: 1, 2, 3, ...
+    store_kv_set("svc", "status", "active")     # strings
+    store_kv_set("svc", "count", 42)             # ints auto-stringified to "42"
+    val = store_kv_get("svc", "count")           # returns string "42"
+    return respond(201, {"id": next_id, "val": val})
+```
+
+### Identity builtins
+
+| Builtin | Signature | Returns | Notes |
+|---------|-----------|---------|-------|
+| `identity_mint(subject, scopes?)` | `(subject: str, scopes: list[str] = [])` | `str` (token) | Mints a signed token (HMAC) valid for 1 hour |
+| `identity_validate(token)` | `(token: str)` | `dict` or `None` | Returns `{subject, scopes, expires_at}`, or `None` if invalid/expired |
+| `identity_has_scope(token, scope)` | `(token: str, scope: str)` | `bool` | Returns `True` if the token is valid and has the given scope |
+
+```python
+def on_login(req):
+    token = identity_mint("user-1", ["read", "write"])
+    return respond(200, {"token": token})
+
+def on_protected(req):
+    token = req["headers"].get("Authorization", "").replace("Bearer ", "")
+    claims = identity_validate(token)
+    if claims == None:
+        return respond(401, {"error": "invalid token"})
+    return respond(200, {"user": claims["subject"]})
+```
+
+### Events builtins
+
+Events are fire-and-forget: delivery failures (including no registered webhook) never break the
+handler. Webhooks are delivered as HTTP POST with a JSON body `{type, payload}`.
+
+| Builtin | Signature | Returns | Notes |
+|---------|-----------|---------|-------|
+| `events_register(url)` | `(url: str)` | `None` | Registers a webhook URL for the current service |
+| `events_emit(event_type, payload?)` | `(event_type: str, payload: dict = {})` | `None` | Emits an event to registered webhook(s) |
+
+To receive events, set `config.webhook_url` in your `stunt.yaml`:
+
+```yaml
+services:
+  myapi:
+    adapter: ./myapi
+    config:
+      webhook_url: http://localhost:9090/webhook
+```
+
+Then `events_emit("order.created", {"id": "123"})` will POST to that URL.
+
+### `request` object (handler argument)
+
+Every handler receives a `req` argument with:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `req.method` | `str` | HTTP method (e.g. `"GET"`, `"POST"`) |
+| `req.path` | `str` | Request path (e.g. `/v1/charges/ch_123`) |
+| `req.headers` | `dict[str, str]` | Request headers (keys in Go canonical form, e.g. `"X-Api-Key"`) |
+| `req.body` | `dict` | Parsed JSON body (empty dict if no body) |
+| `req.params` | `dict[str, str]` | Path parameters extracted from route (e.g. `{id}` → `{"id": "..."}`) |
+| `req.query` | `dict[str, str]` | Query parameters (first value of each key) |
+
+## State persistence
+
+Adapter state (collections, KV stores, blobs) persists on disk in `.stunt/state/` next to your
+`stunt.yaml`. Data survives across `stunt up` restarts — seeds are loaded once, and mutations
+(inserts, updates, deletes) persist between sessions. Run `stunt clean` to reset all state back
+to the seed fixtures.
+
 ## gRPC adapters
 
 An adapter can serve a **gRPC service** in addition to (or instead of) REST endpoints. The service is

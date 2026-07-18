@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -36,6 +37,7 @@ type Engine struct {
 	manifest  *manifest.Manifest
 	states    map[string]*serviceState // keyed by service name
 	cacheRoot string                   // adapter cache root for git sources
+	logger    *log.Logger              // request logger (nil = no logging)
 
 	// wsSem limits the number of concurrent active WebSocket connections
 	// across all services to prevent resource exhaustion. Each handleWebsocket
@@ -86,6 +88,7 @@ func newEngine(m *manifest.Manifest, cacheRoot string) (*Engine, error) {
 		cacheRoot:  cacheRoot,
 		wsSem:      make(chan struct{}, wsMaxConcurrentConns),
 		shutdownCh: make(chan struct{}),
+		logger:     log.New(os.Stderr, "", 0),
 	}
 
 	// Derive a state directory next to the manifest.
@@ -336,7 +339,7 @@ func (e *Engine) serviceHandler(name string, svc manifest.Service) http.Handler 
 	// are not concurrency-safe. Guard all access with a mutex (I2).
 	var rulesMu sync.Mutex
 
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// --- WebSocket dispatch (before HTTP) ---
 		// If the request is a WebSocket upgrade and its path matches a declared
 		// ws route, upgrade and run the connection-lifetime handler. Non-upgrade
@@ -378,6 +381,11 @@ func (e *Engine) serviceHandler(name string, svc manifest.Service) http.Handler 
 		}
 		applyDecision(w, r, d)
 	})
+
+	if e.logger != nil {
+		return requestLogger(name, e.logger)(handler)
+	}
+	return handler
 }
 
 func applyDecision(w http.ResponseWriter, r *http.Request, d rules.Decision) {

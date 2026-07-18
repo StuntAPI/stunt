@@ -12,9 +12,9 @@ All data is synthetic — no real API data is included.
 
 A broader-than-minimal MVP of a Stripe-style payments API: charges (create,
 retrieve, list, capture, refund), customers (CRUD), and account balance.
-State persists in an in-process SQLite-backed collection store, so data you
-create in one request is visible in subsequent requests within the same
-`stunt up` session.
+State persists in an on-disk SQLite-backed collection store (under `.stunt/state/`),
+so data you create in one request is visible in subsequent requests and survives
+across `stunt up` restarts. Run `stunt clean` to reset state to the seed fixtures.
 
 Webhook events are emitted on charge lifecycle transitions (created, updated,
 refunded) to a configurable webhook sink.

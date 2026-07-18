@@ -178,7 +178,9 @@ func TestPlanSubdomainOutput(t *testing.T) {
 	m.Network.Defaults()
 
 	var buf strings.Builder
-	printPlanSubdomain(&buf, m)
+	printPlanSubdomain(&buf, m, map[string]planResult{
+		"alpha": {rules: 1},
+	})
 	out := buf.String()
 	if !strings.Contains(out, "https://alpha.localhost") {
 		t.Errorf("missing https://alpha.localhost in plan output:\n%s", out)
