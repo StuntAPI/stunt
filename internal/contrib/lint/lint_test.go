@@ -424,3 +424,154 @@ func TestPlaceholdersStillNotFlagged(t *testing.T) {
 		}
 	}
 }
+
+// --- ws section validation ---
+
+// TestWSSectionCleanAdapter verifies that a valid ws section with a clean
+// handler script lints without findings.
+func TestWSSectionCleanAdapter(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "adapter.yaml",
+		`id: wsclean
+name: WSClean
+version: "0.1.0"
+ws:
+  - route: /ws/echo
+    handler: scripts/ws.star#on_connect
+`)
+	writeFile(t, dir, "scripts/ws.star",
+		`def on_connect(ws):
+    while True:
+        m = ws.recv()
+        if m == None:
+            break
+        ws.send(m)
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	for _, f := range findings {
+		if f.Severity == SeverityError {
+			t.Errorf("unexpected ws error finding: %s:%d %s", f.File, f.Line, f.Message)
+		}
+	}
+}
+
+// TestWSSectionMissingRoute verifies that a ws endpoint without a route is
+// flagged.
+func TestWSSectionMissingRoute(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "adapter.yaml",
+		`id: wsbad
+name: WSBad
+version: "0.1.0"
+ws:
+  - handler: scripts/ws.star#on_connect
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "ws[0].route") {
+		t.Errorf("expected ws route finding, got: %+v", findings)
+	}
+}
+
+// TestWSSectionMissingHandler verifies that a ws endpoint without a handler
+// is flagged.
+func TestWSSectionMissingHandler(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "adapter.yaml",
+		`id: wsbad
+name: WSBad
+version: "0.1.0"
+ws:
+  - route: /ws/echo
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "ws[0].handler") {
+		t.Errorf("expected ws handler finding, got: %+v", findings)
+	}
+}
+
+// TestWSSectionInvalidHandlerSpec verifies that a handler spec without the
+// "#" separator is flagged.
+func TestWSSectionInvalidHandlerSpec(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "adapter.yaml",
+		`id: wsbad
+name: WSBad
+version: "0.1.0"
+ws:
+  - route: /ws/echo
+    handler: scripts/ws.star
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "scripts/x.star#fn") {
+		t.Errorf("expected handler format finding, got: %+v", findings)
+	}
+}
+
+// TestWSSectionDuplicateRoute verifies that duplicate ws routes are flagged.
+func TestWSSectionDuplicateRoute(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "adapter.yaml",
+		`id: wsbad
+name: WSBad
+version: "0.1.0"
+ws:
+  - route: /ws/echo
+    handler: scripts/ws.star#on_connect
+  - route: /ws/echo
+    handler: scripts/ws.star#on_connect2
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "duplicated") {
+		t.Errorf("expected duplicate route finding, got: %+v", findings)
+	}
+}
+
+// TestWSSectionRealDataInHandlerScript verifies that real-looking data in a
+// ws handler script is flagged.
+func TestWSSectionRealDataInHandlerScript(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "adapter.yaml",
+		`id: wsbad
+name: WSBad
+version: "0.1.0"
+ws:
+  - route: /ws/echo
+    handler: scripts/ws.star#on_connect
+`)
+	writeFile(t, dir, "scripts/ws.star",
+		`def on_connect(ws):
+    # Real-looking email hardcoded in handler
+    ws.send({"email": "admin@real-company.com"})
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "email") {
+		t.Errorf("expected email finding in ws handler script, got: %+v", findings)
+	}
+	if !hasError(findings) {
+		t.Errorf("expected error-severity finding: %+v", findings)
+	}
+}

@@ -1,22 +1,36 @@
-# Echo-style adapter (gRPC example)
+# Echo-style adapter (gRPC + WebSocket example)
 
-A stunt adapter demonstrating a **generic gRPC service** — a small stateful
-"Echo" API. This is a reference example for writing gRPC-backed adapters; it
-does **not** mimic any specific company's API (no DISCLAIMER needed). All data
-is synthetic.
+A stunt adapter demonstrating a **generic gRPC service** and a **WebSocket echo**
+route — a small stateful "Echo" API. This is a reference example for writing
+gRPC- and WS-backed adapters; it does **not** mimic any specific company's API
+(no DISCLAIMER needed). All data is synthetic.
 
 ## What it serves
 
-A trivial gRPC service (`stunt.example.Echo`) with three unary RPCs:
+A trivial gRPC service (`stunt.example.Echo`) with three unary RPCs and one
+streaming RPC:
 
 | RPC | Request | Reply | Behavior |
 |-----|---------|-------|----------|
 | `Say` | `{ message: string }` | `{ message: string, echo_count: int32 }` | Echoes the message back and records it; `echo_count` is the total number of `Say` calls. |
 | `Add` | `{ value: int32 }` | `{ total: int32, count: int32 }` | Accumulates `value` into a running total; `total` is the sum across all `Add` calls, `count` is the number of calls. |
 | `ListEchoes` | `{}` | `{ echoes: [{ message: string }] }` | Returns all messages previously echoed by `Say`. |
+| `StreamEcho` | `{ message: string }` | stream of `{ message: string, echo_count: int32 }` | Server-streaming: echoes the message back 3 times with incrementing count. |
 
 State persists in an in-process SQLite-backed store, so data you create in one
 call is visible in subsequent calls within the same `stunt up` session.
+
+### WebSocket route
+
+The adapter also declares a WebSocket route:
+
+| Route | Handler | Subprotocol | Behavior |
+|-------|---------|-------------|----------|
+| `/ws/echo` | `scripts/ws.star#on_connect` | `echo.v1` | Echoes each message back and increments a global `ws_echo_count` counter. |
+
+Connect with any WebSocket client, send messages, and each one is echoed back.
+The handler runs a connection-lifetime loop using `ws.recv()`/`ws.send()`. See
+[`adapters/README.md`](../README.md) for the WebSocket authoring guide.
 
 ## Schema
 

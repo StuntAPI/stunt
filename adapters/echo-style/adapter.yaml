@@ -24,6 +24,14 @@ grpc:
     - name: StreamEcho
       handler: scripts/echo.star#on_stream_echo
 
+# WebSocket route — connection-lifetime Starlark handler.
+# The handler is invoked once per WS connection and receives a `ws` object
+# with recv()/send()/close() methods. See scripts/ws.star.
+ws:
+  - route: "/ws/echo"
+    handler: "scripts/ws.star#on_connect"
+    subprotocols: ["echo.v1"]
+
 # Backing stores available to Starlark handlers.
 resources:
   - name: echoes

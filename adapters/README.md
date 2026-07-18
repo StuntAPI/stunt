@@ -164,3 +164,85 @@ def on_accumulate(stream):
 - Unary methods on the same service continue to use the `on_<method>(req)` API unchanged.
 
 See `adapters/echo-style/` for a complete, working example.
+
+## WebSocket adapters
+
+An adapter can serve **WebSocket** routes alongside REST and gRPC. Each WS route is backed by a
+connection-lifetime Starlark handler `on_connect(ws)` that is invoked once per WebSocket connection.
+The handler receives a `ws` object with three methods: `recv()`, `send()`, and `close()`.
+
+### Writing a WebSocket adapter
+
+1. **Declare a `ws:` section** in `adapter.yaml`, mapping each route to a Starlark handler:
+
+   ```yaml
+   ws:
+     - route: "/ws/echo"                         # path pattern (supports {param} segments)
+       handler: "scripts/ws.star#on_connect"       # Starlark handler: scripts/<file>.star#<function>
+       subprotocols: ["echo.v1"]                    # optional subprotocol negotiation
+   ```
+
+2. **Write the `on_connect(ws)` handler.** The handler loops on `ws.recv()` to process inbound
+   messages, sends responses via `ws.send()`, and returns when the client disconnects:
+
+   ```python
+   def on_connect(ws):
+       while True:
+           m = ws.recv()
+           if m == None:
+               break          # client disconnected — exit cleanly
+           ws.send(m)         # echo the message back
+   ```
+
+### The `ws` object API
+
+| Method | Description |
+|---|---|
+| **`ws.recv()`** | Returns the next inbound message. A JSON object arrives as a **dict**; other text/binary arrives as a **str**. Returns `None` when the client has disconnected (clean EOF). This is a **blocking** call — no Starlark steps accrue while waiting. |
+| **`ws.send(msg)`** | Sends a frame. If `msg` is a **dict**, it is marshalled to a JSON text frame. If `msg` is a **str**, it is sent as a raw text frame. |
+| **`ws.close(code=1000, reason="")`** | Performs a graceful WebSocket close. `code` defaults to 1000 (normal closure). |
+
+### Step budget & idle connections
+
+The Starlark step budget for WS handlers is elevated (10M steps, 10× the default) so legitimately
+chatty connections are not prematurely killed. The key property is that `recv()` is a blocking
+builtin: while it waits for the next message, **zero steps accrue**. This means:
+
+- **Idle / slow long-lived connections** live indefinitely (`recv` blocks, 0 steps).
+- A handler that tight-loops calling `ws.send(...)` without ever `recv()`-ing is still killed by the
+  step limit (correct DoS guard).
+
+### Worked example: stateful echo
+
+The `echo-style` adapter includes a WebSocket route that echoes each message and increments a global
+KV counter, demonstrating the builtin store integration:
+
+```yaml
+# adapter.yaml
+ws:
+  - route: "/ws/echo"
+    handler: "scripts/ws.star#on_connect"
+    subprotocols: ["echo.v1"]
+```
+
+```python
+# scripts/ws.star
+# Echoes messages back and increments a global kv counter on each message.
+
+def on_connect(ws):
+    while True:
+        m = ws.recv()
+        if m == None:
+            break
+        store_kv_incr("echo", "ws_echo_count")
+        ws.send(m)
+```
+
+### Notes
+
+- WS handlers use the same Starlark sandbox as REST and gRPC handlers — no host I/O, no network.
+- All builtins (`store_collection`, `store_kv_get/set/incr`, `store_blob`, `identity_*`,
+  `events_emit`) are available inside `on_connect`.
+- `stunt adapter lint` validates the `ws:` section and scans handler scripts for real-looking data,
+  just like fixtures and templates.
+- A service can declare `endpoints:` (REST), `grpc:` (gRPC), and `ws:` (WebSocket) simultaneously.
