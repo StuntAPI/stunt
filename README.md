@@ -152,6 +152,20 @@ never runs as root). CLI: `stunt proxy start|stop`, `stunt service install|statu
 `internal/netutil{,/proxy}`, `internal/contrib{,/openapi,/har,/lint,/conform}`, `internal/catalog`,
 `internal/cli`, `cmd/stunt`, `adapters/`.
 
+## Contributing
+
+Contributions are welcome — especially **adapters**. The fastest path:
+
+```bash
+stunt adapter new myapi-style   # scaffold
+# edit adapter.yaml + scripts/*.star; add a DISCLAIMER if branded
+stunt adapter lint ./myapi-style # must pass
+```
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the workflow, quality gates
+(`-race`/`vet`/`gofmt`/`lint`), the branded-adapter naming & disclaimer rules,
+and the trust model. Adapter authoring reference: [`adapters/README.md`](adapters/README.md).
+
 ## Design & roadmap
 
 - Spec: `docs/specs/2025-07-15-stunt-design.md`
