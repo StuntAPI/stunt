@@ -5,9 +5,9 @@
 `stunt` reads a `stunt.yaml` manifest and serves local, runnable stand-ins for real APIs.
 Stateful behavior comes from sandboxed Starlark adapters backed by SQLite/blob primitives;
 declarative behavior comes from a rules engine (templated responses, probabilistic faults,
-conditional expressions). Both REST and gRPC (unary) services are supported. Optionally front
-everything with a portless.dev-style TLS proxy on `*.localhost`. Everything is deterministic via
-`rng_seed`.
+conditional expressions). REST, gRPC (unary + streaming), and WebSocket transports are supported.
+Optionally front everything with a portless.dev-style TLS proxy on `*.localhost`. Everything is
+deterministic via `rng_seed`.
 
 > **Status:** pre-1.0 MVP. The core is built and self-tested; see **Known limitations** below.
 > Unofficial, not affiliated with any provider whose API style an adapter mimics.
@@ -141,7 +141,8 @@ never runs as root). CLI: `stunt proxy start|stop`, `stunt service install|statu
   subdomain mode uses an OS-assigned high port (the URL includes the port).
 - **gRPC** unary and streaming RPCs are supported via the `grpc:` adapter section (served dynamically
   from a compiled protobuf descriptor set). Streaming handlers use `stream.recv()`/`stream.send()`.
-  GraphQL and WebSocket are not yet supported.
+  **WebSocket** is supported via the `ws:` adapter section with connection-lifetime Starlark handlers
+  (`on_connect(ws)` using `ws.recv()`/`ws.send()`). GraphQL is not yet supported.
 - Concurrency is tested with `-race`; the design is single-process per `stunt up`.
 
 ## Project layout

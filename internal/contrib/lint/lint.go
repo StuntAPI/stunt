@@ -19,6 +19,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 // Severity levels for findings.
@@ -52,8 +54,12 @@ func ExitCode(findings []Finding) int {
 
 // Lint scans the adapter directory's fixtures/, templates/, and endpoints/
 // directories (recursively) plus the root adapter.yaml for content that looks
-// like real recorded data. It returns all findings (which may be empty). A
-// nil error with findings is a successful scan that found issues.
+// like real recorded data. It also validates the `ws:` section structurally
+// (each endpoint must have a route + valid handler spec) and scans the ws
+// handler scripts for real-looking data.
+//
+// It returns all findings (which may be empty). A nil error with findings
+// is a successful scan that found issues.
 func Lint(dir string) ([]Finding, error) {
 	var findings []Finding
 
@@ -73,6 +79,94 @@ func Lint(dir string) ([]Finding, error) {
 		ff, err := scanFile("adapter.yaml", manifestPath)
 		if err != nil {
 			return nil, err
+		}
+		findings = append(findings, ff...)
+	}
+
+	// Validate and scan the ws section (handler scripts).
+	wsFindings, err := lintWS(dir)
+	if err != nil {
+		return nil, err
+	}
+	findings = append(findings, wsFindings...)
+
+	return findings, nil
+}
+
+// wsManifest is a minimal struct for parsing just the `ws:` section of
+// adapter.yaml.
+type wsManifest struct {
+	WS []struct {
+		Route   string `yaml:"route"`
+		Handler string `yaml:"handler"`
+	} `yaml:"ws"`
+}
+
+// lintWS validates the ws section of adapter.yaml: each ws endpoint must have
+// a non-empty route and a valid handler spec ("scripts/x.star#fn" form). It
+// also scans each ws handler script for content that looks like real data,
+// so a handler hardcoding real-looking values is flagged.
+func lintWS(dir string) ([]Finding, error) {
+	manifestPath := filepath.Join(dir, "adapter.yaml")
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil, nil // no adapter.yaml → nothing to validate
+	}
+
+	var wm wsManifest
+	if err := yaml.Unmarshal(data, &wm); err != nil {
+		// Malformed YAML is caught by the adapter loader; skip ws lint.
+		return nil, nil
+	}
+
+	var findings []Finding
+
+	seenRoutes := make(map[string]bool)
+	for i, ep := range wm.WS {
+		// Validate route.
+		if ep.Route == "" {
+			findings = append(findings, Finding{
+				File:     "adapter.yaml",
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("ws[%d].route is required", i),
+			})
+			continue
+		}
+		if seenRoutes[ep.Route] {
+			findings = append(findings, Finding{
+				File:     "adapter.yaml",
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("ws[%d].route %q is duplicated", i, ep.Route),
+			})
+		}
+		seenRoutes[ep.Route] = true
+
+		// Validate handler spec.
+		if ep.Handler == "" {
+			findings = append(findings, Finding{
+				File:     "adapter.yaml",
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("ws[%d].handler is required", i),
+			})
+			continue
+		}
+		if !strings.Contains(ep.Handler, "#") {
+			findings = append(findings, Finding{
+				File:     "adapter.yaml",
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("ws[%d].handler %q must be in \"scripts/x.star#fn\" form", i, ep.Handler),
+			})
+			continue
+		}
+
+		// Scan the handler script for real-looking data.
+		scriptPath := ep.Handler[:strings.Index(ep.Handler, "#")]
+		absScript := filepath.Join(dir, scriptPath)
+		ff, err := scanFile(scriptPath, absScript)
+		if err != nil {
+			// Missing script is not a lint error (the loader catches it);
+			// skip scanning.
+			continue
 		}
 		findings = append(findings, ff...)
 	}
