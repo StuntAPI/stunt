@@ -42,20 +42,56 @@ type Service struct {
 }
 
 type Manifest struct {
-	Path     string             `yaml:"-"`
-	Version  int                `yaml:"version"`
-	RNGSeed  int64              `yaml:"rng_seed,omitempty"`
-	Network  Network            `yaml:"network"`
-	Services map[string]Service `yaml:"services,omitempty"`
+	Path          string             `yaml:"-"`
+	Version       int                `yaml:"version"`
+	RNGSeed       int64              `yaml:"rng_seed,omitempty"`
+	Network       Network            `yaml:"network"`
+	Services      map[string]Service `yaml:"services,omitempty"`
+	UnknownFields []string           `yaml:"-"` // top-level keys not in the known set (for warnings)
 }
 
-// Load reads and parses a stunt.yaml from path.
+// knownManifestFields is the set of recognised top-level manifest keys.
+// Any key outside this set is reported via Manifest.UnknownFields.
+var knownManifestFields = map[string]bool{
+	"version":  true,
+	"rng_seed": true,
+	"network":  true,
+	"services": true,
+}
+
+// detectUnknownFields parses data as a YAML node and returns any top-level
+// keys that are not in knownManifestFields. This enables a warning for
+// typos (e.g. `netwrok:`) without rejecting the manifest.
+func detectUnknownFields(data []byte) []string {
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return nil // malformed YAML is caught by the struct decode below
+	}
+	if root.Kind != yaml.DocumentNode || len(root.Content) == 0 {
+		return nil
+	}
+	docNode := root.Content[0]
+	if docNode.Kind != yaml.MappingNode {
+		return nil
+	}
+	var unknown []string
+	for i := 0; i+1 < len(docNode.Content); i += 2 {
+		key := docNode.Content[i].Value
+		if !knownManifestFields[key] {
+			unknown = append(unknown, key)
+		}
+	}
+	return unknown
+}
+
+// Load reads and parses a stunt.yaml from path. Unknown top-level keys are
+// collected into Manifest.UnknownFields so callers can warn about typos.
 func Load(path string) (*Manifest, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	m := &Manifest{Path: path}
+	m := &Manifest{Path: path, UnknownFields: detectUnknownFields(data)}
 	if err := yaml.Unmarshal(data, m); err != nil {
 		return nil, err
 	}

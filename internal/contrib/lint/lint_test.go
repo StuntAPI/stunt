@@ -378,6 +378,28 @@ func TestJWTDetected(t *testing.T) {
 	}
 }
 
+func TestCreditCardNotDoubleFlaggedAsPhone(t *testing.T) {
+	dir := scaffold(t)
+	// A plain credit-card number (no separators) that also matches the
+	// phone-number heuristic. After dedup it should be reported only once
+	// as a credit-card pattern, not also as a phone number.
+	writeFile(t, dir, "fixtures/real.jsonl",
+		`{"id":"item-1","card":"4242424242424242"}`+"\n")
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "credit") {
+		t.Errorf("expected a credit-card finding, got: %+v", findings)
+	}
+	for _, f := range findings {
+		if strings.Contains(strings.ToLower(f.Message), "phone") {
+			t.Errorf("credit-card value should not also be flagged as phone: %s", f.Message)
+		}
+	}
+}
+
 func TestPhoneNumberDetected(t *testing.T) {
 	dir := scaffold(t)
 	writeFile(t, dir, "fixtures/real.jsonl",
