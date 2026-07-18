@@ -128,6 +128,15 @@ func (vm *VM) Call(handlerName string, req Request) (Response, error) {
 // Request. A None return (implicit when the handler has no return statement)
 // is treated as a 200 OK with no body — the streaming convention.
 func (vm *VM) CallWith(handlerName string, arg sk.Value) (Response, error) {
+	return vm.CallWithMaxSteps(handlerName, arg, maxExecutionSteps)
+}
+
+// CallWithMaxSteps is like CallWith but allows the caller to specify a
+// custom step budget. WebSocket handlers use an elevated limit because they
+// run for the lifetime of a connection and may legitimately exchange many
+// messages, each with moderate per-message work. The blocking recv() call
+// accrues no steps while waiting, so idle connections are unaffected.
+func (vm *VM) CallWithMaxSteps(handlerName string, arg sk.Value, maxSteps int) (Response, error) {
 	fn, ok := vm.globals[handlerName]
 	if !ok {
 		return Response{}, fmt.Errorf("starlark: handler %q is not defined", handlerName)
@@ -140,7 +149,7 @@ func (vm *VM) CallWith(handlerName string, arg sk.Value) (Response, error) {
 	thread := &sk.Thread{
 		Name: "stunt",
 	}
-	thread.SetMaxExecutionSteps(maxExecutionSteps)
+	thread.SetMaxExecutionSteps(uint64(maxSteps))
 
 	result, err := sk.Call(thread, fn, sk.Tuple{arg}, nil)
 	if err != nil {

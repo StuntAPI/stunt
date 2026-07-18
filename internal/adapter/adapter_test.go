@@ -474,3 +474,142 @@ endpoints:
 		t.Errorf("error should mention directory escape, got: %v", err)
 	}
 }
+
+// --- WebSocket spec ---
+
+const wsAdapterYAML = `
+id: wstest
+name: WSTest
+ws:
+  - route: /ws/echo
+    handler: scripts/ws.star#on_echo
+    subprotocols: ["chat.v1"]
+  - route: /ws/push
+    handler: scripts/ws.star#on_push
+`
+
+func TestLoadWebsocketSpec(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapter(t, dir, map[string]string{
+		"adapter.yaml":    wsAdapterYAML,
+		"scripts/ws.star": "def on_echo(ws):\n    pass\n",
+	})
+
+	a, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	if len(a.Websockets) != 2 {
+		t.Fatalf("Websockets: %d, want 2", len(a.Websockets))
+	}
+
+	ep0 := a.Websockets[0]
+	if ep0.Route != "/ws/echo" {
+		t.Errorf("route[0] = %q", ep0.Route)
+	}
+	scriptPath := strings.SplitN(ep0.Handler, "#", 2)[0]
+	if !filepath.IsAbs(scriptPath) {
+		t.Errorf("handler script not absolute: %q", ep0.Handler)
+	}
+	if _, err := os.Stat(scriptPath); err != nil {
+		t.Errorf("handler script does not exist: %v", err)
+	}
+	if !strings.HasSuffix(ep0.Handler, "#on_echo") {
+		t.Errorf("handler missing #on_echo: %q", ep0.Handler)
+	}
+	if len(ep0.Subprotocols) != 1 || ep0.Subprotocols[0] != "chat.v1" {
+		t.Errorf("subprotocols = %v", ep0.Subprotocols)
+	}
+}
+
+func TestLoadWebsocketValidation(t *testing.T) {
+	cases := []struct {
+		name string
+		yaml string
+		err  string
+	}{
+		{
+			name: "missing route",
+			yaml: `id: w
+name: W
+ws:
+  - handler: scripts/x.star#f
+`,
+			err: "ws[0].route",
+		},
+		{
+			name: "empty handler",
+			yaml: `id: w
+name: W
+ws:
+  - route: /ws
+`,
+			err: "ws[0].handler",
+		},
+		{
+			name: "handler missing #fn",
+			yaml: `id: w
+name: W
+ws:
+  - route: /ws
+    handler: scripts/x.star
+`,
+			err: "must be in \"scripts/x.star#fn\" form",
+		},
+		{
+			name: "duplicate route",
+			yaml: `id: w
+name: W
+ws:
+  - route: /ws
+    handler: scripts/x.star#f
+  - route: /ws
+    handler: scripts/y.star#f
+`,
+			err: "duplicated",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeAdapter(t, dir, map[string]string{"adapter.yaml": c.yaml})
+			_, err := Load(dir)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), c.err) {
+				t.Errorf("error %q does not contain %q", err.Error(), c.err)
+			}
+		})
+	}
+}
+
+// TestWebsocketHandlerRejectsTraversal verifies that a ws handler script
+// path using ".." traversal is rejected by Load.
+func TestWebsocketHandlerRejectsTraversal(t *testing.T) {
+	parent := t.TempDir()
+	secretPath := filepath.Join(parent, "evil.star")
+	if err := os.WriteFile(secretPath, []byte("def f(ws):\n    pass\n"), 0o644); err != nil {
+		t.Fatalf("write evil.star: %v", err)
+	}
+
+	adapterDir := filepath.Join(parent, "adapter")
+	writeAdapter(t, adapterDir, map[string]string{
+		"adapter.yaml": `
+id: traversal-test
+name: Traversal Test
+ws:
+  - route: /ws
+    handler: ../evil.star#f
+`,
+	})
+
+	_, err := Load(adapterDir)
+	if err == nil {
+		t.Fatal("expected Load to reject ws handler path with .. traversal")
+	}
+	if !strings.Contains(err.Error(), "escapes adapter directory") {
+		t.Errorf("error should mention directory escape, got: %v", err)
+	}
+}
