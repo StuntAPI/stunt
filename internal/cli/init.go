@@ -52,7 +52,12 @@ func newInitCmd() *cobra.Command {
 			if err := writeSampleManifest(path); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "wrote %s\n", path)
+			out := cmd.OutOrStdout()
+			fmt.Fprintf(out, "wrote %s\n", path)
+			fmt.Fprintln(out)
+			fmt.Fprintln(out, "Next steps:")
+			fmt.Fprintln(out, "  stunt plan    # validate and preview")
+			fmt.Fprintln(out, "  stunt up      # start serving on http://127.0.0.1:8000")
 			return nil
 		},
 	}

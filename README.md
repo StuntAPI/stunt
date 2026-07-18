@@ -72,6 +72,8 @@ First-match-wins, top-to-bottom.
 - **when** (both must pass to fire):
   - `when.chance`: percent probability; otherwise fall through.
   - `when.expr`: boolean expression over `request.*` (`method`, `path`, `headers`, `body`), e.g. `request.body.amount > 1000`.
+    - **Headers**: use bracket notation with the canonical Go header key, e.g. `request.headers["X-Api-Key"] == "secret"`. Dot notation (`request.headers.X-Api-Key`) does **not** work because header keys can contain hyphens.
+    - **Body fields**: access parsed JSON body fields with dot notation, e.g. `request.body.amount > 1000` or `request.body.user.email`.
 - **respond**: `status`, `headers`, `latency_ms`, `behavior: timeout`, and `body`:
   - `body.inline` — literal (rendered as JSON).
   - `body.file` — static file (relative to the manifest).
@@ -96,8 +98,24 @@ stunt catalog search stripe            # browse the adapter registry
 
 Starlark handlers are sandboxed (no host I/O, no network) and can use the primitive builtins:
 `store_collection(name)` (insert/get/list/update/delete), `store_kv_get/set/delete/incr`,
-`store_blob(name)` (put/get/stat/delete/list).
+`store_blob(name)` (put/get/stat/delete/list). See the **Starlark Builtins Reference** in
+`adapters/README.md` for full signatures.
 
+### Per-service config
+
+Each service can declare a `config` map in `stunt.yaml`. The values are available to the adapter's
+Starlark handlers via the events emitter (e.g. `webhook_url` is registered automatically):
+
+```yaml
+services:
+  stripe:
+    adapter: ./adapters/stripe-style
+    config:
+      webhook_url: http://localhost:9090/webhook
+```
+
+When `config.webhook_url` is set, `events_emit()` delivers events to that URL via HTTP POST.
+See `adapters/README.md` for the full builtins reference including `events_register` and `events_emit`.
 ### Reference adapters (in this repo)
 
 All unofficial, synthetic-data-only, with a DISCLAIMER. See `adapters/README.md`.
@@ -130,6 +148,14 @@ never runs as root). CLI: `stunt proxy start|stop`, `stunt service install|statu
 
 `Collection` (SQLite), `KV`, `Blob` (FS), `Clock+scheduler` (deterministic), `Identity` (HMAC tokens),
 `Events` (webhooks), `Generator`, `Validator` (JSON-Schema).
+
+### State persistence
+
+Adapter state (collections, KV stores, blobs) persists on disk in `.stunt/state/` next to your
+`stunt.yaml`. Data survives across `stunt up` restarts — the same seed produces the same starting
+data, and any mutations (inserts, updates, deletes) persist between sessions.
+
+Run `stunt clean` to reset all state back to the seed fixtures:
 
 ## Known limitations (MVP)
 

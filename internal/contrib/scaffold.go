@@ -94,7 +94,7 @@ version: "0.1.0"
 real_hosts:
   - api.example.com
 
-# Endpoints are declared inline here and/or in endpoints/*.yaml files.
+# Endpoints are declared inline here (in the endpoints: list below).
 endpoints:
   - route: /hello
     method: GET
@@ -140,7 +140,7 @@ All data is synthetic — no real API data is included.
 ## Layout
 
     adapter.yaml              Manifest: metadata, endpoints, resources, rules
-    endpoints/                Per-endpoint definition files
+    endpoints/                Per-endpoint definition files (reference copies)
       hello.yaml              Example GET /hello endpoint
     templates/                Response templates (text/template with faker/uuid)
       hello.json              Sample template using faker.Email and uuid
@@ -154,12 +154,12 @@ All data is synthetic — no real API data is included.
 ## Getting started
 
 1. Edit adapter.yaml to set your id, name, and real_hosts.
-2. Add endpoints under endpoints/ and reference them in adapter.yaml.
+2. Add endpoints to the endpoints: list in adapter.yaml.
 3. Run stunt up to start the simulator.
 
 ## Convention directories
 
-    endpoints/   Per-endpoint YAML definitions
+    endpoints/   Per-endpoint YAML definitions (reference; add endpoints inline in adapter.yaml)
     templates/   Response templates (text/template + faker/uuid)
     fixtures/    Seed data (JSONL)
     scripts/     Starlark handlers for stateful logic
@@ -167,8 +167,11 @@ All data is synthetic — no real API data is included.
 `, display, display)
 }
 
-const endpointHello = `# Example endpoint definition.
-# This mirrors the /hello endpoint declared in adapter.yaml.
+const endpointHello = `# Example standalone endpoint definition file.
+# This file is for reference — it mirrors the /hello endpoint declared inline
+# in adapter.yaml. stunt currently loads endpoints from the inline endpoints:
+# list in adapter.yaml. Keep this file as a template when you want to add
+# more endpoints inline.
 route: /hello
 method: GET
 rules:
