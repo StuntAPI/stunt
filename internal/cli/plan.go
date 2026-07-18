@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/stunt-adapters/stunt/internal/adapter"
@@ -17,10 +18,12 @@ const defaultManifestPath = "stunt.yaml"
 
 // planResult holds the per-service validation outcome for plan output.
 type planResult struct {
-	endpoints int              // number of adapter endpoints (0 for rules-only)
-	rules     int              // number of rules on the service
-	loadError error            // non-nil if the adapter could not be loaded
-	adapter   *adapter.Adapter // loaded adapter (nil on error or rules-only)
+	endpoints   int              // number of adapter endpoints (0 for rules-only)
+	grpcMethods int              // number of gRPC methods (0 if no gRPC section)
+	wsRoutes    int              // number of WebSocket routes (0 if none)
+	rules       int              // number of rules on the service
+	loadError   error            // non-nil if the adapter could not be loaded
+	adapter     *adapter.Adapter // loaded adapter (nil on error or rules-only)
 }
 
 func newPlanCmd() *cobra.Command {
@@ -79,7 +82,17 @@ func planValidateAdapters(out interface{ Write([]byte) (int, error) }, m *manife
 			fmt.Fprintf(out, "  WARNING: service %q: %v\n", name, err)
 			continue
 		}
-		results[name] = planResult{endpoints: len(a.Endpoints), rules: rules, adapter: a}
+		grpcMethods := 0
+		if a.Grpc != nil {
+			grpcMethods = len(a.Grpc.Methods)
+		}
+		results[name] = planResult{
+			endpoints:   len(a.Endpoints),
+			grpcMethods: grpcMethods,
+			wsRoutes:    len(a.Websockets),
+			rules:       rules,
+			adapter:     a,
+		}
 	}
 	return results
 }
@@ -150,14 +163,24 @@ func printPlanSubdomain(out interface{ Write([]byte) (int, error) }, m *manifest
 }
 
 // adapterSummary renders the parenthesised summary for an adapter-backed
-// service. When the adapter loaded successfully it shows endpoint + rule
-// counts (e.g. "(adapter: ./x, 11 endpoints, 2 rules)"). When loading
-// failed it shows the adapter spec with a warning marker.
+// service. When the adapter loaded successfully it shows endpoint, gRPC
+// method, WebSocket route, and rule counts (e.g. "(adapter: ./x, 11
+// endpoints, 4 grpc methods, 1 ws route, 2 rules)"). gRPC and WS counts are
+// omitted when zero so HTTP-only adapters stay concise. When loading failed
+// it shows the adapter spec with a warning marker.
 func adapterSummary(spec string, r planResult) string {
 	if r.loadError != nil {
 		return fmt.Sprintf("(adapter: %s, NOT LOADABLE — see WARNING above)", spec)
 	}
-	return fmt.Sprintf("(adapter: %s, %d endpoints, %d rules)", spec, r.endpoints, r.rules)
+	parts := []string{fmt.Sprintf("%d endpoints", r.endpoints)}
+	if r.grpcMethods > 0 {
+		parts = append(parts, fmt.Sprintf("%d grpc methods", r.grpcMethods))
+	}
+	if r.wsRoutes > 0 {
+		parts = append(parts, fmt.Sprintf("%d ws routes", r.wsRoutes))
+	}
+	parts = append(parts, fmt.Sprintf("%d rules", r.rules))
+	return fmt.Sprintf("(adapter: %s, %s)", spec, strings.Join(parts, ", "))
 }
 
 // defaultAdapterCacheRoot returns the adapter cache root, honoring the

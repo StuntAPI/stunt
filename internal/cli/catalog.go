@@ -96,7 +96,8 @@ func runCatalogSearch(out io.Writer, url, query string) error {
 	return nil
 }
 
-// runCatalogShow fetches a single entry and prints its full details.
+// runCatalogShow fetches a single entry and prints its full details,
+// including a copy-pasteable manifest snippet and usage guidance.
 func runCatalogShow(out io.Writer, url, name string) error {
 	idx := catalog.NewRemoteIndexWithClient(url, &http.Client{Timeout: 5 * time.Second}, catalog.DefaultCacheTTL)
 	e, err := idx.Get(context.Background(), name)
@@ -109,6 +110,17 @@ func runCatalogShow(out io.Writer, url, name string) error {
 	fmt.Fprintf(out, "Latest ref:  %s\n", e.LatestRef)
 	if len(e.Tags) > 0 {
 		fmt.Fprintf(out, "Tags:        %s\n", strings.Join(e.Tags, ", "))
+	}
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Usage:")
+	fmt.Fprintf(out, "  stunt adapter add %s\n", e.Name)
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "  # or add manually to stunt.yaml:")
+	fmt.Fprintf(out, "  services:\n    %s:\n", e.Name)
+	if e.LatestRef != "" {
+		fmt.Fprintf(out, "      adapter: %s@%s\n", e.GitURL, e.LatestRef)
+	} else {
+		fmt.Fprintf(out, "      adapter: %s\n", e.GitURL)
 	}
 	return nil
 }

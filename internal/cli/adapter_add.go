@@ -6,9 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/stunt-adapters/stunt/internal/adapterdist"
+	"github.com/stunt-adapters/stunt/internal/catalog"
 	"github.com/stunt-adapters/stunt/internal/manifest"
 )
 
@@ -35,19 +37,55 @@ func resolveCacheDir(cmd *cobra.Command) string {
 	return defaultCacheDir()
 }
 
+// resolveCatalogName checks whether sourceSpec is a bare adapter name that
+// matches a catalog entry. If so, it returns the git source spec from the
+// catalog (e.g. "git:github.com/stunt-adapters/stripe-style@v0.1.0").
+// If the spec looks like a path, URL, or git shorthand, it is returned
+// unchanged.
+func resolveCatalogName(sourceSpec string) string {
+	// If it looks like a path, URL, or git shorthand, don't resolve.
+	if strings.ContainsAny(sourceSpec, "/") || strings.HasPrefix(sourceSpec, ".") {
+		return sourceSpec
+	}
+	if strings.Contains(sourceSpec, "://") || strings.HasPrefix(sourceSpec, "git:") {
+		return sourceSpec
+	}
+	// Bare name — try the bundled catalog (no network needed).
+	entry, err := catalog.GetBundled(sourceSpec)
+	if err != nil {
+		return sourceSpec // not in catalog — treat as local path
+	}
+	return catalogEntryToSpec(entry)
+}
+
+// catalogEntryToSpec converts a catalog Entry to a git source spec string
+// (e.g. "git:github.com/stunt-adapters/stripe-style@v0.1.0").
+func catalogEntryToSpec(e catalog.Entry) string {
+	u := e.GitURL
+	u = strings.TrimPrefix(u, "https://")
+	u = strings.TrimPrefix(u, "http://")
+	u = strings.TrimPrefix(u, "git://")
+	spec := "git:" + u
+	if e.LatestRef != "" {
+		spec += "@" + e.LatestRef
+	}
+	return spec
+}
+
 // --- subcommand constructors ---
 
 func newAdapterAddCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "add <source> [name]",
 		Short: "Add an adapter source to the manifest",
 		Long: `Add an adapter source spec to stunt.yaml and ensure it is fetchable.
 
-The source can be a git URL or a local path:
+The source can be a git URL, a local path, or a catalog name:
   git:github.com/user/repo          shorthand, head-at-install
   git:github.com/user/repo@v1.0     shorthand, pinned ref
   https://github.com/user/repo@v1   protocol URL
   ./local/adapter                   local filesystem path
+  stripe-style                      catalog name (resolved to git source)
 
 The source spec (not the cache path) is stored in the manifest so the
 declaration stays portable. If [name] is omitted it is derived from the
@@ -64,9 +102,12 @@ On success the adapter is fetched into the cache and the service is added
 				name = args[1]
 			}
 			force, _ := cmd.Flags().GetBool("force")
-			return runAdapterAdd(cmd.OutOrStdout(), manifestPath, cacheDir, args[0], name, force)
+			sourceSpec := resolveCatalogName(args[0])
+			return runAdapterAdd(cmd.OutOrStdout(), manifestPath, cacheDir, sourceSpec, name, force)
 		},
 	}
+	cmd.Flags().Bool("force", false, "overwrite an existing service with the same name")
+	return cmd
 }
 
 func newAdapterRemoveCmd() *cobra.Command {

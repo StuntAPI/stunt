@@ -59,3 +59,19 @@ func TestInitPrintsNextSteps(t *testing.T) {
 		t.Errorf("missing default URL hint:\n%s", out)
 	}
 }
+
+// TestInitRuleOrderChanceFirst verifies that the probabilistic error rule
+// comes BEFORE the unconditional success rule so it actually fires.
+func TestInitRuleOrderChanceFirst(t *testing.T) {
+	if !strings.Contains(sampleManifest, "occasional-error") {
+		t.Fatal("sample manifest missing 'occasional-error' rule")
+	}
+	chanceIdx := strings.Index(sampleManifest, "occasional-error")
+	successIdx := strings.Index(sampleManifest, "name: success")
+	if chanceIdx < 0 || successIdx < 0 {
+		t.Fatalf("missing rules in sample manifest (chance=%d, success=%d)", chanceIdx, successIdx)
+	}
+	if chanceIdx > successIdx {
+		t.Errorf("probabilistic rule (occasional-error at %d) should come BEFORE success rule (at %d) — first-match-wins means an earlier unconditional rule shadows it", chanceIdx, successIdx)
+	}
+}

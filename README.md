@@ -43,10 +43,10 @@ services:
   example:
     rules:
       - match: { method: GET, path: /hello }
-        respond: { status: 200, body: { template: '{"message":"hi","id":"{{ faker.ID "k" }}"}' } }
-      - match: { method: GET, path: /hello }
         when: { chance: 20 }                       # 20% of replies error
         respond: { status: 503, body: { inline: { error: boom } } }
+      - match: { method: GET, path: /hello }
+        respond: { status: 200, body: { template: '{"message":"hi","id":"{{ faker.ID "k" }}"}' } }
 ```
 
 Stateful adapter service (e.g. the bundled Stripe-style adapter):

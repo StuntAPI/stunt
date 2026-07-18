@@ -82,6 +82,19 @@ func CleanHosts(path string) error {
 	return atomicWriteFile(path, []byte(cleaned), 0o644)
 }
 
+// HasManagedBlock reports whether the hosts file at path currently contains
+// a stunt-managed block. If the file does not exist it returns false.
+func HasManagedBlock(path string) (bool, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("netutil: read hosts file: %w", err)
+	}
+	return strings.Contains(string(content), beginMarker), nil
+}
+
 // --- validation (C1/M3: prevent newline/whitespace injection) ---
 
 // validateHost rejects a hostname that is empty or contains any whitespace

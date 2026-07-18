@@ -25,7 +25,7 @@ func handler200(data []byte) http.Handler {
 func writeCatalogTestServer(t *testing.T) (string, func()) {
 	t.Helper()
 	entries := []catalog.Entry{
-		{Name: "stripe", Description: "Stripe payment API", GitURL: "https://github.com/stunt-adapters/stripe", LatestRef: "v1.0.0", Tags: []string{"payments"}},
+		{Name: "stripe-style", Description: "Stripe-style payment API", GitURL: "https://github.com/stunt-adapters/stripe-style", LatestRef: "v1.0.0", Tags: []string{"payments"}},
 		{Name: "github", Description: "GitHub API", GitURL: "https://github.com/stunt-adapters/github", LatestRef: "v1.0.0", Tags: []string{"devtools"}},
 	}
 	data, err := jsonMarshalCatalog(entries)
@@ -45,25 +45,25 @@ func TestCatalogSearchCmd(t *testing.T) {
 		t.Fatalf("runCatalogSearch: %v", err)
 	}
 	s := out.String()
-	if !strings.Contains(s, "stripe") {
-		t.Errorf("output should contain 'stripe': %q", s)
+	if !strings.Contains(s, "stripe-style") {
+		t.Errorf("output should contain 'stripe-style': %q", s)
 	}
-	if !strings.Contains(s, "Stripe payment API") {
+	if !strings.Contains(s, "Stripe-style payment API") {
 		t.Errorf("output should contain description: %q", s)
 	}
-	if !strings.Contains(s, "github.com/stunt-adapters/stripe") {
+	if !strings.Contains(s, "github.com/stunt-adapters/stripe-style") {
 		t.Errorf("output should contain git URL: %q", s)
 	}
 }
 
 func TestCatalogSearchCmdFallsBackToBundled(t *testing.T) {
 	var out bytes.Buffer
-	// Unreachable URL → falls back to bundled index, which has "stripe".
+	// Unreachable URL → falls back to bundled index, which has "stripe-style".
 	if err := runCatalogSearch(&out, "http://127.0.0.1:1", "stripe"); err != nil {
 		t.Fatalf("runCatalogSearch: %v", err)
 	}
-	if !strings.Contains(out.String(), "stripe") {
-		t.Errorf("bundled fallback should contain 'stripe': %q", out.String())
+	if !strings.Contains(out.String(), "stripe-style") {
+		t.Errorf("bundled fallback should contain 'stripe-style': %q", out.String())
 	}
 }
 
@@ -72,14 +72,21 @@ func TestCatalogShowCmd(t *testing.T) {
 	defer cleanup()
 
 	var out bytes.Buffer
-	if err := runCatalogShow(&out, url, "stripe"); err != nil {
+	if err := runCatalogShow(&out, url, "stripe-style"); err != nil {
 		t.Fatalf("runCatalogShow: %v", err)
 	}
 	s := out.String()
-	for _, want := range []string{"stripe", "Stripe payment API", "v1.0.0", "payments", "github.com/stunt-adapters/stripe"} {
+	for _, want := range []string{"stripe-style", "Stripe-style payment API", "v1.0.0", "payments", "github.com/stunt-adapters/stripe-style"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("output should contain %q: %q", want, s)
 		}
+	}
+	// Should include usage guidance.
+	if !strings.Contains(s, "Usage:") {
+		t.Errorf("output should contain 'Usage:' section: %q", s)
+	}
+	if !strings.Contains(s, "stunt adapter add stripe-style") {
+		t.Errorf("output should suggest 'stunt adapter add stripe-style': %q", s)
 	}
 }
 

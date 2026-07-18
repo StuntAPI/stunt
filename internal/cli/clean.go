@@ -30,10 +30,12 @@ func newCleanCmd() *cobra.Command {
 func runClean(out interface{ Write([]byte) (int, error) }, mdir, hostsFile string) error {
 	// 1. Remove state directory.
 	sp := statePath(mdir)
-	if err := os.RemoveAll(sp); err != nil {
-		fmt.Fprintf(out, "warning: could not remove state dir %s: %v\n", sp, err)
-	} else {
-		fmt.Fprintf(out, "removed state: %s\n", sp)
+	if _, err := os.Stat(sp); err == nil {
+		if err := os.RemoveAll(sp); err != nil {
+			fmt.Fprintf(out, "warning: could not remove state dir %s: %v\n", sp, err)
+		} else {
+			fmt.Fprintf(out, "removed state: %s\n", sp)
+		}
 	}
 
 	// 2. Remove CA directory (cert files). The trust-store entry requires
@@ -47,16 +49,19 @@ func runClean(out interface{ Write([]byte) (int, error) }, mdir, hostsFile strin
 			fmt.Fprintf(out, "  untrust: %s\n", untrust)
 		}
 	}
-	if err := os.RemoveAll(caDir); err != nil {
-		fmt.Fprintf(out, "warning: could not remove CA dir %s: %v\n", caDir, err)
-	} else {
-		fmt.Fprintf(out, "removed CA: %s\n", caDir)
+	if _, err := os.Stat(caDir); err == nil {
+		if err := os.RemoveAll(caDir); err != nil {
+			fmt.Fprintf(out, "warning: could not remove CA dir %s: %v\n", caDir, err)
+		} else {
+			fmt.Fprintf(out, "removed CA: %s\n", caDir)
+		}
 	}
 
 	// 3. Clean hosts block.
+	hadHosts, _ := netutil.HasManagedBlock(hostsFile)
 	if err := netutil.CleanHosts(hostsFile); err != nil {
 		fmt.Fprintf(out, "warning: could not clean hosts: %v\n", err)
-	} else {
+	} else if hadHosts {
 		fmt.Fprintf(out, "cleaned hosts: %s\n", hostsFile)
 	}
 

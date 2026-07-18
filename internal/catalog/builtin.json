@@ -1,23 +1,37 @@
 [
   {
-    "name": "stripe",
-    "description": "Stripe payment API — charges, customers, subscriptions",
-    "git_url": "https://github.com/stunt-adapters/stripe",
+    "name": "stripe-style",
+    "description": "Stripe-style payment API — charges, customers, subscriptions",
+    "git_url": "https://github.com/stunt-adapters/stripe-style",
     "latest_ref": "v0.1.0",
     "tags": ["payments", "fintech"]
   },
   {
-    "name": "google-drive",
-    "description": "Google Drive file storage API — files, folders, sharing",
-    "git_url": "https://github.com/stunt-adapters/google-drive",
+    "name": "drive-style",
+    "description": "Google-Drive-style file storage API — files, folders, sharing",
+    "git_url": "https://github.com/stunt-adapters/drive-style",
     "latest_ref": "v0.1.0",
     "tags": ["storage", "files"]
   },
   {
-    "name": "twitter",
-    "description": "Twitter/X social media API — tweets, users, timelines",
-    "git_url": "https://github.com/stunt-adapters/twitter",
+    "name": "twitter-style",
+    "description": "Twitter/X-style social media API — tweets, users, timelines",
+    "git_url": "https://github.com/stunt-adapters/twitter-style",
     "latest_ref": "v0.1.0",
     "tags": ["social", "media"]
+  },
+  {
+    "name": "dropbox-style",
+    "description": "Dropbox-style file storage API — files, folders, sharing",
+    "git_url": "https://github.com/stunt-adapters/dropbox-style",
+    "latest_ref": "v0.1.0",
+    "tags": ["storage", "files"]
+  },
+  {
+    "name": "echo-style",
+    "description": "Echo gRPC + WebSocket reference adapter — unary, streaming, ws",
+    "git_url": "https://github.com/stunt-adapters/echo-style",
+    "latest_ref": "v0.1.0",
+    "tags": ["grpc", "websocket", "reference"]
   }
 ]
