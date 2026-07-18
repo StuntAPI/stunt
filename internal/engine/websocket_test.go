@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"path/filepath"
 	"sync"
@@ -27,6 +28,10 @@ ws:
   - route: /ws/proto
     handler: scripts/ws.star#on_echo
     subprotocols: ["chat.v1"]
+  - route: /ws/sendlist
+    handler: scripts/ws.star#on_send_list
+  - route: /ws/sendclose
+    handler: scripts/ws.star#on_send_close_status
 `
 
 // wsStarScript implements echo, push, and param handlers.
@@ -51,6 +56,24 @@ def on_push(ws):
 # Param: echo the path param back on connect.
 def on_param(ws):
     ws.send("handler-ready")
+    while True:
+        m = ws.recv()
+        if m == None:
+            break
+
+# SendList: send a JSON array on connect, then wait for disconnect.
+def on_send_list(ws):
+    ws.send([1, 2, 3])
+    while True:
+        m = ws.recv()
+        if m == None:
+            break
+
+# SendCloseStatus: send the close() return value as a string so the
+# test can observe whether validation accepted or rejected the code.
+def on_send_close_status(ws):
+    err = ws.close(99999)
+    ws.send("no-error")
     while True:
         m = ws.recv()
         if m == None:
@@ -371,5 +394,218 @@ func TestWebSocketChattyLoopNotKilledByStepLimit(t *testing.T) {
 		if got != "msg" {
 			t.Errorf("round-trip %d: got %q, want %q", i, got, "msg")
 		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Connection cap: opening more than the limit of concurrent connections
+// results in HTTP 503. Closing a connection frees a slot.
+// ---------------------------------------------------------------------------
+
+func TestWebSocketConnectionCap(t *testing.T) {
+	adapterDir := t.TempDir()
+	writeFile(t, adapterDir, "adapter.yaml", wsAdapterYAML)
+	writeFile(t, adapterDir, "scripts/ws.star", wsStarScript)
+
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"wstest": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	t.Cleanup(func() { e.Close() })
+
+	// Override the semaphore to a small limit for this test.
+	const limit = 3
+	e.wsSem = make(chan struct{}, limit)
+
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	t.Cleanup(cancel)
+	time.Sleep(30 * time.Millisecond)
+
+	baseURL := addrs["wstest"]
+
+	// Open exactly `limit` connections. Each blocks on recv() (no messages
+	// sent) so the semaphore slots are held.
+	var conns []*websocket.Conn
+	for i := 0; i < limit; i++ {
+		c := wsDial(t, baseURL, "/ws/echo", nil)
+		conns = append(conns, c)
+	}
+	defer func() {
+		for _, c := range conns {
+			c.Close(websocket.StatusNormalClosure, "")
+		}
+	}()
+
+	// Give the server a moment to register all connections.
+	time.Sleep(50 * time.Millisecond)
+
+	// The limit+1 connection should be rejected with an HTTP error (503).
+	ctx, cancelDial := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelDial()
+	_, _, dialErr := websocket.Dial(ctx, baseURL+"/ws/echo", nil)
+	if dialErr == nil {
+		t.Fatal("expected error dialing over the connection limit, got nil")
+	}
+
+	// Close one connection to free a slot.
+	conns[0].Close(websocket.StatusNormalClosure, "")
+	conns = conns[1:]
+	time.Sleep(50 * time.Millisecond)
+
+	// A new connection should now succeed.
+	c2 := wsDial(t, baseURL, "/ws/echo", nil)
+	defer c2.Close(websocket.StatusNormalClosure, "")
+	wsSendText(t, c2, "after-free")
+	got := string(wsRecv(t, c2))
+	if got != "after-free" {
+		t.Errorf("echo after free = %q, want %q", got, "after-free")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Shutdown: a connected client receives a close frame when the engine shuts
+// down, not a hard error or timeout.
+// ---------------------------------------------------------------------------
+
+func TestWebSocketShutdownSendsCloseFrame(t *testing.T) {
+	adapterDir := t.TempDir()
+	writeFile(t, adapterDir, "adapter.yaml", wsAdapterYAML)
+	writeFile(t, adapterDir, "scripts/ws.star", wsStarScript)
+
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"wstest": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	time.Sleep(30 * time.Millisecond)
+
+	baseURL := addrs["wstest"]
+	c := wsDial(t, baseURL, "/ws/echo", nil)
+	defer c.CloseNow()
+
+	// Confirm the connection is live.
+	wsSendText(t, c, "ping")
+	_ = wsRecv(t, c)
+
+	// Start reading before triggering shutdown so the close frame can be
+	// received as soon as it arrives.
+	type readResult struct {
+		msgType websocket.MessageType
+		data    []byte
+		err     error
+	}
+	resultCh := make(chan readResult, 1)
+	go func() {
+		rctx, rcancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer rcancel()
+		mt, data, err := c.Read(rctx)
+		resultCh <- readResult{msgType: mt, data: data, err: err}
+	}()
+
+	// Give the read goroutine a moment to start.
+	time.Sleep(50 * time.Millisecond)
+
+	// Trigger server shutdown via cancel — this closes the engine's
+	// shutdownCh, which the WebSocket handler monitors.
+	cancel()
+
+	// The client should receive a close frame (not a timeout).
+	select {
+	case res := <-resultCh:
+		if res.err == nil {
+			t.Fatal("expected a close error on shutdown, got nil")
+		}
+		status := websocket.CloseStatus(res.err)
+		if status == -1 {
+			t.Errorf("expected a WebSocket close error, got non-close error: %v", res.err)
+		}
+	case <-time.After(6 * time.Second):
+		t.Fatal("timed out waiting for client read to return")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// send() with a list: ws.send([1,2,3]) produces valid JSON [1,2,3].
+// ---------------------------------------------------------------------------
+
+func TestWebSocketSendList(t *testing.T) {
+	baseURL := setupWSEngine(t)
+	c := wsDial(t, baseURL, "/ws/sendlist", nil)
+	defer c.Close(websocket.StatusNormalClosure, "")
+
+	data := wsRecv(t, c)
+	var arr []interface{}
+	if err := json.Unmarshal(data, &arr); err != nil {
+		t.Fatalf("unmarshal %q: %v", string(data), err)
+	}
+	if len(arr) != 3 {
+		t.Fatalf("got %d elements, want 3", len(arr))
+	}
+	for i, want := range []float64{1, 2, 3} {
+		if got, ok := arr[i].(float64); !ok || got != want {
+			t.Errorf("arr[%d] = %v, want %v", i, arr[i], want)
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// close() status validation: invalid codes are rejected.
+// ---------------------------------------------------------------------------
+
+func TestValidateCloseCode(t *testing.T) {
+	tests := []struct {
+		code int
+		want bool
+	}{
+		{1000, true},   // StatusNormalClosure
+		{1001, true},   // StatusGoingAway
+		{1011, true},   // StatusInternalError
+		{3000, true},   // start of application-defined range
+		{4999, true},   // end of application-defined range
+		{999, false},   // below minimum
+		{1015, false},  // StatusTLSHandshake — reserved, not valid on wire
+		{1005, false},  // StatusNoStatusRcvd — reserved
+		{1006, false},  // StatusAbnormalClosure — reserved
+		{5000, false},  // above custom range
+		{99999, false}, // wildly out of range
+		{-1, false},    // negative
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%d", tt.code), func(t *testing.T) {
+			err := validateCloseCode(tt.code)
+			if tt.want && err != nil {
+				t.Errorf("validateCloseCode(%d) = %v, want nil", tt.code, err)
+			}
+			if !tt.want && err == nil {
+				t.Errorf("validateCloseCode(%d) = nil, want error", tt.code)
+			}
+		})
 	}
 }
