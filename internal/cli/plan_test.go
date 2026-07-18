@@ -122,8 +122,205 @@ services:
 	}
 }
 
-// TestPlanShowsGrpcAndWsCounts verifies that `stunt plan` shows gRPC method
-// and WebSocket route counts for an adapter with a gRPC section.
+// TestPlanWarnsOnMissingHandlerScript verifies that plan emits a WARNING
+// when an adapter endpoint references a handler script file that does not
+// exist on disk.
+func TestPlanWarnsOnMissingHandlerScript(t *testing.T) {
+	dir := t.TempDir()
+	if err := contrib.Scaffold(dir, "myapi", contrib.ScaffoldOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	// Overwrite adapter.yaml so the endpoint points at a non-existent script.
+	adapterYAML := `id: myapi
+name: MyAPI
+version: "0.1.0"
+endpoints:
+  - route: /hello
+    method: GET
+    handler: scripts/missing.star#on_get
+`
+	if err := os.WriteFile(filepath.Join(dir, "myapi", "adapter.yaml"), []byte(adapterYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mPath := filepath.Join(dir, "stunt.yaml")
+	content := `version: 1
+network:
+  mode: port
+  base_port: 8000
+services:
+  api:
+    adapter: ./myapi
+`
+	if err := os.WriteFile(mPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	root := NewRootCmd()
+	root.SetArgs([]string{"plan", "--manifest", mPath})
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	if err := root.Execute(); err != nil {
+		t.Fatalf("plan should not error: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "WARNING") {
+		t.Errorf("expected WARNING for missing handler script, got:\n%s", out)
+	}
+	if !strings.Contains(out, "missing.star") {
+		t.Errorf("expected 'missing.star' in warning, got:\n%s", out)
+	}
+}
+
+// TestPlanWarnsOnUndefinedHandlerFunction verifies that plan emits a WARNING
+// when a handler script exists but does not define the referenced function.
+func TestPlanWarnsOnUndefinedHandlerFunction(t *testing.T) {
+	dir := t.TempDir()
+	if err := contrib.Scaffold(dir, "myapi", contrib.ScaffoldOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	// Overwrite adapter.yaml to reference a function that isn't defined.
+	adapterYAML := `id: myapi
+name: MyAPI
+version: "0.1.0"
+endpoints:
+  - route: /hello
+    method: GET
+    handler: scripts/hello.star#nonexistent
+`
+	if err := os.WriteFile(filepath.Join(dir, "myapi", "adapter.yaml"), []byte(adapterYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mPath := filepath.Join(dir, "stunt.yaml")
+	content := `version: 1
+network:
+  mode: port
+  base_port: 8000
+services:
+  api:
+    adapter: ./myapi
+`
+	if err := os.WriteFile(mPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	root := NewRootCmd()
+	root.SetArgs([]string{"plan", "--manifest", mPath})
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	if err := root.Execute(); err != nil {
+		t.Fatalf("plan should not error: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "WARNING") {
+		t.Errorf("expected WARNING for undefined handler function, got:\n%s", out)
+	}
+	if !strings.Contains(out, `"nonexistent"`) {
+		t.Errorf("expected 'nonexistent' in warning, got:\n%s", out)
+	}
+}
+
+// TestPlanWarnsOnSyntaxError verifies that plan emits a WARNING when a
+// handler script has a Starlark syntax error.
+func TestPlanWarnsOnSyntaxError(t *testing.T) {
+	dir := t.TempDir()
+	if err := contrib.Scaffold(dir, "myapi", contrib.ScaffoldOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	// Overwrite adapter.yaml so the endpoint references the handler script.
+	adapterYAML := `id: myapi
+name: MyAPI
+version: "0.1.0"
+endpoints:
+  - route: /hello
+    method: GET
+    handler: scripts/hello.star#on_get
+`
+	if err := os.WriteFile(filepath.Join(dir, "myapi", "adapter.yaml"), []byte(adapterYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Write a script with a syntax error (unbalanced parenthesis).
+	badScript := `def on_get(req):
+    return respond(200, {"msg": broken
+`
+	if err := os.WriteFile(filepath.Join(dir, "myapi", "scripts", "hello.star"), []byte(badScript), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	mPath := filepath.Join(dir, "stunt.yaml")
+	content := `version: 1
+network:
+  mode: port
+  base_port: 8000
+services:
+  api:
+    adapter: ./myapi
+`
+	if err := os.WriteFile(mPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	root := NewRootCmd()
+	root.SetArgs([]string{"plan", "--manifest", mPath})
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	if err := root.Execute(); err != nil {
+		t.Fatalf("plan should not error: %v", err)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "WARNING") {
+		t.Errorf("expected WARNING for syntax error, got:\n%s", out)
+	}
+	if !strings.Contains(out, "hello.star") {
+		t.Errorf("expected 'hello.star' in warning, got:\n%s", out)
+	}
+}
+
+// TestPlanNoWarningForCleanAdapter verifies that a clean adapter with valid
+// handler scripts produces no WARNING lines.
+func TestPlanNoWarningForCleanAdapter(t *testing.T) {
+	dir := t.TempDir()
+	if err := contrib.Scaffold(dir, "myapi", contrib.ScaffoldOptions{}); err != nil {
+		t.Fatal(err)
+	}
+
+	mPath := filepath.Join(dir, "stunt.yaml")
+	content := `version: 1
+network:
+  mode: port
+  base_port: 8000
+services:
+  api:
+    adapter: ./myapi
+`
+	if err := os.WriteFile(mPath, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	root := NewRootCmd()
+	root.SetArgs([]string{"plan", "--manifest", mPath})
+	var buf bytes.Buffer
+	root.SetOut(&buf)
+	root.SetErr(&buf)
+	if err := root.Execute(); err != nil {
+		t.Fatalf("plan failed: %v", err)
+	}
+
+	out := buf.String()
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "WARNING") {
+			t.Errorf("clean adapter should not produce WARNING, got line: %s\nFull output:\n%s", line, out)
+		}
+	}
+}
+
 func TestPlanShowsGrpcAndWsCounts(t *testing.T) {
 	// Use the echo-style reference adapter which has 4 gRPC methods and
 	// 1 WebSocket route.

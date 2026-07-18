@@ -177,6 +177,62 @@ func TestSaveDoesNotLeaveTempFile(t *testing.T) {
 
 // TestSaveOverwritesExistingFile verifies that saving over an existing file
 // replaces it atomically (the old content is gone, new content is present).
+func TestLoadDetectsUnknownFields(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "stunt.yaml")
+	content := `version: 1
+rng_seed: 42
+bogus_field: yes
+netwrok:
+  mode: port
+  base_port: 8000
+services:
+  api:
+    adapter: ./api
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(m.UnknownFields) != 2 {
+		t.Fatalf("UnknownFields = %v, want 2 entries", m.UnknownFields)
+	}
+	found := map[string]bool{}
+	for _, f := range m.UnknownFields {
+		found[f] = true
+	}
+	if !found["bogus_field"] {
+		t.Errorf("expected 'bogus_field' in UnknownFields, got %v", m.UnknownFields)
+	}
+	if !found["netwrok"] {
+		t.Errorf("expected 'netwrok' in UnknownFields, got %v", m.UnknownFields)
+	}
+}
+
+func TestLoadNoUnknownFieldsForCleanManifest(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "stunt.yaml")
+	content := `version: 1
+network:
+  mode: port
+  base_port: 8000
+services:
+  api:
+    adapter: ./api
+`
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(m.UnknownFields) != 0 {
+		t.Errorf("UnknownFields = %v, want empty", m.UnknownFields)
+	}
+}
+
 func TestSaveOverwritesExistingFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "stunt.yaml")
 

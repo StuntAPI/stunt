@@ -85,6 +85,14 @@ func Load(src string, builtins sk.StringDict) (*VM, error) {
 	return &VM{globals: globals}, nil
 }
 
+// Has reports whether the named global is defined in the loaded script.
+// This is used by `stunt plan` to verify that a handler function exists
+// before starting the server.
+func (vm *VM) Has(name string) bool {
+	_, ok := vm.globals[name]
+	return ok
+}
+
 // Call invokes the named handler function with a Request and converts the
 // returned Starlark value into a Response. The handler must return either a
 // dict (e.g. from respond) or any value convertible to a Response dict.

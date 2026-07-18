@@ -38,6 +38,7 @@ type Finding struct {
 	File     string // path to the file (relative to the adapter dir)
 	Line     int    // 1-based line number
 	Severity string // "error" or "warn"
+	Value    string // the matched value that triggered the finding (for dedup)
 	Message  string // human-readable description
 }
 
@@ -255,6 +256,8 @@ func scanLine(file string, lineNum int, line string) []Finding {
 	var findings []Finding
 
 	// Regex-based content heuristics on the literal (placeholder-stripped) text.
+	// Patterns are ordered most-specific first so that dedup (by file+line+value)
+	// keeps the most specific finding (e.g. credit-card wins over phone).
 	findings = append(findings, matchPattern(file, lineNum, literal, reEmail, "email address looks like real data", SeverityError)...)
 	findings = append(findings, matchPattern(file, lineNum, literal, reUUID, "literal UUID — use {{ uuid }} instead", SeverityError)...)
 	findings = append(findings, matchPattern(file, lineNum, literal, reProviderID, "provider-style ID — use a faker placeholder instead", SeverityError)...)
@@ -267,6 +270,11 @@ func scanLine(file string, lineNum int, line string) []Finding {
 	findings = append(findings, matchPattern(file, lineNum, literal, reJWT, "JWT token — looks like real data", SeverityError)...)
 	findings = append(findings, matchPattern(file, lineNum, literal, rePhone, "phone number — looks like real data", SeverityError)...)
 	findings = append(findings, matchPattern(file, lineNum, literal, reBase64, "long base64 blob — looks like real encoded data", SeverityError)...)
+
+	// Deduplicate: when the same value matches multiple heuristics on the
+	// same line, keep only the first (most specific) finding. This prevents
+	// e.g. a credit-card number from also being reported as a phone number.
+	findings = dedupFindings(findings)
 
 	// JSON-aware checks (PII field names, long string values).
 	findings = append(findings, checkJSONValues(file, lineNum, line)...)
@@ -286,10 +294,35 @@ func matchPattern(file string, lineNum int, text string, re *regexp.Regexp, msg,
 			File:     file,
 			Line:     lineNum,
 			Severity: severity,
+			Value:    m,
 			Message:  fmt.Sprintf("%s: %s", msg, truncate(m, 80)),
 		})
 	}
 	return findings
+}
+
+// dedupFindings removes findings that share the same (File, Line, Value)
+// triple, keeping the first occurrence. Patterns are applied most-specific
+// first, so this ensures a credit-card number is not also reported as a
+// phone number.
+func dedupFindings(findings []Finding) []Finding {
+	seen := make(map[string]bool, len(findings))
+	out := findings[:0] // reuse backing array
+	for _, f := range findings {
+		if f.Value == "" {
+			// Findings without a matched value (e.g. PII field-name checks)
+			// are always kept.
+			out = append(out, f)
+			continue
+		}
+		key := fmt.Sprintf("%s:%d:%s", f.File, f.Line, f.Value)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, f)
+	}
+	return out
 }
 
 // checkJSONValues parses a line as JSON. If successful, it checks each

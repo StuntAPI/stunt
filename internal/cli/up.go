@@ -6,10 +6,12 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stunt-adapters/stunt/internal/adapter"
@@ -69,6 +71,24 @@ func runUpPort(ctx context.Context, e *engine.Engine, m *manifest.Manifest, out 
 		return err
 	}
 	defer cancel()
+
+	// Write the runtime file so `stunt down` can stop this server.
+	manifestDir := filepath.Dir(m.Path)
+	var addrList []string
+	for _, name := range sortedServiceNames(m.Services) {
+		addrList = append(addrList, addrs[name])
+	}
+	rt := RuntimeFile{
+		PID:       os.Getpid(),
+		Manifest:  m.Path,
+		Mode:      "port",
+		Addresses: addrList,
+		StartedAt: time.Now().Format(time.RFC3339),
+	}
+	if wErr := writeRuntimeFile(manifestDir, rt); wErr != nil {
+		fmt.Fprintf(out, "warning: could not write runtime file: %v\n", wErr)
+	}
+	defer removeRuntimeFile(manifestDir)
 
 	for _, name := range sortedServiceNames(m.Services) {
 		svc := m.Services[name]
@@ -183,6 +203,20 @@ func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifes
 		return fmt.Errorf("subdomain: listen: %w", err)
 	}
 	actualPort := portFromListener(ln)
+
+	// Write the runtime file so `stunt down` can stop this server.
+	subMDir := manifestDir(manifestPath)
+	subRt := RuntimeFile{
+		PID:       os.Getpid(),
+		Manifest:  manifestPath,
+		Mode:      "subdomain",
+		Addresses: []string{fmt.Sprintf("%s://%s:%s", map[bool]string{true: "https", false: "http"}[useTLS], tld, actualPort)},
+		StartedAt: time.Now().Format(time.RFC3339),
+	}
+	if wErr := writeRuntimeFile(subMDir, subRt); wErr != nil {
+		fmt.Fprintf(out, "warning: could not write runtime file: %v\n", wErr)
+	}
+	defer removeRuntimeFile(subMDir)
 
 	// M5: if sync_hosts is enabled, write *.tld entries to the hosts file.
 	// Uses the hostsPath indirection so tests can override it.

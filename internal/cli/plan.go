@@ -10,8 +10,10 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stunt-adapters/stunt/internal/adapter"
+	"github.com/stunt-adapters/stunt/internal/adapter/runtime"
 	"github.com/stunt-adapters/stunt/internal/adapterdist"
 	"github.com/stunt-adapters/stunt/internal/manifest"
+	"github.com/stunt-adapters/stunt/internal/starlark"
 )
 
 const defaultManifestPath = "stunt.yaml"
@@ -42,6 +44,11 @@ func newPlanCmd() *cobra.Command {
 			m.Network.Defaults()
 
 			out := cmd.OutOrStdout()
+
+			// Warn about unknown manifest fields (typos like `netwrok:`).
+			for _, field := range m.UnknownFields {
+				fmt.Fprintf(out, "  WARNING: unknown manifest field %q (may be a typo)\n", field)
+			}
 
 			// Resolve and validate each adapter so plan surfaces load errors
 			// before `stunt up` crashes. A non-loadable adapter prints a
@@ -93,6 +100,10 @@ func planValidateAdapters(out interface{ Write([]byte) (int, error) }, m *manife
 			rules:       rules,
 			adapter:     a,
 		}
+
+		// Pre-compile handler scripts so plan catches missing files,
+		// syntax errors, and undefined functions before `stunt up`.
+		planCheckHandlers(out, name, a)
 	}
 	return results
 }
@@ -130,6 +141,63 @@ func planResolveAdapter(spec, manifestDir string) (*adapter.Adapter, error) {
 		return nil, fmt.Errorf("adapter %q: %w", spec, err)
 	}
 	return a, nil
+}
+
+// planCheckHandlers attempts to compile each handler script referenced by
+// the adapter (HTTP endpoints, gRPC methods, WebSocket routes). It catches
+// missing script files, syntax errors, and undefined handler functions —
+// problems that would otherwise only surface as a 500 at request time.
+// Failures are printed as WARNING lines; plan never aborts.
+func planCheckHandlers(out interface{ Write([]byte) (int, error) }, serviceName string, a *adapter.Adapter) {
+	// Dummy builtins so name resolution passes during compilation — handler
+	// scripts reference store_collection etc. which must resolve at compile
+	// time even though we never call them.
+	dummyBuiltins := runtime.BuildAllBuiltins(runtime.BuiltinOptions{})
+
+	check := func(spec string) {
+		if spec == "" {
+			return
+		}
+		scriptPath, fnName := adapter.SplitHandler(spec)
+		if scriptPath == "" {
+			return
+		}
+
+		// Show the path relative to the adapter dir for a cleaner message.
+		display := spec
+		if rel, err := filepath.Rel(a.Dir, scriptPath); err == nil {
+			display = rel
+			if fnName != "" {
+				display += "#" + fnName
+			}
+		}
+
+		src, err := os.ReadFile(scriptPath)
+		if err != nil {
+			fmt.Fprintf(out, "  WARNING: service %q: handler %s: %v\n", serviceName, display, err)
+			return
+		}
+		vm, err := starlark.Load(string(src), dummyBuiltins)
+		if err != nil {
+			fmt.Fprintf(out, "  WARNING: service %q: handler %s: %v\n", serviceName, display, err)
+			return
+		}
+		if fnName != "" && !vm.Has(fnName) {
+			fmt.Fprintf(out, "  WARNING: service %q: handler %s: function %q is not defined\n", serviceName, display, fnName)
+		}
+	}
+
+	for _, ep := range a.Endpoints {
+		check(ep.Handler)
+	}
+	if a.Grpc != nil {
+		for _, m := range a.Grpc.Methods {
+			check(m.Handler)
+		}
+	}
+	for _, ws := range a.Websockets {
+		check(ws.Handler)
+	}
 }
 
 func printPlanPort(out interface{ Write([]byte) (int, error) }, m *manifest.Manifest, results map[string]planResult) {
