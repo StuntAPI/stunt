@@ -18,15 +18,25 @@ type Adapter struct {
 	// Dir is the absolute path to the adapter directory on disk (set by Load).
 	Dir string `yaml:"-"`
 
-	ID        string       `yaml:"id"`
-	Name      string       `yaml:"name"`
-	RealHosts []string     `yaml:"real_hosts"`
-	Version   string       `yaml:"version"`
-	Endpoints []Endpoint   `yaml:"endpoints"`
-	Resources []Resource   `yaml:"resources"`
-	Rules     []rules.Rule `yaml:"rules"`
-	Identity  *Identity    `yaml:"identity"`
-	Grpc      *GrpcSpec    `yaml:"grpc"`
+	ID         string              `yaml:"id"`
+	Name       string              `yaml:"name"`
+	RealHosts  []string            `yaml:"real_hosts"`
+	Version    string              `yaml:"version"`
+	Endpoints  []Endpoint          `yaml:"endpoints"`
+	Resources  []Resource          `yaml:"resources"`
+	Rules      []rules.Rule        `yaml:"rules"`
+	Identity   *Identity           `yaml:"identity"`
+	Grpc       *GrpcSpec           `yaml:"grpc"`
+	Websockets []WebsocketEndpoint `yaml:"ws"`
+}
+
+// WebsocketEndpoint declares a WebSocket route served by a connection-
+// lifetime Starlark handler. The handler is invoked once per WebSocket
+// connection and receives a `ws` object with recv()/send()/close() methods.
+type WebsocketEndpoint struct {
+	Route        string   `yaml:"route"`
+	Handler      string   `yaml:"handler"`
+	Subprotocols []string `yaml:"subprotocols"`
 }
 
 // GrpcSpec declares an optional gRPC service served from a protobuf
@@ -124,6 +134,23 @@ func (a *Adapter) validate() error {
 			}
 		}
 	}
+	// Validate websocket endpoints.
+	wsRoutes := make(map[string]bool)
+	for i, ws := range a.Websockets {
+		if ws.Route == "" {
+			return fmt.Errorf("adapter: ws[%d].route is required", i)
+		}
+		if wsRoutes[ws.Route] {
+			return fmt.Errorf("adapter: ws[%d].route %q is duplicated", i, ws.Route)
+		}
+		if ws.Handler == "" {
+			return fmt.Errorf("adapter: ws[%d].handler is required", i)
+		}
+		if !strings.Contains(ws.Handler, "#") {
+			return fmt.Errorf("adapter: ws[%d].handler %q must be in \"scripts/x.star#fn\" form", i, ws.Handler)
+		}
+		wsRoutes[ws.Route] = true
+	}
 	return nil
 }
 
@@ -170,6 +197,26 @@ func (a *Adapter) resolveHandlerPaths() error {
 			if fn != "" {
 				a.Grpc.Methods[i].Handler += "#" + fn
 			}
+		}
+	}
+
+	// Resolve websocket handler paths (same format as endpoint handlers).
+	for i := range a.Websockets {
+		h := a.Websockets[i].Handler
+		if h == "" {
+			continue
+		}
+		path, fn := splitHandler(h)
+		if path == "" {
+			continue
+		}
+		resolved, err := a.resolveContainedPath(path)
+		if err != nil {
+			return err
+		}
+		a.Websockets[i].Handler = resolved
+		if fn != "" {
+			a.Websockets[i].Handler += "#" + fn
 		}
 	}
 	return nil

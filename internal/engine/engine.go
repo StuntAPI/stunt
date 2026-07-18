@@ -322,6 +322,19 @@ func (e *Engine) serviceHandler(name string, svc manifest.Service) http.Handler 
 	var rulesMu sync.Mutex
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// --- WebSocket dispatch (before HTTP) ---
+		// If the request is a WebSocket upgrade and its path matches a declared
+		// ws route, upgrade and run the connection-lifetime handler. Non-upgrade
+		// requests or no-match fall through to normal HTTP dispatch unchanged.
+		if st != nil && len(st.adapter.Websockets) > 0 && isWebSocketUpgrade(r) {
+			for _, ws := range st.adapter.Websockets {
+				if _, ok := matchRoute(ws.Route, r.URL.Path); ok {
+					e.handleWebsocket(w, r, st, ws)
+					return
+				}
+			}
+		}
+
 		var body []byte
 		if r.Body != nil {
 			body, _ = io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))

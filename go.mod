@@ -5,6 +5,7 @@ go 1.23.3
 require (
 	github.com/brianvoe/gofakeit/v6 v6.28.0
 	github.com/bufbuild/protocompile v0.14.1
+	github.com/coder/websocket v1.8.15
 	github.com/expr-lang/expr v1.17.8
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/spf13/cobra v1.8.1
