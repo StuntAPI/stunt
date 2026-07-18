@@ -37,6 +37,19 @@ type Engine struct {
 	states    map[string]*serviceState // keyed by service name
 	cacheRoot string                   // adapter cache root for git sources
 
+	// wsSem limits the number of concurrent active WebSocket connections
+	// across all services to prevent resource exhaustion. Each handleWebsocket
+	// call acquires a slot before upgrading; releasing happens on return.
+	wsSem chan struct{}
+
+	// shutdownCh is closed when the engine's servers are being shut down.
+	// WebSocket handlers monitor this channel to proactively send a close
+	// frame to connected clients before the TCP connection is torn down.
+	// Go's http.Server.Shutdown does not cancel request contexts for
+	// hijacked (WebSocket) connections, so this is the only signal.
+	shutdownCh   chan struct{}
+	shutdownOnce sync.Once
+
 	grpcServers []*grpc.Server    // started by serve(), stopped by Close()
 	grpcTargets map[string]string // service name → grpc target (set by serve())
 }
@@ -68,9 +81,11 @@ func New(m *manifest.Manifest) (*Engine, error) {
 // newEngine is the testable constructor that accepts an explicit cache root.
 func newEngine(m *manifest.Manifest, cacheRoot string) (*Engine, error) {
 	e := &Engine{
-		manifest:  m,
-		states:    make(map[string]*serviceState),
-		cacheRoot: cacheRoot,
+		manifest:   m,
+		states:     make(map[string]*serviceState),
+		cacheRoot:  cacheRoot,
+		wsSem:      make(chan struct{}, wsMaxConcurrentConns),
+		shutdownCh: make(chan struct{}),
 	}
 
 	// Derive a state directory next to the manifest.

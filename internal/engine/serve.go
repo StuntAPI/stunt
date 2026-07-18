@@ -86,6 +86,7 @@ func (e *Engine) serve(ctx context.Context, freePorts bool) (map[string]string, 
 	}
 
 	cancel := func() {
+		e.shutdownOnce.Do(func() { close(e.shutdownCh) })
 		cctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		for _, s := range servers {
@@ -123,6 +124,7 @@ func (e *Engine) ServeSingle(ctx context.Context, listenAddr, tld string) (strin
 
 	go func() {
 		<-ctx.Done()
+		e.shutdownOnce.Do(func() { close(e.shutdownCh) })
 		cctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		_ = srv.Shutdown(cctx)
@@ -132,6 +134,7 @@ func (e *Engine) ServeSingle(ctx context.Context, listenAddr, tld string) (strin
 
 	addr := "http://" + ln.Addr().String()
 	cancel := func() {
+		e.shutdownOnce.Do(func() { close(e.shutdownCh) })
 		cctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		_ = srv.Shutdown(cctx)

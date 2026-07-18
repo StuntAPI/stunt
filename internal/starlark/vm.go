@@ -276,6 +276,17 @@ func StarlarkToGo(d *sk.Dict) map[string]any {
 	return out
 }
 
+// StarlarkListToGo converts a Starlark list into a Go []any, suitable for
+// JSON marshalling. Each element is recursively converted via
+// starlarkValueToGo.
+func StarlarkListToGo(l *sk.List) []any {
+	out := make([]any, l.Len())
+	for i := range out {
+		out[i] = starlarkValueToGo(l.Index(i))
+	}
+	return out
+}
+
 // starlarkValueToGo converts an arbitrary Starlark value into a Go value.
 func starlarkValueToGo(v sk.Value) any {
 	switch x := v.(type) {

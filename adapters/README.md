@@ -198,9 +198,9 @@ The handler receives a `ws` object with three methods: `recv()`, `send()`, and `
 
 | Method | Description |
 |---|---|
-| **`ws.recv()`** | Returns the next inbound message. A JSON object arrives as a **dict**; other text/binary arrives as a **str**. Returns `None` when the client has disconnected (clean EOF). This is a **blocking** call — no Starlark steps accrue while waiting. |
-| **`ws.send(msg)`** | Sends a frame. If `msg` is a **dict**, it is marshalled to a JSON text frame. If `msg` is a **str**, it is sent as a raw text frame. |
-| **`ws.close(code=1000, reason="")`** | Performs a graceful WebSocket close. `code` defaults to 1000 (normal closure). |
+| **`ws.recv()`** | Returns the next inbound message. A JSON object arrives as a **dict**; other text/binary arrives as a **str**. Returns `None` when the client has disconnected (clean EOF). This is a **blocking** call — no Starlark steps accrue while waiting. On engine shutdown the connection is closed with a `StatusGoingAway` frame; `recv()` then returns `None` as with any client-side close. |
+| **`ws.send(msg)`** | Sends a text frame. If `msg` is a **dict**, it is marshalled to a JSON text frame. If `msg` is a **list**, it is marshalled to a JSON array. If `msg` is an **int**, **float**, or **bool**, its JSON representation is sent. If `msg` is a **str**, it is sent as a raw text frame. |
+| **`ws.close(code=1000, reason="")`** | Performs a graceful WebSocket close. `code` defaults to 1000 (normal closure). Invalid status codes produce a Starlark error. Valid ranges are 1000–1014 and 3000–4999 (per RFC 6455 §7.4). |
 
 ### Step budget & idle connections
 

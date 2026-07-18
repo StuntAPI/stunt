@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/coder/websocket"
@@ -29,6 +30,13 @@ import (
 // without prematurely terminating legitimate connections.
 const wsMaxSteps = 10_000_000
 
+// wsMaxConcurrentConns is the maximum number of concurrent active WebSocket
+// connections per engine. Once this limit is reached, new upgrade attempts
+// are rejected with HTTP 503 (Service Unavailable) so clients get a clear
+// signal to back off. This prevents a single adapter from exhausting file
+// descriptors, goroutines, or memory under load.
+const wsMaxConcurrentConns = 256
+
 // isWebSocketUpgrade reports whether the HTTP request is a WebSocket upgrade
 // request. It checks for the required Upgrade and Connection headers per
 // RFC 6455 §4.1. coder/websocket's Accept does its own validation; this is
@@ -50,13 +58,23 @@ func containsToken(val, token string) bool {
 
 // handleWebsocket upgrades the HTTP connection to a WebSocket and runs the
 // connection-lifetime Starlark handler. It blocks the ServeHTTP goroutine
-// until the handler returns (client disconnect, graceful close, or context
-// cancellation). Panic recovery ensures a buggy handler never crashes the
+// until the handler returns (client disconnect, graceful close, or engine
+// shutdown). Panic recovery ensures a buggy handler never crashes the
 // server.
 //
 // The handler signature is: on_connect(ws). The ws object exposes recv(),
 // send(), and close() methods. When the client disconnects, recv() returns
 // None and the handler returns naturally.
+//
+// Concurrent connections are capped by the engine's wsSem semaphore to
+// prevent resource exhaustion. If the cap is reached, the upgrade is
+// rejected with HTTP 503.
+//
+// On engine shutdown, the handler proactively sends a StatusGoingAway close
+// frame to the client via the engine's shutdownCh, so the client sees a
+// clean WebSocket close rather than a bare TCP teardown. Go's
+// http.Server.Shutdown does not cancel request contexts for hijacked
+// (WebSocket) connections, so the shutdownCh is the only signal.
 func (e *Engine) handleWebsocket(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -67,10 +85,19 @@ func (e *Engine) handleWebsocket(
 	// buggy handler never crashes the HTTP server.
 	defer func() {
 		if rec := recover(); rec != nil {
-			// Connection may already be in a bad state; nothing more to do.
-			_ = rec
+			fmt.Fprintf(os.Stderr, "engine: websocket handler panic: %v\n", rec)
 		}
 	}()
+
+	// Acquire a semaphore slot BEFORE accepting the upgrade. If the cap is
+	// reached, reject with 503 so clients get a clear signal to back off.
+	select {
+	case e.wsSem <- struct{}{}:
+		defer func() { <-e.wsSem }()
+	default:
+		http.Error(w, "too many concurrent WebSocket connections", http.StatusServiceUnavailable)
+		return
+	}
 
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		Subprotocols: ep.Subprotocols,
@@ -80,15 +107,41 @@ func (e *Engine) handleWebsocket(
 		return
 	}
 
-	// Bind the connection's lifetime to the request context. When the HTTP
-	// server shuts down (engine.Close → server.Shutdown), r.Context() is
-	// cancelled and the handler's recv/send calls return errors, causing
-	// it to terminate promptly.
-	ctx := r.Context()
+	// Use an independent context for WebSocket I/O rather than r.Context().
+	//
+	// coder/websocket registers a context.AfterFunc in setupReadTimeout that
+	// calls c.close() (raw TCP teardown) as soon as the read context is
+	// cancelled. If we passed r.Context(), a server shutdown would tear down
+	// the TCP connection before we could write a close frame. By using an
+	// independent context we keep the connection alive until WE decide to
+	// close it.
+	wsCtx, wsCancel := context.WithCancel(context.Background())
+	defer wsCancel()
 
-	// Defer a status-normal close in case the handler returns without
-	// explicitly closing. Close is idempotent if already closed.
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	// Monitor for engine shutdown. When the engine's shutdownCh is closed,
+	// proactively close the connection with StatusGoingAway so the client
+	// receives a clean close frame.
+	//
+	// Go's http.Server.Shutdown removes hijacked connections from its
+	// activeConn map (StateHijacked), so closeIdleConns returns immediately
+	// without waiting for the handler to finish. r.Context() is never
+	// cancelled for hijacked connections, so the shutdownCh is the only
+	// reliable signal.
+	go func() {
+		select {
+		case <-e.shutdownCh:
+			_ = conn.Close(websocket.StatusGoingAway, "")
+		case <-wsCtx.Done():
+			// Handler returned normally; nothing to do.
+		}
+	}()
+
+	// Defer a close for when the handler returns (client disconnect, handler
+	// error, etc.). conn.Close is idempotent, so if the shutdown goroutine
+	// already closed the connection, this is a no-op.
+	defer func() {
+		_ = conn.Close(websocket.StatusNormalClosure, "")
+	}()
 
 	scriptPath, fnName := adapter.SplitHandler(ep.Handler)
 
@@ -98,7 +151,7 @@ func (e *Engine) handleWebsocket(
 		return
 	}
 
-	wsv := &wsValue{conn: conn, ctx: ctx}
+	wsv := &wsValue{conn: conn, ctx: wsCtx}
 
 	// CallWithMaxSteps uses an elevated step budget (wsMaxSteps) so chatty
 	// connections are not prematurely killed. The blocking recv() accrues
@@ -114,6 +167,7 @@ func (e *Engine) handleWebsocket(
 //
 //	msg = ws.recv()            # dict (JSON), str, or None (client closed)
 //	ws.send({"k": v})          # send a JSON text frame
+//	ws.send([1, 2, 3])         # send a JSON array text frame
 //	ws.send("hello")           # send a text frame
 //	ws.close(code=1000, reason="")  # graceful close
 type wsValue struct {
@@ -164,6 +218,10 @@ func (w *wsValue) AttrNames() []string {
 // This is a BLOCKING builtin: while waiting for the next message, no Starlark
 // VM steps accrue. This means idle connections are not killed by the step
 // limit.
+//
+// On engine shutdown the wsValue uses an independent context, so recv will
+// not return until the connection is actually closed (by the shutdown
+// goroutine or by the client). See handleWebsocket for details.
 func (w *wsValue) recv(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
 	if err := sk.UnpackArgs("recv", args, kwargs); err != nil {
 		return nil, err
@@ -208,8 +266,9 @@ func (w *wsValue) recv(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.T
 }
 
 // send writes an outbound message. A dict argument is marshalled to a JSON
-// text frame; a str argument is sent as a raw text frame. Returns None on
-// success.
+// text frame; a list argument is marshalled to a JSON array; scalar values
+// (int, float, bool) are sent as their JSON representation; a str argument is
+// sent as a raw text frame. Returns None on success.
 func (w *wsValue) send(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
 	var msgVal sk.Value
 	if err := sk.UnpackArgs("send", args, kwargs, "msg", &msgVal); err != nil {
@@ -224,8 +283,33 @@ func (w *wsValue) send(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.T
 			return nil, fmt.Errorf("send: marshal dict to JSON: %w", err)
 		}
 		payload = data
+	case *sk.List:
+		data, err := json.Marshal(starlark.StarlarkListToGo(v))
+		if err != nil {
+			return nil, fmt.Errorf("send: marshal list to JSON: %w", err)
+		}
+		payload = data
+	case sk.Int:
+		n, _ := v.Int64()
+		data, err := json.Marshal(n)
+		if err != nil {
+			return nil, fmt.Errorf("send: marshal int to JSON: %w", err)
+		}
+		payload = data
+	case sk.Float:
+		data, err := json.Marshal(float64(v))
+		if err != nil {
+			return nil, fmt.Errorf("send: marshal float to JSON: %w", err)
+		}
+		payload = data
+	case sk.Bool:
+		data, err := json.Marshal(bool(v))
+		if err != nil {
+			return nil, fmt.Errorf("send: marshal bool to JSON: %w", err)
+		}
+		payload = data
 	default:
-		// Any non-dict value: stringify.
+		// Any other value: stringify.
 		s, ok := sk.AsString(msgVal)
 		if !ok {
 			s = msgVal.String()
@@ -239,9 +323,28 @@ func (w *wsValue) send(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.T
 	return sk.None, nil
 }
 
+// validateCloseCode checks whether a status code is valid for use in a
+// WebSocket close frame per RFC 6455 §7.4. The valid ranges are 1000–1014
+// (excluding reserved codes 1004, 1005, 1006, 1015) and 3000–4999
+// (application-defined).
+func validateCloseCode(code int) error {
+	switch websocket.StatusCode(code) {
+	case 1004, 1005, 1006, 1015:
+		return fmt.Errorf("close: status code %d is reserved and cannot be used", code)
+	}
+	if code >= 1000 && code <= 1014 {
+		return nil
+	}
+	if code >= 3000 && code <= 4999 {
+		return nil
+	}
+	return fmt.Errorf("close: status code %d is not a valid WebSocket close code", code)
+}
+
 // close performs a graceful WebSocket close. The code defaults to 1000
 // (StatusNormalClosure) and the reason defaults to empty. After close, the
-// connection is terminated.
+// connection is terminated. Invalid status codes produce a Starlark error
+// rather than sending a malformed close frame.
 func (w *wsValue) close(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
 	var codeVal sk.Value
 	var reasonVal sk.Value
@@ -253,6 +356,9 @@ func (w *wsValue) close(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.
 	if codeVal != nil {
 		if c, ok := codeVal.(sk.Int); ok {
 			n, _ := c.Int64()
+			if err := validateCloseCode(int(n)); err != nil {
+				return nil, err
+			}
 			code = websocket.StatusCode(n)
 		}
 	}
