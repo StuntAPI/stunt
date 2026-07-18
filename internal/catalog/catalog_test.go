@@ -12,9 +12,9 @@ import (
 
 // cannedEntries is a known set of entries served by the test HTTP server.
 var cannedEntries = []Entry{
-	{Name: "stripe", Description: "Stripe payment API", GitURL: "https://github.com/stunt-adapters/stripe", LatestRef: "v1.0.0", Tags: []string{"payments", "fintech"}},
-	{Name: "google-drive", Description: "Google Drive file storage API", GitURL: "https://github.com/stunt-adapters/google-drive", LatestRef: "v1.0.0", Tags: []string{"storage", "files"}},
-	{Name: "twitter", Description: "Twitter/X social media API", GitURL: "https://github.com/stunt-adapters/twitter", LatestRef: "v1.0.0", Tags: []string{"social", "media"}},
+	{Name: "stripe-style", Description: "Stripe-style payment API", GitURL: "https://github.com/stunt-adapters/stripe-style", LatestRef: "v1.0.0", Tags: []string{"payments", "fintech"}},
+	{Name: "drive-style", Description: "Google-Drive-style file storage API", GitURL: "https://github.com/stunt-adapters/drive-style", LatestRef: "v1.0.0", Tags: []string{"storage", "files"}},
+	{Name: "twitter-style", Description: "Twitter/X-style social media API", GitURL: "https://github.com/stunt-adapters/twitter-style", LatestRef: "v1.0.0", Tags: []string{"social", "media"}},
 }
 
 func mustMarshalEntries(t *testing.T, entries []Entry) []byte {
@@ -51,8 +51,8 @@ func TestSearchFiltersByName(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("got %d results, want 1", len(results))
 	}
-	if results[0].Name != "stripe" {
-		t.Errorf("Name = %q, want %q", results[0].Name, "stripe")
+	if results[0].Name != "stripe-style" {
+		t.Errorf("Name = %q, want %q", results[0].Name, "stripe-style")
 	}
 }
 
@@ -68,8 +68,8 @@ func TestSearchFiltersByTag(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("got %d results, want 1", len(results))
 	}
-	if results[0].Name != "google-drive" {
-		t.Errorf("Name = %q, want %q", results[0].Name, "google-drive")
+	if results[0].Name != "drive-style" {
+		t.Errorf("Name = %q, want %q", results[0].Name, "drive-style")
 	}
 }
 
@@ -94,14 +94,14 @@ func TestGetReturnsKnownEntry(t *testing.T) {
 	defer srv.Close()
 
 	idx := NewRemoteIndexWithClient(srv.URL, srv.Client(), time.Minute)
-	e, err := idx.Get(context.Background(), "twitter")
+	e, err := idx.Get(context.Background(), "twitter-style")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if e.Name != "twitter" {
-		t.Errorf("Name = %q, want %q", e.Name, "twitter")
+	if e.Name != "twitter-style" {
+		t.Errorf("Name = %q, want %q", e.Name, "twitter-style")
 	}
-	if e.GitURL != "https://github.com/stunt-adapters/twitter" {
+	if e.GitURL != "https://github.com/stunt-adapters/twitter-style" {
 		t.Errorf("GitURL = %q", e.GitURL)
 	}
 }
@@ -134,15 +134,15 @@ func TestRemoteFetchParsesJSON(t *testing.T) {
 	// Verify all fields parsed correctly.
 	var stripe *Entry
 	for i := range results {
-		if results[i].Name == "stripe" {
+		if results[i].Name == "stripe-style" {
 			stripe = &results[i]
 			break
 		}
 	}
 	if stripe == nil {
-		t.Fatal("stripe entry not found")
+		t.Fatal("stripe-style entry not found")
 	}
-	if stripe.Description != "Stripe payment API" {
+	if stripe.Description != "Stripe-style payment API" {
 		t.Errorf("Description = %q", stripe.Description)
 	}
 	if stripe.LatestRef != "v1.0.0" {
@@ -185,7 +185,7 @@ func TestFallbackToBundledOnUnreachableURL(t *testing.T) {
 	for _, e := range results {
 		names[e.Name] = true
 	}
-	for _, want := range []string{"stripe", "google-drive", "twitter"} {
+	for _, want := range []string{"stripe-style", "drive-style", "twitter-style"} {
 		if !names[want] {
 			t.Errorf("bundled index missing %q", want)
 		}
@@ -194,12 +194,12 @@ func TestFallbackToBundledOnUnreachableURL(t *testing.T) {
 
 func TestBundledGetReturnsKnownEntry(t *testing.T) {
 	idx := NewRemoteIndexWithClient("http://127.0.0.1:1", &http.Client{Timeout: 200 * time.Millisecond}, time.Minute)
-	e, err := idx.Get(context.Background(), "stripe")
+	e, err := idx.Get(context.Background(), "stripe-style")
 	if err != nil {
 		t.Fatalf("Get via bundled fallback: %v", err)
 	}
-	if !strings.HasPrefix(e.GitURL, "https://github.com/stunt-adapters/stripe") {
-		t.Errorf("GitURL = %q, want a github.com/stunt-adapters/stripe URL", e.GitURL)
+	if !strings.HasPrefix(e.GitURL, "https://github.com/stunt-adapters/stripe-style") {
+		t.Errorf("GitURL = %q, want a github.com/stunt-adapters/stripe-style URL", e.GitURL)
 	}
 }
 
@@ -280,5 +280,48 @@ func TestRemoteFetchCapsLargeBody(t *testing.T) {
 	}
 	if len(results) == 0 {
 		t.Fatal("expected bundled entries as fallback after truncated fetch")
+	}
+}
+
+// TestBundledIndexHasAllReferenceAdapters verifies that the bundled fallback
+// catalog includes all 5 reference adapters with the correct `-style` names.
+func TestBundledIndexHasAllReferenceAdapters(t *testing.T) {
+	entries, err := bundledEntries()
+	if err != nil {
+		t.Fatalf("bundledEntries: %v", err)
+	}
+	names := make(map[string]bool)
+	for _, e := range entries {
+		names[e.Name] = true
+	}
+	expected := []string{"stripe-style", "drive-style", "twitter-style", "dropbox-style", "echo-style"}
+	for _, want := range expected {
+		if !names[want] {
+			t.Errorf("bundled index missing reference adapter %q (has: %v)", want, entries)
+		}
+	}
+}
+
+// TestGetBundledReturnsKnownEntry verifies the GetBundled function works for
+// offline catalog name resolution.
+func TestGetBundledReturnsKnownEntry(t *testing.T) {
+	e, err := GetBundled("echo-style")
+	if err != nil {
+		t.Fatalf("GetBundled(\"echo-style\"): %v", err)
+	}
+	if e.Name != "echo-style" {
+		t.Errorf("Name = %q, want %q", e.Name, "echo-style")
+	}
+	if !strings.Contains(e.Description, "gRPC") {
+		t.Errorf("Description should mention gRPC: %q", e.Description)
+	}
+}
+
+// TestGetBundledReturnsErrorForUnknown verifies that GetBundled errors on
+// unknown names.
+func TestGetBundledReturnsErrorForUnknown(t *testing.T) {
+	_, err := GetBundled("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for unknown adapter")
 	}
 }

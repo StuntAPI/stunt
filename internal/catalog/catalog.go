@@ -180,6 +180,22 @@ func bundledEntries() ([]Entry, error) {
 	return bundled, nil
 }
 
+// GetBundled returns the entry with the given name from the bundled fallback
+// index (no network access). It is used for offline catalog-name resolution
+// in `adapter add <name>`.
+func GetBundled(name string) (Entry, error) {
+	entries, err := bundledEntries()
+	if err != nil {
+		return Entry{}, err
+	}
+	for _, e := range entries {
+		if e.Name == name {
+			return e, nil
+		}
+	}
+	return Entry{}, fmt.Errorf("catalog: adapter %q not found", name)
+}
+
 // matches reports whether an entry matches a lowercased query in its name,
 // description, or tags.
 func matches(e Entry, q string) bool {

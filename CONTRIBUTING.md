@@ -97,9 +97,9 @@ go test ./...                  # runs the suite
 3. **Import from a spec (optional):** jump-start an adapter from an existing
    API description:
    ```bash
-   stunt adapter import openapi  path/to/openapi.json  --adapter ./myapi-style
-   stunt adapter import har     path/to traces.har     --adapter ./myapi-style
-   stunt adapter import proto   path/to api.proto      --adapter ./myapi-style
+   stunt adapter import openapi  path/to/openapi.json  --dir ./myapi-style
+   stunt adapter import har     path/to traces.har     --dir ./myapi-style
+   stunt adapter import proto   path/to api.proto      --dir ./myapi-style
    ```
 
 4. **Test it locally:**

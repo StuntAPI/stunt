@@ -435,6 +435,17 @@ func netListen() (net.Listener, error) {
 	return net.Listen("tcp", "127.0.0.1:0")
 }
 
+// Start launches one HTTP server per service at sequential ports from
+// base_port (and one gRPC server per gRPC-backed adapter on free ports),
+// returning immediately with a map of service name -> http://host:port and a
+// shutdown function. The caller must call the shutdown function (or cancel
+// ctx) to stop the servers. Use Start (non-blocking) when you need the actual
+// addresses before serving completes (e.g. printing a banner in `stunt up`);
+// use Serve (blocking) when you just want to serve until ctx is canceled.
+func (e *Engine) Start(ctx context.Context) (map[string]string, func(), error) {
+	return e.serve(ctx, false)
+}
+
 // GrpcTarget returns the gRPC dial target ("host:port") for the named
 // service, or "" if the service has no gRPC server. Must be called after
 // ServeForTest (or Serve) has started servers.
@@ -443,4 +454,14 @@ func (e *Engine) GrpcTarget(name string) string {
 		return ""
 	}
 	return e.grpcTargets[name]
+}
+
+// AdapterFor returns the loaded adapter for the named service, or nil if the
+// service has no adapter (rules-only) or is not loaded. Useful for
+// introspection (e.g. printing gRPC method counts in `stunt up`).
+func (e *Engine) AdapterFor(name string) *adapter.Adapter {
+	if st, ok := e.states[name]; ok {
+		return st.adapter
+	}
+	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -172,6 +173,90 @@ func TestMaybeSyncHostsWritesEntries(t *testing.T) {
 	if !strings.Contains(out.String(), "synced 2 host") {
 		t.Errorf("output = %q", out.String())
 	}
+}
+
+// TestRunUpPortShowsGrpcTarget verifies that `stunt up` (port mode) prints
+// the gRPC dial target when serving a gRPC-backed adapter. It uses the
+// echo-style reference adapter which has a gRPC section.
+func TestRunUpPortShowsGrpcTarget(t *testing.T) {
+	repoRoot := repoRoot(t)
+	echoDir := filepath.Join(repoRoot, "adapters", "echo-style")
+	if _, err := os.Stat(filepath.Join(echoDir, "adapter.yaml")); err != nil {
+		t.Skipf("echo-style adapter not found at %s", echoDir)
+	}
+
+	mDir := t.TempDir()
+	manifestPath := filepath.Join(mDir, "stunt.yaml")
+	m := &manifest.Manifest{
+		Version: 1,
+		Path:    manifestPath,
+		Network: manifest.Network{Mode: "port", BasePort: 8000},
+		Services: map[string]manifest.Service{
+			"echo": {Adapter: echoDir},
+		},
+	}
+
+	e, err := engine.New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Use a mutex-protected buffer so we can safely read the output while
+	// runUpPort writes to it.
+	var mu sync.Mutex
+	var out bytes.Buffer
+	safeOut := &lockingWriter{mu: &mu, buf: &out}
+
+	done := make(chan error, 1)
+	go func() { done <- runUpPort(ctx, e, m, safeOut) }()
+
+	// Wait for the banner to appear.
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case <-deadline:
+			mu.Lock()
+			s := out.String()
+			mu.Unlock()
+			t.Fatalf("timeout waiting for banner. Output so far:\n%s", s)
+		case err := <-done:
+			mu.Lock()
+			s := out.String()
+			mu.Unlock()
+			t.Fatalf("runUpPort exited early: %v. Output:\n%s", err, s)
+		case <-time.After(100 * time.Millisecond):
+			mu.Lock()
+			s := out.String()
+			mu.Unlock()
+			if strings.Contains(s, "Ctrl-C") {
+				if !strings.Contains(s, "grpc://") {
+					t.Errorf("banner should show grpc:// target:\n%s", s)
+				}
+				if !strings.Contains(s, "4 grpc methods") {
+					t.Errorf("banner should show gRPC method count:\n%s", s)
+				}
+				cancel()
+				<-done
+				return
+			}
+		}
+	}
+}
+
+// lockingWriter wraps a bytes.Buffer with a mutex for safe concurrent access.
+type lockingWriter struct {
+	mu  *sync.Mutex
+	buf *bytes.Buffer
+}
+
+func (w *lockingWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.Write(p)
 }
 
 func TestMaybeSyncHostsPreservesExisting(t *testing.T) {

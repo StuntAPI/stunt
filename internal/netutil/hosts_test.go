@@ -638,3 +638,40 @@ func TestValidateIP(t *testing.T) {
 		})
 	}
 }
+
+func TestHasManagedBlock(t *testing.T) {
+	t.Run("no block", func(t *testing.T) {
+		p := filepath.Join(t.TempDir(), "hosts")
+		os.WriteFile(p, []byte("127.0.0.1 localhost\n"), 0o644)
+		got, err := HasManagedBlock(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got {
+			t.Error("expected false for file without managed block")
+		}
+	})
+
+	t.Run("with block", func(t *testing.T) {
+		p := filepath.Join(t.TempDir(), "hosts")
+		os.WriteFile(p, []byte("127.0.0.1 localhost\n# BEGIN stunt\n127.0.0.1 api.test\n# END stunt\n"), 0o644)
+		got, err := HasManagedBlock(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !got {
+			t.Error("expected true for file with managed block")
+		}
+	})
+
+	t.Run("file absent", func(t *testing.T) {
+		p := filepath.Join(t.TempDir(), "nonexistent")
+		got, err := HasManagedBlock(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got {
+			t.Error("expected false for nonexistent file")
+		}
+	})
+}

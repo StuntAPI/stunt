@@ -66,7 +66,7 @@ func TestRunClean(t *testing.T) {
 	}
 }
 
-func TestRunClean_NoCA(t *testing.T) {
+func TestRunClean_NothingToClean(t *testing.T) {
 	mdir := t.TempDir()
 	hp := filepath.Join(t.TempDir(), "hosts")
 	os.WriteFile(hp, []byte("127.0.0.1 localhost\n"), 0o644)
@@ -75,8 +75,14 @@ func TestRunClean_NoCA(t *testing.T) {
 	if err := runClean(&out, mdir, hp); err != nil {
 		t.Fatal(err)
 	}
-	// Should complete without error even with nothing to clean.
-	if !strings.Contains(out.String(), "removed state") {
-		t.Errorf("should report state removal:\n%s", out.String())
+	// When nothing exists, output should NOT claim removal.
+	if strings.Contains(out.String(), "removed state") {
+		t.Errorf("should not claim state removal when nothing exists: %q", out.String())
+	}
+	if strings.Contains(out.String(), "removed CA") {
+		t.Errorf("should not claim CA removal when nothing exists: %q", out.String())
+	}
+	if strings.Contains(out.String(), "cleaned hosts") {
+		t.Errorf("should not claim hosts cleaning when nothing exists: %q", out.String())
 	}
 }

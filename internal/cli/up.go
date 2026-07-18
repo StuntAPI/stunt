@@ -8,9 +8,11 @@ import (
 	"os/signal"
 	"sort"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
+	"github.com/stunt-adapters/stunt/internal/adapter"
 	"github.com/stunt-adapters/stunt/internal/engine"
 	"github.com/stunt-adapters/stunt/internal/manifest"
 	"github.com/stunt-adapters/stunt/internal/netutil"
@@ -48,29 +50,64 @@ func runUp(cmd *cobra.Command, args []string) error {
 	case "subdomain":
 		return runUpSubdomain(ctx, cmd, m, out)
 	default:
-		return runUpPort(ctx, m, out)
+		e, err := engine.New(m)
+		if err != nil {
+			return err
+		}
+		defer e.Close()
+		return runUpPort(ctx, e, m, out)
 	}
 }
 
-// runUpPort serves each service on its own port (existing behavior).
-func runUpPort(ctx context.Context, m *manifest.Manifest, out interface{ Write([]byte) (int, error) }) error {
-	port := m.Network.BasePort
-	for name, svc := range m.Services {
-		if svc.Adapter != "" {
-			fmt.Fprintf(out, "  %s  ->  http://127.0.0.1:%d  (adapter: %s, %d rules)\n", name, port, svc.Adapter, len(svc.Rules))
-		} else {
-			fmt.Fprintf(out, "  %s  ->  http://127.0.0.1:%d  (%d rules)\n", name, port, len(svc.Rules))
-		}
-		port++
-	}
-	fmt.Fprintln(out, "stunt up — Ctrl-C to stop")
-
-	e, err := engine.New(m)
+// runUpPort serves each service on its own port. The engine must already be
+// created by the caller. Banner addresses come from the engine's actual
+// listener ports so they always match what `stunt plan` predicts (both use
+// alphabetical service order).
+func runUpPort(ctx context.Context, e *engine.Engine, m *manifest.Manifest, out interface{ Write([]byte) (int, error) }) error {
+	addrs, cancel, err := e.Start(ctx)
 	if err != nil {
 		return err
 	}
-	defer e.Close()
-	return e.Serve(ctx)
+	defer cancel()
+
+	for _, name := range sortedServiceNames(m.Services) {
+		svc := m.Services[name]
+		httpAddr := addrs[name]
+		grpcTarget := e.GrpcTarget(name)
+
+		if svc.Adapter != "" {
+			summary := upServiceSummary(svc, e.AdapterFor(name))
+			if grpcTarget != "" {
+				fmt.Fprintf(out, "  %s  ->  %s  grpc://%s  %s\n", name, httpAddr, grpcTarget, summary)
+			} else {
+				fmt.Fprintf(out, "  %s  ->  %s  %s\n", name, httpAddr, summary)
+			}
+		} else {
+			fmt.Fprintf(out, "  %s  ->  %s  (%d rules)\n", name, httpAddr, len(svc.Rules))
+		}
+	}
+	fmt.Fprintln(out, "stunt up — Ctrl-C to stop")
+
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+// upServiceSummary renders the parenthesised summary for an adapter-backed
+// service in the `stunt up` banner. When the adapter is available it includes
+// gRPC method and WebSocket route counts.
+func upServiceSummary(svc manifest.Service, a *adapter.Adapter) string {
+	if a == nil {
+		return fmt.Sprintf("(adapter: %s, %d rules)", svc.Adapter, len(svc.Rules))
+	}
+	parts := []string{fmt.Sprintf("%d endpoints", len(a.Endpoints))}
+	if a.Grpc != nil && len(a.Grpc.Methods) > 0 {
+		parts = append(parts, fmt.Sprintf("%d grpc methods", len(a.Grpc.Methods)))
+	}
+	if len(a.Websockets) > 0 {
+		parts = append(parts, fmt.Sprintf("%d ws routes", len(a.Websockets)))
+	}
+	parts = append(parts, fmt.Sprintf("%d rules", len(svc.Rules)))
+	return fmt.Sprintf("(adapter: %s, %s)", svc.Adapter, strings.Join(parts, ", "))
 }
 
 // runUpSubdomain serves all services behind a single TLS proxy.

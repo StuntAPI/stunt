@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stunt-adapters/stunt/internal/adapterdist"
+	"github.com/stunt-adapters/stunt/internal/catalog"
 	"github.com/stunt-adapters/stunt/internal/manifest"
 )
 
@@ -698,6 +699,10 @@ func TestAdapterAddSubcommandRegistered(t *testing.T) {
 	if cmd.Name() != "add" {
 		t.Fatalf("command name = %q, want %q", cmd.Name(), "add")
 	}
+	// --force flag should be registered (finding #4 fix).
+	if cmd.Flag("force") == nil {
+		t.Error("adapter add should have a --force flag")
+	}
 }
 
 func TestAdapterRemoveSubcommandRegistered(t *testing.T) {
@@ -730,6 +735,55 @@ func TestAdapterUpdateSubcommandRegistered(t *testing.T) {
 	}
 	if cmd.Name() != "update" {
 		t.Fatalf("command name = %q, want %q", cmd.Name(), "update")
+	}
+}
+
+// =========================================================================
+// catalog name resolution
+// =========================================================================
+
+// TestResolveCatalogNameResolvesBareName verifies that a bare adapter name
+// matching a bundled catalog entry is resolved to a git source spec.
+func TestResolveCatalogNameResolvesBareName(t *testing.T) {
+	spec := resolveCatalogName("echo-style")
+	if !strings.HasPrefix(spec, "git:") {
+		t.Errorf("expected git: spec for catalog name 'echo-style', got %q", spec)
+	}
+	if !strings.Contains(spec, "echo-style") {
+		t.Errorf("expected spec to contain 'echo-style', got %q", spec)
+	}
+}
+
+// TestResolveCatalogNamePassesThroughPath verifies that local paths are NOT
+// resolved through the catalog.
+func TestResolveCatalogNamePassesThroughPath(t *testing.T) {
+	for _, input := range []string{"./local", "/abs/path", "git:github.com/x/y", "https://github.com/x/y"} {
+		got := resolveCatalogName(input)
+		if got != input {
+			t.Errorf("resolveCatalogName(%q) = %q, want %q (should pass through)", input, got, input)
+		}
+	}
+}
+
+// TestResolveCatalogNameUnknownBareName verifies that an unknown bare name is
+// returned as-is (treated as a local path).
+func TestResolveCatalogNameUnknownBareName(t *testing.T) {
+	got := resolveCatalogName("totally-unknown-adapter")
+	if got != "totally-unknown-adapter" {
+		t.Errorf("expected unknown name to pass through, got %q", got)
+	}
+}
+
+// TestCatalogEntryToSpec verifies the conversion from catalog Entry to git
+// source spec.
+func TestCatalogEntryToSpec(t *testing.T) {
+	e := catalog.Entry{
+		GitURL:    "https://github.com/stunt-adapters/stripe-style",
+		LatestRef: "v0.1.0",
+	}
+	spec := catalogEntryToSpec(e)
+	if spec != "git:github.com/stunt-adapters/stripe-style@v0.1.0" {
+		t.Errorf("catalogEntryToSpec = %q", spec)
 	}
 }
 
