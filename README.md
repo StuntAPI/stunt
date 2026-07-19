@@ -1,16 +1,45 @@
 # stunt
 
-**Local API simulators — test against real APIs, locally, without remote accounts.**
+### A stunt double for your APIs — test against real services, **locally**, without remote accounts.
 
-`stunt` reads a `stunt.yaml` manifest and serves local, runnable stand-ins for real APIs.
-Stateful behavior comes from sandboxed Starlark adapters backed by SQLite/blob primitives;
-declarative behavior comes from a rules engine (templated responses, probabilistic faults,
-conditional expressions). REST, gRPC (unary + streaming), WebSocket, and GraphQL transports are supported.
-Optionally front everything with a portless.dev-style TLS proxy on `*.localhost`. Everything is
-deterministic via `rng_seed`.
+`stunt` spins up **stateful, realistic** local stand-ins for the APIs you integrate
+(Stripe, Drive, Dropbox, gRPC services, GraphQL APIs, …) so you can develop and test
+without creating accounts, handling live credentials, burning money, hitting rate limits,
+or depending on the network. One static Go binary. Everything deterministic.
 
-> **Status:** pre-1.0 MVP. The core is built and self-tested; see **Known limitations** below.
-> Unofficial, not affiliated with any provider whose API style an adapter mimics.
+> See the **magic in 30 seconds**:
+
+```bash
+stunt demo        # boots a stateful Stripe-style sim; prints copy-paste curl that creates a charge,
+                  # lists it back (stateful!), captures it, and fires a webhook — all locally
+```
+
+---
+
+## Why
+
+Integrating remote APIs is painful for testing: you create accounts, juggle credentials,
+pay for usage, hit rate limits, depend on the network, and get **non-deterministic**
+results. Existing mock tools (WireMock, Prism, MSW, Microcks) are great at *static* and
+*schema* mocking, but they don't give you a **stateful, runnable stand-in** for an
+arbitrary service without hand-authoring everything.
+
+`stunt` does. A Stripe-style adapter actually stores the charge you create — create it,
+list it, capture it, get the webhook — and it all resets on `stunt clean`.
+
+### How it's different
+
+| | **stunt** | WireMock | Prism | MSW | Mockoon |
+|---|---|---|---|---|---|
+| **Stateful** (create → list → mutate persists) | ✅ | partial | ❌ | ❌ | ❌ |
+| **Sandboxed adapter logic** (safe to install strangers' mocks) | ✅ Starlark | ❌ | ❌ | ❌ JS | ❌ JS |
+| **Protocols** | REST, gRPC (+streaming), WebSocket, GraphQL | REST (+ limited) | REST, OpenAPI | REST, GraphQL | REST |
+| **Single static binary, no runtime deps** | ✅ Go | JVM | node | node | electron |
+| **Generate from real API descriptions** | OpenAPI, HAR, proto | OpenAPI | OpenAPI | — | OpenAPI |
+| **Adapter ecosystem / catalog** | ✅ (git-distributed) | stubs | — | — | templates |
+
+*(Each of those tools is excellent at what it does; this is a feature matrix, not a
+verdict. Corrections welcome.)*
 
 ---
 
@@ -20,25 +49,26 @@ deterministic via `rng_seed`.
 go install github.com/stunt-adapters/stunt/cmd/stunt@latest
 ```
 
-> This machine note (dev only): if `go` commands fail with a stdlib version mismatch, prefix
-> them with `env -u GOROOT` (a local `GOROOT`/toolchain misconfiguration).
+> Dev-machine note: if `go` commands fail with a stdlib-version mismatch, prefix them
+> with `env -u GOROOT` (a local toolchain quirk; not needed in CI/for end users).
+> *(Homebrew + GitHub Releases binaries are planned — see roadmap.)*
 
 ## Quickstart
 
 ```bash
-stunt init            # writes a sample stunt.yaml
-stunt plan            # validate + show what will run
-stunt up              # serve all services (Ctrl-C to stop)
+stunt init     # writes a sample stunt.yaml
+stunt plan     # validate + show what will run (warns on unloadable adapters)
+stunt up       # serve all services (Ctrl-C to stop)  — logs every request
+stunt down     # stop a backgrounded `stunt up`
+stunt clean    # reset all adapter state to seed fixtures
 ```
 
-Inline, declarative service (no adapter needed):
+Inline, declarative service (no adapter needed) — probabilistic faults, templates, conditions:
 
 ```yaml
 version: 1
 rng_seed: 42
-network:
-  mode: port
-  base_port: 8000
+network: { mode: port, base_port: 8000 }
 services:
   example:
     rules:
@@ -49,158 +79,91 @@ services:
         respond: { status: 200, body: { template: '{"message":"hi","id":"{{ faker.ID "k" }}"}' } }
 ```
 
-Stateful adapter service (e.g. the bundled Stripe-style adapter):
+Stateful adapter service (the bundled Stripe-style sim):
 
 ```yaml
 version: 1
-rng_seed: 42
-network:
-  mode: port
-  base_port: 8000
-services:
-  stripe:
-    adapter: ./adapters/stripe-style
-```
-
-Then `curl http://127.0.0.1:8000/v1/charges -d '{"amount":1000,"currency":"usd"}'`.
-
-## Rules engine
-
-First-match-wins, top-to-bottom.
-
-- **match**: `method`, `path` (globs `*` one segment, `**` zero+), `headers`.
-- **when** (both must pass to fire):
-  - `when.chance`: percent probability; otherwise fall through.
-  - `when.expr`: boolean expression over `request.*` (`method`, `path`, `headers`, `body`), e.g. `request.body.amount > 1000`.
-    - **Headers**: use bracket notation with the canonical Go header key, e.g. `request.headers["X-Api-Key"] == "secret"`. Dot notation (`request.headers.X-Api-Key`) does **not** work because header keys can contain hyphens.
-    - **Body fields**: access parsed JSON body fields with dot notation, e.g. `request.body.amount > 1000` or `request.body.user.email`.
-- **respond**: `status`, `headers`, `latency_ms`, `behavior: timeout`, and `body`:
-  - `body.inline` — literal (rendered as JSON).
-  - `body.file` — static file (relative to the manifest).
-  - `body.template` — `text/template` with `{{ .Request.* }}`, `{{ faker.ID/Email/Name }}`, `{{ uuid }}`, `{{ now }}`.
-
-## Adapters
-
-An adapter is a directory (later: a git repo) describing how to simulate one API:
-`adapter.yaml` + `endpoints/` + `templates/` + `fixtures/` + `scripts/*.star` + `schemas/`.
-Endpoints are either rules-based or backed by **sandboxed Starlark** handlers with access to
-stateful primitives. Build your own with the contributor workflow:
-
-```bash
-stunt adapter new myapi               # scaffold a synthetic adapter
-stunt adapter import openapi spec.yaml # generate endpoints/templates from an OpenAPI doc
-stunt adapter import har session.har   # infer endpoints + synthetic fixtures from a HAR
-stunt adapter import proto api.proto    # scaffold a gRPC adapter from a .proto (descriptor + handlers)
-stunt adapter lint ./adapters/myapi     # enforce SYNTHETIC data only (the safety guard)
-stunt adapter test ./adapters/myapi     # conformance vs your local real traces
-stunt catalog search stripe            # browse the adapter registry
-```
-
-Starlark handlers are sandboxed (no host I/O, no network) and can use the primitive builtins:
-`store_collection(name)` (insert/get/list/update/delete), `store_kv_get/set/delete/incr`,
-`store_blob(name)` (put/get/stat/delete/list). See the **Starlark Builtins Reference** in
-`adapters/README.md` for full signatures.
-
-### Per-service config
-
-Each service can declare a `config` map in `stunt.yaml`. The values are available to the adapter's
-Starlark handlers via the events emitter (e.g. `webhook_url` is registered automatically):
-
-```yaml
+network: { mode: port, base_port: 8000 }
 services:
   stripe:
     adapter: ./adapters/stripe-style
     config:
-      webhook_url: http://localhost:9090/webhook
+      webhook_url: http://localhost:9090/webhook   # events_emit() delivers here
 ```
 
-When `config.webhook_url` is set, `events_emit()` delivers events to that URL via HTTP POST.
-See `adapters/README.md` for the full builtins reference including `events_register` and `events_emit`.
-### Reference adapters (in this repo)
+Then `curl http://127.0.0.1:8000/v1/charges -H "Authorization: Bearer sk_test_demo" -d '{"amount":1000,"currency":"usd"}'`,
+list it back, capture it — state persists across requests and restarts.
 
-All unofficial, synthetic-data-only, with a DISCLAIMER. See `adapters/README.md`.
+## Adapters
+
+An adapter is a directory describing how to simulate one API: `adapter.yaml` + Starlark
+handlers + fixtures/schemas. Logic runs in a **sandboxed Starlark VM** (no host I/O —
+that's why strangers' adapters are safe to install) backed by stateful primitives
+(Collection / KV / Blob / Identity / Events). Build your own:
+
+```bash
+stunt adapter new myapi-style                 # scaffold (synthetic data)
+stunt adapter import openapi spec.yaml        # generate from an OpenAPI doc
+stunt adapter import har session.har          # infer endpoints + synthetic fixtures
+stunt adapter import proto api.proto          # scaffold a gRPC adapter (descriptor + handlers)
+stunt adapter lint ./myapi-style              # enforce SYNTHETIC data only (the safety guard)
+stunt adapter test ./myapi-style              # conformance vs your local real traces
+stunt catalog search stripe                   # browse the adapter registry
+```
+
+**Reference adapters in this repo** (all unofficial, synthetic-data-only, with a DISCLAIMER):
 
 | Adapter | Simulates | Backing |
 |---|---|---|
-| `adapters/stripe-style` | payments API — charges (create/retrieve/list/capture/refund), customers (CRUD), balance | Collection + Starlark |
-| `adapters/drive-style` | files API — upload/get/download/list/patch/delete, folders, about/quota | Blob + Collection |
-| `adapters/twitter-style` | X.com/Twitter-style — mock OAuth, tweets (CRUD), users, timeline | Collection (pure-mock reads) |
-| `adapters/echo-style` | generic gRPC service (Say, Add, ListEchoes) — gRPC reference example | Collection + KV + Starlark |
-| `adapters/dropbox-style` | files API (RPC-style) — upload/download/list_folder/get_metadata/create_folder/delete | Blob + Collection |
-| `adapters/blog-style` | generic GraphQL blog API (users, posts, comments, nested relations) — GraphQL reference example | Collection + Starlark |
+| `stripe-style` | payments — charges (create/retrieve/list/capture/refund), customers (CRUD), balance, auth + webhooks | Collection + Starlark |
+| `drive-style` | files API — upload/get/download/list/patch/delete, folders, about/quota | Blob + Collection |
+| `dropbox-style` | files API (RPC-style) — upload/download/list_folder/get_metadata | Blob + Collection |
+| `twitter-style` | mock OAuth, tweets (CRUD), users, timeline | Collection (pure-mock) |
+| `echo-style` | gRPC service (unary + streaming) + WebSocket — multi-transport reference | Collection + KV |
+| `blog-style` | GraphQL blog API — users/posts/comments, nested relations, mutations | Collection + Starlark |
 
-## Networking (`*.localhost`, TLS)
+Full adapter authoring reference (the `adapter.yaml` schema, **Starlark builtins reference** with
+exact signatures, gRPC/WebSocket/GraphQL sections): **[`adapters/README.md`](adapters/README.md)**.
 
-`network.mode: subdomain` runs the engine on a high port behind a portless.dev-style TLS proxy:
+## Transports & primitives
 
-```yaml
-network:
-  mode: subdomain
-  tld: localhost
-  tls: true
-```
+- **Transports**: REST, gRPC (unary **and streaming**), WebSocket, GraphQL (full introspection + DoS limits).
+- **Rules engine**: first-match-wins; `match` (method/path globs/headers), `when.chance` (probabilistic),
+  `when.expr` (boolean over `request.*`), `respond` (status/headers/latency/timeout + `body.inline|file|template`).
+- **Primitives**: Collection (SQLite), KV, Blob (FS), Identity (HMAC tokens), Events (webhooks w/ retry),
+  Clock+scheduler (deterministic), Generator, Validator (JSON-Schema). State persists in `.stunt/state/`.
+- **Networking**: optional portless.dev-style TLS proxy on `*.localhost` (HTTP/2, local CA). The privileged
+  listener forwards to an **unprivileged** engine, so adapter code never runs as root. WSS passthrough verified.
 
-Then services are reachable at `https://<service>.localhost` (HTTP/2, local CA auto-trusted via
-`stunt setup`). The privileged listener forwards to an **unprivileged** engine (so adapter code
-never runs as root). CLI: `stunt proxy start|stop`, `stunt service install|status|uninstall`,
-`stunt trust`, `stunt hosts sync|clean`, `stunt doctor`, `stunt clean`.
+## Safety & trust
 
-## Primitives
-
-`Collection` (SQLite), `KV`, `Blob` (FS), `Clock+scheduler` (deterministic), `Identity` (HMAC tokens),
-`Events` (webhooks), `Generator`, `Validator` (JSON-Schema).
-
-### State persistence
-
-Adapter state (collections, KV stores, blobs) persists on disk in `.stunt/state/` next to your
-`stunt.yaml`. Data survives across `stunt up` restarts — the same seed produces the same starting
-data, and any mutations (inserts, updates, deletes) persist between sessions.
-
-Run `stunt clean` to reset all state back to the seed fixtures:
-
-## Known limitations (MVP)
-
-- Adapters load from **local paths or git refs** (`stunt adapter add git:host/user/repo@ref`, cached under `~/.stunt/adapters`, pinned tags/sha/head).
-  The remote catalog index URL is a placeholder (`stunt catalog` works offline via a bundled fallback).
-- Adapters can `identity_mint`/`identity_validate` tokens and `events_emit` webhooks from Starlark
-  (the stripe-style adapter demonstrates real bearer-token validation + `charge.*` webhook emission).
-- The privileged `:443` bind requires `stunt setup`/`stunt service install` (one-time); without it,
-  subdomain mode uses an OS-assigned high port (the URL includes the port).
-- **gRPC** unary and streaming RPCs are supported via the `grpc:` adapter section (served dynamically
-  from a compiled protobuf descriptor set). Streaming handlers use `stream.recv()`/`stream.send()`.
-  **WebSocket** is supported via the `ws:` adapter section with connection-lifetime Starlark handlers
-  (`on_connect(ws)` using `ws.recv()`/`ws.send()`). **GraphQL** is supported via the `graphql:` adapter
-  section with an SDL schema + convention-named Starlark resolvers (`on_<field>` for root fields,
-  `resolve_<Type>_<field>` for object fields; scalar fields default to `parent[field]`). Full
-  introspection (`__schema`/`__type`/`__typename`) and DoS limits (depth, field count, timeout) are
-  included.
-- Concurrency is tested with `-race`; the design is single-process per `stunt up`.
-
-## Project layout
-
-`internal/{rules,manifest,engine,adapter,adapter/runtime,starlark}`,
-`internal/primitives{,/blob,/clock,/events,/gen,/identity,/kv,/validator}`,
-`internal/netutil{,/proxy}`, `internal/contrib{,/openapi,/har,/lint,/conform}`, `internal/catalog`,
-`internal/cli`, `cmd/stunt`, `adapters/`.
+The defining property: **a community adapter is safe to install** — adapter logic is sandboxed
+Starlark with no host I/O, bounded by execution-step limits; all file reads an adapter can trigger
+are path-containment-guarded; `stunt adapter lint` enforces synthetic-data-only. See
+**[SECURITY.md](SECURITY.md)** for the full threat model.
 
 ## Contributing
 
-Contributions are welcome — especially **adapters**. The fastest path:
+Contributions are welcome — especially **adapters**. See **[CONTRIBUTING.md](CONTRIBUTING.md)**
+for the workflow and quality gates (`just ci` = build + `test -race` + vet + gofmt + mod-tidy +
+lint-adapters). Quick path: `stunt adapter new myapi-style` → edit → `stunt adapter lint` → PR.
 
-```bash
-stunt adapter new myapi-style   # scaffold
-# edit adapter.yaml + scripts/*.star; add a DISCLAIMER if branded
-stunt adapter lint ./myapi-style # must pass
-```
+## Status & roadmap
 
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the workflow, quality gates
-(`-race`/`vet`/`gofmt`/`lint`), the branded-adapter naming & disclaimer rules,
-and the trust model. Adapter authoring reference: [`adapters/README.md`](adapters/README.md).
-
-## Design & roadmap
-
-- Spec: `docs/specs/2025-07-15-stunt-design.md`
-- Plans: `docs/plans/`
-- Issue tracking: `bd` (beads) — `bd ready`, `bd list`, `bd epic status`
+**Pre-1.0 MVP.** Core is built, self-tested (`just ci` green), and dogfooded. On the roadmap:
+a **public catalog** (today's `stunt catalog` is offline/bundled + git refs), **Homebrew / GitHub
+Releases** install, `stunt setup` privileged-path hardening, and broader adapter coverage.
+**Not planned for v1**: GraphQL subscriptions, npm adapter distribution.
 
 Found a security issue? See **[SECURITY.md](SECURITY.md)** — do not open a public issue.
+
+## Project layout
+
+`cmd/stunt` (CLI) · `internal/{rules,manifest,engine,adapter(+runtime),starlark,grpcsim,graphqlsim}`
+· `internal/primitives{,/blob,/clock,/events,/gen,/identity,/kv,/validator}` ·
+`internal/netutil{,/proxy}` · `internal/contrib{,/openapi,/har,/lint,/conform,/proto,/scaffold}`
+· `internal/catalog` · `internal/cli` · `internal/adapterdist` · `adapters/`.
+
+## Design & tracking
+
+- Spec: `docs/specs/2025-07-15-stunt-design.md` · Plans: `docs/plans/` · Dogfood findings: `docs/dogfood/`
