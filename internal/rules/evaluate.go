@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/expr-lang/expr"
+	"github.com/stunt-adapters/stunt/internal/pathutil"
 )
 
 // Evaluate applies rules in order. The first rule whose Match matches AND
@@ -66,9 +66,12 @@ func bodyBytes(b *Body, baseDir string, req Request, fk *Faker) []byte {
 		return out
 	}
 	if b.File != "" {
-		p := b.File
-		if !filepath.IsAbs(p) {
-			p = filepath.Join(baseDir, p)
+		// Security: validate the file path stays within baseDir to prevent
+		// path-traversal attacks (../../etc/passwd). An adapter must never
+		// be able to read files outside its own directory.
+		p, err := pathutil.ContainedPath(baseDir, b.File)
+		if err != nil {
+			return []byte(fmt.Sprintf("stunt: body file path rejected: %v", err))
 		}
 		data, err := os.ReadFile(p)
 		if err != nil {

@@ -18,6 +18,7 @@ import (
 	"github.com/stunt-adapters/stunt/internal/adapter/runtime"
 	"github.com/stunt-adapters/stunt/internal/adapterdist"
 	"github.com/stunt-adapters/stunt/internal/manifest"
+	"github.com/stunt-adapters/stunt/internal/pathutil"
 	"github.com/stunt-adapters/stunt/internal/primitives"
 	"github.com/stunt-adapters/stunt/internal/primitives/blob"
 	"github.com/stunt-adapters/stunt/internal/primitives/events"
@@ -241,9 +242,14 @@ func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir,
 				return nil, fmt.Errorf("seed collection %s: %w", res.Name, err)
 			}
 			if res.Seed != "" {
-				seedPath := res.Seed
-				if !filepath.IsAbs(seedPath) {
-					seedPath = filepath.Join(a.Dir, seedPath)
+				// Security: validate the seed path stays within the adapter
+				// directory to prevent path-traversal attacks.
+				seedPath, err := pathutil.ContainedPath(a.Dir, res.Seed)
+				if err != nil {
+					store.Close()
+					kvStore.Close()
+					blobStore.Close()
+					return nil, fmt.Errorf("seed collection %s: %w", res.Name, err)
 				}
 				if err := col.Seed(seedPath); err != nil {
 					store.Close()

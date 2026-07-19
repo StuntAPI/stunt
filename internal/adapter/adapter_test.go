@@ -441,7 +441,7 @@ grpc:
 	if err == nil {
 		t.Fatal("expected Load to reject descriptor path with .. traversal")
 	}
-	if !strings.Contains(err.Error(), "escapes adapter directory") {
+	if !strings.Contains(err.Error(), "escapes base directory") {
 		t.Errorf("error should mention directory escape, got: %v", err)
 	}
 }
@@ -470,7 +470,7 @@ endpoints:
 	if err == nil {
 		t.Fatal("expected Load to reject handler script path with .. traversal")
 	}
-	if !strings.Contains(err.Error(), "escapes adapter directory") {
+	if !strings.Contains(err.Error(), "escapes base directory") {
 		t.Errorf("error should mention directory escape, got: %v", err)
 	}
 }
@@ -609,7 +609,7 @@ ws:
 	if err == nil {
 		t.Fatal("expected Load to reject ws handler path with .. traversal")
 	}
-	if !strings.Contains(err.Error(), "escapes adapter directory") {
+	if !strings.Contains(err.Error(), "escapes base directory") {
 		t.Errorf("error should mention directory escape, got: %v", err)
 	}
 }
@@ -799,7 +799,7 @@ graphql:
 	if err == nil {
 		t.Fatal("expected Load to reject schema path with .. traversal")
 	}
-	if !strings.Contains(err.Error(), "escapes adapter directory") {
+	if !strings.Contains(err.Error(), "escapes base directory") {
 		t.Errorf("error should mention directory escape, got: %v", err)
 	}
 }

@@ -57,6 +57,7 @@ func Load(src string, builtins sk.StringDict) (*VM, error) {
 	loadThread := &sk.Thread{
 		Name: "stunt-load",
 	}
+	loadThread.SetMaxExecutionSteps(maxExecutionSteps)
 
 	// Enable while-loops (a non-standard Starlark extension) so that
 	// streaming handlers can drain inbound streams naturally:

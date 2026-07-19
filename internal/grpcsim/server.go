@@ -28,6 +28,11 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
+// maxRecvMsgSize is the maximum size (4 MiB) of a single inbound gRPC
+// message accepted by stunt's dynamic gRPC server. This is a deliberate,
+// explicit bound rather than an implicit reliance on grpc-go's default.
+const maxRecvMsgSize = 4 << 20 // 4 MiB
+
 // Handler is a Go function that processes a single gRPC request. fullMethod is
 // the gRPC method path (e.g. "/pkg.Svc/Method"). The request is decoded into
 // req as a JSON-like Go map; the handler returns a response map or a non-nil
@@ -304,7 +309,13 @@ func Serve(ctx context.Context, svc *Service, lis net.Listener) (*grpc.Server, *
 		return nil, nil, err
 	}
 
-	server := grpc.NewServer()
+	server := grpc.NewServer(
+		// Security: set an explicit receive message-size limit rather than
+		// relying on the implicit grpc-go default. This makes the bound a
+		// deliberate decision and prevents a malicious adapter from pushing
+		// arbitrarily large messages to exhaust memory (4 MiB).
+		grpc.MaxRecvMsgSize(maxRecvMsgSize),
+	)
 	// RegisterService with a nil impl skips grpc's reflect-based HandlerType
 	// type-check (which would panic on a non-interface placeholder). The
 	// method-handler closures ignore srv entirely.

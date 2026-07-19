@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -444,6 +445,56 @@ func (c *echoCountClient) invoke(ctx context.Context, fullMethod string, reqMap 
 		return nil, fmt.Errorf("unmarshal response map: %w", err)
 	}
 	return respMap, nil
+}
+
+// TestMaxRecvMsgSizeExceeded verifies that a gRPC message larger than the
+// configured MaxRecvMsgSize (4 MiB) is rejected by the server.
+func TestMaxRecvMsgSizeExceeded(t *testing.T) {
+	fds := compileDescriptor(t)
+
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	addr := lis.Addr().String()
+
+	svc := &grpcsim.Service{
+		FullName:   "stunt.test.Greeter",
+		Descriptor: fds,
+		Methods: map[string]grpcsim.Handler{
+			"SayHello": func(ctx context.Context, fullMethod string, req map[string]any) (map[string]any, error) {
+				return map[string]any{"message": "ok"}, nil
+			},
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	srv, result, err := grpcsim.Serve(ctx, svc, lis)
+	if err != nil {
+		t.Fatalf("grpcsim.Serve: %v", err)
+	}
+	defer func() {
+		srv.GracefulStop()
+		_ = result.Wait()
+	}()
+
+	client := newDynClient(t, fds, addr)
+
+	// Build a payload larger than 4 MiB — the server must reject it.
+	bigName := strings.Repeat("A", 5*1024*1024)
+	_, err = client.invoke(ctx, "/stunt.test.Greeter/SayHello", map[string]any{"name": bigName})
+	if err == nil {
+		t.Fatal("expected error for oversized message, got nil")
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected grpc status error, got: %v", err)
+	}
+	if st.Code() != codes.ResourceExhausted {
+		t.Errorf("expected code ResourceExhausted, got %v", st.Code())
+	}
 }
 
 // TestUniqueHandlerTypePerServiceDesc verifies that BuildServiceDesc produces

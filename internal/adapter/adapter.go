@@ -7,9 +7,9 @@ package adapter
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
+	"github.com/stunt-adapters/stunt/internal/pathutil"
 	"github.com/stunt-adapters/stunt/internal/rules"
 )
 
@@ -108,15 +108,9 @@ type Identity struct {
 // adapter directory). It rejects paths that escape the adapter directory via
 // traversal (e.g. ../../etc/passwd) to prevent unauthorized file access (I4).
 func (a *Adapter) ReadFile(rel string) ([]byte, error) {
-	full := rel
-	if !filepath.IsAbs(rel) {
-		full = filepath.Join(a.Dir, rel)
-	}
-	// Security: verify the cleaned path is within a.Dir (I4).
-	cleanPath := filepath.Clean(full)
-	relChecked, err := filepath.Rel(a.Dir, cleanPath)
-	if err != nil || strings.HasPrefix(relChecked, "..") || filepath.IsAbs(relChecked) {
-		return nil, fmt.Errorf("adapter: path %q escapes adapter directory", rel)
+	cleanPath, err := pathutil.ContainedPath(a.Dir, rel)
+	if err != nil {
+		return nil, err
 	}
 	return os.ReadFile(cleanPath)
 }
@@ -296,16 +290,7 @@ func (a *Adapter) resolveHandlerPaths() error {
 // resolveContainedPath resolves a relative path to an absolute path within
 // a.Dir, rejecting paths that escape the adapter directory via traversal.
 func (a *Adapter) resolveContainedPath(path string) (string, error) {
-	full := path
-	if !filepath.IsAbs(path) {
-		full = filepath.Join(a.Dir, path)
-	}
-	cleanPath := filepath.Clean(full)
-	rel, err := filepath.Rel(a.Dir, cleanPath)
-	if err != nil || strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
-		return "", fmt.Errorf("adapter: handler script path %q escapes adapter directory", path)
-	}
-	return cleanPath, nil
+	return pathutil.ContainedPath(a.Dir, path)
 }
 
 // splitHandler splits "scripts/x.star#on_post" into ("scripts/x.star", "on_post").

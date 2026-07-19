@@ -59,6 +59,60 @@ func TestEvaluateBodyFromFile(t *testing.T) {
 	}
 }
 
+func TestEvaluateBodyFileTraversalRejected(t *testing.T) {
+	baseDir := t.TempDir()
+
+	// Create a secret file in baseDir's parent to prove it is NOT read.
+	absBase, _ := filepath.Abs(baseDir)
+	parent := filepath.Dir(absBase)
+	secretPath := filepath.Join(parent, "traversal_secret.json")
+	if err := os.WriteFile(secretPath, []byte(`{"secret": true}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Remove(secretPath) })
+
+	rules := []Rule{{Match: Match{Path: "/x"}, Respond: Respond{Status: 200, Body: &Body{File: "../traversal_secret.json"}}}}
+	d := Evaluate(Request{Path: "/x"}, rules, NewRNG(1), NewFaker(1), baseDir)
+	body := string(d.BodyBytes)
+	if strings.Contains(body, `"secret": true`) {
+		t.Fatalf("PATH TRAVERSAL: outside file was read! body = %q", body)
+	}
+	if !strings.Contains(body, "path rejected") && !strings.Contains(body, "body file error") {
+		t.Fatalf("expected a rejection message, got %q", body)
+	}
+}
+
+func TestEvaluateBodyFileTraversalDeepRejected(t *testing.T) {
+	baseDir := t.TempDir()
+
+	rules := []Rule{{Match: Match{Path: "/x"}, Respond: Respond{Status: 200, Body: &Body{File: "../../etc/passwd"}}}}
+	d := Evaluate(Request{Path: "/x"}, rules, NewRNG(1), NewFaker(1), baseDir)
+	body := string(d.BodyBytes)
+	if strings.Contains(body, "root:") {
+		t.Fatalf("PATH TRAVERSAL: /etc/passwd was read! body = %q", body)
+	}
+	if !strings.Contains(body, "path rejected") && !strings.Contains(body, "body file error") {
+		t.Fatalf("expected a rejection message, got %q", body)
+	}
+}
+
+func TestEvaluateBodyFileAbsoluteRejected(t *testing.T) {
+	baseDir := t.TempDir()
+
+	// An absolute path outside baseDir should be rejected.
+	tmp := filepath.Join(t.TempDir(), "abs.json")
+	if err := os.WriteFile(tmp, []byte(`{"from": "abs"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	rules := []Rule{{Match: Match{Path: "/x"}, Respond: Respond{Status: 200, Body: &Body{File: tmp}}}}
+	d := Evaluate(Request{Path: "/x"}, rules, NewRNG(1), NewFaker(1), baseDir)
+	body := string(d.BodyBytes)
+	if strings.Contains(body, `"from": "abs"`) {
+		t.Fatalf("PATH TRAVERSAL: absolute outside file was read! body = %q", body)
+	}
+}
+
 func TestEvaluateBodyTemplate(t *testing.T) {
 	rules := []Rule{{
 		Match:   Match{Method: "POST", Path: "/x"},
