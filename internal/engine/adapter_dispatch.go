@@ -160,6 +160,22 @@ func (e *Engine) runHandler(
 		return
 	}
 
+	// JSON array body (for endpoints returning a bare array, e.g. Discord
+	// GET /channels/{id}/messages).
+	if resp.BodyList != nil {
+		if w.Header().Get("Content-Type") == "" {
+			w.Header().Set("Content-Type", "application/json")
+		}
+		data, err := json.Marshal(resp.BodyList)
+		if err != nil {
+			writeError(w, 500, fmt.Sprintf("marshal response body list: %v", err))
+			return
+		}
+		w.WriteHeader(status)
+		_, _ = w.Write(data)
+		return
+	}
+
 	// Default content type for JSON bodies.
 	if resp.Body != nil && w.Header().Get("Content-Type") == "" {
 		w.Header().Set("Content-Type", "application/json")
