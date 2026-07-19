@@ -259,7 +259,11 @@ func (w *wsValue) recv(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.T
 	// dict. Otherwise return as plain str.
 	var obj map[string]any
 	if json.Unmarshal(data, &obj) == nil {
-		return starlark.GoToStarlark(obj), nil
+		sv, err := starlark.GoToStarlark(obj)
+		if err != nil {
+			return nil, fmt.Errorf("recv: %w", err)
+		}
+		return sv, nil
 	}
 
 	return sk.String(string(data)), nil
@@ -278,13 +282,21 @@ func (w *wsValue) send(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.T
 	var payload []byte
 	switch v := msgVal.(type) {
 	case *sk.Dict:
-		data, err := json.Marshal(starlark.StarlarkToGo(v))
+		m, err := starlark.StarlarkToGo(v)
+		if err != nil {
+			return nil, fmt.Errorf("send: convert dict: %w", err)
+		}
+		data, err := json.Marshal(m)
 		if err != nil {
 			return nil, fmt.Errorf("send: marshal dict to JSON: %w", err)
 		}
 		payload = data
 	case *sk.List:
-		data, err := json.Marshal(starlark.StarlarkListToGo(v))
+		l, err := starlark.StarlarkListToGo(v)
+		if err != nil {
+			return nil, fmt.Errorf("send: convert list: %w", err)
+		}
+		data, err := json.Marshal(l)
 		if err != nil {
 			return nil, fmt.Errorf("send: marshal list to JSON: %w", err)
 		}

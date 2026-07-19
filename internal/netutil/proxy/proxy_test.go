@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	"strings"
 	"testing"
 	"time"
@@ -428,6 +429,67 @@ func TestProxyTLS_HostStripsPort(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	if string(body) != "port-stripped" {
 		t.Errorf("body = %q, want %q", body, "port-stripped")
+	}
+}
+
+// TestProxyReuseProxiesToSameBackend verifies that the same *httputil.ReverseProxy
+// instance is reused across multiple requests to the same backend, rather
+// than allocating a new one per request. This ensures backend connection
+// pooling works correctly.
+func TestProxyReuseProxiesToSameBackend(t *testing.T) {
+	backend := startBackend(t, "reuse-me")
+
+	p, err := New(Options{
+		TLS:  false,
+		Addr: freeAddr(t),
+		Backends: map[string]string{
+			"reuse.localhost": backend,
+		},
+	})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	startProxy(t, p)
+
+	// Make multiple requests to the same backend.
+	for i := 0; i < 3; i++ {
+		req, _ := http.NewRequest("GET", "http://"+p.opts.Addr+"/", nil)
+		req.Host = "reuse.localhost"
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("request %d: %v", i, err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if string(body) != "reuse-me" {
+			t.Errorf("request %d body = %q, want %q", i, body, "reuse-me")
+		}
+	}
+
+	// Verify the proxy cache has exactly one entry for the backend and it's
+	// the same instance across lookups.
+	val, ok := p.proxyCache.Load(backend)
+	if !ok {
+		t.Fatal("proxyCache should have an entry for the backend")
+	}
+	rp1 := val.(*httputil.ReverseProxy)
+	val2, ok := p.proxyCache.Load(backend)
+	if !ok {
+		t.Fatal("proxyCache entry disappeared")
+	}
+	rp2 := val2.(*httputil.ReverseProxy)
+	if rp1 != rp2 {
+		t.Fatal("same cache key returned different ReverseProxy instances")
+	}
+
+	// Verify only one backend is cached (not one per request).
+	count := 0
+	p.proxyCache.Range(func(k, v any) bool {
+		count++
+		return true
+	})
+	if count != 1 {
+		t.Errorf("proxyCache has %d entries, want 1", count)
 	}
 }
 

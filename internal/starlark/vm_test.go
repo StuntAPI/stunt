@@ -379,3 +379,237 @@ def on_get(req):
 		t.Fatal("expected error for non-int status, got nil")
 	}
 }
+
+// --- CallRaw / CallWithMaxSteps / ValueToGo / StarlarkListToGo unit tests ---
+
+// TestCallRawReturnsRawValue verifies that CallRaw returns the raw Starlark
+// value without converting it to a Response. A handler returning a list
+// should give us a *sk.List, not a Response.
+func TestCallRawReturnsRawValue(t *testing.T) {
+	src := `
+def resolver(args):
+    return [1, 2, 3]
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	result, err := vm.CallRaw("resolver", sk.None)
+	if err != nil {
+		t.Fatalf("CallRaw: %v", err)
+	}
+
+	list, ok := result.(*sk.List)
+	if !ok {
+		t.Fatalf("expected *sk.List, got %T", result)
+	}
+	if list.Len() != 3 {
+		t.Fatalf("list len = %d, want 3", list.Len())
+	}
+}
+
+// TestCallRawReturnsNone verifies that CallRaw returns sk.None when the
+// handler has no explicit return.
+func TestCallRawReturnsNone(t *testing.T) {
+	src := `
+def handler(args):
+    x = 1 + 1
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	result, err := vm.CallRaw("handler", sk.None)
+	if err != nil {
+		t.Fatalf("CallRaw: %v", err)
+	}
+	if _, ok := result.(sk.NoneType); !ok {
+		t.Fatalf("expected sk.NoneType, got %T (%v)", result, result)
+	}
+}
+
+// TestCallRawUndefinedHandler verifies that CallRaw errors on an undefined
+// handler name.
+func TestCallRawUndefinedHandler(t *testing.T) {
+	src := `
+def on_get(req):
+    return respond(200, {})
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	_, err = vm.CallRaw("nonexistent", sk.None)
+	if err == nil {
+		t.Fatal("expected error for undefined handler in CallRaw")
+	}
+}
+
+// TestCallRawNotCallable verifies that CallRaw errors when the named global
+// is not callable.
+func TestCallRawNotCallable(t *testing.T) {
+	src := `
+my_var = 42
+def on_get(req):
+    return respond(200, {})
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	_, err = vm.CallRaw("my_var", sk.None)
+	if err == nil {
+		t.Fatal("expected error for non-callable in CallRaw")
+	}
+}
+
+// TestCallWithMaxSteps verifies that CallWithMaxSteps works correctly with a
+// custom step budget, and that the None-return convention (200 OK) is
+// respected.
+func TestCallWithMaxSteps(t *testing.T) {
+	src := `
+def handler(stream):
+    x = 0
+    for i in range(100):
+        x = x + i
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	resp, err := vm.CallWithMaxSteps("handler", sk.None, 50000)
+	if err != nil {
+		t.Fatalf("CallWithMaxSteps: %v", err)
+	}
+	if resp.Status != 200 {
+		t.Fatalf("status = %d, want 200 (None return convention)", resp.Status)
+	}
+}
+
+// TestCallWithMaxStepsExceeded verifies that exceeding the step budget
+// produces an error rather than hanging.
+func TestCallWithMaxStepsExceeded(t *testing.T) {
+	src := `
+def handler(stream):
+    x = 0
+    while True:
+        x = x + 1
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := vm.CallWithMaxSteps("handler", sk.None, 1000)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected step-limit error, got nil")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("CallWithMaxSteps did not return; step limit not enforced")
+	}
+}
+
+// TestCallWithMaxStepsUndefinedHandler verifies that CallWithMaxSteps errors
+// on an undefined handler name.
+func TestCallWithMaxStepsUndefinedHandler(t *testing.T) {
+	src := `
+def on_get(req):
+    return respond(200, {})
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	_, err = vm.CallWithMaxSteps("nonexistent", sk.None, 1000)
+	if err == nil {
+		t.Fatal("expected error for undefined handler in CallWithMaxSteps")
+	}
+}
+
+// TestValueToGoScalar verifies ValueToGo on basic scalar types.
+func TestValueToGoScalar(t *testing.T) {
+	tests := []struct {
+		name string
+		val  sk.Value
+		want any
+	}{
+		{"string", sk.String("hello"), "hello"},
+		{"int", sk.MakeInt(42), int64(42)},
+		{"bool_true", sk.Bool(true), true},
+		{"bool_false", sk.Bool(false), false},
+		{"float", sk.Float(3.14), 3.14},
+		{"none", sk.None, nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := ValueToGo(tc.val)
+			if err != nil {
+				t.Fatalf("ValueToGo: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("got %v (%T), want %v (%T)", got, got, tc.want, tc.want)
+			}
+		})
+	}
+}
+
+// TestStarlarkListToGo verifies StarlarkListToGo converts a Starlark list to
+// a Go []any with recursive element conversion.
+func TestStarlarkListToGo(t *testing.T) {
+	elems := []sk.Value{
+		sk.MakeInt(1),
+		sk.String("two"),
+		sk.Bool(true),
+		sk.None,
+	}
+	list := sk.NewList(elems)
+
+	got, err := StarlarkListToGo(list)
+	if err != nil {
+		t.Fatalf("StarlarkListToGo: %v", err)
+	}
+	if len(got) != 4 {
+		t.Fatalf("len = %d, want 4", len(got))
+	}
+	if got[0] != int64(1) {
+		t.Errorf("elem 0 = %v (%T), want int64(1)", got[0], got[0])
+	}
+	if got[1] != "two" {
+		t.Errorf("elem 1 = %v, want 'two'", got[1])
+	}
+	if got[2] != true {
+		t.Errorf("elem 2 = %v, want true", got[2])
+	}
+	if got[3] != nil {
+		t.Errorf("elem 3 = %v, want nil", got[3])
+	}
+}
+
+// TestStarlarkToGo verifies StarlarkToGo converts a dict correctly,
+// including nested structures.
+func TestStarlarkToGo(t *testing.T) {
+	d := sk.NewDict(2)
+	d.SetKey(sk.String("name"), sk.String("Alice"))
+	d.SetKey(sk.String("age"), sk.MakeInt(30))
+
+	got, err := StarlarkToGo(d)
+	if err != nil {
+		t.Fatalf("StarlarkToGo: %v", err)
+	}
+	if got["name"] != "Alice" {
+		t.Errorf("name = %v, want Alice", got["name"])
+	}
+	if got["age"] != int64(30) {
+		t.Errorf("age = %v (%T), want int64(30)", got["age"], got["age"])
+	}
+}

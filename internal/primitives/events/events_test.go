@@ -304,7 +304,7 @@ func TestRetriesHappen(t *testing.T) {
 
 	e := newTestEmitter()
 	e.Register("svc", server.URL)
-	e.backoff = 1 * time.Millisecond // speed up test
+	e.SetBackoff(1 * time.Millisecond) // speed up test
 
 	start := time.Now()
 	err := e.Emit(context.Background(), "svc", "test", nil)
@@ -342,16 +342,28 @@ func TestEnvelopeMarshal(t *testing.T) {
 func TestSetMaxRetriesClampsToZero(t *testing.T) {
 	e := NewEmitter()
 	e.SetMaxRetries(0)
-	if e.maxRetries != 1 {
-		t.Fatalf("maxRetries = %d, want 1 (clamped)", e.maxRetries)
+
+	e.mu.RLock()
+	n := e.maxRetries
+	e.mu.RUnlock()
+	if n != 1 {
+		t.Fatalf("maxRetries = %d, want 1 (clamped)", n)
 	}
+
 	e.SetMaxRetries(-5)
-	if e.maxRetries != 1 {
-		t.Fatalf("maxRetries = %d, want 1 (clamped)", e.maxRetries)
+	e.mu.RLock()
+	n = e.maxRetries
+	e.mu.RUnlock()
+	if n != 1 {
+		t.Fatalf("maxRetries = %d, want 1 (clamped)", n)
 	}
+
 	e.SetMaxRetries(5)
-	if e.maxRetries != 5 {
-		t.Fatalf("maxRetries = %d, want 5", e.maxRetries)
+	e.mu.RLock()
+	n = e.maxRetries
+	e.mu.RUnlock()
+	if n != 5 {
+		t.Fatalf("maxRetries = %d, want 5", n)
 	}
 }
 
@@ -365,7 +377,10 @@ func TestMaxRetriesZeroStillAttempts(t *testing.T) {
 
 	e := newTestEmitter()
 	e.Register("svc", server.URL)
+
+	e.mu.Lock()
 	e.maxRetries = 0 // simulate misconfiguration
+	e.mu.Unlock()
 
 	err := e.Emit(context.Background(), "svc", "test", map[string]any{"k": "v"})
 	if err != nil {
@@ -374,6 +389,41 @@ func TestMaxRetriesZeroStillAttempts(t *testing.T) {
 	if sink.count() != 1 {
 		t.Fatalf("sink received %d posts, want 1 (at least one attempt)", sink.count())
 	}
+}
+
+// TestConcurrentEmitAndSetMaxRetries verifies that Emit() is safe to call
+// concurrently with SetMaxRetries()/SetBackoff(). Before the mutex fix this
+// test triggers a -race detector failure.
+func TestConcurrentEmitAndSetMaxRetries(t *testing.T) {
+	sink := newSink()
+	server := httptest.NewServer(http.HandlerFunc(sink.handler))
+	defer server.Close()
+
+	e := newTestEmitter()
+	e.Register("svc", server.URL)
+	e.SetMaxRetries(3)
+
+	var wg sync.WaitGroup
+
+	// Writer goroutine: repeatedly changes maxRetries and backoff.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			e.SetMaxRetries(i%5 + 1)
+			e.SetBackoff(time.Duration(i%3+1) * time.Millisecond)
+		}
+	}()
+
+	// Reader goroutines: repeatedly call Emit.
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_ = e.Emit(context.Background(), "svc", "race", map[string]any{"ok": true})
+		}()
+	}
+	wg.Wait()
 }
 
 // TestLargeResponseBodyCapped verifies that Emit does not read an unbounded
@@ -397,7 +447,7 @@ func TestLargeResponseBodyCapped(t *testing.T) {
 
 	e := newTestEmitter()
 	e.Register("svc", server.URL)
-	e.backoff = 1 * time.Millisecond
+	e.SetBackoff(1 * time.Millisecond)
 
 	err := e.Emit(context.Background(), "svc", "test", map[string]any{"k": "v"})
 	if err != nil {
