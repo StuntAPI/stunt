@@ -219,13 +219,20 @@ func printPlanSubdomain(out interface{ Write([]byte) (int, error) }, m *manifest
 	if tld == "" {
 		tld = "localhost"
 	}
+	// Reflect the actual protocol: manifest tls:false → http://, tls:true/
+	// omitted → https://. Plan has no --no-tls flag, so it reports the
+	// manifest default (the CLI flag can only further disable TLS at runtime).
+	scheme := "https"
+	if !manifest.ResolveTLS(&m.Network, false) {
+		scheme = "http"
+	}
 	for _, name := range sortedServiceNames(m.Services) {
 		svc := m.Services[name]
 		r := results[name]
 		if svc.Adapter != "" {
-			fmt.Fprintf(out, "  %s  ->  https://%s.%s  %s\n", name, name, tld, adapterSummary(svc.Adapter, r))
+			fmt.Fprintf(out, "  %s  ->  %s://%s.%s  %s\n", name, scheme, name, tld, adapterSummary(svc.Adapter, r))
 		} else {
-			fmt.Fprintf(out, "  %s  ->  https://%s.%s  (%d rules)\n", name, name, tld, r.rules)
+			fmt.Fprintf(out, "  %s  ->  %s://%s.%s  (%d rules)\n", name, scheme, name, tld, r.rules)
 		}
 	}
 }

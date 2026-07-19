@@ -116,7 +116,12 @@ def on_upload(req):
 
 The KV store is a simple string→string key-value store backed by SQLite. **All values are stored
 and returned as strings** — `set` accepts any type and stringifies it; `get` always returns a string;
-`incr` returns an `int`.
+`incr` returns an `int` (the new counter value) for convenience — use `str(store_kv_incr(...))` if you need to store it back via `set`.
+
+> **Why does `incr` return `int` while `get` returns `str`?** The KV store stores everything as strings.
+`incr` atomically reads, parses, increments, and writes the value, returning the computed `int` so you
+can use it directly for IDs and counters without an extra `int()` conversion. `get` returns the raw
+stored string. If you `get` a counter after `incr`, you'll get the string representation (e.g. `"3"`).
 
 | Builtin | Signature | Returns | Notes |
 |---------|-----------|---------|-------|

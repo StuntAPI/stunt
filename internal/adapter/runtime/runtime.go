@@ -19,6 +19,8 @@
 //	v = store_kv_get("svc", "key")    # → str or None if missing
 //	store_kv_delete("svc", "key")
 //	n = store_kv_incr("svc", "counter") # → int (atomic; for monotonic ids)
+//	# Note: incr returns int for convenience; get returns the stored string.
+//	# KV stores values as strings internally.
 //
 // Blob store — store_blob(name) returns a blob object with methods:
 //

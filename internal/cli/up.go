@@ -95,6 +95,13 @@ func runUpPort(ctx context.Context, e *engine.Engine, m *manifest.Manifest, out 
 		httpAddr := addrs[name]
 		grpcTarget := e.GrpcTarget(name)
 
+		// Show a clear error for services whose adapter failed to load
+		// (partial startup — the service is still reachable but returns 503).
+		if loadErr := e.ServiceLoadError(name); loadErr != "" {
+			fmt.Fprintf(out, "  %s  ->  %s  (LOAD ERROR: %s)\n", name, httpAddr, loadErr)
+			continue
+		}
+
 		if svc.Adapter != "" {
 			summary := upServiceSummary(svc, e.AdapterFor(name))
 			if grpcTarget != "" {
@@ -109,7 +116,10 @@ func runUpPort(ctx context.Context, e *engine.Engine, m *manifest.Manifest, out 
 	fmt.Fprintln(out, "stunt up — Ctrl-C to stop")
 
 	<-ctx.Done()
-	return ctx.Err()
+	// Graceful shutdown: suppress the "context canceled" error that looks
+	// like a failure to the user. Print a clean message instead.
+	fmt.Fprintln(out, "stopped.")
+	return nil
 }
 
 // upServiceSummary renders the parenthesised summary for an adapter-backed
@@ -140,7 +150,9 @@ func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifes
 	if tld == "" {
 		tld = "localhost"
 	}
-	useTLS := !noTLS
+	// Manifest tls:false → HTTP; tls:true/omitted → HTTPS (default).
+	// The --no-tls CLI flag overrides the manifest to force HTTP.
+	useTLS := manifest.ResolveTLS(&m.Network, noTLS)
 
 	manifestPath, _ := cmd.Flags().GetString("manifest")
 
@@ -242,7 +254,11 @@ func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifes
 	fmt.Fprintln(out, "stunt up (subdomain mode) — Ctrl-C to stop")
 
 	// Start the proxy (blocks until ctx is canceled).
-	return p.Serve(ctx, ln)
+	err = p.Serve(ctx, ln)
+	// Graceful shutdown: suppress the "context canceled" message that looks
+	// like a failure. Print a clean message instead.
+	fmt.Fprintln(out, "stopped.")
+	return nil
 }
 
 // maybeSyncHosts writes <service>.<tld> entries to the hosts file pointing

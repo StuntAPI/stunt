@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -38,6 +39,11 @@ type Engine struct {
 	states    map[string]*serviceState // keyed by service name
 	cacheRoot string                   // adapter cache root for git sources
 	logger    *log.Logger              // request logger (nil = no logging)
+
+	// loadErrors stores per-service adapter load errors for best-effort
+	// startup. A service with a load error has no entry in states and serves
+	// a 503 error response instead of crashing the engine.
+	loadErrors map[string]error
 
 	// wsSem limits the number of concurrent active WebSocket connections
 	// across all services to prevent resource exhaustion. Each handleWebsocket
@@ -89,6 +95,7 @@ func newEngine(m *manifest.Manifest, cacheRoot string) (*Engine, error) {
 		wsSem:      make(chan struct{}, wsMaxConcurrentConns),
 		shutdownCh: make(chan struct{}),
 		logger:     log.New(os.Stderr, "", 0),
+		loadErrors: make(map[string]error),
 	}
 
 	// Derive a state directory next to the manifest.
@@ -101,11 +108,31 @@ func newEngine(m *manifest.Manifest, cacheRoot string) (*Engine, error) {
 		}
 		st, err := buildServiceState(name, svc, stateDir, manifestDir, cacheRoot, m.RNGSeed)
 		if err != nil {
-			// Clean up any states we already built.
-			e.Close()
-			return nil, fmt.Errorf("engine: service %q: %w", name, err)
+			// Best-effort: log the error and continue serving the rest.
+			// A single broken service must not prevent the good ones from
+			// starting (M3 partial startup).
+			fmt.Fprintf(os.Stderr, "engine: service %q: %v\n", name, err)
+			e.loadErrors[name] = err
+			continue
 		}
 		e.states[name] = st
+	}
+
+	// If NO adapter-backed service loaded successfully AND there are no
+	// rules-only services to fall back on, fail. This prevents starting an
+	// engine where nothing works.
+	if len(e.states) == 0 && len(e.loadErrors) > 0 {
+		hasRulesOnly := false
+		for _, svc := range m.Services {
+			if svc.Adapter == "" {
+				hasRulesOnly = true
+				break
+			}
+		}
+		if !hasRulesOnly {
+			e.Close()
+			return nil, fmt.Errorf("engine: all %d service(s) failed to load (first: %v)", len(e.loadErrors), e.firstLoadError())
+		}
 	}
 
 	return e, nil
@@ -333,13 +360,21 @@ func (e *Engine) serviceHandler(name string, svc manifest.Service) http.Handler 
 	rng := rules.NewRNG(e.manifest.RNGSeed)
 	fk := rules.NewFaker(e.manifest.RNGSeed)
 	baseDir := filepath.Dir(e.manifest.Path)
-	st := e.states[name] // nil for rules-only services
+	st := e.states[name]          // nil for rules-only services
+	loadErr := e.loadErrors[name] // non-empty if adapter failed to load
 
 	// rng and faker are shared across goroutines; math/rand.Rand and gofakeit
 	// are not concurrency-safe. Guard all access with a mutex (I2).
 	var rulesMu sync.Mutex
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// If this service's adapter failed to load, return a 503 error so the
+		// service is reachable but clearly broken (partial startup, M3).
+		if loadErr != nil {
+			writeStatus(w, http.StatusServiceUnavailable,
+				fmt.Sprintf(`{"error":"service %q adapter failed to load: %s"}`, name, loadErr.Error()))
+			return
+		}
 		// --- WebSocket dispatch (before HTTP) ---
 		// If the request is a WebSocket upgrade and its path matches a declared
 		// ws route, upgrade and run the connection-lifetime handler. Non-upgrade
@@ -462,6 +497,36 @@ func (e *Engine) GrpcTarget(name string) string {
 func (e *Engine) AdapterFor(name string) *adapter.Adapter {
 	if st, ok := e.states[name]; ok {
 		return st.adapter
+	}
+	return nil
+}
+
+// ServiceLoadError returns a non-empty error message if the named service's
+// adapter failed to load (partial startup). Returns "" if the service loaded
+// successfully or is rules-only.
+func (e *Engine) ServiceLoadError(name string) string {
+	if err, ok := e.loadErrors[name]; ok {
+		return err.Error()
+	}
+	return ""
+}
+
+// HasLoadError returns true if any service had a load error during engine
+// construction.
+func (e *Engine) HasLoadError() bool {
+	return len(e.loadErrors) > 0
+}
+
+// firstLoadError returns the first (deterministic by sorted name) load
+// error for error messages.
+func (e *Engine) firstLoadError() error {
+	names := make([]string, 0, len(e.loadErrors))
+	for n := range e.loadErrors {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	for _, n := range names {
+		return fmt.Errorf("service %q: %w", n, e.loadErrors[n])
 	}
 	return nil
 }

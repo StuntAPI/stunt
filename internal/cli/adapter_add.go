@@ -166,7 +166,9 @@ services are skipped (they are always live).`,
 // --- run functions ---
 
 // runAdapterAdd parses the source spec, ensures it is fetchable, and records
-// it in the manifest as services.<name>.adapter.
+// it in the manifest as services.<name>.adapter. It uses surgical yaml.Node
+// editing to preserve comments, indentation, and formatting of the
+// existing manifest.
 func runAdapterAdd(out interface{ Write([]byte) (int, error) }, manifestPath, cacheDir, sourceSpec, name string, force bool) error {
 	src, err := adapterdist.ParseSource(sourceSpec)
 	if err != nil {
@@ -188,26 +190,32 @@ func runAdapterAdd(out interface{ Write([]byte) (int, error) }, manifestPath, ca
 		name = deriveServiceName(src)
 	}
 
-	// Load or create the manifest.
-	m, err := loadOrCreateManifest(manifestPath)
-	if err != nil {
-		return err
+	// Check for collision against the existing manifest.
+	if m, err := manifest.Load(manifestPath); err == nil {
+		if _, exists := m.Services[name]; exists && !force {
+			return fmt.Errorf("adapter add: service %q already exists (use --force to overwrite)", name)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("adapter add: load manifest: %w", err)
 	}
 
-	// Check for collision.
-	if _, exists := m.Services[name]; exists && !force {
-		return fmt.Errorf("adapter add: service %q already exists (use --force to overwrite)", name)
+	// If the manifest doesn't exist yet, create it with manifest.Save (this
+	// is the initial creation path — formatting preservation doesn't apply).
+	if _, err := os.Stat(manifestPath); os.IsNotExist(err) {
+		m := &manifest.Manifest{
+			Version:  1,
+			Services: make(map[string]manifest.Service),
+		}
+		m.Services[name] = manifest.Service{Adapter: src.String()}
+		if err := manifest.Save(m, manifestPath); err != nil {
+			return fmt.Errorf("adapter add: %w", err)
+		}
+		fmt.Fprintf(out, "added %s  adapter: %s\n", name, src.String())
+		return nil
 	}
 
-	// Record the source spec.
-	if m.Services == nil {
-		m.Services = make(map[string]manifest.Service)
-	}
-	svc := m.Services[name] // preserve existing rules/config if present
-	svc.Adapter = src.String()
-	m.Services[name] = svc
-
-	if err := manifest.Save(m, manifestPath); err != nil {
+	// Surgically add/update the service node, preserving formatting.
+	if err := manifest.AddServiceNode(manifestPath, name, src.String()); err != nil {
 		return fmt.Errorf("adapter add: %w", err)
 	}
 
@@ -215,7 +223,8 @@ func runAdapterAdd(out interface{ Write([]byte) (int, error) }, manifestPath, ca
 	return nil
 }
 
-// runAdapterRemove deletes a service from the manifest.
+// runAdapterRemove deletes a service from the manifest. Uses surgical
+// yaml.Node editing to preserve comments and formatting.
 func runAdapterRemove(out interface{ Write([]byte) (int, error) }, manifestPath, name string) error {
 	m, err := manifest.Load(manifestPath)
 	if err != nil {
@@ -231,8 +240,7 @@ func runAdapterRemove(out interface{ Write([]byte) (int, error) }, manifestPath,
 		return nil
 	}
 
-	delete(m.Services, name)
-	if err := manifest.Save(m, manifestPath); err != nil {
+	if err := manifest.RemoveServiceNode(manifestPath, name); err != nil {
 		return fmt.Errorf("adapter remove: %w", err)
 	}
 	fmt.Fprintf(out, "removed %s\n", name)
@@ -382,23 +390,4 @@ func lastSegment(s string) string {
 		}
 	}
 	return s
-}
-
-// loadOrCreateManifest loads an existing manifest or creates a new minimal
-// one (version:1, no services) if the file does not exist.
-func loadOrCreateManifest(manifestPath string) (*manifest.Manifest, error) {
-	m, err := manifest.Load(manifestPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return &manifest.Manifest{
-				Version:  1,
-				Services: make(map[string]manifest.Service),
-			}, nil
-		}
-		return nil, fmt.Errorf("load manifest %s: %w", manifestPath, err)
-	}
-	if m.Services == nil {
-		m.Services = make(map[string]manifest.Service)
-	}
-	return m, nil
 }

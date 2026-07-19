@@ -15,6 +15,12 @@ export GOROOT := ""
 # Path to a freshly-built stunt binary used by adapter linting.
 stunt_bin := "/tmp/stunt-ci"
 
+# Compute the version string from git (tag, or commit hash).
+version := `git describe --tags --always --dirty 2>/dev/null || echo dev`
+
+# ldflags to inject the version into the binary.
+ldflags := "-X github.com/stunt-adapters/stunt/internal/cli.Version=" + version
+
 # default: show available recipes
 default:
     @just --list
@@ -28,7 +34,7 @@ ci: build test vet fmt-check mod-tidy lint-adapters
 
 # Compile everything (including the CLI binary).
 build:
-    go build ./...
+    go build -ldflags "{{ldflags}}" ./...
 
 # Run the full test suite under the race detector.
 test:
@@ -70,7 +76,7 @@ mod-tidy:
 lint-adapters: build
     #!/usr/bin/env bash
     set -euo pipefail
-    go build -o {{stunt_bin}} ./cmd/stunt
+    go build -ldflags "{{ldflags}}" -o {{stunt_bin}} ./cmd/stunt
     fail=0
     for a in adapters/*/; do
         printf ':: lint %s\n' "$a"
@@ -80,14 +86,14 @@ lint-adapters: build
 
 # Lint a single adapter directory (usage: just lint-adapter ./adapters/echo-style).
 lint-adapter dir:
-    go build -o {{stunt_bin}} ./cmd/stunt
+    go build -ldflags "{{ldflags}}" -o {{stunt_bin}} ./cmd/stunt
     {{stunt_bin}} adapter lint {{dir}}
 
 # Quick smoke test: build, init a temp manifest, up, curl, down. (host-safe.)
 smoke:
     #!/usr/bin/env bash
     set -euo pipefail
-    go build -o {{stunt_bin}} ./cmd/stunt
+    go build -ldflags "{{ldflags}}" -o {{stunt_bin}} ./cmd/stunt
     tmp="$(mktemp -d)"
     trap 'cd /; kill "$(cat "$tmp/up.pid" 2>/dev/null)" 2>/dev/null || true; rm -rf "$tmp"' EXIT
     cd "$tmp"
