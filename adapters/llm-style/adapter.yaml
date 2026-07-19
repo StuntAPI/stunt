@@ -1,0 +1,42 @@
+# stunt adapter manifest — LLM API simulator (OpenAI + Anthropic, unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of OpenAI and Anthropic chat APIs for
+# LOCAL TESTING ONLY. It does not call any real LLM API. All data is
+# synthetic. See DISCLAIMER.
+id: llm-style
+name: "LLM API simulator (OpenAI + Anthropic, unofficial)"
+version: "0.1.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- OpenAI-compatible ---
+  - route: /v1/chat/completions
+    method: POST
+    handler: scripts/openai.star#on_chat_completions
+  - route: /v1/models
+    method: GET
+    handler: scripts/openai.star#on_list_models
+
+  # --- Anthropic-compatible ---
+  - route: /v1/messages
+    method: POST
+    handler: scripts/anthropic.star#on_messages
+
+# Auth scheme metadata (mock: accept any non-empty key).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            message: resource not found
+            type: not_found
