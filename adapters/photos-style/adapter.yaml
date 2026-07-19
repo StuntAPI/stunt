@@ -1,0 +1,78 @@
+# stunt adapter manifest — Google-Photos-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Google Photos Library API for
+# LOCAL TESTING ONLY. It does not call the real Google Photos API. All data
+# is synthetic. See DISCLAIMER.
+id: photos-style
+name: "Google-Photos-style API simulator (unofficial)"
+version: "0.1.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- OAuth2 ---
+  - route: /o/oauth2/auth
+    method: GET
+    handler: scripts/oauth.star#on_authorize
+  - route: /o/oauth2/token
+    method: POST
+    handler: scripts/oauth.star#on_token
+
+  # --- Uploads (raw octet-stream → uploadToken) ---
+  - route: /v1/uploads
+    method: POST
+    handler: scripts/uploads.star#on_uploads
+
+  # --- Media items ---
+  - route: /v1/mediaItems:batchCreate
+    method: POST
+    handler: scripts/media_items.star#on_batch_create
+  - route: /v1/mediaItems:search
+    method: POST
+    handler: scripts/media_items.star#on_search
+  - route: /v1/mediaItems
+    method: GET
+    handler: scripts/media_items.star#on_list
+
+  # --- Albums ---
+  - route: /v1/albums
+    method: GET
+    handler: scripts/albums.star#on_list_albums
+  - route: /v1/albums
+    method: POST
+    handler: scripts/albums.star#on_create_album
+  - route: /v1/albums/{id}
+    method: GET
+    handler: scripts/albums.star#on_get_album
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: tokens
+    kind: collection
+  - name: refresh_tokens
+    kind: collection
+  - name: codes
+    kind: collection
+  - name: upload_tokens
+    kind: collection
+  - name: media_items
+    kind: collection
+  - name: albums
+    kind: collection
+
+# Auth scheme metadata (mock: bearer tokens validated against the tokens
+# collection).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: resource_not_found
