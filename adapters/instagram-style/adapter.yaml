@@ -1,0 +1,74 @@
+# stunt adapter manifest — Instagram-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of an Instagram Graph API (Meta)
+# for LOCAL TESTING ONLY. It does not call the real Instagram API. All data
+# is synthetic. See DISCLAIMER.
+id: instagram-style
+name: "Instagram-style API simulator (unofficial)"
+version: "0.1.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order). The
+# publish flow requires media_publish BEFORE media (route ordering).
+endpoints:
+  # --- OAuth2 (Meta authorization code) ---
+  - route: /oauth/authorize
+    method: GET
+    handler: scripts/oauth.star#on_authorize
+  - route: /oauth/access_token
+    method: POST
+    handler: scripts/oauth.star#on_access_token
+
+  # --- Profile (literal, before parameterized routes) ---
+  - route: /v21.0/me
+    method: GET
+    handler: scripts/profile.star#on_profile
+
+  # --- Insights (per-media metrics) ---
+  - route: /v21.0/{media_id}/insights
+    method: GET
+    handler: scripts/insights.star#on_insights
+
+  # --- Publish step 2: media_publish BEFORE media (route ordering) ---
+  - route: /v21.0/{ig_user_id}/media_publish
+    method: POST
+    handler: scripts/publish.star#on_publish
+
+  # --- Publish step 1: create media container ---
+  - route: /v21.0/{ig_user_id}/media
+    method: POST
+    handler: scripts/publish.star#on_create
+
+  # --- List media (GET on the same route as create container) ---
+  - route: /v21.0/{ig_user_id}/media
+    method: GET
+    handler: scripts/publish.star#on_list_media
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: tokens
+    kind: collection
+  - name: codes
+    kind: collection
+  - name: containers
+    kind: collection
+  - name: media
+    kind: collection
+
+# Auth scheme metadata (mock: API routes check bearer PRESENCE, not value).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            message: resource not found
+            code: 404
