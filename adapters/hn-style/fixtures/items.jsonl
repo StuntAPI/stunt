@@ -1,0 +1,6 @@
+{"id":"1001","type":"story","by":"alice","time_offset":"1","title":"Show HN: A synthetic demo for local testing","url":"https://example.test/show-hn","score":"42","descendants":"3","kids":["1002","1003"]}
+{"id":"1002","type":"comment","by":"bob","time_offset":"2","text":"Great post! Testing locally is the way.","parent":"1001","kids":["1004"]}
+{"id":"1003","type":"comment","by":"carol","time_offset":"3","text":"Interesting approach.","parent":"1001"}
+{"id":"1004","type":"comment","by":"dave","time_offset":"4","text":"Nested reply for testing.","parent":"1002"}
+{"id":"1005","type":"story","by":"eve","time_offset":"5","title":"Ask HN: Best practices for local API simulation?","text":"What tools do you use?","score":"15","descendants":"1"}
+{"id":"1006","type":"job","by":"startup-co","time_offset":"6","title":"Startup is hiring a senior engineer","url":"https://example.test/jobs/1","score":"0","descendants":"0"}
