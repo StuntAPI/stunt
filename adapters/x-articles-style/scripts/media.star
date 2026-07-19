@@ -13,16 +13,7 @@
 # since the mock's purpose is to validate the pipeline (the client gets a
 # media_id to attach as cover_media_id on a subsequent draft).
 
-def _pad5(n):
-    if n < 10:
-        return "0000" + str(n)
-    if n < 100:
-        return "000" + str(n)
-    if n < 1000:
-        return "00" + str(n)
-    if n < 10000:
-        return "0" + str(n)
-    return str(n)
+# Shared helper (_pad5) is preloaded from scripts/lib.star.
 
 # on_upload accepts a media blob and returns a media_id_string.
 def on_upload(req):

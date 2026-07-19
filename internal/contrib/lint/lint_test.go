@@ -702,3 +702,65 @@ graphql:
 		t.Errorf("expected error-severity finding: %+v", findings)
 	}
 }
+
+// TestScriptDriftDetectsDuplicateDefs verifies that the same function name
+// defined in multiple handler scripts (excluding lib.star) is flagged as a
+// drift warning.
+func TestScriptDriftDetectsDuplicateDefs(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "scripts/a.star",
+		`def _bearer(req):
+    return "tok"
+
+def on_get(req):
+    return respond(200, {})
+`)
+	writeFile(t, dir, "scripts/b.star",
+		`def _bearer(req):
+    return "tok"
+
+def on_post(req):
+    return respond(200, {})
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "_bearer") {
+		t.Errorf("expected drift warning for _bearer, got: %+v", findings)
+	}
+	// Drift is a warning, not an error — it should not cause a non-zero exit.
+	if hasError(findings) {
+		t.Errorf("drift should be a warning, not an error: %+v", findings)
+	}
+}
+
+// TestScriptDriftIgnoresLibStar verifies that functions defined in lib.star
+// are NOT flagged as drift (lib.star is the shared library).
+func TestScriptDriftIgnoresLibStar(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "scripts/lib.star",
+		`def _bearer(req):
+    return "tok"
+`)
+	writeFile(t, dir, "scripts/a.star",
+		`def on_custom_a(req):
+    return respond(200, {})
+`)
+	writeFile(t, dir, "scripts/b.star",
+		`def on_custom_b(req):
+    return respond(200, {})
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	// _bearer is only in lib.star — no drift.
+	for _, f := range findings {
+		if strings.Contains(f.Message, "drift") {
+			t.Errorf("unexpected drift finding when helpers are in lib.star: %+v", f)
+		}
+	}
+}

@@ -3,23 +3,8 @@
 # GET /v2/userinfo (Bearer) -> { sub, name, email, picture }
 # Returns 401 if the token is invalid.
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
-
-def _bearer(req):
-    auth = req["headers"].get("Authorization", "")
-    if auth[:7] == "Bearer ":
-        return auth[7:]
-    return ""
-
-def _member_for_token(req):
-    token = _bearer(req)
-    if token == "":
-        return None
-    c = store_collection("tokens")
-    doc = c.get(token)
-    if doc == None:
-        return None
-    return doc
+# Shared helpers (_bearer, _member_for_token) are preloaded from
+# scripts/lib.star.
 
 # on_userinfo returns the member bound to the Bearer token.
 def on_userinfo(req):

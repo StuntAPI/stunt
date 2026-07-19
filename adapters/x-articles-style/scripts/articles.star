@@ -14,20 +14,9 @@
 #   - publish unknown id        -> 404 { error: "article not found" }
 #   - get unknown id            -> 404 { error: "article not found" }
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
+# Shared helper (_pad5) is preloaded from scripts/lib.star.
 
-# --- shared helpers ---
-
-def _pad5(n):
-    if n < 10:
-        return "0000" + str(n)
-    if n < 100:
-        return "000" + str(n)
-    if n < 1000:
-        return "00" + str(n)
-    if n < 10000:
-        return "0" + str(n)
-    return str(n)
+# --- adapter-specific helpers ---
 
 def _next_article_id():
     return "a_" + str(store_kv_incr("xarticles", "article_seq"))

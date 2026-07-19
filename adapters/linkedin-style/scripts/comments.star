@@ -5,23 +5,8 @@
 # POST /rest/comments (Bearer; { actor, object, message:{text} }) -> { id }
 #   Posts a comment; resolves actor "urn:li:person:me" to the authenticated member.
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
-
-def _bearer(req):
-    auth = req["headers"].get("Authorization", "")
-    if auth[:7] == "Bearer ":
-        return auth[7:]
-    return ""
-
-def _member_for_token(req):
-    token = _bearer(req)
-    if token == "":
-        return None
-    c = store_collection("tokens")
-    doc = c.get(token)
-    if doc == None:
-        return None
-    return doc
+# Shared helpers (_bearer, _member_for_token) are preloaded from
+# scripts/lib.star.
 
 # on_list_comments returns comments authored by the token's member.
 def on_list_comments(req):

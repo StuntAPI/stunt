@@ -13,13 +13,7 @@
 # (The Python reference uses SHA-256; Starlark has no hashlib, so FNV-1a is
 # substituted — both produce deterministic, independent, finite values.)
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
-
-def _bearer_present(req):
-    auth = req["headers"].get("Authorization", "")
-    if auth[:7] == "Bearer ":
-        return True
-    return False
+# Shared helper (_bearer_present) is preloaded from scripts/lib.star.
 
 # _fnv1a computes a deterministic 64-bit hash of a string (FNV-1a).
 def _fnv1a(s):

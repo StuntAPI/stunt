@@ -11,19 +11,9 @@
 #   - refresh_token grant returns NO new refresh_token (Reddit only issues
 #     one on the initial permanent authorization-code grant).
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
+# Shared helpers (_has_ua, _ua_rejected) are preloaded from scripts/lib.star.
 
-# --- shared helpers (copied; keep in sync across scripts) ---
-
-def _has_ua(req):
-    ua = req["headers"].get("User-Agent", "")
-    # Reddit bans absent/generic UAs. Accept only a descriptive one (our
-    # adapter sends "***REMOVED***.me/1.0 (...)"). This is what makes the
-    # missing-UA bug reproducible.
-    return ua != "" and ua.find("/") >= 0 and ua.find("(") >= 0
-
-def _ua_rejected(req):
-    return respond(429, {"message": "Too Many Requests", "error": 429})
+# --- adapter-specific helpers (not shared) ---
 
 def _is_basic(req):
     auth = req["headers"].get("Authorization", "")

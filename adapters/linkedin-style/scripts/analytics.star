@@ -10,23 +10,8 @@
 #   IMPRESSION -> base + 11
 # where base = post seq.
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
-
-def _bearer(req):
-    auth = req["headers"].get("Authorization", "")
-    if auth[:7] == "Bearer ":
-        return auth[7:]
-    return ""
-
-def _member_for_token(req):
-    token = _bearer(req)
-    if token == "":
-        return None
-    c = store_collection("tokens")
-    doc = c.get(token)
-    if doc == None:
-        return None
-    return doc
+# Shared helpers (_bearer, _member_for_token, _to_int) are preloaded from
+# scripts/lib.star.
 
 # on_analytics returns daily metric buckets for a post.
 def on_analytics(req):
@@ -104,14 +89,4 @@ def _bucket(count, query_type, ugc_urn, i):
         },
     }
 
-def _to_int(s):
-    if s == None or s == "":
-        return 0
-    n = 0
-    for i in range(len(s)):
-        ch = s[i]
-        if ch >= "0" and ch <= "9":
-            n = n * 10 + (ord(ch) - ord("0"))
-        else:
-            return 0
-    return n
+
