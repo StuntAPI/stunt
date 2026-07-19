@@ -613,3 +613,193 @@ ws:
 		t.Errorf("error should mention directory escape, got: %v", err)
 	}
 }
+
+// --- GraphQL spec tests ---
+
+const graphqlAdapterYAML = `
+id: blog
+game: Blog
+graphql:
+  schema: schemas/blog.graphql
+  resolvers: scripts/resolvers.star
+  path: /gql
+`
+
+const graphqlStar = `
+def on_users(args):
+    return respond(200, [])
+`
+
+const graphqlSDL = `
+type Query {
+  users: [User!]!
+}
+type User {
+  id: ID!
+  name: String!
+}
+`
+
+func TestLoadGraphqlSpec(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapter(t, dir, map[string]string{
+		"adapter.yaml":           graphqlAdapterYAML,
+		"scripts/resolvers.star": graphqlStar,
+		"schemas/blog.graphql":   graphqlSDL,
+	})
+
+	a, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	if a.Graphql == nil {
+		t.Fatal("Graphql is nil")
+	}
+	if !filepath.IsAbs(a.Graphql.Schema) {
+		t.Errorf("Schema not absolute: %q", a.Graphql.Schema)
+	}
+	if !strings.HasSuffix(a.Graphql.Schema, "schemas/blog.graphql") {
+		t.Errorf("Schema path unexpected: %q", a.Graphql.Schema)
+	}
+	if !filepath.IsAbs(a.Graphql.Resolvers) {
+		t.Errorf("Resolvers not absolute: %q", a.Graphql.Resolvers)
+	}
+	if !strings.HasSuffix(a.Graphql.Resolvers, "scripts/resolvers.star") {
+		t.Errorf("Resolvers path unexpected: %q", a.Graphql.Resolvers)
+	}
+	if a.Graphql.Path != "/gql" {
+		t.Errorf("Path = %q, want /gql", a.Graphql.Path)
+	}
+}
+
+func TestLoadGraphqlDefaultPath(t *testing.T) {
+	dir := t.TempDir()
+	yaml := `
+id: blog
+name: Blog
+graphql:
+  schema: schemas/blog.graphql
+  resolvers: scripts/resolvers.star
+`
+	writeAdapter(t, dir, map[string]string{
+		"adapter.yaml":           yaml,
+		"scripts/resolvers.star": "pass\n",
+		"schemas/blog.graphql":   graphqlSDL,
+	})
+
+	a, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if a.Graphql.Path != "/graphql" {
+		t.Errorf("Path = %q, want /graphql", a.Graphql.Path)
+	}
+}
+
+func TestLoadGraphqlValidation(t *testing.T) {
+	cases := []struct {
+		name string
+		yaml string
+		err  string
+	}{
+		{
+			name: "missing schema",
+			yaml: `id: g
+name: G
+graphql:
+  resolvers: scripts/x.star
+`,
+			err: "graphql.schema",
+		},
+		{
+			name: "missing resolvers",
+			yaml: `id: g
+name: G
+graphql:
+  schema: schemas/x.graphql
+`,
+			err: "graphql.resolvers",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeAdapter(t, dir, map[string]string{"adapter.yaml": c.yaml})
+			_, err := Load(dir)
+			if err == nil {
+				t.Fatal("expected error, got nil")
+			}
+			if !strings.Contains(err.Error(), c.err) {
+				t.Errorf("error %q does not contain %q", err.Error(), c.err)
+			}
+		})
+	}
+}
+
+func TestSchemaSDL(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapter(t, dir, map[string]string{
+		"adapter.yaml":           graphqlAdapterYAML,
+		"scripts/resolvers.star": graphqlStar,
+		"schemas/blog.graphql":   graphqlSDL,
+	})
+
+	a, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	data, err := a.SchemaSDL()
+	if err != nil {
+		t.Fatalf("SchemaSDL: %v", err)
+	}
+	if !strings.Contains(string(data), "type Query") {
+		t.Errorf("SDL does not contain 'type Query': %s", data)
+	}
+}
+
+func TestSchemaSDLNoGraphql(t *testing.T) {
+	dir := t.TempDir()
+	writeAdapter(t, dir, map[string]string{
+		"adapter.yaml": "id: plain\nname: Plain\n",
+	})
+
+	a, err := Load(dir)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	_, err = a.SchemaSDL()
+	if err == nil {
+		t.Fatal("expected error when no graphql configured")
+	}
+}
+
+func TestGraphqlSchemaRejectsTraversal(t *testing.T) {
+	parent := t.TempDir()
+	secretPath := filepath.Join(parent, "secret.graphql")
+	if err := os.WriteFile(secretPath, []byte("type Query { x: Int }"), 0o644); err != nil {
+		t.Fatalf("write secret: %v", err)
+	}
+
+	adapterDir := filepath.Join(parent, "adapter")
+	writeAdapter(t, adapterDir, map[string]string{
+		"adapter.yaml": `
+id: traversal-test
+name: Traversal Test
+graphql:
+  schema: ../secret.graphql
+  resolvers: scripts/x.star
+`,
+		"scripts/x.star": "pass\n",
+	})
+
+	_, err := Load(adapterDir)
+	if err == nil {
+		t.Fatal("expected Load to reject schema path with .. traversal")
+	}
+	if !strings.Contains(err.Error(), "escapes adapter directory") {
+		t.Errorf("error should mention directory escape, got: %v", err)
+	}
+}
