@@ -3,13 +3,7 @@
 # Returns the static mock profile. The token is NOT validated — only its
 # presence is checked (token-PRESENCE policy).
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
-
-def _bearer_present(req):
-    auth = req["headers"].get("Authorization", "")
-    if auth[:7] == "Bearer ":
-        return True
-    return False
+# Shared helper (_bearer_present) is preloaded from scripts/lib.star.
 
 # on_profile returns the mock profile.
 def on_profile(req):

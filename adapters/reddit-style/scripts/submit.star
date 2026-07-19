@@ -10,27 +10,13 @@
 #   - Missing title -> non-empty errors[].
 #   - Valid -> id (bare), url, name (t3_<id>).
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
-
-# --- shared helpers (copied; keep in sync across scripts) ---
-
-def _has_ua(req):
-    ua = req["headers"].get("User-Agent", "")
-    # Reddit bans absent/generic UAs. Accept only a descriptive one (our
-    # adapter sends "***REMOVED***.me/1.0 (...)"). This is what makes the
-    # missing-UA bug reproducible.
-    return ua != "" and ua.find("/") >= 0 and ua.find("(") >= 0
-
-def _ua_rejected(req):
-    return respond(429, {"message": "Too Many Requests", "error": 429})
+# Shared helpers (_has_ua, _ua_rejected) are preloaded from scripts/lib.star.
 
 def _bearer(req):
     auth = req["headers"].get("Authorization", "")
     if auth[:7] == "Bearer ":
         return auth[7:]
     return ""
-
-# --- handlers ---
 
 # on_submit creates a new post for the authenticated user.
 def on_submit(req):

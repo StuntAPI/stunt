@@ -184,6 +184,9 @@ func (e *Engine) runHandler(
 }
 
 // getOrLoadVM returns the cached VM for scriptPath, or loads it on first use.
+// If a lib.star exists in the same directory as the handler script, its
+// top-level definitions are preloaded and made available to the handler as
+// shared-library helpers.
 func (st *serviceState) getOrLoadVM(scriptPath string) (*starlark.VM, error) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
@@ -197,7 +200,15 @@ func (st *serviceState) getOrLoadVM(scriptPath string) (*starlark.VM, error) {
 		return nil, fmt.Errorf("read %s: %w", scriptPath, err)
 	}
 
-	vm, err := starlark.Load(string(src), st.builtins)
+	// Check for a lib.star in the same directory as the handler script.
+	// If present, its top-level defs are injected as predeclared globals.
+	libPath := filepath.Join(filepath.Dir(scriptPath), "lib.star")
+	var libSrc string
+	if libData, err := os.ReadFile(libPath); err == nil {
+		libSrc = string(libData)
+	}
+
+	vm, err := starlark.LoadWithLib(string(src), libSrc, st.builtins)
 	if err != nil {
 		return nil, fmt.Errorf("load %s: %w", scriptPath, err)
 	}

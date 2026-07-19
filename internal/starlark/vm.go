@@ -47,33 +47,76 @@ type VM struct {
 // respond(status=200, body=None, headers=None) returns a dict suitable as
 // a handler return value. If status is omitted it defaults to 200.
 func Load(src string, builtins sk.StringDict) (*VM, error) {
-	predeclared := sk.StringDict{
-		"respond": sk.NewBuiltin("respond", respondBuiltin),
+	return loadFile("handler.star", src, buildPredeclared(builtins))
+}
+
+// LoadWithLib is like Load but first executes libSrc (if non-empty),
+// capturing its top-level definitions and making them available to the
+// handler script as if they were predeclared builtins. This is the
+// shared-library mechanism: a lib.star in the adapter's scripts/ directory
+// provides shared helpers without Starlark's load() (which stunt does not
+// support).
+//
+// libSrc runs under the same step-limit and sandbox constraints as the
+// handler script. Its globals are frozen before being injected, so handlers
+// cannot mutate shared library state.
+//
+// If libSrc is empty, LoadWithLib behaves exactly like Load.
+func LoadWithLib(src, libSrc string, builtins sk.StringDict) (*VM, error) {
+	if libSrc == "" {
+		return Load(src, builtins)
 	}
-	// Caller-provided builtins override or extend the defaults.
-	for k, v := range builtins {
+
+	predeclared := buildPredeclared(builtins)
+
+	opts := &syntax.FileOptions{While: true}
+
+	// Exec the library first, under the same step limit + sandbox.
+	libThread := &sk.Thread{Name: "stunt-lib"}
+	libThread.SetMaxExecutionSteps(maxExecutionSteps)
+	libGlobals, err := sk.ExecFileOptions(opts, libThread, "lib.star", libSrc, predeclared)
+	if err != nil {
+		return nil, fmt.Errorf("starlark load lib: %w", err)
+	}
+
+	// Freeze lib globals so handlers cannot mutate shared library state.
+	for _, v := range libGlobals {
+		v.Freeze()
+	}
+
+	// Inject lib globals into the handler's predeclared dict.
+	for k, v := range libGlobals {
 		predeclared[k] = v
 	}
 
+	return loadFile("handler.star", src, predeclared)
+}
+
+// buildPredeclared assembles the predeclared StringDict that every script
+// sees: the default respond builtin plus any caller-provided builtins.
+func buildPredeclared(builtins sk.StringDict) sk.StringDict {
+	predeclared := sk.StringDict{
+		"respond": sk.NewBuiltin("respond", respondBuiltin),
+	}
+	for k, v := range builtins {
+		predeclared[k] = v
+	}
+	return predeclared
+}
+
+// loadFile execs src under a step-limited, while-enabled thread, freezes the
+// resulting globals, and returns the VM. This is the common path for both
+// Load and LoadWithLib.
+func loadFile(name, src string, predeclared sk.StringDict) (*VM, error) {
+	opts := &syntax.FileOptions{
+		While: true,
+	}
 	loadThread := &sk.Thread{
 		Name: "stunt-load",
 	}
 	loadThread.SetMaxExecutionSteps(maxExecutionSteps)
 
-	// Enable while-loops (a non-standard Starlark extension) so that
-	// streaming handlers can drain inbound streams naturally:
-	//
-	//   while True:
-	//       m = stream.recv()
-	//       if m == None: break
-	//
-	// Recursion remains disabled to preserve the compile-time recursion
-	// check that prevents unbounded stack growth. While-loops are safe
-	// because each iteration is bounded by SetMaxExecutionSteps.
-	opts := &syntax.FileOptions{
-		While: true,
-	}
-	globals, err := sk.ExecFileOptions(opts, loadThread, "handler.star", src, predeclared)
+	globals, err := sk.ExecFileOptions(opts, loadThread, name, src, predeclared)
 	if err != nil {
 		return nil, fmt.Errorf("starlark load: %w", err)
 	}

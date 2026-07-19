@@ -6,13 +6,7 @@
 # Returns the user's published media, each with one synthetic reply child.
 # The fetchThreadsEngagement adapter flattens each post's replies.data[] rows.
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
-
-def _bearer_present(req):
-    auth = req["headers"].get("Authorization", "")
-    if auth[:7] == "Bearer ":
-        return True
-    return False
+# Shared helper (_bearer_present) is preloaded from scripts/lib.star.
 
 # on_engagement returns the user's published media with synthetic replies.
 def on_engagement(req):

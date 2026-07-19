@@ -6,23 +6,8 @@
 #
 # Rate-limit injection: after N posts (configurable via KV), returns 429.
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
-
-def _bearer(req):
-    auth = req["headers"].get("Authorization", "")
-    if auth[:7] == "Bearer ":
-        return auth[7:]
-    return ""
-
-def _member_for_token(req):
-    token = _bearer(req)
-    if token == "":
-        return None
-    c = store_collection("tokens")
-    doc = c.get(token)
-    if doc == None:
-        return None
-    return doc
+# Shared helpers (_bearer, _member_for_token, _to_int) are preloaded from
+# scripts/lib.star.
 
 # on_ugc_posts creates a new post for the authenticated member.
 def on_ugc_posts(req):
@@ -104,13 +89,3 @@ def _get_fail_after():
     if v == None or v == "":
         return 0
     return _to_int(v)
-
-def _to_int(s):
-    n = 0
-    for i in range(len(s)):
-        ch = s[i]
-        if ch >= "0" and ch <= "9":
-            n = n * 10 + (ord(ch) - ord("0"))
-        else:
-            return 0
-    return n

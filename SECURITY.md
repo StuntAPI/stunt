@@ -92,6 +92,38 @@ cloned adapter is still subject to the sandbox/gate/check above once served.
 - Panic recovery on every handler call path (HTTP/Starlark/gRPC/WS/GraphQL) — a
   faulty handler yields an error, never a crash.
 
+## Adapter auth/header handling
+
+These are the implicit security-relevant design decisions around how adapter
+handlers interact with request headers, OAuth, and outbound network calls:
+
+- **Header pass-through is intentional.** Handlers receive ALL request headers
+  (including `Authorization`) via `req["headers"]` so adapters can read Bearer
+  tokens, Basic credentials, `User-Agent`, etc. **Implication:** any installed
+  adapter can read auth headers from requests it handles. The adapter is
+  sandboxed (no host I/O, no network) and cannot exfiltrate them, but it does
+  *see* the inbound request's credentials. This is by design — OAuth-aware
+  adapters (LinkedIn, Threads, Reddit, X Articles) need to validate tokens.
+
+- **PKCE S256 is relaxed in the x-articles-style adapter** (documented in the
+  script's module docstring). The real X server verifies `code_verifier` by
+  computing `base64url_no_pad(sha256(code_verifier))` and comparing against the
+  stored `code_challenge`. Starlark in stunt has no `sha256` or `base64`
+  builtins, so the mock checks `code_verifier` for *presence* (non-empty) but
+  does **not** verify the cryptographic match. This is acceptable for a
+  localhost pipeline double: a real client that generates a valid S256 pair
+  always passes, and a client that omits the verifier fails appropriately. The
+  only gap is that a deliberately-wrong-but-present verifier is accepted.
+
+- **`events_register` / `events_emit` is an SSRF surface** adapters *can* use.
+  An adapter can call `events_register("http://...")` to register an arbitrary
+  webhook URL, then `events_emit(type, payload)` to deliver a POST to it. This
+  is fire-and-forget: delivery failures never break the handler. The four new
+  adapters (linkedin-style, threads-style, reddit-style, x-articles-style) do
+  **not** use events at all. But it is a known capability — any installed
+  adapter could register a webhook and emit to localhost services. The events
+  emitter is subject to a 10-second timeout per `events_emit` call.
+
 ## Disclosure / responsible use
 
 Branded adapters use `<provider>-style` naming and ship a `DISCLAIMER` stating

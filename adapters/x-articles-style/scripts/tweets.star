@@ -17,7 +17,7 @@
 # fails here (proving the reply-chain path is used). Reply validation ensures
 # chain integrity (a reply must target a known tweet).
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
+# Shared helper (_pad5) is preloaded from scripts/lib.star.
 
 def _next_tweet_id():
     return "tweet_" + str(store_kv_incr("xarticles", "tweet_seq"))

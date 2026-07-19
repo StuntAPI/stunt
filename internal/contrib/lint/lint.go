@@ -60,6 +60,10 @@ func ExitCode(findings []Finding) int {
 // graphql: schema + resolvers must be present with a valid handler spec) and
 // scans the ws + graphql handler/resolver scripts for real-looking data.
 //
+// It also checks the scripts/ directory for helper-drift: the same function
+// name defined in multiple handler scripts (excluding lib.star) is flagged as
+// a warning, since it indicates copy-pasted code that should be in lib.star.
+//
 // It returns all findings (which may be empty). A nil error with findings
 // is a successful scan that found issues.
 func Lint(dir string) ([]Finding, error) {
@@ -98,6 +102,13 @@ func Lint(dir string) ([]Finding, error) {
 		return nil, err
 	}
 	findings = append(findings, gqlFindings...)
+
+	// Check scripts/ for helper-drift (same function name in multiple files).
+	driftFindings, err := lintScriptDrift(dir)
+	if err != nil {
+		return nil, err
+	}
+	findings = append(findings, driftFindings...)
 
 	return findings, nil
 }
@@ -269,6 +280,89 @@ func splitGraphqlHandler(h string) (path, fn string) {
 		return h, ""
 	}
 	return h[:idx], h[idx+1:]
+}
+
+// reDef matches a top-level Starlark function definition, capturing the
+// function name. It requires `def ` at the start of a line (no leading
+// whitespace) to avoid matching nested defs.
+var reDef = regexp.MustCompile(`^def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(`)
+
+// lintScriptDrift scans the scripts/ directory (recursively) for .star files
+// and flags any function name defined in more than one handler script
+// (excluding lib.star). This catches copy-pasted helpers that should be
+// moved to scripts/lib.star. The finding is a warning (not an error) because
+// the code may be intentionally duplicated.
+func lintScriptDrift(dir string) ([]Finding, error) {
+	scriptsDir := filepath.Join(dir, "scripts")
+	// name -> list of files that define it
+	defs := make(map[string][]string)
+
+	err := filepath.WalkDir(scriptsDir, func(path string, d os.DirEntry, wErr error) error {
+		if wErr != nil {
+			if os.IsNotExist(wErr) {
+				return nil
+			}
+			return wErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if strings.ToLower(filepath.Ext(path)) != ".star" {
+			return nil
+		}
+		// lib.star is the shared library — its defs are expected to be used
+		// across files, so it is excluded from the drift check.
+		if filepath.Base(path) == "lib.star" {
+			return nil
+		}
+		names, err := extractDefNames(path)
+		if err != nil {
+			return nil // skip unreadable files
+		}
+		rel, err := filepath.Rel(dir, path)
+		if err != nil {
+			rel = path
+		}
+		for _, name := range names {
+			defs[name] = append(defs[name], rel)
+		}
+		return nil
+	})
+	if err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("lint: drift scan %s: %w", scriptsDir, err)
+	}
+
+	var findings []Finding
+	for name, files := range defs {
+		if len(files) > 1 {
+			findings = append(findings, Finding{
+				File:     files[0],
+				Severity: SeverityWarn,
+				Message:  fmt.Sprintf("function %q is defined in %d scripts (%s) — move to lib.star to avoid drift", name, len(files), strings.Join(files, ", ")),
+			})
+		}
+	}
+	return findings, nil
+}
+
+// extractDefNames reads a .star file and returns the names of all top-level
+// function definitions (lines matching `^def <name>(`).
+func extractDefNames(path string) ([]string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var names []string
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for scanner.Scan() {
+		if m := reDef.FindStringSubmatch(scanner.Text()); m != nil {
+			names = append(names, m[1])
+		}
+	}
+	return names, scanner.Err()
 }
 
 // scanDirRecursive walks dir recursively, scanning all files whose

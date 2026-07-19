@@ -8,25 +8,10 @@
 # GET  /oauth/v2/authorization  -> 302 redirect with code+state
 # POST /oauth/v2/accessToken    -> { access_token, expires_in, refresh_token, scope }
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
+# Shared helpers (_bearer, _member_for_token) are preloaded from
+# scripts/lib.star.
 
-# --- shared helpers (copied; keep in sync across scripts) ---
-
-def _bearer(req):
-    auth = req["headers"].get("Authorization", "")
-    if auth[:7] == "Bearer ":
-        return auth[7:]
-    return ""
-
-def _member_for_token(req):
-    token = _bearer(req)
-    if token == "":
-        return None
-    c = store_collection("tokens")
-    doc = c.get(token)
-    if doc == None:
-        return None
-    return doc
+# --- adapter-specific helpers (not shared) ---
 
 def _pad3(n):
     if n < 10:

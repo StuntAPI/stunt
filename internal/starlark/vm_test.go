@@ -1,6 +1,7 @@
 package starlark
 
 import (
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -193,6 +194,164 @@ def on_get(req):
 
 	if resp.Body["msg"] != "hello World" {
 		t.Fatalf("Body[msg] = %v, want 'hello World'", resp.Body["msg"])
+	}
+}
+
+// --- LoadWithLib: shared-library preload mechanism ---
+
+// TestLoadWithLibHelperWorks verifies that a handler can use a helper defined
+// in lib.star when libSrc is passed to LoadWithLib.
+func TestLoadWithLibHelperWorks(t *testing.T) {
+	libSrc := `
+def _greet(name):
+    return "hello " + name
+`
+	src := `
+def on_get(req):
+    return respond(200, {"msg": _greet(req["body"]["name"])})
+`
+	vm, err := LoadWithLib(src, libSrc, nil)
+	if err != nil {
+		t.Fatalf("LoadWithLib: %v", err)
+	}
+
+	resp, err := vm.Call("on_get", Request{
+		Method: "GET",
+		Body:   map[string]any{"name": "World"},
+	})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if resp.Body["msg"] != "hello World" {
+		t.Fatalf("Body[msg] = %v, want 'hello World'", resp.Body["msg"])
+	}
+}
+
+// TestLoadWithLibEmptyDelegatesToLoad verifies that empty libSrc behaves
+// exactly like Load — no error, handler works normally.
+func TestLoadWithLibEmptyDelegatesToLoad(t *testing.T) {
+	src := `
+def on_get(req):
+    return respond(200, {"ok": True})
+`
+	vm, err := LoadWithLib(src, "", nil)
+	if err != nil {
+		t.Fatalf("LoadWithLib: %v", err)
+	}
+
+	resp, err := vm.Call("on_get", Request{Method: "GET"})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if resp.Status != 200 {
+		t.Fatalf("Status = %d, want 200", resp.Status)
+	}
+}
+
+// TestLoadWithLibErrorSurfaces verifies that a syntax/runtime error in
+// lib.star produces a clear error rather than silently succeeding.
+func TestLoadWithLibErrorSurfaces(t *testing.T) {
+	libSrc := `
+def broken(
+` // missing closing paren
+	src := `
+def on_get(req):
+    return respond(200, {})
+`
+	_, err := LoadWithLib(src, libSrc, nil)
+	if err == nil {
+		t.Fatal("expected error from broken lib.star, got nil")
+	}
+	// The error should mention the lib so it's distinguishable.
+	if !strings.Contains(err.Error(), "lib") {
+		t.Fatalf("error should mention lib, got: %v", err)
+	}
+}
+
+// TestLoadWithLibStepLimitApplies verifies that the step limit applies to
+// lib.star too — an infinite loop in the lib cannot hang the load.
+func TestLoadWithLibStepLimitApplies(t *testing.T) {
+	libSrc := `
+while True:
+    pass
+`
+	src := `
+def on_get(req):
+    return respond(200, {})
+`
+	done := make(chan error, 1)
+	go func() {
+		_, err := LoadWithLib(src, libSrc, nil)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected error from infinite loop in lib, got nil")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("LoadWithLib did not return within 5s; step limit not enforced on lib")
+	}
+}
+
+// TestLoadWithLibLibGlobalsFrozen verifies that the handler cannot mutate
+// a global defined in lib.star (the lib globals are frozen before injection).
+func TestLoadWithLibLibGlobalsFrozen(t *testing.T) {
+	libSrc := `
+_counter = 0
+`
+	src := `
+def on_get(req):
+    _counter = _counter + 1
+    return respond(200, {"count": _counter})
+`
+	vm, err := LoadWithLib(src, libSrc, nil)
+	if err != nil {
+		t.Fatalf("LoadWithLib: %v", err)
+	}
+
+	_, err = vm.Call("on_get", Request{Method: "GET"})
+	if err == nil {
+		t.Fatal("expected frozen-global error when handler modifies lib global, got nil")
+	}
+}
+
+// TestLoadWithLibUsesBuiltins verifies that lib functions can call builtins
+// passed via the builtins dict.
+func TestLoadWithLibUsesBuiltins(t *testing.T) {
+	libSrc := `
+def _double(name):
+    return greet(name) + " " + greet(name)
+`
+	src := `
+def on_get(req):
+    return respond(200, {"msg": _double(req["body"]["name"])})
+`
+	builtins := sk.StringDict{
+		"greet": sk.NewBuiltin("greet", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, _ []sk.Tuple) (sk.Value, error) {
+			var name string
+			if err := sk.UnpackArgs("greet", args, nil, "name", &name); err != nil {
+				return nil, err
+			}
+			return sk.String("hi " + name), nil
+		}),
+	}
+
+	vm, err := LoadWithLib(src, libSrc, builtins)
+	if err != nil {
+		t.Fatalf("LoadWithLib: %v", err)
+	}
+
+	resp, err := vm.Call("on_get", Request{
+		Method: "GET",
+		Body:   map[string]any{"name": "World"},
+	})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if resp.Body["msg"] != "hi World hi World" {
+		t.Fatalf("Body[msg] = %v, want 'hi World hi World'", resp.Body["msg"])
 	}
 }
 

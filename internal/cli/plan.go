@@ -177,7 +177,16 @@ func planCheckHandlers(out interface{ Write([]byte) (int, error) }, serviceName 
 			fmt.Fprintf(out, "  WARNING: service %q: handler %s: %v\n", serviceName, display, err)
 			return
 		}
-		vm, err := starlark.Load(string(src), dummyBuiltins)
+
+		// Preload lib.star if present in the same scripts/ directory, so
+		// shared helpers resolve during the compile check.
+		libPath := filepath.Join(filepath.Dir(scriptPath), "lib.star")
+		var libSrc string
+		if libData, err := os.ReadFile(libPath); err == nil {
+			libSrc = string(libData)
+		}
+
+		vm, err := starlark.LoadWithLib(string(src), libSrc, dummyBuiltins)
 		if err != nil {
 			fmt.Fprintf(out, "  WARNING: service %q: handler %s: %v\n", serviceName, display, err)
 			return

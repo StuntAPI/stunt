@@ -6,7 +6,7 @@
 # The authorization code is single-use: exchanging it deletes it so a replay
 # returns 400 invalid_grant.
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
+# Shared helper (_bearer_present) is preloaded from scripts/lib.star.
 
 # --- helpers ---
 

@@ -8,13 +8,7 @@
 # Token-PRESENCE policy: any Bearer header is accepted; the value is NOT
 # validated (Threads has no author-URN-matching semantics to exercise).
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
-
-def _bearer_present(req):
-    auth = req["headers"].get("Authorization", "")
-    if auth[:7] == "Bearer ":
-        return True
-    return False
+# Shared helper (_bearer_present) is preloaded from scripts/lib.star.
 
 # on_create handles step 1: create a media container.
 def on_create(req):

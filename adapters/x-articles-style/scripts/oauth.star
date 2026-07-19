@@ -29,9 +29,9 @@
 #   that a deliberately-wrong-but-present verifier is accepted — acceptable
 #   for local testing.
 
-# NOTE: Starlark load() is unavailable in stunt, so shared helpers are inlined.
+# Shared helper (_pad5) is preloaded from scripts/lib.star.
 
-# --- shared helpers ---
+# --- adapter-specific helpers ---
 
 def _is_basic(req):
     auth = req["headers"].get("Authorization", "")
@@ -39,17 +39,6 @@ def _is_basic(req):
 
 def _contains(s, substr):
     return s.find(substr) >= 0
-
-def _pad5(n):
-    if n < 10:
-        return "0000" + str(n)
-    if n < 100:
-        return "000" + str(n)
-    if n < 1000:
-        return "00" + str(n)
-    if n < 10000:
-        return "0" + str(n)
-    return str(n)
 
 # _rand_code generates a synthetic authorization code. Starlark has no
 # crypto-secure RNG, so we use the KV sequence counter to produce a unique,
