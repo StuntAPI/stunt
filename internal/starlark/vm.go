@@ -139,6 +139,33 @@ func (vm *VM) CallWith(handlerName string, arg sk.Value) (Response, error) {
 	return vm.CallWithMaxSteps(handlerName, arg, maxExecutionSteps)
 }
 
+// CallRaw invokes the named handler with a pre-built Starlark value and
+// returns the raw Starlark result without converting it to a Response.
+// This is used by GraphQL resolvers, where the return value can be a list,
+// scalar, or dict — not just the respond(...) convention. A None return
+// is returned as sk.None; the caller decides how to interpret it.
+func (vm *VM) CallRaw(handlerName string, arg sk.Value) (sk.Value, error) {
+	fn, ok := vm.globals[handlerName]
+	if !ok {
+		return nil, fmt.Errorf("starlark: handler %q is not defined", handlerName)
+	}
+
+	if _, ok := fn.(sk.Callable); !ok {
+		return nil, fmt.Errorf("starlark: %q is not callable", handlerName)
+	}
+
+	thread := &sk.Thread{
+		Name: "stunt",
+	}
+	thread.SetMaxExecutionSteps(maxExecutionSteps)
+
+	result, err := sk.Call(thread, fn, sk.Tuple{arg}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("starlark: call %q: %w", handlerName, err)
+	}
+	return result, nil
+}
+
 // CallWithMaxSteps is like CallWith but allows the caller to specify a
 // custom step budget. WebSocket handlers use an elevated limit because they
 // run for the lifetime of a connection and may legitimately exchange many
@@ -293,6 +320,13 @@ func StarlarkListToGo(l *sk.List) []any {
 		out[i] = starlarkValueToGo(l.Index(i))
 	}
 	return out
+}
+
+// ValueToGo converts an arbitrary Starlark value into a Go value. This is
+// the general-purpose converter for resolver return values that may be
+// dicts, lists, scalars, or None.
+func ValueToGo(v sk.Value) any {
+	return starlarkValueToGo(v)
 }
 
 // starlarkValueToGo converts an arbitrary Starlark value into a Go value.

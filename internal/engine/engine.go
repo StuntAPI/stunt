@@ -74,8 +74,9 @@ type serviceState struct {
 	emitter   *events.Emitter
 	builtins  sk.StringDict
 
-	mu  sync.Mutex
-	vms map[string]*starlark.VM // script path → VM (loaded once)
+	mu        sync.Mutex
+	vms       map[string]*starlark.VM // script path → VM (loaded once)
+	gqlSchema any                     // *graphqlSchemaCache (parsed schema cache)
 }
 
 // New creates an Engine from a manifest. Git adapter sources are resolved
@@ -386,6 +387,14 @@ func (e *Engine) serviceHandler(name string, svc manifest.Service) http.Handler 
 					return
 				}
 			}
+		}
+
+		// --- GraphQL dispatch (before HTTP) ---
+		// If the adapter has a graphql spec and the request path matches
+		// the configured graphql path, handle it as GraphQL.
+		if st != nil && st.adapter != nil && st.adapter.Graphql != nil && r.URL.Path == graphqlPath(st) {
+			e.handleGraphql(w, r, st)
+			return
 		}
 
 		var body []byte

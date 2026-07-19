@@ -9,6 +9,7 @@ require (
 	github.com/expr-lang/expr v1.17.8
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/spf13/cobra v1.8.1
+	github.com/vektah/gqlparser/v2 v2.5.36
 	go.starlark.net v0.0.0-20240925182052-1207426daebd
 	google.golang.org/grpc v1.72.2
 	google.golang.org/protobuf v1.36.11
@@ -17,9 +18,11 @@ require (
 )
 
 require (
+	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/kr/text v0.1.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect

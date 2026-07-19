@@ -27,6 +27,7 @@ type Adapter struct {
 	Rules      []rules.Rule        `yaml:"rules"`
 	Identity   *Identity           `yaml:"identity"`
 	Grpc       *GrpcSpec           `yaml:"grpc"`
+	Graphql    *GraphqlSpec        `yaml:"graphql"`
 	Websockets []WebsocketEndpoint `yaml:"ws"`
 }
 
@@ -60,6 +61,25 @@ type GrpcSpec struct {
 type GrpcMethod struct {
 	Name    string `yaml:"name"`    // bare method name, e.g. "SayHello"
 	Handler string `yaml:"handler"` // "scripts/greeter.star#on_say_hello"
+}
+
+// GraphqlSpec declares an optional GraphQL endpoint served from an SDL
+// schema plus convention-named Starlark resolver functions. When Graphql
+// is nil the adapter is HTTP-only (no GraphQL endpoint).
+type GraphqlSpec struct {
+	// Schema is the path to the GraphQL SDL file, relative to the adapter
+	// directory. Resolved to absolute by Load.
+	Schema string `yaml:"schema"`
+
+	// Resolvers is the path to the Starlark script containing resolver
+	// functions. It may be in "scripts/x.star#fn" or "scripts/x.star" form
+	// (the latter uses convention-named functions on_<field> and
+	// resolve_<Type>_<field>). Resolved to absolute by Load.
+	Resolvers string `yaml:"resolvers"`
+
+	// Path is the HTTP path at which the GraphQL endpoint is served.
+	// Optional; defaults to "/graphql".
+	Path string `yaml:"path"`
 }
 
 // Endpoint is one route declaration in adapter.yaml. An endpoint may either
@@ -113,6 +133,16 @@ func (a *Adapter) DescriptorBytes() ([]byte, error) {
 	return a.ReadFile(a.Grpc.Descriptor)
 }
 
+// SchemaSDL reads the GraphQL SDL file referenced by the graphql spec. It
+// returns the raw SDL bytes, applying the same directory-containment check
+// used by ReadFile to reject path-traversal attacks.
+func (a *Adapter) SchemaSDL() ([]byte, error) {
+	if a.Graphql == nil || a.Graphql.Schema == "" {
+		return nil, fmt.Errorf("adapter: no graphql schema configured")
+	}
+	return a.ReadFile(a.Graphql.Schema)
+}
+
 // validate checks basic structural invariants after parsing.
 func (a *Adapter) validate() error {
 	if a.ID == "" {
@@ -132,6 +162,20 @@ func (a *Adapter) validate() error {
 			if m.Handler == "" {
 				return fmt.Errorf("adapter: grpc.methods[%d].handler is required", i)
 			}
+		}
+	}
+	// Validate graphql spec.
+	if a.Graphql != nil {
+		if a.Graphql.Schema == "" {
+			return fmt.Errorf("adapter: graphql.schema is required when graphql is declared")
+		}
+		if a.Graphql.Resolvers == "" {
+			return fmt.Errorf("adapter: graphql.resolvers is required when graphql is declared")
+		}
+		// Resolvers may be "scripts/x.star#fn" or "scripts/x.star".
+		rPath, _ := splitHandler(a.Graphql.Resolvers)
+		if rPath == "" {
+			return fmt.Errorf("adapter: graphql.resolvers %q must be a script path", a.Graphql.Resolvers)
 		}
 	}
 	// Validate websocket endpoints.
@@ -218,7 +262,34 @@ func (a *Adapter) resolveHandlerPaths() error {
 		if fn != "" {
 			a.Websockets[i].Handler += "#" + fn
 		}
+	} // Resolve graphql schema + resolvers paths (same containment check).
+	if a.Graphql != nil {
+		if a.Graphql.Schema != "" {
+			resolved, err := a.resolveContainedPath(a.Graphql.Schema)
+			if err != nil {
+				return err
+			}
+			a.Graphql.Schema = resolved
+		}
+		if a.Graphql.Resolvers != "" {
+			rPath, fn := splitHandler(a.Graphql.Resolvers)
+			if rPath != "" {
+				resolved, err := a.resolveContainedPath(rPath)
+				if err != nil {
+					return err
+				}
+				a.Graphql.Resolvers = resolved
+				if fn != "" {
+					a.Graphql.Resolvers += "#" + fn
+				}
+			}
+		}
+		// Default path.
+		if a.Graphql.Path == "" {
+			a.Graphql.Path = "/graphql"
+		}
 	}
+
 	return nil
 }
 
