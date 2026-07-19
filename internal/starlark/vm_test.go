@@ -309,6 +309,61 @@ def on_get(req):
 
 // --- M8: non-int status returns an error ---
 
+// --- stunt-sec: top-level while-True must be bounded at load time ---
+
+func TestLoadWhileTrueBoundedByStepLimit(t *testing.T) {
+	// A malicious adapter with a top-level while True: pass must be caught
+	// by the step limit during Load (not during a handler call).
+	src := `
+while True:
+    pass
+
+def on_get(req):
+    return respond(200, {})
+`
+	done := make(chan error, 1)
+	go func() {
+		_, err := Load(src, nil)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected error from top-level while True, got nil")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Load did not return within 5 seconds; load-phase step limit not enforced")
+	}
+}
+
+// TestLoadWhileTrueWithLargeLoop also proves the step limit catches a
+// more realistic slow-burn loop that increments a counter forever.
+func TestLoadWhileTrueWithLargeLoop(t *testing.T) {
+	src := `
+x = 0
+while x < 1000000000:
+    x = x + 1
+
+def on_get(req):
+    return respond(200, {"x": x})
+`
+	done := make(chan error, 1)
+	go func() {
+		_, err := Load(src, nil)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Fatal("expected error from infinite load-time loop, got nil")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Load did not return within 5 seconds; load-phase step limit not enforced")
+	}
+}
+
 func TestNonIntStatusError(t *testing.T) {
 	src := `
 def on_get(req):
