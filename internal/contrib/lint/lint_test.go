@@ -597,3 +597,108 @@ ws:
 		t.Errorf("expected error-severity finding: %+v", findings)
 	}
 }
+
+// --- graphql section validation ---
+
+// TestGraphqlSectionCleanAdapter verifies that a valid graphql section with
+// a clean resolver script lints without findings.
+func TestGraphqlSectionCleanAdapter(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "adapter.yaml",
+		`id: gqlclean
+name: GQLClean
+version: "0.1.0"
+graphql:
+  schema: schemas/blog.graphql
+  resolvers: scripts/resolvers.star
+`)
+	writeFile(t, dir, "schemas/blog.graphql",
+		`type Query { user(id: ID!): User }
+type User { id: ID! name: String! }
+`)
+	writeFile(t, dir, "scripts/resolvers.star",
+		`def on_user(args):
+    return respond(200, {"id": "1", "name": "synthetic"})
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	for _, f := range findings {
+		if f.Severity == SeverityError {
+			t.Errorf("unexpected graphql error finding: %s:%d %s", f.File, f.Line, f.Message)
+		}
+	}
+}
+
+// TestGraphqlSectionMissingSchema verifies that a graphql section without
+// a schema is flagged.
+func TestGraphqlSectionMissingSchema(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "adapter.yaml",
+		`id: gqlbad
+name: GQLBad
+version: "0.1.0"
+graphql:
+  resolvers: scripts/resolvers.star
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "graphql.schema") {
+		t.Errorf("expected graphql.schema finding, got: %+v", findings)
+	}
+}
+
+// TestGraphqlSectionMissingResolvers verifies that a graphql section without
+// resolvers is flagged.
+func TestGraphqlSectionMissingResolvers(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "adapter.yaml",
+		`id: gqlbad
+name: GQLBad
+version: "0.1.0"
+graphql:
+  schema: schemas/blog.graphql
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "graphql.resolvers") {
+		t.Errorf("expected graphql.resolvers finding, got: %+v", findings)
+	}
+}
+
+// TestGraphqlSectionRealDataInResolverScript verifies that real-looking data
+// in a graphql resolver script is flagged.
+func TestGraphqlSectionRealDataInResolverScript(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "adapter.yaml",
+		`id: gqlbad
+name: GQLBad
+version: "0.1.0"
+graphql:
+  schema: schemas/blog.graphql
+  resolvers: scripts/resolvers.star
+`)
+	writeFile(t, dir, "scripts/resolvers.star",
+		`def on_user(args):
+    return respond(200, {"email": "admin@real-company.com"})
+`)
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "email") {
+		t.Errorf("expected email finding in graphql resolver script, got: %+v", findings)
+	}
+	if !hasError(findings) {
+		t.Errorf("expected error-severity finding: %+v", findings)
+	}
+}

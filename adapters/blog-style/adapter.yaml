@@ -1,0 +1,27 @@
+# stunt adapter manifest — Blog GraphQL example (generic, unbranded)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# A generic GraphQL reference adapter. It does NOT mimic a specific
+# company's API, so no DISCLAIMER is needed. All data is synthetic.
+id: blog-style
+name: "Blog GraphQL example adapter"
+version: "0.1.0"
+
+# GraphQL service — served from the SDL schema + convention-named Starlark
+# resolvers. Root fields use on_<field>(callArg); object fields use
+# resolve_<Type>_<field>(callArg). Scalar fields default to parent[field].
+graphql:
+  schema: schemas/schema.graphql
+  resolvers: scripts/resolvers.star
+
+# Backing stores available to Starlark resolvers.
+resources:
+  - name: users
+    kind: collection
+    seed: fixtures/users.jsonl
+  - name: posts
+    kind: collection
+    seed: fixtures/posts.jsonl
+  - name: comments
+    kind: collection
+    seed: fixtures/comments.jsonl

@@ -1,0 +1,49 @@
+# Blog GraphQL schema — a small but realistic blog domain.
+#
+# Demonstrates: types, lists, nested relations (User.posts, Post.comments,
+# Post.author), an enum (PostStatus), a custom scalar (DateTime), and
+# Query + Mutation roots. All data is synthetic.
+
+scalar DateTime
+
+"""Publication status of a blog post."""
+enum PostStatus {
+  PUBLISHED
+  DRAFT
+}
+
+type User {
+  id: ID!
+  name: String!
+  bio: String
+  posts: [Post!]!
+}
+
+type Post {
+  id: ID!
+  title: String!
+  body: String!
+  status: PostStatus!
+  createdAt: DateTime
+  author: User!
+  comments: [Comment!]!
+}
+
+type Comment {
+  id: ID!
+  body: String!
+  author: String!
+}
+
+type Query {
+  user(id: ID!): User
+  users: [User!]!
+  post(id: ID!): Post
+  posts(status: PostStatus): [Post!]!
+}
+
+type Mutation {
+  createUser(name: String!, bio: String): User!
+  createPost(userId: ID!, title: String!, body: String!, status: PostStatus): Post!
+  addComment(postId: ID!, author: String!, body: String!): Comment!
+}
