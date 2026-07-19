@@ -1,0 +1,76 @@
+# stunt adapter manifest — X Articles API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* the X Articles long-form publishing REST
+# surface (draft → publish + media upload + PKCE OAuth2 + the x:tweet surface)
+# for LOCAL TESTING ONLY. It does not call the real X API. All data is
+# synthetic. See DISCLAIMER.
+#
+# It is a faithful port of ***REMOVED***'s mock_x_api/server.py: same JSON shapes,
+# status codes, and error conditions. It is a PIPELINE double — it validates
+# the draft→publish flow, media upload, and error handling, not real authz or
+# rendering.
+id: x-articles-style
+name: "X Articles API simulator (unofficial)"
+version: "0.1.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- OAuth2 PKCE: authorize redirect + token ---
+  - route: /2/oauth2/authorize
+    method: GET
+    handler: scripts/oauth.star#on_authorize
+  - route: /2/oauth2/token
+    method: POST
+    handler: scripts/oauth.star#on_token
+
+  # --- Articles: draft (literal route first) ---
+  - route: /2/articles/draft
+    method: POST
+    handler: scripts/articles.star#on_draft
+  # --- Articles: publish (parameterized) ---
+  - route: /2/articles/{id}/publish
+    method: POST
+    handler: scripts/articles.star#on_publish
+  # --- Articles: metadata lookup (parameterized) ---
+  - route: /2/articles/{id}
+    method: GET
+    handler: scripts/articles.star#on_get
+
+  # --- Media upload (octet-stream) ---
+  - route: /2/media/upload
+    method: POST
+    handler: scripts/media.star#on_upload
+
+  # --- Tweets (the x:tweet surface: 280-char + reply-chain) ---
+  - route: /2/tweets
+    method: POST
+    handler: scripts/tweets.star#on_create
+  - route: /2/tweets/{id}
+    method: GET
+    handler: scripts/tweets.star#on_retrieve
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: articles
+    kind: collection
+  - name: tweets
+    kind: collection
+  - name: oauth_codes
+    kind: collection
+
+# Auth scheme metadata (mock: any bearer token is accepted; not enforced).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: resource not found
