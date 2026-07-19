@@ -55,9 +55,10 @@ func ExitCode(findings []Finding) int {
 
 // Lint scans the adapter directory's fixtures/, templates/, and endpoints/
 // directories (recursively) plus the root adapter.yaml for content that looks
-// like real recorded data. It also validates the `ws:` section structurally
-// (each endpoint must have a route + valid handler spec) and scans the ws
-// handler scripts for real-looking data.
+// like real recorded data. It also validates the `ws:` and `graphql:` sections
+// structurally (ws: each endpoint must have a route + valid handler spec;
+// graphql: schema + resolvers must be present with a valid handler spec) and
+// scans the ws + graphql handler/resolver scripts for real-looking data.
 //
 // It returns all findings (which may be empty). A nil error with findings
 // is a successful scan that found issues.
@@ -90,6 +91,13 @@ func Lint(dir string) ([]Finding, error) {
 		return nil, err
 	}
 	findings = append(findings, wsFindings...)
+
+	// Validate and scan the graphql section (schema + resolver script).
+	gqlFindings, err := lintGraphql(dir)
+	if err != nil {
+		return nil, err
+	}
+	findings = append(findings, gqlFindings...)
 
 	return findings, nil
 }
@@ -173,6 +181,94 @@ func lintWS(dir string) ([]Finding, error) {
 	}
 
 	return findings, nil
+}
+
+// graphqlManifest is a minimal struct for parsing just the `graphql:`
+// section of adapter.yaml.
+type graphqlManifest struct {
+	Graphql *struct {
+		Schema    string `yaml:"schema"`
+		Resolvers string `yaml:"resolvers"`
+		Path      string `yaml:"path"`
+	} `yaml:"graphql"`
+}
+
+// lintGraphql validates the graphql section of adapter.yaml: the schema and
+// resolvers fields must be present, and the resolvers spec must be a valid
+// handler path (either "scripts/x.star" or "scripts/x.star#fn" form). It
+// also scans the resolver script for content that looks like real data,
+// so a resolver hardcoding real-looking values is flagged.
+func lintGraphql(dir string) ([]Finding, error) {
+	manifestPath := filepath.Join(dir, "adapter.yaml")
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil, nil // no adapter.yaml → nothing to validate
+	}
+
+	var gm graphqlManifest
+	if err := yaml.Unmarshal(data, &gm); err != nil {
+		// Malformed YAML is caught by the adapter loader; skip graphql lint.
+		return nil, nil
+	}
+	if gm.Graphql == nil {
+		return nil, nil // no graphql section → nothing to validate
+	}
+
+	var findings []Finding
+
+	// Validate schema.
+	if gm.Graphql.Schema == "" {
+		findings = append(findings, Finding{
+			File:     "adapter.yaml",
+			Severity: SeverityError,
+			Message:  "graphql.schema is required when graphql is declared",
+		})
+	}
+
+	// Validate resolvers presence.
+	if gm.Graphql.Resolvers == "" {
+		findings = append(findings, Finding{
+			File:     "adapter.yaml",
+			Severity: SeverityError,
+			Message:  "graphql.resolvers is required when graphql is declared",
+		})
+		return findings, nil // can't scan a missing script
+	}
+
+	// Validate resolvers is a valid script path (optionally with #fn).
+	// Unlike ws handlers, graphql resolvers may use convention-named
+	// functions without a # fragment.
+	scriptPath, _ := splitGraphqlHandler(gm.Graphql.Resolvers)
+	if scriptPath == "" {
+		findings = append(findings, Finding{
+			File:     "adapter.yaml",
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("graphql.resolvers %q must be a script path", gm.Graphql.Resolvers),
+		})
+		return findings, nil
+	}
+
+	// Scan the resolver script for real-looking data.
+	absScript := filepath.Join(dir, scriptPath)
+	ff, err := scanFile(scriptPath, absScript)
+	if err != nil {
+		// Missing script is not a lint error (the loader catches it);
+		// skip scanning.
+		return findings, nil
+	}
+	findings = append(findings, ff...)
+
+	return findings, nil
+}
+
+// splitGraphqlHandler splits "scripts/x.star#fn" into ("scripts/x.star", "fn").
+// Unlike ws handlers, the # fragment is optional for graphql resolvers.
+func splitGraphqlHandler(h string) (path, fn string) {
+	idx := strings.Index(h, "#")
+	if idx < 0 {
+		return h, ""
+	}
+	return h[:idx], h[idx+1:]
 }
 
 // scanDirRecursive walks dir recursively, scanning all files whose

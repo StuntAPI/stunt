@@ -5,7 +5,7 @@
 `stunt` reads a `stunt.yaml` manifest and serves local, runnable stand-ins for real APIs.
 Stateful behavior comes from sandboxed Starlark adapters backed by SQLite/blob primitives;
 declarative behavior comes from a rules engine (templated responses, probabilistic faults,
-conditional expressions). REST, gRPC (unary + streaming), and WebSocket transports are supported.
+conditional expressions). REST, gRPC (unary + streaming), WebSocket, and GraphQL transports are supported.
 Optionally front everything with a portless.dev-style TLS proxy on `*.localhost`. Everything is
 deterministic via `rng_seed`.
 
@@ -127,6 +127,7 @@ All unofficial, synthetic-data-only, with a DISCLAIMER. See `adapters/README.md`
 | `adapters/twitter-style` | X.com/Twitter-style — mock OAuth, tweets (CRUD), users, timeline | Collection (pure-mock reads) |
 | `adapters/echo-style` | generic gRPC service (Say, Add, ListEchoes) — gRPC reference example | Collection + KV + Starlark |
 | `adapters/dropbox-style` | files API (RPC-style) — upload/download/list_folder/get_metadata/create_folder/delete | Blob + Collection |
+| `adapters/blog-style` | generic GraphQL blog API (users, posts, comments, nested relations) — GraphQL reference example | Collection + Starlark |
 
 ## Networking (`*.localhost`, TLS)
 
@@ -168,7 +169,11 @@ Run `stunt clean` to reset all state back to the seed fixtures:
 - **gRPC** unary and streaming RPCs are supported via the `grpc:` adapter section (served dynamically
   from a compiled protobuf descriptor set). Streaming handlers use `stream.recv()`/`stream.send()`.
   **WebSocket** is supported via the `ws:` adapter section with connection-lifetime Starlark handlers
-  (`on_connect(ws)` using `ws.recv()`/`ws.send()`). GraphQL is not yet supported.
+  (`on_connect(ws)` using `ws.recv()`/`ws.send()`). **GraphQL** is supported via the `graphql:` adapter
+  section with an SDL schema + convention-named Starlark resolvers (`on_<field>` for root fields,
+  `resolve_<Type>_<field>` for object fields; scalar fields default to `parent[field]`). Full
+  introspection (`__schema`/`__type`/`__typename`) and DoS limits (depth, field count, timeout) are
+  included.
 - Concurrency is tested with `-race`; the design is single-process per `stunt up`.
 
 ## Project layout

@@ -33,6 +33,7 @@ The unbranded, generic adapter scaffold (`stunt adapter new`) is unaffected by t
 | `adapters/twitter-style` | an X.com / Twitter-style API (auth, tweets, users, timeline) | Identity + Collection (pure-mock) |
 | `adapters/echo-style` | a generic gRPC service (Say, Add, ListEchoes) — gRPC reference example | Collection + KV + Starlark |
 | `adapters/dropbox-style` | a Dropbox-style files API (upload/download, list_folder, metadata) | Blob + Collection |
+| `adapters/blog-style` | a generic GraphQL blog API (users, posts, comments, nested relations) — GraphQL reference example | Collection + Starlark |
 
 Each adapter is **broader than a minimal demo** but remains an MVP: enough endpoints to be a useful
 local stand-in and to exercise the stunt primitives end to end. See each adapter's own README.
@@ -397,4 +398,183 @@ def on_connect(ws):
   `events_emit`) are available inside `on_connect`.
 - `stunt adapter lint` validates the `ws:` section and scans handler scripts for real-looking data,
   just like fixtures and templates.
-- A service can declare `endpoints:` (REST), `grpc:` (gRPC), and `ws:` (WebSocket) simultaneously.
+- A service can declare `endpoints:` (REST), `grpc:` (gRPC), `ws:` (WebSocket), and `graphql:` (GraphQL)
+  simultaneously.
+
+## GraphQL adapters
+
+An adapter can serve a **GraphQL endpoint** in addition to (or instead of) REST, gRPC, or WebSocket.
+The endpoint is served from an SDL schema file plus convention-named Starlark resolver functions.
+No generated code is needed — the executor parses the SDL, validates query documents, and dispatches
+field resolution to Starlark.
+
+### Writing a GraphQL adapter
+
+1. **Write an SDL schema** (`schemas/schema.graphql`) describing your types, queries, and mutations:
+
+   ```graphql
+   type User {
+     id: ID!
+     name: String!
+     posts: [Post!]!
+   }
+
+   type Post {
+     id: ID!
+     title: String!
+     author: User!
+   }
+
+   type Query {
+     user(id: ID!): User
+     users: [User!]!
+   }
+
+   type Mutation {
+     createUser(name: String!): User!
+   }
+   ```
+
+2. **Declare a `graphql:` section** in `adapter.yaml`, pointing to the schema and a resolver script:
+
+   ```yaml
+   graphql:
+     schema: schemas/schema.graphql      # SDL file (relative to adapter dir)
+     resolvers: scripts/resolvers.star    # Starlark script with on_*/resolve_* functions
+     # path: /graphql                     # optional; defaults to /graphql
+   ```
+
+3. **Write Starlark resolvers.** The resolver model has two conventions:
+
+   - **Root fields** (Query / Mutation) — routed to `on_<field>(callArg)` functions.
+   - **Object fields** — routed to `resolve_<Type>_<field>(callArg)` functions. If a resolver is
+     absent, the **default resolver** returns `parent[fieldName]` (the property of the parent object
+     with the same name as the field).
+
+   `callArg` is a single Starlark dict with two keys:
+
+   | Key | Description |
+   |-----|-------------|
+   | `parent` | The parent object (dict). For root fields this is `None`; for object fields it is the resolved value of the parent type. |
+   | `args` | The field arguments (dict), with variables and defaults already resolved by the executor. |
+
+   Resolvers return `respond(status, body)` where `body` is the resolved value (a dict, list, string,
+   or `None`). All the usual Starlark builtins (`store_collection`, `store_kv_get/set/incr`,
+   `store_blob`, `identity_*`, `events_emit`) are available.
+
+   ```python
+   # Root resolver: Query.user(id)
+   def on_user(args):
+       uid = args["args"]["id"]
+       for u in store_collection("users").list():
+           if u.get("id") == uid:
+               return respond(200, u)
+       return respond(200, None)
+
+   # Object resolver: User.posts (relational)
+   def resolve_User_posts(args):
+       uid = args["parent"]["id"]
+       return respond(200, [p for p in store_collection("posts").list() if p.get("user_id") == uid])
+   ```
+
+   > **Scalar fields need no resolver.** Fields like `id`, `name`, `title` are resolved automatically
+   > from the parent object via the default resolver. Only relational fields (those that require a
+   > lookup or computation) need a `resolve_*` function.
+
+### Args & variables
+
+GraphQL arguments (literals, variables, and default values) are resolved by the executor and
+passed to the resolver as `args["args"]`. Optional arguments that are omitted appear as `None` —
+use `args["args"].get("field")` to safely access them.
+
+```graphql
+query($status: PostStatus) {
+  posts(status: $status) { id title }
+}
+```
+
+```python
+def on_posts(args):
+    status = args["args"].get("status")  # None if not provided
+    posts = store_collection("posts").list()
+    if status != None:
+        posts = [p for p in posts if p.get("status") == status]
+    return respond(200, posts)
+```
+
+### Enums & custom scalars
+
+- **Enums** (e.g. `enum PostStatus { PUBLISHED; DRAFT }`) are passed and returned as plain strings.
+- **Custom scalars** (e.g. `scalar DateTime`) pass through as-is — the executor does not validate or
+  coerce them.
+
+### Introspection
+
+Full introspection is supported: `__schema`, `__type(name:)`, and `__typename` work out of the box.
+This means GraphQL clients and tools (GraphiQL, code generators) can query the schema at runtime.
+
+### DoS limits
+
+The executor enforces the following limits to prevent abuse:
+
+| Limit | Default | Description |
+|-------|---------|-------------|
+| Max query depth | 10 | Maximum nesting depth of a query. |
+| Max field count | 1000 | Maximum number of fields in a query. |
+| Execution timeout | context deadline | Request context timeout (cancels long-running resolvers). |
+
+Queries that exceed these limits are rejected with a 400 error.
+
+### Worked example
+
+```yaml
+# adapter.yaml
+graphql:
+  schema: schemas/schema.graphql
+  resolvers: scripts/resolvers.star
+```
+
+```graphql
+# schemas/schema.graphql
+enum PostStatus { PUBLISHED; DRAFT }
+type User { id: ID! name: String! posts: [Post!]! }
+type Post { id: ID! title: String! status: PostStatus! author: User! }
+type Query { users: [User!]! posts(status: PostStatus): [Post!]! }
+```
+
+```python
+# scripts/resolvers.star
+
+def on_users(args):
+    return respond(200, store_collection("users").list())
+
+def on_posts(args):
+    status = args["args"].get("status")
+    posts = store_collection("posts").list()
+    if status != None:
+        posts = [p for p in posts if p.get("status") == status]
+    return respond(200, posts)
+
+# Relational: User.posts
+def resolve_User_posts(args):
+    uid = args["parent"]["id"]
+    return respond(200, [p for p in store_collection("posts").list() if p.get("user_id") == uid])
+
+# Relational: Post.author
+def resolve_Post_author(args):
+    author_id = args["parent"]["user_id"]
+    for u in store_collection("users").list():
+        if u.get("id") == author_id:
+            return respond(200, u)
+    return respond(200, None)
+```
+
+### Notes
+
+- GraphQL resolvers use the same Starlark sandbox as REST, gRPC, and WS handlers — no host I/O,
+  no network.
+- `stunt adapter lint` validates the `graphql:` section (schema + resolvers must be present with a
+  valid handler spec) and scans resolver scripts for real-looking data, just like fixtures and
+  templates.
+- See `adapters/blog-style/` for a complete, working example with seeded collections, nested
+  relations, enums, mutations, and a custom scalar.
