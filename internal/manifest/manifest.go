@@ -13,7 +13,7 @@ type Network struct {
 	Mode           string `yaml:"mode"`                       // "port" or "subdomain"
 	BasePort       int    `yaml:"base_port,omitempty"`        // sequential ports (port mode)
 	TLD            string `yaml:"tld,omitempty"`              // TLD for subdomain mode (default: "localhost")
-	TLS            bool   `yaml:"tls,omitempty"`              // enable TLS in subdomain mode (default: true)
+	TLS            *bool  `yaml:"tls,omitempty"`              // enable TLS in subdomain mode (nil = default true; *false = explicit HTTP)
 	SyncHosts      bool   `yaml:"sync_hosts,omitempty"`       // sync /etc/hosts for *.tld
 	SpoofRealHosts bool   `yaml:"spoof_real_hosts,omitempty"` // redirect real hostnames to localhost
 }
@@ -25,14 +25,29 @@ func (n *Network) Defaults() {
 		if n.TLD == "" {
 			n.TLD = "localhost"
 		}
-		// TLS defaults to true in subdomain mode (only override if explicitly
-		// set to false in YAML; since Go can't distinguish unset-false from
-		// explicit-false for a bool, we treat zero as "not configured" and
-		// default to true).
-		// Note: if the user explicitly writes tls: false, they must also set a
-		// non-default field to distinguish. In practice this is fine — the CLI
-		// --no-tls flag is the primary override mechanism.
+		// TLS defaults to true in subdomain mode. Using *bool lets us
+		// distinguish "omitted" (nil → default true) from "explicitly false"
+		// (*false → HTTP). Without *bool, the Go zero value false is
+		// indistinguishable from an intentional tls: false.
+		if n.TLS == nil {
+			t := true
+			n.TLS = &t
+		}
 	}
+}
+
+// ResolveTLS determines whether TLS should be used in subdomain mode.
+// The manifest's TLS field (after Defaults()) sets the default; the --no-tls
+// CLI flag (noTLS) overrides it to false. For port mode TLS is always false
+// (each service gets a plain HTTP listener).
+func ResolveTLS(n *Network, noTLS bool) bool {
+	if noTLS {
+		return false
+	}
+	if n.TLS == nil {
+		return true // default: TLS on in subdomain mode
+	}
+	return *n.TLS
 }
 
 type Service struct {
