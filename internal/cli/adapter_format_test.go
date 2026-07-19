@@ -14,6 +14,13 @@ import (
 // add/remove preserves manifest formatting" fix. It takes a manifest WITH
 // comments + 2-space indent + flow-style mappings, runs `adapter add` then
 // `adapter remove`, and asserts that comments and formatting are preserved.
+//
+// Known residual: yaml.v3's Node encoder normalises the *internal* whitespace
+// of flow mappings ("{ a: b }" -> "{a: b}"), so a manifest using flow style
+// is not byte-identical after a round-trip — but comments, indentation, and
+// the flow-vs-block style ARE preserved (the original bug destroyed comments,
+// changed indent 2->4, and expanded flow to block). Block-style manifests
+// round-trip byte-identically.
 func TestAdapterAddRemovePreservesComments(t *testing.T) {
 	original := `# This is my stunt config
 version: 1
