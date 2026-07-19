@@ -1,0 +1,75 @@
+# stunt adapter manifest — Threads-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of a Threads (Meta) REST + OAuth2 API
+# for LOCAL TESTING ONLY. It does not call the real Threads API. All data is
+# synthetic. See DISCLAIMER.
+id: threads-style
+name: "Threads-style API simulator (unofficial)"
+version: "0.1.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: route ordering matters for the publish flow: /threads_publish is
+# declared BEFORE /threads so the publish step matches its own route and not
+# the create-container route's suffix (the dispatch engine checks in
+# declaration order).
+endpoints:
+  # --- OAuth2 (Meta authorization code) ---
+  - route: /oauth/authorize
+    method: GET
+    handler: scripts/oauth.star#on_authorize
+  - route: /oauth/access_token
+    method: POST
+    handler: scripts/oauth.star#on_access_token
+
+  # --- Profile (literal, before parameterized /v1.0/{id}/... routes) ---
+  - route: /v1.0/me
+    method: GET
+    handler: scripts/profile.star#on_profile
+
+  # --- Insights (per-media metrics) ---
+  - route: /v1.0/{id}/insights
+    method: GET
+    handler: scripts/insights.star#on_insights
+
+  # --- Publish step 2: threads_publish BEFORE threads (route ordering) ---
+  - route: /v1.0/{id}/threads_publish
+    method: POST
+    handler: scripts/publish.star#on_publish
+
+  # --- Publish step 1: create media container ---
+  - route: /v1.0/{id}/threads
+    method: POST
+    handler: scripts/publish.star#on_create
+
+  # --- Engagement inbox (GET on the same route as create container) ---
+  - route: /v1.0/{id}/threads
+    method: GET
+    handler: scripts/engagement.star#on_engagement
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: tokens
+    kind: collection
+  - name: codes
+    kind: collection
+  - name: containers
+    kind: collection
+  - name: media
+    kind: collection
+
+# Auth scheme metadata (mock: API routes check bearer PRESENCE, not value).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            message: resource not found
+            code: 404
