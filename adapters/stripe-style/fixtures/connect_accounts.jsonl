@@ -1,0 +1,2 @@
+{"id":"seed-acct-alpha","object":"account","type":"express","country":"US","business_type":"company","charges_enabled":true,"payouts_enabled":true,"details_submitted":true,"requirements":{"currently_due":[],"eventually_due":[],"past_due":[],"disabled_reason":null}}
+{"id":"seed-acct-beta","object":"account","type":"custom","country":"GB","business_type":"individual","charges_enabled":true,"payouts_enabled":true,"details_submitted":true,"requirements":{"currently_due":[],"eventually_due":[],"past_due":[],"disabled_reason":null}}

@@ -15,46 +15,87 @@ endpoints:
   # Does NOT require auth — it is how callers obtain a valid bearer token.
   - route: /v1/tokens
     method: POST
-    handler: scripts/tokens.star#on_create
+    handler: scripts/tokens.star#on_mint_token
 
   # --- Charges ---
   - route: /v1/charges
     method: POST
-    handler: scripts/charges.star#on_create
+    handler: scripts/charges.star#on_create_charge
   - route: /v1/charges/{id}
     method: GET
-    handler: scripts/charges.star#on_retrieve
+    handler: scripts/charges.star#on_retrieve_charge
   - route: /v1/charges
     method: GET
-    handler: scripts/charges.star#on_list
+    handler: scripts/charges.star#on_list_charges
   - route: /v1/charges/{id}/capture
     method: POST
-    handler: scripts/charges.star#on_capture
+    handler: scripts/charges.star#on_capture_charge
   - route: /v1/charges/{id}/refund
     method: POST
-    handler: scripts/charges.star#on_refund
+    handler: scripts/charges.star#on_refund_charge
 
   # --- Customers ---
   - route: /v1/customers
     method: POST
-    handler: scripts/customers.star#on_create
+    handler: scripts/customers.star#on_create_customer
   - route: /v1/customers/{id}
     method: GET
-    handler: scripts/customers.star#on_retrieve
+    handler: scripts/customers.star#on_retrieve_customer
   - route: /v1/customers
     method: GET
-    handler: scripts/customers.star#on_list
+    handler: scripts/customers.star#on_list_customers
   - route: /v1/customers/{id}
     method: POST
-    handler: scripts/customers.star#on_update
+    handler: scripts/customers.star#on_update_customer
   - route: /v1/customers/{id}
     method: DELETE
-    handler: scripts/customers.star#on_delete
+    handler: scripts/customers.star#on_delete_customer
 
   # --- Balance ---
   - route: /v1/balance
     method: GET
-    handler: scripts/balance.star#on_get
+    handler: scripts/balance.star#on_get_balance
+
+  # --- Connect: Accounts ---
+  - route: /v1/accounts
+    method: POST
+    handler: scripts/accounts.star#on_create_account
+  - route: /v1/accounts/{id}
+    method: GET
+    handler: scripts/accounts.star#on_retrieve_account
+  - route: /v1/accounts/{id}
+    method: POST
+    handler: scripts/accounts.star#on_update_account
+  - route: /v1/accounts
+    method: GET
+    handler: scripts/accounts.star#on_list_accounts
+
+  # --- Connect: Account Links (onboarding) ---
+  - route: /v1/account_links
+    method: POST
+    handler: scripts/account_links.star#on_create_account_link
+
+  # --- Connect: Transfers ---
+  - route: /v1/transfers
+    method: POST
+    handler: scripts/transfers.star#on_create_transfer
+  - route: /v1/transfers/{id}
+    method: GET
+    handler: scripts/transfers.star#on_retrieve_transfer
+  - route: /v1/transfers
+    method: GET
+    handler: scripts/transfers.star#on_list_transfers
+  - route: /v1/transfers/{id}/reversals
+    method: POST
+    handler: scripts/transfers.star#on_reverse_transfer
+
+  # --- Connect: Payouts ---
+  - route: /v1/payouts
+    method: POST
+    handler: scripts/payouts.star#on_create_payout
+  - route: /v1/payouts
+    method: GET
+    handler: scripts/payouts.star#on_list_payouts
 
 # Backing stores available to Starlark handlers via store_collection.
 resources:
@@ -64,6 +105,13 @@ resources:
   - name: customers
     kind: collection
     seed: fixtures/customers.jsonl
+  - name: connect_accounts
+    kind: collection
+    seed: fixtures/connect_accounts.jsonl
+  - name: transfers
+    kind: collection
+  - name: payouts
+    kind: collection
 
 # Auth scheme: bearer token validated via identity_validate.
 # Dev bypass: tokens starting with "sk_test" are accepted without validation.
