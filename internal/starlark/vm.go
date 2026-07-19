@@ -26,10 +26,11 @@ type Request struct {
 // Response is the Go-friendly representation of the HTTP response produced
 // by a Starlark handler.
 type Response struct {
-	Status  int
-	Headers map[string]string
-	Body    map[string]any
-	RawBody string // raw text body (when handler returns a string body)
+	Status   int
+	Headers  map[string]string
+	Body     map[string]any
+	BodyList []any  // JSON array body (for endpoints returning a bare array)
+	RawBody  string // raw text body (when handler returns a string body)
 }
 
 // VM wraps the globals defined by a loaded script. Each Load call produces
@@ -296,6 +297,12 @@ func starlarkToResponse(v sk.Value) (Response, error) {
 					return Response{}, fmt.Errorf("starlark: convert body: %w", err)
 				}
 				resp.Body = m
+			} else if ll, ok := val.(*sk.List); ok {
+				arr, err := StarlarkListToGo(ll)
+				if err != nil {
+					return Response{}, fmt.Errorf("starlark: convert body list: %w", err)
+				}
+				resp.BodyList = arr
 			} else if ss, ok := sk.AsString(val); ok && val.Type() == "string" {
 				resp.RawBody = ss
 			}
