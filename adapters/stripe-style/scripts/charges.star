@@ -2,52 +2,10 @@
 #
 # Each handler receives `req` with keys: method, path, headers, body, params.
 # Returns respond(status, body, headers).
-
-# --- auth helper (duplicated in each script; Starlark load() is unavailable) ---
-
-# _bearer_token extracts the bearer token from the Authorization header, or
-# None if absent.
-def _bearer_token(req):
-    headers = req.get("headers")
-    if headers == None:
-        return None
-    auth = headers.get("Authorization", "")
-    if auth == None:
-        auth = ""
-    if auth.startswith("Bearer "):
-        return auth[7:]
-    return None
-
-# _require_auth validates the bearer token.
-#
-# Returns None if authorized, or an error-response dict to return from the
-# handler if not.
-#
-# Dev bypass: tokens starting with "sk_test" are accepted WITHOUT
-# identity_validate, for frictionless local testing.
-def _require_auth(req):
-    token = _bearer_token(req)
-    if token == None:
-        return respond(401, {"error": {"type": "authentication_error", "message": "Missing Authorization header. Provide 'Authorization: Bearer <token>'."}})
-
-    # Dev bypass: sk_test tokens skip real validation.
-    if token.startswith("sk_test"):
-        return None
-
-    # Real validation via the identity issuer.
-    claims = identity_validate(token)
-    if claims == None:
-        return respond(401, {"error": {"type": "authentication_error", "message": "Invalid API Key provided."}})
-    return None
-
-# _next_id returns a monotonically-increasing provider-style ID using the
-# KV store as a sequence counter. Produces ids like "ch_1", "ch_2", ...
-def _next_id(prefix):
-    # Atomic increment via store_kv_incr (race-free under concurrent requests).
-    return prefix + "_" + str(store_kv_incr("stripe", prefix + "_seq"))
+# Shared helpers (_bearer_token, _require_auth, _next_id) are in lib.star.
 
 # POST /v1/charges — create a charge (status starts as "pending").
-def on_create(req):
+def on_create_charge(req):
     err = _require_auth(req)
     if err != None:
         return err
@@ -84,7 +42,7 @@ def on_create(req):
     return respond(201, doc)
 
 # GET /v1/charges/{id} — retrieve a single charge.
-def on_retrieve(req):
+def on_retrieve_charge(req):
     err = _require_auth(req)
     if err != None:
         return err
@@ -97,7 +55,7 @@ def on_retrieve(req):
     return respond(200, doc)
 
 # GET /v1/charges — list all charges.
-def on_list(req):
+def on_list_charges(req):
     err = _require_auth(req)
     if err != None:
         return err
@@ -107,7 +65,7 @@ def on_list(req):
     return respond(200, {"object": "list", "data": docs, "has_more": False, "url": "/v1/charges"})
 
 # POST /v1/charges/{id}/capture — capture a pending charge (set status succeeded).
-def on_capture(req):
+def on_capture_charge(req):
     err = _require_auth(req)
     if err != None:
         return err
@@ -128,7 +86,7 @@ def on_capture(req):
     return respond(200, doc)
 
 # POST /v1/charges/{id}/refund — refund a charge (set status refunded).
-def on_refund(req):
+def on_refund_charge(req):
     err = _require_auth(req)
     if err != None:
         return err

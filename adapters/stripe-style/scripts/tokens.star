@@ -4,7 +4,7 @@
 # valid bearer token for subsequent authenticated requests.
 
 # POST /v1/tokens — mint a test token via the identity issuer.
-def on_create(req):
+def on_mint_token(req):
     # Accept optional subject/scopes from the body, defaulting to test_user.
     body = req["body"]
     if body == None:
