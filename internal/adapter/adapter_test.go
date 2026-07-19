@@ -618,7 +618,7 @@ ws:
 
 const graphqlAdapterYAML = `
 id: blog
-game: Blog
+name: Blog
 graphql:
   schema: schemas/blog.graphql
   resolvers: scripts/resolvers.star
