@@ -202,3 +202,5 @@ and the trust model. Adapter authoring reference: [`adapters/README.md`](adapter
 - Spec: `docs/specs/2025-07-15-stunt-design.md`
 - Plans: `docs/plans/`
 - Issue tracking: `bd` (beads) — `bd ready`, `bd list`, `bd epic status`
+
+Found a security issue? See **[SECURITY.md](SECURITY.md)** — do not open a public issue.
