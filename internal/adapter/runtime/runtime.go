@@ -296,7 +296,11 @@ func buildEventsBuiltins(emitter *events.Emitter, serviceName string) sk.StringD
 			}
 			payload := map[string]any{}
 			if d, ok := payloadVal.(*sk.Dict); ok {
-				payload = starlark.StarlarkToGo(d)
+				p, err := starlark.StarlarkToGo(d)
+				if err != nil {
+					return nil, fmt.Errorf("events_emit: %w", err)
+				}
+				payload = p
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), eventsEmitTimeout)
 			defer cancel()
@@ -400,7 +404,7 @@ func (c *collectionValue) get(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs
 	if err != nil {
 		return nil, err
 	}
-	return starlark.GoToStarlark(doc), nil
+	return starlark.GoToStarlark(doc)
 }
 
 func (c *collectionValue) list(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
@@ -413,7 +417,11 @@ func (c *collectionValue) list(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwarg
 	}
 	elems := make([]sk.Value, len(docs))
 	for i, doc := range docs {
-		elems[i] = starlark.GoToStarlark(doc)
+		sv, err := starlark.GoToStarlark(doc)
+		if err != nil {
+			return nil, err
+		}
+		elems[i] = sv
 	}
 	return sk.NewList(elems), nil
 }
@@ -587,7 +595,7 @@ func dictToGoMap(v sk.Value) (map[string]any, error) {
 	if !ok {
 		return nil, fmt.Errorf("expected dict, got %s", v.Type())
 	}
-	return starlark.StarlarkToGo(d), nil
+	return starlark.StarlarkToGo(d)
 }
 
 // starlarkValueToString converts any Starlark value into its string

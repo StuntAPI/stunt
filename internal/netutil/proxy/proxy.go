@@ -59,6 +59,11 @@ type Proxy struct {
 
 	// certCache memoises minted leaf certs keyed by SNI hostname.
 	certCache sync.Map
+
+	// proxyCache memoises *httputil.ReverseProxy instances keyed by backend
+	// address so they (and their Transports' connection pools) are reused
+	// across requests instead of being re-created per request.
+	proxyCache sync.Map
 }
 
 // New creates a Proxy from the given options. If TLS is enabled and no CA is
@@ -182,9 +187,24 @@ func (p *Proxy) handler() http.Handler {
 	})
 }
 
-// proxyTo creates a reverse proxy for the given backend and serves the
-// request through it.
+// proxyTo looks up (or creates) a cached reverse proxy for the given
+// backend and serves the request through it. The reverse proxy is built once
+// per backend address and reused across requests so that the underlying
+// Transport's connection pool persists.
 func (p *Proxy) proxyTo(w http.ResponseWriter, r *http.Request, backend string) {
+	rp := p.getOrCreateProxy(backend)
+	rp.ServeHTTP(w, r)
+}
+
+// getOrCreateProxy returns a cached *httputil.ReverseProxy for the given
+// backend address, creating one on first use. The proxy's Director sets
+// X-Forwarded-* headers from the per-request Host (via req.Host, which at
+// Director time is the incoming request's Host).
+func (p *Proxy) getOrCreateProxy(backend string) *httputil.ReverseProxy {
+	if cached, ok := p.proxyCache.Load(backend); ok {
+		return cached.(*httputil.ReverseProxy)
+	}
+
 	target := &url.URL{
 		Scheme: "http",
 		Host:   backend,
@@ -198,15 +218,18 @@ func (p *Proxy) proxyTo(w http.ResponseWriter, r *http.Request, backend string) 
 	}
 	rp.Director = func(req *http.Request) {
 		originalDirector(req)
-		// Preserve the original Host for the backend.
-		req.Header.Set("X-Forwarded-Host", r.Host)
+		// At Director time req.Host is the incoming request's Host (the base
+		// Director only rewrites URL.Scheme/URL.Host, not req.Host).
+		req.Header.Set("X-Forwarded-Host", req.Host)
 		req.Header.Set("X-Forwarded-Proto", scheme)
 	}
 	rp.ErrorHandler = func(w http.ResponseWriter, _ *http.Request, err error) {
 		writeJSONError(w, http.StatusBadGateway,
 			fmt.Sprintf("backend unreachable: %v", err))
 	}
-	rp.ServeHTTP(w, r)
+
+	actual, _ := p.proxyCache.LoadOrStore(backend, rp)
+	return actual.(*httputil.ReverseProxy)
 }
 
 // getCertificate mints (and caches) a leaf TLS certificate for the SNI

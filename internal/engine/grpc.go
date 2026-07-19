@@ -324,7 +324,7 @@ func (s *streamValue) recv(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []
 		}
 		return nil, err
 	}
-	return starlark.GoToStarlark(msg), nil
+	return starlark.GoToStarlark(msg)
 }
 
 // send writes an outbound message. The argument must be a Starlark dict,
@@ -338,7 +338,11 @@ func (s *streamValue) send(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []
 	if !ok {
 		return nil, fmt.Errorf("send: msg must be a dict, got %s", msgVal.Type())
 	}
-	if err := s.stream.Send(starlark.StarlarkToGo(dict)); err != nil {
+	m, err := starlark.StarlarkToGo(dict)
+	if err != nil {
+		return nil, fmt.Errorf("send: %w", err)
+	}
+	if err := s.stream.Send(m); err != nil {
 		return nil, err
 	}
 	return sk.None, nil

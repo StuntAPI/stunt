@@ -55,12 +55,23 @@ func NewEmitter() *Emitter {
 // SetMaxRetries configures the maximum number of delivery attempts. Values
 // less than 1 are clamped to 1 so that Emit always makes at least one attempt
 // (otherwise the retry loop is skipped and a confusing nil-wrapped error is
-// returned). Not safe for concurrent use with Emit; call before emitting.
+// returned). Safe for concurrent use with Emit.
 func (e *Emitter) SetMaxRetries(n int) {
 	if n < 1 {
 		n = 1
 	}
+	e.mu.Lock()
 	e.maxRetries = n
+	e.mu.Unlock()
+}
+
+// SetBackoff configures the base retry backoff duration. The actual delay
+// for attempt N is backoff << (N-1) (exponential). Safe for concurrent use
+// with Emit.
+func (e *Emitter) SetBackoff(d time.Duration) {
+	e.mu.Lock()
+	e.backoff = d
+	e.mu.Unlock()
 }
 
 // Register sets the webhook target URL for the given namespace, overwriting
@@ -99,9 +110,15 @@ func (e *Emitter) Emit(ctx context.Context, ns, eventType string, payload map[st
 		return fmt.Errorf("events: marshal envelope: %w", err)
 	}
 
+	// Read retry settings under the read-lock to avoid a data race with
+	// SetMaxRetries/SetBackoff.
+	e.mu.RLock()
+	maxRetries := e.maxRetries
+	backoff := e.backoff
+	e.mu.RUnlock()
+
 	// Defensive: ensure at least one attempt even if maxRetries was set to
 	// zero or negative externally.
-	maxRetries := e.maxRetries
 	if maxRetries < 1 {
 		maxRetries = 1
 	}
@@ -112,7 +129,7 @@ func (e *Emitter) Emit(ctx context.Context, ns, eventType string, payload map[st
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(e.backoff << (attempt - 1)):
+			case <-time.After(backoff << (attempt - 1)):
 			}
 		}
 

@@ -203,25 +203,28 @@ func (rs *starlarkResolverSet) callResolver(vm *starlark.VM, fnName string, pare
 	}()
 
 	// Build a single Starlark dict carrying both parent and args.
-	callArg := starlark.GoToStarlark(map[string]any{
+	callArg, err := starlark.GoToStarlark(map[string]any{
 		"parent": parent,
 		"args":   args,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("resolver args: %w", err)
+	}
 
 	rawResult, err := vm.CallRaw(fnName, callArg)
 	if err != nil {
 		return nil, err
 	}
 
-	return starlarkResultToGo(rawResult), nil
+	return starlarkResultToGo(rawResult)
 }
 
 // starlarkResultToGo converts a raw Starlark value returned by a resolver
 // into a Go value. A respond(...) dict (with key "body") yields the body;
 // any other value is converted directly via starlark.ValueToGo.
-func starlarkResultToGo(v sk.Value) any {
+func starlarkResultToGo(v sk.Value) (any, error) {
 	if v == nil {
-		return nil
+		return nil, nil
 	}
 	// Check if it's a respond(...) dict with a "body" key.
 	if d, ok := v.(*sk.Dict); ok {
@@ -229,7 +232,7 @@ func starlarkResultToGo(v sk.Value) any {
 		if found {
 			// Extract the body value. None body → nil.
 			if _, isNone := bodyVal.(sk.NoneType); isNone {
-				return nil
+				return nil, nil
 			}
 			return starlark.ValueToGo(bodyVal)
 		}
@@ -238,7 +241,7 @@ func starlarkResultToGo(v sk.Value) any {
 	}
 	// None → nil.
 	if _, ok := v.(sk.NoneType); ok {
-		return nil
+		return nil, nil
 	}
 	return starlark.ValueToGo(v)
 }

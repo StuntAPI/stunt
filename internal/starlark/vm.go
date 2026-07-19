@@ -2,6 +2,7 @@ package starlark
 
 import (
 	"fmt"
+	"time"
 
 	sk "go.starlark.net/starlark"
 	"go.starlark.net/syntax"
@@ -107,7 +108,7 @@ func (vm *VM) Call(handlerName string, req Request) (Response, error) {
 		return Response{}, fmt.Errorf("starlark: %q is not callable", handlerName)
 	}
 
-	reqVal := GoToStarlark(map[string]any{
+	reqVal, err := GoToStarlark(map[string]any{
 		"method":  req.Method,
 		"path":    req.Path,
 		"headers": req.Headers,
@@ -115,6 +116,9 @@ func (vm *VM) Call(handlerName string, req Request) (Response, error) {
 		"params":  req.Params,
 		"query":   req.Query,
 	})
+	if err != nil {
+		return Response{}, fmt.Errorf("starlark: build request value: %w", err)
+	}
 
 	// Create a fresh thread per Call so concurrent requests don't share
 	// mutable state (C1). Enforce a step limit to prevent infinite loops (I5).
@@ -244,7 +248,11 @@ func starlarkToResponse(v sk.Value) (Response, error) {
 			resp.Status = status
 		case "body":
 			if bd, ok := val.(*sk.Dict); ok {
-				resp.Body = StarlarkToGo(bd)
+				m, err := StarlarkToGo(bd)
+				if err != nil {
+					return Response{}, fmt.Errorf("starlark: convert body: %w", err)
+				}
+				resp.Body = m
 			} else if ss, ok := sk.AsString(val); ok && val.Type() == "string" {
 				resp.RawBody = ss
 			}
@@ -261,99 +269,149 @@ func starlarkToResponse(v sk.Value) (Response, error) {
 // --- conversion helpers: Go → Starlark ---
 
 // GoToStarlark converts a Go value into the equivalent Starlark value.
-// Supports string, int, int64, float64, bool, nil, map[string]any, and
-// slices of any of these.
-func GoToStarlark(v any) sk.Value {
+// Supports string, bool, all integer types (int, int8–int64, uint, uint8–uint64),
+// float32/float64, time.Time (→ RFC3339 string), []byte (→ string), nil,
+// map[string]any, map[string]string, and slices of any of these.
+// For unsupported types it returns an error so adapter authors notice the
+// problem instead of getting a silently-stringified value.
+func GoToStarlark(v any) (sk.Value, error) {
 	switch x := v.(type) {
 	case nil:
-		return sk.None
+		return sk.None, nil
 	case string:
-		return sk.String(x)
+		return sk.String(x), nil
 	case bool:
-		return sk.Bool(x)
+		return sk.Bool(x), nil
 	case int:
-		return sk.MakeInt(x)
+		return sk.MakeInt(x), nil
 	case int64:
-		return sk.MakeInt64(x)
+		return sk.MakeInt64(x), nil
+	case int32:
+		return sk.MakeInt64(int64(x)), nil
+	case int16:
+		return sk.MakeInt64(int64(x)), nil
+	case int8:
+		return sk.MakeInt64(int64(x)), nil
+	case uint:
+		return sk.MakeUint64(uint64(x)), nil
+	case uint64:
+		return sk.MakeUint64(x), nil
+	case uint32:
+		return sk.MakeUint64(uint64(x)), nil
+	case uint16:
+		return sk.MakeUint64(uint64(x)), nil
+	case uint8:
+		return sk.MakeUint64(uint64(x)), nil
 	case float64:
-		return sk.Float(x)
+		return sk.Float(x), nil
+	case float32:
+		return sk.Float(float64(x)), nil
+	case time.Time:
+		return sk.String(x.Format(time.RFC3339)), nil
+	case []byte:
+		return sk.String(string(x)), nil
 	case map[string]any:
 		d := sk.NewDict(len(x))
 		for k, val := range x {
-			d.SetKey(sk.String(k), GoToStarlark(val))
+			sv, err := GoToStarlark(val)
+			if err != nil {
+				return nil, fmt.Errorf("map key %q: %w", k, err)
+			}
+			d.SetKey(sk.String(k), sv)
 		}
-		return d
+		return d, nil
 	case map[string]string:
 		d := sk.NewDict(len(x))
 		for k, val := range x {
 			d.SetKey(sk.String(k), sk.String(val))
 		}
-		return d
+		return d, nil
 	case []any:
 		elems := make([]sk.Value, len(x))
 		for i, val := range x {
-			elems[i] = GoToStarlark(val)
+			sv, err := GoToStarlark(val)
+			if err != nil {
+				return nil, fmt.Errorf("slice index %d: %w", i, err)
+			}
+			elems[i] = sv
 		}
-		return sk.NewList(elems)
+		return sk.NewList(elems), nil
 	default:
-		return sk.String(fmt.Sprintf("%v", v))
+		return nil, fmt.Errorf("starlark: unsupported Go type %T", v)
 	}
 }
 
 // --- conversion helpers: Starlark → Go ---
 
 // StarlarkToGo converts a Starlark dict into a Go map[string]any.
-func StarlarkToGo(d *sk.Dict) map[string]any {
+func StarlarkToGo(d *sk.Dict) (map[string]any, error) {
 	out := make(map[string]any, d.Len())
 	for _, item := range d.Items() {
 		key, _ := sk.AsString(item[0])
-		out[key] = starlarkValueToGo(item[1])
+		val, err := starlarkValueToGo(item[1])
+		if err != nil {
+			return nil, fmt.Errorf("dict key %q: %w", key, err)
+		}
+		out[key] = val
 	}
-	return out
+	return out, nil
 }
 
 // StarlarkListToGo converts a Starlark list into a Go []any, suitable for
 // JSON marshalling. Each element is recursively converted via
 // starlarkValueToGo.
-func StarlarkListToGo(l *sk.List) []any {
+func StarlarkListToGo(l *sk.List) ([]any, error) {
 	out := make([]any, l.Len())
 	for i := range out {
-		out[i] = starlarkValueToGo(l.Index(i))
+		val, err := starlarkValueToGo(l.Index(i))
+		if err != nil {
+			return nil, fmt.Errorf("list index %d: %w", i, err)
+		}
+		out[i] = val
 	}
-	return out
+	return out, nil
 }
 
 // ValueToGo converts an arbitrary Starlark value into a Go value. This is
 // the general-purpose converter for resolver return values that may be
 // dicts, lists, scalars, or None.
-func ValueToGo(v sk.Value) any {
+func ValueToGo(v sk.Value) (any, error) {
 	return starlarkValueToGo(v)
 }
 
 // starlarkValueToGo converts an arbitrary Starlark value into a Go value.
-func starlarkValueToGo(v sk.Value) any {
+// For sk.Int values that overflow int64, an error is returned rather than
+// silently truncating.
+func starlarkValueToGo(v sk.Value) (any, error) {
 	switch x := v.(type) {
 	case sk.NoneType:
-		return nil
+		return nil, nil
 	case sk.String:
-		return string(x)
+		return string(x), nil
 	case sk.Bool:
-		return bool(x)
+		return bool(x), nil
 	case sk.Int:
-		n, _ := x.Int64()
-		return n
+		n, ok := x.Int64()
+		if !ok {
+			return nil, fmt.Errorf("starlark: integer %s overflows int64", x.String())
+		}
+		return n, nil
 	case sk.Float:
-		return float64(x)
+		return float64(x), nil
 	case *sk.Dict:
 		return StarlarkToGo(x)
 	case *sk.List:
 		out := make([]any, x.Len())
 		for i := range out {
-			out[i] = starlarkValueToGo(x.Index(i))
+			val, err := starlarkValueToGo(x.Index(i))
+			if err != nil {
+				return nil, fmt.Errorf("list index %d: %w", i, err)
+			}
+			out[i] = val
 		}
-		return out
+		return out, nil
 	default:
-		return v.String()
+		return v.String(), nil
 	}
 }
 
