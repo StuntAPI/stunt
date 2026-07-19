@@ -116,7 +116,10 @@ func (e *Engine) runHandler(
 
 	var bodyMap map[string]any
 	if len(body) > 0 {
-		if err := json.Unmarshal(body, &bodyMap); err != nil {
+		ct := r.Header.Get("Content-Type")
+		if isFormContentType(ct) {
+			bodyMap = parseFormBody(string(body))
+		} else if err := json.Unmarshal(body, &bodyMap); err != nil {
 			bodyMap = nil // non-JSON body; handler gets empty body
 		}
 	}
@@ -278,4 +281,35 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 	w.WriteHeader(status)
 	data, _ := json.Marshal(map[string]string{"error": msg})
 	_, _ = w.Write(data)
+}
+
+// isFormContentType reports whether ct is an HTML form content type
+// (application/x-www-form-urlencoded), optionally followed by parameters
+// such as charset.
+func isFormContentType(ct string) bool {
+	ct = strings.TrimSpace(strings.ToLower(ct))
+	if i := strings.IndexByte(ct, ';'); i >= 0 {
+		ct = strings.TrimSpace(ct[:i])
+	}
+	return ct == "application/x-www-form-urlencoded"
+}
+
+// parseFormBody parses a URL-encoded form body
+// (key=value&key2=value2) into a map[string]any suitable for the Starlark
+// handler's req["body"].
+func parseFormBody(raw string) map[string]any {
+	vals, err := url.ParseQuery(raw)
+	if err != nil {
+		return nil
+	}
+	out := make(map[string]any, len(vals))
+	for k, vs := range vals {
+		if len(vs) > 0 {
+			out[k] = vs[0]
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
