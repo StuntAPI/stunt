@@ -1,0 +1,79 @@
+# stunt adapter manifest — LinkedIn-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of a LinkedIn-style REST + OAuth2 API
+# for LOCAL TESTING ONLY. It does not call the real LinkedIn API. All data is
+# synthetic. See DISCLAIMER.
+id: linkedin-style
+name: "LinkedIn-style API simulator (unofficial)"
+version: "0.1.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- OAuth2 (Arctic, body-param client creds) ---
+  - route: /oauth/v2/authorization
+    method: GET
+    handler: scripts/oauth.star#on_authorize
+  - route: /oauth/v2/accessToken
+    method: POST
+    handler: scripts/oauth.star#on_access_token
+
+  # --- Member resolution ---
+  - route: /v2/userinfo
+    method: GET
+    handler: scripts/userinfo.star#on_userinfo
+
+  # --- Publish (ugcPosts) ---
+  - route: /v2/ugcPosts
+    method: POST
+    handler: scripts/posts.star#on_ugc_posts
+
+  # --- Comments (ingest + reply) ---
+  - route: /rest/comments
+    method: GET
+    handler: scripts/comments.star#on_list_comments
+  - route: /rest/comments
+    method: POST
+    handler: scripts/comments.star#on_post_comment
+
+  # --- Posts resolution (literal before parameterized) ---
+  - route: /rest/posts/{urn}
+    method: GET
+    handler: scripts/posts.star#on_resolve_post
+
+  # --- Metrics ---
+  - route: /rest/memberCreatorPostAnalytics
+    method: GET
+    handler: scripts/analytics.star#on_analytics
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: tokens
+    kind: collection
+  - name: refresh_tokens
+    kind: collection
+  - name: codes
+    kind: collection
+  - name: posts
+    kind: collection
+  - name: comments
+    kind: collection
+
+# Auth scheme metadata (mock: bearer tokens validated against the tokens
+# collection).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          status: 404
+          message: resource not found
+          exception: com.linkedin.common.NotFoundException
