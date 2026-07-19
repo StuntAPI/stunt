@@ -25,6 +25,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newServiceCmd())
 	root.AddCommand(newAdapterCmd())
 	root.AddCommand(newCatalogCmd())
+	root.AddCommand(newDemoCmd())
 	return root
 }
 
