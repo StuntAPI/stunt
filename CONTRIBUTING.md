@@ -151,15 +151,20 @@ finding, replace the value with a faker or a clearly-fake placeholder.
 
 ### Go core
 
-If you touch `internal/...` or `cmd/...`:
+If you touch `internal/...` or `cmd/...`, the canonical gate is one command:
 
 ```bash
-go test ./... -race ./...      # race-clean
-go vet ./...                   # clean
-gofmt -l .                     # empty (no output)
+just ci
 ```
 
-All four must pass. `-race` is non-negotiable for new concurrent code. Tests
+That runs `build` + `test -race` + `vet` + `fmt-check` + `mod-tidy` +
+`lint-adapters` — the exact set a PR must pass. (A hosted CI job invokes the
+same `just ci`, so there's one source of truth for "does this ship".) Granular
+recipes exist too: `just test`, `just vet`, `just fmt`, `just fmt-check`,
+`just lint-adapters`, `just smoke`. The equivalent raw commands are
+`go test -race ./...`, `go vet ./...`, and `gofmt -l .` (must be empty).
+
+All gates must pass. `-race` is non-negotiable for new concurrent code. Tests
 are **host-safe** by convention: they use temp dirs, free high ports,
 `file://` git fixtures, and `httptest` sinks — they never touch `~/.stunt`,
 `/etc/hosts`, the system trust store, or the real network.
