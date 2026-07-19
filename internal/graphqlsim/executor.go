@@ -29,6 +29,7 @@ import (
 
 	"github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
+	"github.com/vektah/gqlparser/v2/validator"
 )
 
 // Default DoS limit values.
@@ -111,7 +112,19 @@ func LoadSchema(sdl []byte) (*ast.Schema, error) {
 // and may have Errors. A returned error means the query could not be
 // executed at all (parse/validation failure, DoS limit hit); in that case
 // Result is nil.
-func Execute(ctx context.Context, schema *ast.Schema, query string, variables map[string]any, operationName string, resolvers ResolverSet, opts Options) (*Result, error) {
+func Execute(ctx context.Context, schema *ast.Schema, query string, variables map[string]any, operationName string, resolvers ResolverSet, opts Options) (result *Result, err error) {
+	// Top-level panic recovery: a bug in the executor (not just a resolver)
+	// should never crash the HTTP handler. Convert to a GraphQL error.
+	defer func() {
+		if r := recover(); r != nil {
+			result = &Result{
+				Data:   nil,
+				Errors: []Error{{Message: fmt.Sprintf("graphqlsim: internal error: %v", r)}},
+			}
+			err = nil
+		}
+	}()
+
 	if variables == nil {
 		variables = map[string]any{}
 	}
@@ -136,6 +149,15 @@ func Execute(ctx context.Context, schema *ast.Schema, query string, variables ma
 		return nil, err
 	}
 
+	// Coerce and validate variables per the GraphQL spec.
+	coercedVars, verr := validator.VariableValues(schema, op, variables)
+	if verr != nil {
+		return &Result{
+			Data:   nil,
+			Errors: []Error{{Message: verr.Error()}},
+		}, nil
+	}
+
 	// DoS limits: compute depth + field count before executing.
 	depth, fields := analyzeOperation(op, doc.Fragments)
 	if depth > opts.MaxDepth {
@@ -157,7 +179,7 @@ func Execute(ctx context.Context, schema *ast.Schema, query string, variables ma
 		schema:    schema,
 		doc:       doc,
 		resolvers: resolvers,
-		variables: variables,
+		variables: coercedVars,
 		rootType:  rootTypeFor(schema, op),
 	}
 
@@ -271,8 +293,13 @@ func (ex *executor) executeSelectionSet(ctx context.Context, parentType *ast.Def
 		// Complete the value.
 		completed, propagated := ex.completeValue(ctx, fieldDef.Type, resolved, f.field.SelectionSet, fieldPath)
 		if propagated {
-			// Non-null violation: this object becomes null.
-			return nil, true
+			if fieldDef.Type.NonNull {
+				// Non-null violation on a non-null field: propagate to parent.
+				return nil, true
+			}
+			// Nullable field: absorb the propagation, set null, continue.
+			result[f.field.Alias] = nil
+			continue
 		}
 		result[f.field.Alias] = completed
 	}
@@ -366,14 +393,16 @@ func (ex *executor) completeValue(ctx context.Context, fieldType *ast.Type, resu
 		objMap, _ := result.(map[string]any)
 		objResult, propagated := ex.executeSelectionSet(ctx, runtimeType, objMap, selections, path)
 		if propagated {
-			// Non-null violation inside the object: this object becomes
-			// null. If the field type is NonNull, the wrapper above will
-			// re-propagate; otherwise the null is absorbed here.
-			return nil, false
+			// Non-null violation inside the object: propagate upward so
+			// that nullable parents can absorb and non-null parents can
+			// re-propagate without adding a duplicate error.
+			return nil, true
 		}
 		return objResult, false
+	case ast.Enum:
+		return ex.completeEnum(typeDef, fieldType, result, path)
 	default:
-		// Scalar or enum — serialize.
+		// Scalar — serialize.
 		return completeScalar(result), false
 	}
 }
@@ -391,14 +420,36 @@ func (ex *executor) completeList(ctx context.Context, elemType *ast.Type, result
 		elemPath := append(append([]any{}, path...), i)
 		val, propagated := ex.completeValue(ctx, elemType, item, selections, elemPath)
 		if propagated {
-			// Non-null violation in an element: the list becomes null.
-			// If the list type is NonNull, the wrapper above will
-			// re-propagate; otherwise the null is absorbed here.
-			return nil, false
+			// Non-null violation in an element: propagate upward so that
+			// nullable list fields can absorb and non-null list fields can
+			// re-propagate without adding a duplicate error.
+			return nil, true
 		}
 		completed[i] = val
 	}
 	return completed, false
+}
+
+// completeEnum validates that a resolved value is a valid member of the
+// enum type. An invalid value is treated like a null: for non-null fields it
+// produces an error and propagates; for nullable fields it becomes null.
+func (ex *executor) completeEnum(typeDef *ast.Definition, fieldType *ast.Type, result any, path []any) (any, bool) {
+	strVal, ok := result.(string)
+	if !ok {
+		// Non-string values (e.g. already-coerced) pass through.
+		return result, false
+	}
+	for _, ev := range typeDef.EnumValues {
+		if ev.Name == strVal {
+			return result, false
+		}
+	}
+	// Invalid enum value.
+	if fieldType.NonNull {
+		ex.addError(fmt.Sprintf("Cannot return invalid enum value %q for non-nullable field", strVal), path, nil)
+		return nil, true
+	}
+	return nil, false
 }
 
 // resolveRuntimeType determines the concrete object type for a resolved

@@ -12,7 +12,7 @@ func introspectionSchema(schema *ast.Schema) map[string]any {
 	for _, t := range schema.Types {
 		// Skip introspection "builtin" types? No — GraphiQL expects all
 		// types including introspection types (__Schema, __Type, etc.).
-		types = append(types, serializeType(t))
+		types = append(types, serializeType(schema, t))
 	}
 
 	result := map[string]any{
@@ -30,7 +30,7 @@ func introspectionSchema(schema *ast.Schema) map[string]any {
 	if len(schema.Directives) > 0 {
 		directives := make([]any, 0, len(schema.Directives))
 		for _, d := range schema.Directives {
-			directives = append(directives, serializeDirective(d))
+			directives = append(directives, serializeDirective(schema, d))
 		}
 		result["directives"] = directives
 	}
@@ -40,12 +40,12 @@ func introspectionSchema(schema *ast.Schema) map[string]any {
 // introspectionType returns the serialized type for __type(name:) queries.
 func introspectionType(schema *ast.Schema, name string) map[string]any {
 	if t, ok := schema.Types[name]; ok {
-		return serializeType(t)
+		return serializeType(schema, t)
 	}
 	return nil
 }
 
-func serializeType(t *ast.Definition) map[string]any {
+func serializeType(schema *ast.Schema, t *ast.Definition) map[string]any {
 	result := map[string]any{
 		"name": t.Name,
 		"kind": string(t.Kind),
@@ -53,14 +53,23 @@ func serializeType(t *ast.Definition) map[string]any {
 	if t.Description != "" {
 		result["description"] = t.Description
 	}
-	if len(t.Fields) > 0 {
+	// Input objects expose inputFields (not fields).
+	if t.Kind == ast.InputObject {
+		if len(t.Fields) > 0 {
+			inputFields := make([]any, 0, len(t.Fields))
+			for _, f := range t.Fields {
+				inputFields = append(inputFields, serializeInputValue(schema, f))
+			}
+			result["inputFields"] = inputFields
+		}
+	} else if len(t.Fields) > 0 {
 		fields := make([]any, 0, len(t.Fields))
 		for _, f := range t.Fields {
 			if f.Name[:1] == "_" && f.Name != "__typename" {
 				// Skip internal fields (prefixed with _) except __typename.
 				continue
 			}
-			fields = append(fields, serializeField(f))
+			fields = append(fields, serializeField(schema, f))
 		}
 		result["fields"] = fields
 	}
@@ -95,17 +104,17 @@ func serializeType(t *ast.Definition) map[string]any {
 	return result
 }
 
-func serializeField(f *ast.FieldDefinition) map[string]any {
+func serializeField(schema *ast.Schema, f *ast.FieldDefinition) map[string]any {
 	result := map[string]any{
 		"name": f.Name,
-		"type": serializeTypeRef(f.Type),
+		"type": serializeTypeRef(schema, f.Type),
 	}
 	if len(f.Arguments) > 0 {
 		args := make([]any, 0, len(f.Arguments))
 		for _, a := range f.Arguments {
 			arg := map[string]any{
 				"name": a.Name,
-				"type": serializeTypeRef(a.Type),
+				"type": serializeTypeRef(schema, a.Type),
 			}
 			args = append(args, arg)
 		}
@@ -114,31 +123,64 @@ func serializeField(f *ast.FieldDefinition) map[string]any {
 	return result
 }
 
-func serializeTypeRef(t *ast.Type) map[string]any {
+// serializeInputValue serializes a field/argument for use as an __InputValue
+// (input object fields and field arguments).
+func serializeInputValue(schema *ast.Schema, f *ast.FieldDefinition) map[string]any {
+	result := map[string]any{
+		"name": f.Name,
+		"type": serializeTypeRef(schema, f.Type),
+	}
+	if f.Description != "" {
+		result["description"] = f.Description
+	}
+	if f.DefaultValue != nil {
+		result["defaultValue"] = f.DefaultValue.String()
+	}
+	return result
+}
+
+// serializeTypeRef serializes a type reference for introspection. The kind
+// is determined by looking up the actual type definition in the schema.
+// NonNull is checked FIRST so that NonNull named types (e.g. String!) get a
+// NON_NULL wrapper rather than losing it.
+func serializeTypeRef(schema *ast.Schema, t *ast.Type) map[string]any {
 	if t == nil {
 		return nil
 	}
-	if t.NamedType != "" {
+	// Check NonNull FIRST — before NamedType.
+	if t.NonNull {
+		inner := serializeTypeRef(schema, &ast.Type{
+			NamedType: t.NamedType,
+			Elem:      t.Elem,
+		})
 		return map[string]any{
-			"kind":   "OBJECT",
+			"kind":   "NON_NULL",
+			"name":   nil,
+			"ofType": inner,
+		}
+	}
+	// Named type: look up actual kind from schema.
+	if t.NamedType != "" {
+		kind := "SCALAR" // default for built-in scalars not in schema.Types
+		if def, ok := schema.Types[t.NamedType]; ok {
+			kind = string(def.Kind)
+		}
+		return map[string]any{
+			"kind":   kind,
 			"name":   t.NamedType,
 			"ofType": nil,
 		}
 	}
-	// List type
-	inner := serializeTypeRef(t.Elem)
-	kind := "LIST"
-	if t.NonNull {
-		kind = "NON_NULL"
-	}
+	// List type.
+	inner := serializeTypeRef(schema, t.Elem)
 	return map[string]any{
-		"kind":   kind,
+		"kind":   "LIST",
 		"name":   nil,
 		"ofType": inner,
 	}
 }
 
-func serializeDirective(d *ast.DirectiveDefinition) map[string]any {
+func serializeDirective(schema *ast.Schema, d *ast.DirectiveDefinition) map[string]any {
 	result := map[string]any{
 		"name": d.Name,
 	}
@@ -148,6 +190,17 @@ func serializeDirective(d *ast.DirectiveDefinition) map[string]any {
 			locs = append(locs, string(l))
 		}
 		result["locations"] = locs
+	}
+	if len(d.Arguments) > 0 {
+		args := make([]any, 0, len(d.Arguments))
+		for _, a := range d.Arguments {
+			arg := map[string]any{
+				"name": a.Name,
+				"type": serializeTypeRef(schema, a.Type),
+			}
+			args = append(args, arg)
+		}
+		result["args"] = args
 	}
 	return result
 }
