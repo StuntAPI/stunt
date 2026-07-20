@@ -163,7 +163,7 @@ def on_add_sheet(req):
 
     sheets.append(sheet_obj)
     sc = store_collection("spreadsheets")
-    sc.update(doc["_id"], doc)
+    sc.update(doc["id"], doc)
 
     return respond(200, {
         "spreadsheetId": ss_id,
@@ -284,7 +284,7 @@ def _handle_batch_update(req, ss_id, doc):
             # Unknown request type — echo it back as a no-op reply.
             replies.append({})
 
-    sc.update(doc["_id"], doc)
+    sc.update(doc["id"], doc)
 
     return respond(200, {
         "spreadsheetId": ss_id,
