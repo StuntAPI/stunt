@@ -8,6 +8,10 @@ id: discord-style
 name: "Discord-style API simulator (unofficial)"
 version: "0.1.0"
 
+api:
+  name: "Discord API"
+  version: "v10"
+
 # Endpoints — each maps a route + method to a Starlark handler.
 # NOTE: literal routes must come BEFORE parameterized routes so they are
 # matched first (the dispatch engine checks in declaration order).

@@ -8,6 +8,10 @@ id: dropbox-style
 name: "Dropbox-style API simulator (unofficial)"
 version: "0.1.0"
 
+api:
+  name: "Dropbox API"
+  version: "2"
+
 # Dropbox uses RPC-style endpoints: POST /2/files/{action} with JSON bodies.
 # This is distinct from REST-style adapters (e.g., drive-style) and provides
 # useful adapter-pattern variety for local testing.

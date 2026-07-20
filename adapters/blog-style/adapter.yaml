@@ -7,6 +7,10 @@ id: blog-style
 name: "Blog GraphQL example adapter"
 version: "0.1.0"
 
+api:
+  name: "GraphQL demo"
+  version: "1.0"
+
 # GraphQL service — served from the SDL schema + convention-named Starlark
 # resolvers. Root fields use on_<field>(callArg); object fields use
 # resolve_<Type>_<field>(callArg). Scalar fields default to parent[field].

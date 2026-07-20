@@ -8,6 +8,10 @@ id: google-style
 name: "Google OAuth2 API simulator (unofficial)"
 version: "0.1.0"
 
+api:
+  name: "Google OAuth2 API"
+  version: "v2"
+
 # Endpoints — each maps a route + method to a Starlark handler.
 endpoints:
   # --- OAuth2 ---
