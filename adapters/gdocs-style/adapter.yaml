@@ -1,0 +1,59 @@
+# stunt adapter manifest — Google Docs API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Google Docs API (v1) for LOCAL
+# TESTING ONLY. It does not call the real Google API. All data is synthetic.
+# See DISCLAIMER.
+id: gdocs-style
+name: "Google Docs API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Google Docs API"
+  version: "v1"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Create document ---
+  - route: /v1/documents
+    method: POST
+    handler: scripts/documents.star#on_create_document
+
+  # --- Batch update (literal 3rd segment with colon) ---
+  - route: /v1/documents/{documentId}/revisions
+    method: GET
+    handler: scripts/documents.star#on_get_revisions
+
+  # --- Batch update (POST with :batchUpdate suffix) ---
+  - route: /v1/documents/{documentId}/batchUpdate
+    method: POST
+    handler: scripts/documents.star#on_batch_update
+
+  # --- Get document ---
+  - route: /v1/documents/{documentId}
+    method: GET
+    handler: scripts/documents.star#on_get_document
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: documents
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: 404
+            message: "Method not found."
+            status: "NOT_FOUND"
