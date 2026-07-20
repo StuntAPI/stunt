@@ -1,0 +1,133 @@
+# stunt adapter manifest — Salesforce REST + SOQL API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Salesforce REST API (v60.0)
+# for LOCAL TESTING ONLY. It does not call the real Salesforce API. All data
+# is synthetic. See DISCLAIMER.
+id: salesforce-style
+name: "Salesforce REST API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Salesforce REST API"
+  version: "v60.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- OAuth2 ---
+  - route: /services/oauth2/token
+    method: POST
+    handler: scripts/oauth.star#on_token
+
+  # --- sobjects describe global + per-object describe ---
+  - route: /services/data/v60.0/sobjects
+    method: GET
+    handler: scripts/sobjects.star#on_describe_global
+  - route: /services/data/v60.0/sobjects/Account
+    method: GET
+    handler: scripts/sobjects.star#on_describe_object
+  - route: /services/data/v60.0/sobjects/Contact
+    method: GET
+    handler: scripts/sobjects.star#on_describe_object
+  - route: /services/data/v60.0/sobjects/Opportunity
+    method: GET
+    handler: scripts/sobjects.star#on_describe_object
+  - route: /services/data/v60.0/sobjects/Lead
+    method: GET
+    handler: scripts/sobjects.star#on_describe_object
+  - route: /services/data/v60.0/sobjects/User
+    method: GET
+    handler: scripts/sobjects.star#on_describe_object
+
+  # --- Account CRUD (specific object) ---
+  - route: /services/data/v60.0/sobjects/Account
+    method: POST
+    handler: scripts/sobjects.star#on_create
+  - route: /services/data/v60.0/sobjects/Account/{id}
+    method: GET
+    handler: scripts/sobjects.star#on_retrieve
+  - route: /services/data/v60.0/sobjects/Account/{id}
+    method: PATCH
+    handler: scripts/sobjects.star#on_update
+  - route: /services/data/v60.0/sobjects/Account/{id}
+    method: DELETE
+    handler: scripts/sobjects.star#on_delete
+
+  # --- Contact CRUD ---
+  - route: /services/data/v60.0/sobjects/Contact
+    method: POST
+    handler: scripts/sobjects.star#on_create
+  - route: /services/data/v60.0/sobjects/Contact/{id}
+    method: GET
+    handler: scripts/sobjects.star#on_retrieve
+  - route: /services/data/v60.0/sobjects/Contact/{id}
+    method: PATCH
+    handler: scripts/sobjects.star#on_update
+  - route: /services/data/v60.0/sobjects/Contact/{id}
+    method: DELETE
+    handler: scripts/sobjects.star#on_delete
+
+  # --- Opportunity CRUD ---
+  - route: /services/data/v60.0/sobjects/Opportunity
+    method: POST
+    handler: scripts/sobjects.star#on_create
+  - route: /services/data/v60.0/sobjects/Opportunity/{id}
+    method: GET
+    handler: scripts/sobjects.star#on_retrieve
+  - route: /services/data/v60.0/sobjects/Opportunity/{id}
+    method: PATCH
+    handler: scripts/sobjects.star#on_update
+  - route: /services/data/v60.0/sobjects/Opportunity/{id}
+    method: DELETE
+    handler: scripts/sobjects.star#on_delete
+
+  # --- SOQL query ---
+  - route: /services/data/v60.0/query
+    method: GET
+    handler: scripts/query.star#on_query
+  - route: /services/data/v60.0/queryAll
+    method: GET
+    handler: scripts/query.star#on_query
+
+  # --- composite batch ---
+  - route: /services/data/v60.0/composite
+    method: POST
+    handler: scripts/composite.star#on_composite
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: access_tokens
+    kind: collection
+  - name: accounts
+    kind: collection
+    seed: fixtures/accounts.jsonl
+  - name: contacts
+    kind: collection
+    seed: fixtures/contacts.jsonl
+  - name: opportunities
+    kind: collection
+    seed: fixtures/opportunities.jsonl
+  - name: leads
+    kind: collection
+    seed: fixtures/leads.jsonl
+  - name: users
+    kind: collection
+    seed: fixtures/users.jsonl
+
+# Auth scheme metadata: OAuth2 bearer tokens.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          - message: "The requested resource does not exist"
+            errorCode: "NOT_FOUND"
+            fields: []

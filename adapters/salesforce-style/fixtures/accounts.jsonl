@@ -1,0 +1,1 @@
+{"id":"001_SEED_AAA","Id":"001_SEED_AAA","Name":"GenePoint","Type":"Customer","Industry":"Biotechnology","Phone":"{{ faker.Phone }}","Website":"https://genepoint.example","BillingCity":"Springfield","BillingState":"CA","AnnualRevenue":5.2,"NumberOfEmployees":50}
