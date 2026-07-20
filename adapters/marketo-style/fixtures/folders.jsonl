@@ -1,0 +1,3 @@
+{"id":"4001","name":"Marketing Activities","parentId":null,"folderType":"Folder","createdAt":"2024-01-01T00:00:00Z"}
+{"id":"4002","name":"Lead Nurturing","parentId":"4001","folderType":"Folder","createdAt":"2024-01-01T00:00:00Z"}
+{"id":"4003","name":"Email Programs","parentId":"4001","folderType":"Program","createdAt":"2024-01-01T00:00:00Z"}

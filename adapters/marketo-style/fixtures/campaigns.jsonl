@@ -1,0 +1,3 @@
+{"id":"2001","name":"Welcome Email Campaign","description":"Onboarding welcome series","type":"trigger","isActive":true}
+{"id":"2002","name":"Nurture Program Campaign","description":"Lead nurture flow","type":"batch","isActive":true}
+{"id":"2003","name":"Re-engagement Campaign","description":"Win-back dormant leads","type":"trigger","isActive":false}

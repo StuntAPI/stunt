@@ -1,0 +1,3 @@
+{"id":"1001","email":"{{ faker.Email }}","firstName":"Alice","lastName":"Anderson","createdAt":"2024-01-01T00:00:00Z","updatedAt":"2024-01-02T00:00:00Z"}
+{"id":"1002","email":"{{ faker.Email }}","firstName":"Bob","lastName":"Brown","createdAt":"2024-01-01T00:00:00Z","updatedAt":"2024-01-03T00:00:00Z"}
+{"id":"1003","email":"{{ faker.Email }}","firstName":"Carol","lastName":"Chen","createdAt":"2024-01-01T00:00:00Z","updatedAt":"2024-01-04T00:00:00Z"}
