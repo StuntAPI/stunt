@@ -1,0 +1,57 @@
+# stunt adapter manifest — Helius Solana RPC + Enhanced API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Helius API (v0) for LOCAL
+# TESTING ONLY. It does not call the real Helius API. All data is synthetic.
+# See DISCLAIMER.
+id: helius-style
+name: "Helius Solana RPC + Enhanced API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Helius Solana RPC + Enhanced API"
+  version: "v0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- JSON-RPC (catches /?api-key=...) ---
+  - route: /
+    method: POST
+    handler: scripts/rpc.star#on_rpc
+
+  # --- Enhanced API: transactions ---
+  - route: /v0/transactions
+    method: POST
+    handler: scripts/enhanced.star#on_parse_transactions
+
+  # --- Parameterized routes ---
+  - route: /v0/addresses/{address}/balances
+    method: GET
+    handler: scripts/enhanced.star#on_get_balances
+  - route: /v0/addresses/{address}/nfts
+    method: GET
+    handler: scripts/enhanced.star#on_get_nfts
+
+  # --- Names ---
+  - route: /v0/names
+    method: POST
+    handler: scripts/enhanced.star#on_get_names
+
+# Backing stores.
+resources: []
+
+# Auth scheme metadata (api-key query param).
+identity:
+  token_scheme: api_key
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: "Not Found"
