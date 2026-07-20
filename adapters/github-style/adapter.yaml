@@ -1,0 +1,109 @@
+# stunt adapter manifest — GitHub App-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of GitHub's REST + GraphQL API
+# (X-GitHub-Api-Version: 2022-11-28) for LOCAL TESTING ONLY. It does not call
+# the real GitHub API. All data is synthetic. See DISCLAIMER.
+id: github-style
+name: "GitHub App-style API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "GitHub REST + GraphQL API"
+  version: "2022-11-28"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- App metadata + installation token exchange ---
+  - route: /app
+    method: GET
+    handler: scripts/app.star#on_get_app
+  - route: /app/installations
+    method: GET
+    handler: scripts/app.star#on_list_installations
+  - route: /app/installations/{installation_id}/access_tokens
+    method: POST
+    handler: scripts/app.star#on_create_installation_token
+  - route: /installation
+    method: GET
+    handler: scripts/app.star#on_get_installation
+
+  # --- Repository ---
+  - route: /repos/{owner}/{repo}
+    method: GET
+    handler: scripts/repos.star#on_get_repo
+
+  # --- Issues (stateful) ---
+  - route: /repos/{owner}/{repo}/issues
+    method: GET
+    handler: scripts/issues.star#on_list_issues
+  - route: /repos/{owner}/{repo}/issues
+    method: POST
+    handler: scripts/issues.star#on_create_issue
+  - route: /repos/{owner}/{repo}/issues/{issue_number}
+    method: GET
+    handler: scripts/issues.star#on_get_issue
+  - route: /repos/{owner}/{repo}/issues/{issue_number}
+    method: PATCH
+    handler: scripts/issues.star#on_update_issue
+
+  # --- Pull requests (stateful) ---
+  - route: /repos/{owner}/{repo}/pulls
+    method: GET
+    handler: scripts/pulls.star#on_list_pulls
+  - route: /repos/{owner}/{repo}/pulls
+    method: POST
+    handler: scripts/pulls.star#on_create_pull
+  - route: /repos/{owner}/{repo}/pulls/{pull_number}/reviews
+    method: GET
+    handler: scripts/pulls.star#on_list_reviews
+
+  # --- Actions ---
+  - route: /repos/{owner}/{repo}/dispatches
+    method: POST
+    handler: scripts/actions.star#on_dispatch
+  - route: /repos/{owner}/{repo}/actions/runs
+    method: GET
+    handler: scripts/actions.star#on_list_runs
+
+  # --- Webhooks (register) ---
+  - route: /repos/{owner}/{repo}/hooks
+    method: POST
+    handler: scripts/hooks.star#on_create_hook
+
+  # --- GraphQL ---
+  - route: /graphql
+    method: POST
+    handler: scripts/graphql.star#on_graphql
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: issues
+    kind: collection
+  - name: pulls
+    kind: collection
+  - name: hooks
+    kind: collection
+  - name: runs
+    kind: collection
+  - name: reviews
+    kind: collection
+  - name: installation_tokens
+    kind: collection
+
+# Auth scheme metadata (GitHub uses Bearer tokens: JWT, ghs_, or ghp_).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404 in the GitHub error envelope.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          message: "Not Found"
+          documentation_url: "https://docs.github.com/rest"
