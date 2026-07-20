@@ -1,0 +1,83 @@
+# stunt adapter manifest — Square API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Square API for LOCAL TESTING
+# ONLY. It does not call the real Square API. All data is synthetic.
+# See DISCLAIMER.
+id: square-style
+name: "Square API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Square API"
+  version: "2024-08-21"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+endpoints:
+  # --- OAuth2 token ---
+  - route: /oauth2/token
+    method: POST
+    handler: scripts/oauth.star#on_token
+
+  # --- Payments ---
+  - route: /v2/payments
+    method: POST
+    handler: scripts/payments.star#on_create_payment
+  - route: /v2/payments/{id}
+    method: GET
+    handler: scripts/payments.star#on_get_payment
+  - route: /v2/payments/{id}/complete
+    method: POST
+    handler: scripts/payments.star#on_complete_payment
+
+  # --- Refunds ---
+  - route: /v2/refunds
+    method: POST
+    handler: scripts/refunds.star#on_create_refund
+
+  # --- Locations ---
+  - route: /v2/locations
+    method: GET
+    handler: scripts/locations.star#on_list_locations
+
+  # --- Catalog (the deeply-nested Catalog API) ---
+  - route: /v2/catalog/search
+    method: POST
+    handler: scripts/catalog.star#on_search_catalog
+
+  # --- Orders ---
+  - route: /v2/orders
+    method: POST
+    handler: scripts/orders.star#on_create_order
+  - route: /v2/orders/{id}
+    method: GET
+    handler: scripts/orders.star#on_get_order
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: payments
+    kind: collection
+  - name: refunds
+    kind: collection
+  - name: orders
+    kind: collection
+  - name: access_tokens
+    kind: collection
+
+# Auth scheme: Square uses Authorization: Bearer <access_token> + a
+# Square-Version header. Both are checked.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          errors:
+            - code: "NOT_FOUND"
+              category: "API_ERROR"
+              detail: "Resource not found"
