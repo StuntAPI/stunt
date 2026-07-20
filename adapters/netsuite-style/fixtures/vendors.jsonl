@@ -1,0 +1,2 @@
+{"id":"1","entityId":"Vendor Alpha","companyName":"Alpha Supplies Inc","email":"{{ faker.Email }}","terms":{"refName":"Net 30"},"currency":{"refName":"USD"}}
+{"id":"2","entityId":"Vendor Beta","companyName":"Beta Components Ltd","email":"{{ faker.Email }}","terms":{"refName":"Net 45"},"currency":{"refName":"USD"}}

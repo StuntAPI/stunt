@@ -1,0 +1,3 @@
+{"id":"1","entityId":"jsmith","firstName":"John","lastName":"Smith","email":"{{ faker.Email }}","title":"Sales Manager","department":{"refName":"Sales"},"subsidiary":"1"}
+{"id":"2","entityId":"mjohnson","firstName":"Mary","lastName":"Johnson","email":"{{ faker.Email }}","title":"Accountant","department":{"refName":"Finance"},"subsidiary":"1"}
+{"id":"3","entityId":"bwilson","firstName":"Bob","lastName":"Wilson","email":"{{ faker.Email }}","title":"Operations Lead","department":{"refName":"Operations"},"subsidiary":"1"}
