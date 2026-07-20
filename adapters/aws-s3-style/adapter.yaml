@@ -1,0 +1,74 @@
+# stunt adapter manifest — Amazon S3-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Amazon S3 API for
+# LOCAL TESTING ONLY. It does not call the real Amazon S3 API. All data is
+# synthetic. See DISCLAIMER.
+id: aws-s3-style
+name: "Amazon S3-style API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Amazon S3 API"
+  version: "2006-03-01"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# Path-style URLs: /{bucket}/{key}
+#
+# NOTE: literal routes and query-string-driven routes must come BEFORE
+# parameterized routes so they are matched first (the dispatch engine
+# checks in declaration order).
+endpoints:
+  # --- Bucket operations ---
+  # ListObjectsV2: GET /{bucket}?list-type=2
+  - route: /{bucket}
+    method: GET
+    handler: scripts/objects.star#on_list_or_location
+  # Create bucket: PUT /{bucket}
+  - route: /{bucket}
+    method: PUT
+    handler: scripts/buckets.star#on_create_bucket
+
+  # --- Object operations ---
+  # Upload object: PUT /{bucket}/{key}
+  - route: /{bucket}/{key}
+    method: PUT
+    handler: scripts/objects.star#on_put_object
+  # Download object: GET /{bucket}/{key}
+  - route: /{bucket}/{key}
+    method: GET
+    handler: scripts/objects.star#on_get_object
+  # Head object: HEAD /{bucket}/{key}
+  - route: /{bucket}/{key}
+    method: HEAD
+    handler: scripts/objects.star#on_head_object
+  # Delete object: DELETE /{bucket}/{key}
+  - route: /{bucket}/{key}
+    method: DELETE
+    handler: scripts/objects.star#on_delete_object
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: buckets
+    kind: collection
+  - name: objects
+    kind: collection
+
+# Auth scheme: SigV4 (AWS4-HMAC-SHA256). Structural validation only for v1.
+identity:
+  token_scheme: custom
+
+# Catch-all: any unmatched route returns a 404 in S3-shaped XML.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: resource_not_found
+
+# Resources notes:
+# - buckets collection: {name, created, region}
+# - objects collection: {bucket, key, content, contentType, etag,
+#                        lastModified, size}
