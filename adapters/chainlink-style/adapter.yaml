@@ -1,0 +1,79 @@
+# stunt adapter manifest — Chainlink Data Feeds + Functions + Automation + CCIP
+# simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Chainlink off-chain services
+# API for LOCAL TESTING ONLY. It does not call the real Chainlink API. All
+# data is synthetic. See DISCLAIMER.
+id: chainlink-style
+name: "Chainlink Data Feeds + Functions + Automation + CCIP simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Chainlink Data Feeds + Functions + Automation"
+  version: "1.0"
+
+# Auth: Bearer for Functions/Automation/CCIP; Data Feeds are public.
+identity:
+  token_scheme: bearer
+
+# Endpoints — each maps a route + method to a Starlark handler.
+endpoints:
+  # --- Data Feeds (public, no auth required) ---
+  - route: /feeds
+    method: GET
+    handler: scripts/feeds.star#on_list_feeds
+  - route: /feeds/{feedID}
+    method: GET
+    handler: scripts/feeds.star#on_get_feed
+
+  # --- Functions (auth required) ---
+  - route: /v2/functions/createSecrets
+    method: POST
+    handler: scripts/functions.star#on_create_secrets
+  - route: /v2/functions/encryptSecrets
+    method: POST
+    handler: scripts/functions.star#on_encrypt_secrets
+  - route: /v2/functions/createRequest
+    method: POST
+    handler: scripts/functions.star#on_create_request
+
+  # --- Automation (auth required) ---
+  - route: /v2/automation/registerUpkeep
+    method: POST
+    handler: scripts/automation.star#on_register_upkeep
+  - route: /v2/automation/upkeeps
+    method: GET
+    handler: scripts/automation.star#on_list_upkeeps
+  - route: /v2/automation/{id}
+    method: GET
+    handler: scripts/automation.star#on_get_upkeep
+
+  # --- CCIP (auth required) ---
+  - route: /v2/ccip/messages
+    method: GET
+    handler: scripts/ccip.star#on_list_messages
+  - route: /v2/ccip/lane/{src}/{dst}
+    method: GET
+    handler: scripts/ccip.star#on_lane
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: feeds
+    kind: collection
+  - name: secrets
+    kind: collection
+  - name: upkeeps
+    kind: collection
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: "NOT_FOUND"
+            message: "Endpoint not found"
