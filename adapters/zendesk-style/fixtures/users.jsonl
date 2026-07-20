@@ -1,0 +1,5 @@
+{"id":"101","name":"Alice Green","email":"{{ faker.Email }}","role":"end-user","active":true,"organization_id":"301"}
+{"id":"102","name":"Bob Brown","email":"{{ faker.Email }}","role":"end-user","active":true,"organization_id":"301"}
+{"id":"103","name":"Carol Chen","email":"{{ faker.Email }}","role":"end-user","active":true,"organization_id":"302"}
+{"id":"201","name":"Support Agent One","email":"{{ faker.Email }}","role":"agent","active":true,"organization_id":null}
+{"id":"202","name":"Support Agent Two","email":"{{ faker.Email }}","role":"admin","active":true,"organization_id":null}

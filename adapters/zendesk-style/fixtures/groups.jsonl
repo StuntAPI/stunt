@@ -1,0 +1,3 @@
+{"id":"1","name":"Support","description":"General support group","default":true}
+{"id":"2","name":"Billing","description":"Billing inquiries","default":false}
+{"id":"3","name":"Engineering","description":"Technical escalations","default":false}
