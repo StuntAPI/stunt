@@ -1,0 +1,85 @@
+# stunt adapter manifest — Firebase Auth + Firestore + Cloud Messaging API
+# simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Firebase Auth, Firestore, and
+# Cloud Messaging (FCM) APIs for LOCAL TESTING ONLY. It does not call the
+# real Firebase API. All data is synthetic. See DISCLAIMER.
+id: firebase-style
+name: "Firebase Auth + Firestore + Cloud Messaging API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Firebase Auth + Firestore + Cloud Messaging API"
+  version: "v1"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Auth v1 REST ---
+  - route: /v1/accounts:signInWithPassword
+    method: POST
+    handler: scripts/auth.star#on_sign_in_with_password
+  - route: /v1/accounts:signUp
+    method: POST
+    handler: scripts/auth.star#on_sign_up
+  - route: /v1/accounts:signInWithIdp
+    method: POST
+    handler: scripts/auth.star#on_sign_in_with_idp
+  - route: /v1/accounts:getAccountInfo
+    method: POST
+    handler: scripts/auth.star#on_get_account_info
+  - route: /v1/accounts:lookup
+    method: POST
+    handler: scripts/auth.star#on_get_account_info
+
+  # --- Auth v3 (Identity Toolkit legacy) ---
+  - route: /identitytoolkit/v3/relyingparty/{action}
+    method: POST
+    handler: scripts/auth.star#on_relyingparty
+
+  # --- Firestore ---
+  - route: /v1/projects/{project}/databases/(default)/documents/{collection}
+    method: GET
+    handler: scripts/firestore.star#on_list_documents
+  - route: /v1/projects/{project}/databases/(default)/documents/{collection}
+    method: POST
+    handler: scripts/firestore.star#on_create_document
+  - route: /v1/projects/{project}/databases/(default)/documents/{collection}/{id}
+    method: GET
+    handler: scripts/firestore.star#on_get_document
+  - route: /v1/projects/{project}/databases/(default)/documents/{collection}/{id}
+    method: PATCH
+    handler: scripts/firestore.star#on_upsert_document
+
+  # --- FCM (Cloud Messaging) ---
+  - route: /v1/projects/{project}/messages:send
+    method: POST
+    handler: scripts/fcm.star#on_send_message
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: users
+    kind: collection
+  - name: documents
+    kind: collection
+  - name: messages
+    kind: collection
+
+# Auth scheme metadata (mock: bearer token or key accepted; presence checked).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: 404
+            message: "Not Found"
+            status: "NOT_FOUND"
