@@ -1,0 +1,79 @@
+# stunt adapter manifest — WhatsApp Business Cloud API-style simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of Meta's WhatsApp Business Cloud API
+# (version v21.0) for LOCAL TESTING ONLY. It does not call the real WhatsApp
+# API. All data is synthetic. See DISCLAIMER.
+id: whatsapp-style
+name: "WhatsApp Business Cloud API-style simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "WhatsApp Business Cloud API (Meta)"
+  version: "v21.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Send messages ---
+  - route: /v21.0/{phone_number_id}/messages
+    method: POST
+    handler: scripts/messages.star#on_send_message
+
+  # --- Phone number registration ---
+  - route: /v21.0/{phone_number_id}/register
+    method: POST
+    handler: scripts/phonenumber.star#on_register
+
+  # --- Media upload ---
+  - route: /v21.0/{phone_number_id}/media
+    method: POST
+    handler: scripts/media.star#on_upload_media
+
+  # --- Message templates (list + create) ---
+  - route: /v21.0/{waba_id}/message_templates
+    method: GET
+    handler: scripts/templates.star#on_list_templates
+  - route: /v21.0/{waba_id}/message_templates
+    method: POST
+    handler: scripts/templates.star#on_create_template
+
+  # --- Generic resource lookup (3 segments: phone status, message status, media) ---
+  - route: /v21.0/{resource_id}
+    method: GET
+    handler: scripts/resource.star#on_get_resource
+
+  # --- Template update (POST /v21.0/{template_id}) ---
+  - route: /v21.0/{template_id}
+    method: POST
+    handler: scripts/templates.star#on_update_template
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: messages
+    kind: collection
+  - name: templates
+    kind: collection
+  - name: media
+    kind: collection
+  - name: phone_numbers
+    kind: collection
+
+# Auth scheme metadata (Meta uses Bearer access tokens).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404 in the Meta error envelope.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            message: "Unsupported get request"
+            type: "OAuthException"
+            code: 803
+            fbtrace_id: "synthetic_fbtrace_id"
