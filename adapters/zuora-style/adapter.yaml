@@ -1,0 +1,111 @@
+# stunt adapter manifest — Zuora Billing REST API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Zuora Billing REST API (v1) for
+# LOCAL TESTING ONLY. It does not call the real Zuora API. All data is
+# synthetic. See DISCLAIMER.
+id: zuora-style
+name: "Zuora Billing REST API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Zuora REST API"
+  version: "v1"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Accounts ---
+  - route: /v1/accounts
+    method: GET
+    handler: scripts/accounts.star#on_list_accounts
+  - route: /v1/accounts
+    method: POST
+    handler: scripts/accounts.star#on_create_account
+  - route: /v1/accounts/{accountKey}
+    method: GET
+    handler: scripts/accounts.star#on_get_account
+
+  # --- Subscriptions ---
+  - route: /v1/subscriptions
+    method: POST
+    handler: scripts/subscriptions.star#on_create_subscription
+  - route: /v1/subscriptions/{subscriptionKey}/cancel
+    method: POST
+    handler: scripts/subscriptions.star#on_cancel_subscription
+  - route: /v1/subscriptions/{subscriptionKey}
+    method: PUT
+    handler: scripts/subscriptions.star#on_update_subscription
+  - route: /v1/subscriptions/{subscriptionKey}
+    method: GET
+    handler: scripts/subscriptions.star#on_get_subscription
+
+  # --- Usage (metered billing) ---
+  - route: /v1/usage
+    method: POST
+    handler: scripts/usage.star#on_record_usage
+  - route: /v1/usage
+    method: GET
+    handler: scripts/usage.star#on_list_usage
+
+  # --- Invoices ---
+  - route: /v1/invoices/{invoiceId}
+    method: GET
+    handler: scripts/billing.star#on_get_invoice
+
+  # --- Payments ---
+  - route: /v1/payments
+    method: GET
+    handler: scripts/billing.star#on_list_payments
+
+  # --- Payment methods ---
+  - route: /v1/payment-methods/credit-cards
+    method: POST
+    handler: scripts/billing.star#on_create_payment_method
+
+  # --- Transactions ---
+  - route: /v1/transactions/billing/preview
+    method: POST
+    handler: scripts/billing.star#on_preview_billing
+
+  # --- ZOQL query (Zuora Object Query Language) ---
+  - route: /v1/action/query
+    method: POST
+    handler: scripts/query.star#on_query
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: accounts
+    kind: collection
+    seed: fixtures/accounts.jsonl
+  - name: subscriptions
+    kind: collection
+    seed: fixtures/subscriptions.jsonl
+  - name: usage
+    kind: collection
+  - name: invoices
+    kind: collection
+    seed: fixtures/invoices.jsonl
+  - name: payments
+    kind: collection
+  - name: payment_methods
+    kind: collection
+
+# Auth scheme: Bearer or apiAccessKeyId/apiSecretAccessKey.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          success: false
+          processId: "synthetic"
+          reasons:
+            - code: "NOT_FOUND"
+              message: "Resource not found"
