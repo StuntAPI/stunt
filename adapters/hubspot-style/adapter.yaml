@@ -1,0 +1,137 @@
+# stunt adapter manifest — HubSpot CRM API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the HubSpot CRM API (v3) for
+# LOCAL TESTING ONLY. It does not call the real HubSpot API. All data is
+# synthetic. See DISCLAIMER.
+id: hubspot-style
+name: "HubSpot CRM API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "HubSpot CRM API"
+  version: "v3"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- contacts CRUD ---
+  - route: /crm/v3/objects/contacts
+    method: GET
+    handler: scripts/objects.star#on_list
+  - route: /crm/v3/objects/contacts
+    method: POST
+    handler: scripts/objects.star#on_create
+  - route: /crm/v3/objects/contacts/batch/create
+    method: POST
+    handler: scripts/batch.star#on_batch_create
+  - route: /crm/v3/objects/contacts/batch/read
+    method: POST
+    handler: scripts/batch.star#on_batch_read
+  - route: /crm/v3/objects/contacts/batch/update
+    method: POST
+    handler: scripts/batch.star#on_batch_update
+  - route: /crm/v3/objects/contacts/{id}
+    method: GET
+    handler: scripts/objects.star#on_get
+  - route: /crm/v3/objects/contacts/{id}
+    method: PATCH
+    handler: scripts/objects.star#on_update
+  - route: /crm/v3/objects/contacts/{id}
+    method: DELETE
+    handler: scripts/objects.star#on_delete
+
+  # --- contacts associations ---
+  - route: /crm/v3/objects/contacts/{id}/associations/{toObjectType}/{toObjectId}/{associationType}
+    method: PUT
+    handler: scripts/associations.star#on_associate
+  - route: /crm/v3/objects/contacts/{id}/associations/{toObjectType}
+    method: GET
+    handler: scripts/associations.star#on_list_associations
+
+  # --- companies CRUD ---
+  - route: /crm/v3/objects/companies
+    method: GET
+    handler: scripts/objects.star#on_list
+  - route: /crm/v3/objects/companies
+    method: POST
+    handler: scripts/objects.star#on_create
+  - route: /crm/v3/objects/companies/{id}
+    method: GET
+    handler: scripts/objects.star#on_get
+  - route: /crm/v3/objects/companies/{id}
+    method: PATCH
+    handler: scripts/objects.star#on_update
+  - route: /crm/v3/objects/companies/{id}
+    method: DELETE
+    handler: scripts/objects.star#on_delete
+
+  # --- deals CRUD ---
+  - route: /crm/v3/objects/deals
+    method: GET
+    handler: scripts/objects.star#on_list
+  - route: /crm/v3/objects/deals
+    method: POST
+    handler: scripts/objects.star#on_create
+  - route: /crm/v3/objects/deals/{id}
+    method: GET
+    handler: scripts/objects.star#on_get
+  - route: /crm/v3/objects/deals/{id}
+    method: PATCH
+    handler: scripts/objects.star#on_update
+  - route: /crm/v3/objects/deals/{id}
+    method: DELETE
+    handler: scripts/objects.star#on_delete
+
+  # --- tickets CRUD ---
+  - route: /crm/v3/objects/tickets
+    method: GET
+    handler: scripts/objects.star#on_list
+  - route: /crm/v3/objects/tickets
+    method: POST
+    handler: scripts/objects.star#on_create
+  - route: /crm/v3/objects/tickets/{id}
+    method: GET
+    handler: scripts/objects.star#on_get
+  - route: /crm/v3/objects/tickets/{id}
+    method: PATCH
+    handler: scripts/objects.star#on_update
+  - route: /crm/v3/objects/tickets/{id}
+    method: DELETE
+    handler: scripts/objects.star#on_delete
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: contacts
+    kind: collection
+    seed: fixtures/contacts.jsonl
+  - name: companies
+    kind: collection
+    seed: fixtures/companies.jsonl
+  - name: deals
+    kind: collection
+    seed: fixtures/deals.jsonl
+  - name: tickets
+    kind: collection
+    seed: fixtures/tickets.jsonl
+  - name: associations
+    kind: collection
+
+# Auth scheme: Bearer token or hapikey query param.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          status: "error"
+          message: "The requested resource was not found."
+          category: "OBJECT_NOT_FOUND"
+          errors: []
+          corrId: "synthetic-corr-id"

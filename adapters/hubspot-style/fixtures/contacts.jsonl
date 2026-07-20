@@ -1,0 +1,1 @@
+{"id":"1","properties":{"firstname":"Alice","lastname":"Green","email":"{{ faker.Email }}","lifecyclestage":"lead"},"createdAt":"2024-01-01T00:00:00Z","updatedAt":"2024-01-01T00:00:00Z","archived":false}
