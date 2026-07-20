@@ -1,0 +1,64 @@
+# stunt adapter manifest — Apple Search Ads API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Apple Search Ads API (v4) for
+# LOCAL TESTING ONLY. It does not call the real Apple API. All data is
+# synthetic. See DISCLAIMER.
+id: apple-searchads-style
+name: "Apple Search Ads API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Apple Search Ads API"
+  version: "v4"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Campaigns (find + create) ---
+  - route: /api/v4/campaigns/find
+    method: POST
+    handler: scripts/campaigns.star#on_find_campaigns
+  - route: /api/v4/campaigns
+    method: POST
+    handler: scripts/campaigns.star#on_create_campaign
+  - route: /api/v4/reports/campaigns
+    method: POST
+    handler: scripts/reports.star#on_report_campaigns
+
+  # --- Parameterized routes ---
+  - route: /api/v4/campaigns/{campaign_id}
+    method: GET
+    handler: scripts/campaigns.star#on_get_campaign
+  - route: /api/v4/campaigns/{campaign_id}/ads
+    method: POST
+    handler: scripts/campaigns.star#on_create_ad
+  - route: /api/v4/campaigns/{campaign_id}/keywords/targeting/find
+    method: POST
+    handler: scripts/keywords.star#on_find_keywords
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: campaigns
+    kind: collection
+  - name: ads
+    kind: collection
+  - name: keywords
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: bearer_jwt
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          data:
+            status: "NOT_FOUND"
+            message: "Resource not found"
