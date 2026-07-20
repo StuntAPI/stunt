@@ -1,0 +1,2 @@
+{"id":"acc-seed-a","item_id":"item-seed-a","balances":{"available":1100.00,"current":1200.00,"iso_currency_code":"USD"},"name":"Plaid Checking","mask":"0000","subtype":"checking","type":"depository"}
+{"id":"acc-seed-b","item_id":"item-seed-a","balances":{"available":2500.00,"current":2500.00,"iso_currency_code":"USD"},"name":"Plaid Savings","mask":"1111","subtype":"savings","type":"depository"}
