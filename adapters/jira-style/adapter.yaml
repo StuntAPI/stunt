@@ -1,0 +1,91 @@
+# stunt adapter manifest — Jira Cloud REST API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Jira Cloud REST API (v3) for
+# LOCAL TESTING ONLY. It does not call the real Jira API. All data is
+# synthetic. See DISCLAIMER.
+id: jira-style
+name: "Jira Cloud REST API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Jira Cloud REST API"
+  version: "3"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- server info ---
+  - route: /rest/api/3/myself
+    method: GET
+    handler: scripts/misc.star#on_myself
+  - route: /rest/api/3/serverInfo
+    method: GET
+    handler: scripts/misc.star#on_server_info
+
+  # --- projects ---
+  - route: /rest/api/3/project
+    method: GET
+    handler: scripts/project.star#on_list_projects
+  - route: /rest/api/3/project/{key}
+    method: GET
+    handler: scripts/project.star#on_get_project
+
+  # --- search (JQL) ---
+  - route: /rest/api/3/search
+    method: GET
+    handler: scripts/search.star#on_search
+
+  # --- issue CRUD ---
+  - route: /rest/api/3/issue
+    method: POST
+    handler: scripts/issue.star#on_create_issue
+  - route: /rest/api/3/issue/{key}
+    method: GET
+    handler: scripts/issue.star#on_get_issue
+  - route: /rest/api/3/issue/{key}
+    method: PUT
+    handler: scripts/issue.star#on_update_issue
+
+  # --- issue transitions ---
+  - route: /rest/api/3/issue/{key}/transitions
+    method: GET
+    handler: scripts/issue.star#on_list_transitions
+  - route: /rest/api/3/issue/{key}/transitions
+    method: POST
+    handler: scripts/issue.star#on_do_transition
+
+  # --- issue comments ---
+  - route: /rest/api/3/issue/{key}/comment
+    method: POST
+    handler: scripts/issue.star#on_add_comment
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: issues
+    kind: collection
+    seed: fixtures/issues.jsonl
+  - name: projects
+    kind: collection
+    seed: fixtures/projects.jsonl
+  - name: comments
+    kind: collection
+  - name: transitions
+    kind: collection
+
+# Auth scheme: Basic (email:api_token) or Bearer (PAT).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          errorMessages:
+            - "Issue Does Not Exist"
+          errors: {}
