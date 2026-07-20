@@ -1,0 +1,83 @@
+# stunt adapter manifest — Microsoft Entra ID (Azure AD) API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Microsoft Graph + Entra ID
+# (Azure AD) API for LOCAL TESTING ONLY. It does not call the real Microsoft
+# API. All data is synthetic. See DISCLAIMER.
+id: entra-id-style
+name: "Microsoft Entra ID (Azure AD) API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Microsoft Graph / Entra ID"
+  version: "v1.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- OAuth2 (Microsoft identity platform v2.0) ---
+  - route: /common/oauth2/v2.0/authorize
+    method: GET
+    handler: scripts/oauth.star#on_authorize
+  - route: /common/oauth2/v2.0/token
+    method: POST
+    handler: scripts/oauth.star#on_token
+
+  # --- Graph /me (delegated identity) ---
+  - route: /v1.0/me
+    method: GET
+    handler: scripts/graph.star#on_me
+
+  # --- Graph users (parameterized) ---
+  - route: /v1.0/users
+    method: GET
+    handler: scripts/graph.star#on_list_users
+  - route: /v1.0/users
+    method: POST
+    handler: scripts/graph.star#on_create_user
+  - route: /v1.0/users/{id}
+    method: GET
+    handler: scripts/graph.star#on_get_user
+
+  # --- Graph applications (app registrations) ---
+  - route: /v1.0/applications
+    method: GET
+    handler: scripts/graph.star#on_list_applications
+
+  # --- Graph service principals (enterprise apps / service accounts) ---
+  - route: /v1.0/servicePrincipals
+    method: GET
+    handler: scripts/graph.star#on_list_service_principals
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: tokens
+    kind: collection
+  - name: refresh_tokens
+    kind: collection
+  - name: codes
+    kind: collection
+  - name: users
+    kind: collection
+  - name: applications
+    kind: collection
+  - name: service_principals
+    kind: collection
+
+# Auth scheme metadata (mock: bearer tokens validated against the tokens
+# collection).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: "Request_ResourceNotFound"
+            message: "Resource not found."
