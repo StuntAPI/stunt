@@ -1,0 +1,65 @@
+# stunt adapter manifest — Google Apps Script API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Google Apps Script API (v1) for
+# LOCAL TESTING ONLY. It does not call the real Google API. All data is
+# synthetic. See DISCLAIMER.
+id: apps-script-style
+name: "Google Apps Script API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Google Apps Script API"
+  version: "v1"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Projects ---
+  - route: /v1/projects
+    method: GET
+    handler: scripts/projects.star#on_list_projects
+  - route: /v1/projects
+    method: POST
+    handler: scripts/projects.star#on_create_project
+
+  # --- Content (literal 4th segment) ---
+  - route: /v1/projects/{scriptId}/content
+    method: GET
+    handler: scripts/content.star#on_get_content
+  - route: /v1/projects/{scriptId}/content
+    method: POST
+    handler: scripts/content.star#on_update_content
+
+  # --- Deployments (literal 4th segment) ---
+  - route: /v1/projects/{scriptId}/deployments
+    method: POST
+    handler: scripts/projects.star#on_create_deployment
+
+  # --- Run function (literal 5th segment) ---
+  - route: /v1/projects/{scriptId}/scripts/{functionName}/run
+    method: POST
+    handler: scripts/run.star#on_run
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: projects
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: 404
+            message: "Method not found."
+            status: "NOT_FOUND"
