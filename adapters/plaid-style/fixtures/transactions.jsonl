@@ -1,0 +1,3 @@
+{"id":"tx-seed-alpha","account_id":"acc-seed-a","amount":-12.50,"date":"2024-01-04","name":"ACH Direct Deposit","category":["Transfer","Deposit"],"pending":false,"cursor_batch":0}
+{"id":"tx-seed-beta","account_id":"acc-seed-a","amount":4.50,"date":"2024-01-05","name":"Coffee Shop","category":["Food and Drink","Restaurants"],"pending":false,"cursor_batch":0}
+{"id":"tx-seed-gamma","account_id":"acc-seed-b","amount":-1000.00,"date":"2024-01-06","name":"Transfer to Savings","category":["Transfer","Withdrawal"],"pending":false,"cursor_batch":1}
