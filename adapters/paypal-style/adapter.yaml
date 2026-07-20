@@ -1,0 +1,69 @@
+# stunt adapter manifest — PayPal Orders v2-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the PayPal Orders v2 API for LOCAL
+# TESTING ONLY. It does not call the real PayPal API. All data is synthetic.
+# See DISCLAIMER.
+id: paypal-style
+name: "PayPal Orders v2-style API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "PayPal Orders API"
+  version: "v2"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+endpoints:
+  # --- OAuth2 token ---
+  - route: /v1/oauth2/token
+    method: POST
+    handler: scripts/oauth.star#on_token
+
+  # --- Orders ---
+  - route: /v2/checkout/orders
+    method: POST
+    handler: scripts/orders.star#on_create_order
+  - route: /v2/checkout/orders/{id}
+    method: GET
+    handler: scripts/orders.star#on_get_order
+  - route: /v2/checkout/orders/{id}/capture
+    method: POST
+    handler: scripts/orders.star#on_capture_order
+  - route: /v2/checkout/orders/{id}/authorize
+    method: POST
+    handler: scripts/orders.star#on_authorize_order
+
+  # --- Payments / Captures ---
+  - route: /v2/payments/captures/{id}
+    method: GET
+    handler: scripts/payments.star#on_get_capture
+  - route: /v2/payments/captures/{capture_id}/refund
+    method: POST
+    handler: scripts/payments.star#on_refund
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: orders
+    kind: collection
+  - name: captures
+    kind: collection
+  - name: refunds
+    kind: collection
+  - name: access_tokens
+    kind: collection
+
+# Auth scheme: OAuth2 bearer tokens.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          name: "RESOURCE_NOT_FOUND"
+          message: "not found"
+          debug_id: "synthetic-debug"
