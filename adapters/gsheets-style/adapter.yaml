@@ -1,0 +1,85 @@
+# stunt adapter manifest — Google Sheets API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Google Sheets API (v4) for LOCAL
+# TESTING ONLY. It does not call the real Google API. All data is synthetic.
+# See DISCLAIMER.
+id: gsheets-style
+name: "Google Sheets API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Google Sheets API"
+  version: "v4"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Create spreadsheet ---
+  - route: /v4/spreadsheets
+    method: POST
+    handler: scripts/spreadsheets.star#on_create_spreadsheet
+
+  # --- Values batch operations (literal 4th segment) ---
+  - route: /v4/spreadsheets/{spreadsheetId}/values:batchGet
+    method: POST
+    handler: scripts/values.star#on_batch_get
+  - route: /v4/spreadsheets/{spreadsheetId}/values:batchUpdate
+    method: POST
+    handler: scripts/values.star#on_batch_update
+
+  # --- Add sheet (literal 4th segment) ---
+  - route: /v4/spreadsheets/{spreadsheetId}/sheets
+    method: POST
+    handler: scripts/spreadsheets.star#on_add_sheet
+
+  # --- Spreadsheet-level operations (3 segments, POST dispatch) ---
+  # Captures "spreadsheetId" or "spreadsheetId:batchUpdate" in one param.
+  - route: /v4/spreadsheets/{ss_id_or_verb}
+    method: POST
+    handler: scripts/spreadsheets.star#on_post_dispatch
+
+  # --- Get spreadsheet metadata (3 segments, GET) ---
+  - route: /v4/spreadsheets/{spreadsheetId}
+    method: GET
+    handler: scripts/spreadsheets.star#on_get_spreadsheet
+
+  # --- Values GET (5 segments) ---
+  - route: /v4/spreadsheets/{spreadsheetId}/values/{range}
+    method: GET
+    handler: scripts/values.star#on_get_values
+
+  # --- Values PUT (5 segments) ---
+  - route: /v4/spreadsheets/{spreadsheetId}/values/{range}
+    method: PUT
+    handler: scripts/values.star#on_update_values
+
+  # --- Values POST: append/clear (5 segments, captures range:verb) ---
+  - route: /v4/spreadsheets/{spreadsheetId}/values/{range_verb}
+    method: POST
+    handler: scripts/values.star#on_values_post
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: spreadsheets
+    kind: collection
+  - name: cells
+    kind: collection
+
+# Auth scheme metadata (mock: any Bearer token accepted).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: 404
+            message: "Method not found."
+            status: "NOT_FOUND"
