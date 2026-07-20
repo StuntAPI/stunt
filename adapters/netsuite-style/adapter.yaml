@@ -1,0 +1,172 @@
+# stunt adapter manifest — NetSuite SuiteTalk REST API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of NetSuite's SuiteTalk REST API (v1)
+# for LOCAL TESTING ONLY. It does not call the real NetSuite API. All data is
+# synthetic. See DISCLAIMER.
+id: netsuite-style
+name: "NetSuite SuiteTalk REST API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "NetSuite SuiteTalk REST API"
+  version: "1.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- SuiteQL (POST body: {q: "SELECT * FROM customer"}) ---
+  - route: /services/rest/query/v1/suiteql
+    method: POST
+    handler: scripts/query.star#on_suiteql
+  - route: /services/rest/v1/suiteql
+    method: POST
+    handler: scripts/query.star#on_suiteql
+
+  # --- metadata catalog ---
+  - route: /services/rest/record/v1/metadata-catalog
+    method: GET
+    handler: scripts/catalog.star#on_catalog
+
+  # --- customer CRUD (literal list/create BEFORE parameterized) ---
+  - route: /services/rest/record/v1/customer
+    method: GET
+    handler: scripts/record.star#on_list
+  - route: /services/rest/record/v1/customer
+    method: POST
+    handler: scripts/record.star#on_create
+  - route: /services/rest/record/v1/customer/{id}
+    method: GET
+    handler: scripts/record.star#on_get
+  - route: /services/rest/record/v1/customer/{id}
+    method: PATCH
+    handler: scripts/record.star#on_update
+  - route: /services/rest/record/v1/customer/{id}
+    method: DELETE
+    handler: scripts/record.star#on_delete
+
+  # --- salesOrder CRUD ---
+  - route: /services/rest/record/v1/salesOrder
+    method: GET
+    handler: scripts/record.star#on_list
+  - route: /services/rest/record/v1/salesOrder
+    method: POST
+    handler: scripts/record.star#on_create
+  - route: /services/rest/record/v1/salesOrder/{id}
+    method: GET
+    handler: scripts/record.star#on_get
+  - route: /services/rest/record/v1/salesOrder/{id}
+    method: PATCH
+    handler: scripts/record.star#on_update
+  - route: /services/rest/record/v1/salesOrder/{id}
+    method: DELETE
+    handler: scripts/record.star#on_delete
+
+  # --- invoice CRUD ---
+  - route: /services/rest/record/v1/invoice
+    method: GET
+    handler: scripts/record.star#on_list
+  - route: /services/rest/record/v1/invoice
+    method: POST
+    handler: scripts/record.star#on_create
+  - route: /services/rest/record/v1/invoice/{id}
+    method: GET
+    handler: scripts/record.star#on_get
+  - route: /services/rest/record/v1/invoice/{id}
+    method: PATCH
+    handler: scripts/record.star#on_update
+  - route: /services/rest/record/v1/invoice/{id}
+    method: DELETE
+    handler: scripts/record.star#on_delete
+
+  # --- item CRUD ---
+  - route: /services/rest/record/v1/item
+    method: GET
+    handler: scripts/record.star#on_list
+  - route: /services/rest/record/v1/item
+    method: POST
+    handler: scripts/record.star#on_create
+  - route: /services/rest/record/v1/item/{id}
+    method: GET
+    handler: scripts/record.star#on_get
+  - route: /services/rest/record/v1/item/{id}
+    method: PATCH
+    handler: scripts/record.star#on_update
+  - route: /services/rest/record/v1/item/{id}
+    method: DELETE
+    handler: scripts/record.star#on_delete
+
+  # --- employee CRUD ---
+  - route: /services/rest/record/v1/employee
+    method: GET
+    handler: scripts/record.star#on_list
+  - route: /services/rest/record/v1/employee
+    method: POST
+    handler: scripts/record.star#on_create
+  - route: /services/rest/record/v1/employee/{id}
+    method: GET
+    handler: scripts/record.star#on_get
+  - route: /services/rest/record/v1/employee/{id}
+    method: PATCH
+    handler: scripts/record.star#on_update
+  - route: /services/rest/record/v1/employee/{id}
+    method: DELETE
+    handler: scripts/record.star#on_delete
+
+  # --- vendor CRUD ---
+  - route: /services/rest/record/v1/vendor
+    method: GET
+    handler: scripts/record.star#on_list
+  - route: /services/rest/record/v1/vendor
+    method: POST
+    handler: scripts/record.star#on_create
+  - route: /services/rest/record/v1/vendor/{id}
+    method: GET
+    handler: scripts/record.star#on_get
+  - route: /services/rest/record/v1/vendor/{id}
+    method: PATCH
+    handler: scripts/record.star#on_update
+  - route: /services/rest/record/v1/vendor/{id}
+    method: DELETE
+    handler: scripts/record.star#on_delete
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: customers
+    kind: collection
+    seed: fixtures/customers.jsonl
+  - name: salesOrders
+    kind: collection
+    seed: fixtures/salesOrders.jsonl
+  - name: invoices
+    kind: collection
+    seed: fixtures/invoices.jsonl
+  - name: items
+    kind: collection
+    seed: fixtures/items.jsonl
+  - name: employees
+    kind: collection
+    seed: fixtures/employees.jsonl
+  - name: vendors
+    kind: collection
+    seed: fixtures/vendors.jsonl
+
+# Auth scheme metadata: Token-Based Authentication (TBA) or NLAuth.
+identity:
+  token_scheme: tba
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          type: "https://docs.oracle.com/en/cloud/saas/netsuite-online-help/not-found"
+          title: "Not Found"
+          status: 404
+          "o:errorDetails":
+            - detail: "That record does not exist."
+              "o:errorCode": "RCRD_DSNT_EXIST"

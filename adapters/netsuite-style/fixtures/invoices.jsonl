@@ -1,0 +1,2 @@
+{"id":"1","tranId":"INV-001","entity":{"refName":"Acme Corporation"},"trandate":"2024-01-20","total":5250.00,"status":"Open","currency":{"refName":"USD"},"dueDate":"2024-02-19"}
+{"id":"2","tranId":"INV-002","entity":{"refName":"Initech LLC"},"trandate":"2024-02-10","total":800.00,"status":"Paid in Full","currency":{"refName":"USD"},"dueDate":"2024-02-10"}

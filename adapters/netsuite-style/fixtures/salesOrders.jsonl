@@ -1,0 +1,2 @@
+{"id":"1","tranId":"SO-001","entity":{"refName":"Acme Corporation"},"trandate":"2024-01-15","total":5250.00,"status":"Pending Approval","currency":{"refName":"USD"},"items":[{"item":{"refName":"Widget A"},"quantity":10,"rate":500.00}]}
+{"id":"2","tranId":"SO-002","entity":{"refName":"Globex Industries"},"trandate":"2024-02-03","total":1200.00,"status":"Pending Fulfillment","currency":{"refName":"USD"},"items":[{"item":{"refName":"Service Plan"},"quantity":1,"rate":1200.00}]}

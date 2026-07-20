@@ -1,0 +1,3 @@
+{"id":"1","itemId":"Widget-A","displayName":"Widget A","description":"Industrial-grade widget","salesPrice":500.00,"currency":{"refName":"USD"},"incomeAccount":{"refName":"Sales"}}
+{"id":"2","itemId":"Widget-B","displayName":"Widget B","description":"Compact widget variant","salesPrice":250.00,"currency":{"refName":"USD"},"incomeAccount":{"refName":"Sales"}}
+{"id":"3","itemId":"Service-Plan","displayName":"Service Plan","description":"Annual maintenance and support","salesPrice":1200.00,"currency":{"refName":"USD"},"incomeAccount":{"refName":"Service Income"}}
