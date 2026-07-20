@@ -1,0 +1,71 @@
+# stunt adapter manifest — Avalara AvaTax REST API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Avalara AvaTax REST API
+# for LOCAL TESTING ONLY. It does not call the real Avalara API. All data
+# is synthetic. See DISCLAIMER.
+id: avalara-style
+name: "Avalara AvaTax REST API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Avalara AvaTax REST API"
+  version: "2"
+
+# Auth: Bearer (account/license key) OR Basic.
+identity:
+  token_scheme: bearer
+
+# Endpoints — each maps a route + method to a Starlark handler.
+endpoints:
+  # --- Tax Calculation ---
+  - route: /v2/tax/calculate
+    method: POST
+    handler: scripts/tax.star#on_calculate_tax
+
+  # --- Transactions ---
+  - route: /v2/transactions/create
+    method: POST
+    handler: scripts/transactions.star#on_create_transaction
+  - route: /v2/transactions
+    method: GET
+    handler: scripts/transactions.star#on_list_transactions
+  - route: /v2/transactions/{id}
+    method: GET
+    handler: scripts/transactions.star#on_get_transaction
+  - route: /v2/transactions/{id}/void
+    method: POST
+    handler: scripts/transactions.star#on_void_transaction
+
+  # --- Companies ---
+  - route: /v2/companies
+    method: GET
+    handler: scripts/companies.star#on_list_companies
+
+  # --- Definitions (nexus, tax codes) ---
+  - route: /v2/definitions/nexuses
+    method: GET
+    handler: scripts/definitions.star#on_list_nexuses
+  - route: /v2/definitions/taxcodes
+    method: GET
+    handler: scripts/definitions.star#on_list_taxcodes
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: transactions
+    kind: collection
+  - name: companies
+    kind: collection
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: "NotFound"
+            message: "The requested resource was not found"
+            target: ""
