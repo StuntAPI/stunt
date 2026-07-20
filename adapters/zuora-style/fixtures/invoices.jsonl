@@ -1,0 +1,2 @@
+{"id":"INV-A","invoiceId":"INV-A","invoiceNumber":"INV-SYNTH-001","accountId":"ACC-A","accountNumber":"ACC-SYNTH-001","amount":1250.00,"balance":0,"status":"Posted","invoiceDate":"2024-01-15","dueDate":"2024-02-15","currency":"USD"}
+{"id":"INV-B","invoiceId":"INV-B","invoiceNumber":"INV-SYNTH-002","accountId":"ACC-B","accountNumber":"ACC-SYNTH-002","amount":890.50,"balance":890.50,"status":"Posted","invoiceDate":"2024-01-20","dueDate":"2024-02-20","currency":"EUR"}
