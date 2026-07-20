@@ -1,0 +1,60 @@
+# stunt adapter manifest — CloudKit Web Services API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the CloudKit Web Services API (v1)
+# for LOCAL TESTING ONLY. It does not call the real Apple API. All data is
+# synthetic. See DISCLAIMER.
+id: cloudkit-style
+name: "CloudKit Web Services API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "CloudKit Web Services API"
+  version: "1"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Literal routes first ---
+  - route: /database/1/{container}/{env}/public/users/current
+    method: GET
+    handler: scripts/users.star#on_current_user
+
+  - route: /database/1/{container}/{env}/public/zones/list
+    method: GET
+    handler: scripts/zones.star#on_list_zones
+
+  - route: /database/1/{container}/{env}/public/records/lookup
+    method: GET
+    handler: scripts/records.star#on_lookup
+
+  - route: /database/1/{container}/{env}/public/records/query
+    method: GET
+    handler: scripts/records.star#on_query
+
+  - route: /database/1/{container}/{env}/public/records/modify
+    method: POST
+    handler: scripts/records.star#on_modify
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: records
+    kind: collection
+  - name: zones
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: custom
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          serverErrorCode: "NOT_FOUND"
+          reason: "not found"
