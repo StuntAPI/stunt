@@ -120,7 +120,15 @@ func (e *Engine) runHandler(
 		if isFormContentType(ct) {
 			bodyMap = parseFormBody(string(body))
 		} else if err := json.Unmarshal(body, &bodyMap); err != nil {
-			bodyMap = nil // non-JSON body; handler gets empty body
+			// Try parsing as a JSON array (e.g., JSON-RPC batch requests).
+			// If it parses, wrap under a reserved key so the handler can
+			// detect and process batch bodies.
+			var bodyList []any
+			if err2 := json.Unmarshal(body, &bodyList); err2 == nil {
+				bodyMap = map[string]any{"_batch": bodyList}
+			} else {
+				bodyMap = nil // non-JSON body; handler gets empty body
+			}
 		}
 	}
 

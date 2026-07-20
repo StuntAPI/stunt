@@ -1,0 +1,42 @@
+# stunt adapter manifest — Ethereum JSON-RPC provider simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of an Ethereum JSON-RPC provider
+# (Alchemy/Infura/QuickNode shape) for LOCAL TESTING ONLY. It does not call
+# any real Ethereum node. All data is synthetic. See DISCLAIMER.
+id: eth-jsonrpc-style
+name: "Ethereum JSON-RPC provider simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Ethereum JSON-RPC"
+  version: "1.0"
+
+# A single POST endpoint handles ALL JSON-RPC methods by dispatching on the
+# `method` field in the request body. Both single requests ({...}) and
+# batch requests ([{...},{...}]) are supported.
+endpoints:
+  - route: /
+    method: POST
+    handler: scripts/rpc.star#on_jsonrpc
+
+# Backing stores for deterministic, stateful chain simulation.
+resources:
+  - name: transactions
+    kind: collection
+  - name: receipts
+    kind: collection
+  - name: logs
+    kind: collection
+  - name: blocks
+    kind: collection
+
+# Catch-all: any unmatched route returns 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: not_found
