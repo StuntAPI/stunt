@@ -47,12 +47,18 @@ def _b64url_decode(seg):
         v3 = vals[i + 2]
         v4 = vals[i + 3]
         b1 = v1 * 4 + v2 // 16
+        if b1 >= 128:
+            return ""
         result = result + _CHARS[b1]
         if orig_len > i + 2:
             b2 = (v2 % 16) * 16 + v3 // 4
+            if b2 >= 128:
+                return ""
             result = result + _CHARS[b2]
         if orig_len > i + 3:
             b3 = (v3 % 4) * 64 + v4
+            if b3 >= 128:
+                return ""
             result = result + _CHARS[b3]
         i = i + 4
     return result

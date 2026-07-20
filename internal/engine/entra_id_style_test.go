@@ -312,5 +312,3 @@ func entraExtractParam(rawurl, param string) string {
 	}
 	return u.Query().Get(param)
 }
-
-
