@@ -1,0 +1,121 @@
+# stunt adapter manifest — Microsoft Graph API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Microsoft Graph data-plane API
+# (Teams / Outlook / OneDrive / SharePoint / Excel) for LOCAL TESTING ONLY.
+# It does not call the real Microsoft Graph API. All data is synthetic.
+# See DISCLAIMER.
+#
+# NOTE: this is the DATA plane of Graph (Teams/Outlook/SharePoint/OneDrive/
+# Excel) — distinct from entra-id-style which models the identity /
+# app-registration plane.
+id: microsoft-graph-style
+name: "Microsoft Graph API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Microsoft Graph API"
+  version: "v1.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- /me profile ---
+  - route: /v1.0/me
+    method: GET
+    handler: scripts/me.star#on_me
+
+  # --- Users ---
+  - route: /v1.0/users
+    method: GET
+    handler: scripts/users.star#on_list_users
+  - route: /v1.0/users/{id}
+    method: GET
+    handler: scripts/users.star#on_get_user
+
+  # --- Outlook mail ---
+  - route: /v1.0/me/mailFolders
+    method: GET
+    handler: scripts/mail.star#on_list_folders
+  - route: /v1.0/me/messages
+    method: GET
+    handler: scripts/mail.star#on_list_messages
+  - route: /v1.0/me/messages/{id}
+    method: GET
+    handler: scripts/mail.star#on_get_message
+  - route: /v1.0/me/sendMail
+    method: POST
+    handler: scripts/mail.star#on_send_mail
+
+  # --- Calendar ---
+  - route: /v1.0/me/events
+    method: GET
+    handler: scripts/calendar.star#on_list_events
+  - route: /v1.0/me/events
+    method: POST
+    handler: scripts/calendar.star#on_create_event
+
+  # --- OneDrive ---
+  - route: /v1.0/me/drive
+    method: GET
+    handler: scripts/drive.star#on_get_drive
+  - route: /v1.0/me/drive/root/children
+    method: GET
+    handler: scripts/drive.star#on_list_children
+
+  # --- SharePoint ---
+  - route: /v1.0/groups/{id}/sites
+    method: GET
+    handler: scripts/sharepoint.star#on_list_sites
+
+  # --- Teams chats ---
+  - route: /v1.0/me/chats
+    method: GET
+    handler: scripts/teams.star#on_list_chats
+  - route: /v1.0/me/chats
+    method: POST
+    handler: scripts/teams.star#on_create_chat
+  - route: /v1.0/chats/{id}/messages
+    method: GET
+    handler: scripts/teams.star#on_list_chat_messages
+  - route: /v1.0/chats/{id}/messages
+    method: POST
+    handler: scripts/teams.star#on_send_chat_message
+
+  # --- Excel ---
+  - route: /v1.0/me/drive/items/{id}/workbook/worksheets
+    method: GET
+    handler: scripts/excel.star#on_list_worksheets
+  - route: /v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/add
+    method: POST
+    handler: scripts/excel.star#on_add_table_row
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: messages
+    kind: collection
+  - name: events
+    kind: collection
+  - name: chats
+    kind: collection
+  - name: chat_messages
+    kind: collection
+  - name: files
+    kind: collection
+
+# Auth scheme metadata (mock: any Bearer token accepted; presence checked).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: "NotFound"
+            message: "Resource not found."
