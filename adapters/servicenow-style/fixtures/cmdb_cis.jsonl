@@ -1,0 +1,2 @@
+{"id":"sysid_ci_001","sys_id":"sysid_ci_001","name":"mail-srv-01","sys_class_name":"cmdb_ci_server","ip_address":"10.0.1.10","operational_status":"1","operational_status_display":"Operational","manufacturer":"Dell","serial_number":"DLL-SERIAL-A","assigned_to":"sysid_user_001"}
+{"id":"sysid_ci_002","sys_id":"sysid_ci_002","name":"vpn-gw-01","sys_class_name":"cmdb_ci_net_gear","ip_address":"10.0.1.1","operational_status":"1","operational_status_display":"Operational","manufacturer":"Cisco","serial_number":"CSC-SERIAL-B","assigned_to":"sysid_user_003"}

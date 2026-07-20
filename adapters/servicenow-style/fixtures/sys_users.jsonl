@@ -1,0 +1,4 @@
+{"id":"sysid_user_001","sys_id":"sysid_user_001","user_name":"achen","name":"Alice Chen","email":"{{ faker.Email }}","title":"IT Support Lead","department":"IT","active":true}
+{"id":"sysid_user_002","sys_id":"sysid_user_002","user_name":"bgarcia","name":"Bob Garcia","email":"{{ faker.Email }}","title":"Software Engineer","department":"Engineering","active":true}
+{"id":"sysid_user_003","sys_id":"sysid_user_003","user_name":"dkim","name":"David Kim","email":"{{ faker.Email }}","title":"Network Engineer","department":"IT","active":true}
+{"id":"sysid_user_004","sys_id":"sysid_user_004","user_name":"ewatson","name":"Emma Watson","email":"{{ faker.Email }}","title":"Accountant","department":"Finance","active":true}

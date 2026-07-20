@@ -1,0 +1,2 @@
+{"id":"sysid_ritm_001","sys_id":"sysid_ritm_001","number":"RITM0010A01","short_description":"New laptop request","state":"2","state_display":"In Progress","assigned_to":"sysid_user_001","assigned_to_display":"Alice Chen","opened_at":"2024-01-15 10:00:00","active":true}
+{"id":"sysid_ritm_002","sys_id":"sysid_ritm_002","number":"RITM0010A02","short_description":"Software access request","state":"3","state_display":"On Hold","assigned_to":"sysid_user_003","assigned_to_display":"David Kim","opened_at":"2024-01-16 14:30:00","active":true}
