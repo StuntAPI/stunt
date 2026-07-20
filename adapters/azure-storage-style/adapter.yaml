@@ -1,0 +1,88 @@
+# stunt adapter manifest — Azure Blob Storage-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Azure Storage Blob REST API
+# for LOCAL TESTING ONLY. It does not call the real Azure API. All data is
+# synthetic. See DISCLAIMER.
+id: azure-storage-style
+name: "Azure Blob Storage API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Azure Storage Blob REST API"
+  version: "2024-08-04"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+#
+# Azure Blob uses path-style URLs: /{container}/{blob}. Query parameters
+# like ?comp=list and ?comp=block select sub-operations. The x-ms-version
+# header carries the API version (2024-08-04).
+#
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Service-level ---
+  # ListContainers: GET /?comp=list
+  - route: /
+    method: GET
+    handler: scripts/containers.star#on_list_containers
+
+  # --- Container operations ---
+  # Create container: PUT /{container} (x-ms-blob-public-access)
+  # List blobs:       GET /{container}?restype=container&comp=list
+  - route: /{container}
+    method: PUT
+    handler: scripts/containers.star#on_create_container
+  - route: /{container}
+    method: GET
+    handler: scripts/blobs.star#on_container_get
+  - route: /{container}
+    method: HEAD
+    handler: scripts/containers.star#on_head_container
+  - route: /{container}
+    method: DELETE
+    handler: scripts/containers.star#on_delete_container
+
+  # --- Blob operations ---
+  # Upload:   PUT /{container}/{blob} (x-ms-blob-type: BlockBlob)
+  # Download: GET /{container}/{blob}
+  # HEAD:     HEAD /{container}/{blob} (metadata headers)
+  # Delete:   DELETE /{container}/{blob}
+  - route: /{container}/{blob}
+    method: PUT
+    handler: scripts/blobs.star#on_put_blob
+  - route: /{container}/{blob}
+    method: GET
+    handler: scripts/blobs.star#on_get_blob
+  - route: /{container}/{blob}
+    method: HEAD
+    handler: scripts/blobs.star#on_head_blob
+  - route: /{container}/{blob}
+    method: DELETE
+    handler: scripts/blobs.star#on_delete_blob
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: containers
+    kind: collection
+  - name: blobs
+    kind: collection
+
+# Auth scheme: SharedKey / SAS / bearer. Structural validation only for v1.
+identity:
+  token_scheme: custom
+
+# Catch-all: any unmatched route returns an Azure-style XML error.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: resource_not_found
+
+# Resources notes:
+# - containers: {name, publicAccess, lastModified, etag}
+# - blobs: {container, name, content, contentType, blobType, contentLength,
+#            etag, lastModified, metadata}
