@@ -1,0 +1,3 @@
+{"id":"tx-001","accountId":"acc-001","status":"booked","bookingDate":"2024-01-15","valueDate":"2024-01-15","amount":"-50.00","description":"Coffee Shop","debtorName":"John Doe","creditorName":"Coffee Shop","type":"DEBIT"}
+{"id":"tx-002","accountId":"acc-001","status":"booked","bookingDate":"2024-01-10","valueDate":"2024-01-10","amount":"2500.00","description":"Salary Payment","debtorName":"ACME Corp","creditorName":"John Doe","type":"CREDIT"}
+{"id":"tx-003","accountId":"acc-001","status":"pending","bookingDate":"2024-01-20","valueDate":"2024-01-20","amount":"-29.99","description":"Online Subscription","debtorName":"John Doe","creditorName":"Streaming Service","type":"DEBIT"}
