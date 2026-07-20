@@ -1,0 +1,63 @@
+# stunt adapter manifest — Azure Service Bus + Storage SAS simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Azure Service Bus + Storage
+# queue API (2024-01-01) for LOCAL TESTING ONLY. It does not call the real
+# Azure API. All data is synthetic. See DISCLAIMER.
+id: azure-servicebus-style
+name: "Azure Service Bus + Storage simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Azure Service Bus + Storage"
+  version: "2024-01-01"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+endpoints:
+  # --- Service Bus: send message ---
+  - route: /{queue}/messages
+    method: POST
+    handler: scripts/servicebus.star#on_send_message
+
+  # --- Service Bus: receive message (DELETE on head) ---
+  - route: /{queue}/messages/head
+    method: DELETE
+    handler: scripts/servicebus.star#on_receive_message
+
+  # --- Service Bus: management info ---
+  - route: /$topicInfo
+    method: GET
+    handler: scripts/servicebus.star#on_topic_info
+
+  # --- Storage queue: send message (XML body) ---
+  - route: /{account}/{queue}/messages
+    method: POST
+    handler: scripts/storage.star#on_send_storage_message
+
+  # --- Storage queue: receive message ---
+  - route: /{account}/{queue}/messages
+    method: GET
+    handler: scripts/storage.star#on_receive_storage_message
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: sb_messages
+    kind: collection
+  - name: storage_messages
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: sas_bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: "NotFound"
+            message: "The specified resource was not found."
