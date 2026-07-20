@@ -91,6 +91,12 @@ func adapterYAML(id, display string) string {
 id: %s
 name: %s
 version: "0.1.0"
+
+# The real upstream API this adapter simulates. Update these to match the
+# real API's name and the specific version you are reproducing.
+api:
+  name: "Example API"
+  version: "v1"
 real_hosts:
   - api.example.com
 

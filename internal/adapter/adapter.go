@@ -21,7 +21,8 @@ type Adapter struct {
 	ID         string              `yaml:"id"`
 	Name       string              `yaml:"name"`
 	RealHosts  []string            `yaml:"real_hosts"`
-	Version    string              `yaml:"version"`
+	Version    string              `yaml:"version"` // the adapter's own semver (simulator version)
+	API        *APISpec            `yaml:"api"`     // the real upstream API + version being simulated
 	Endpoints  []Endpoint          `yaml:"endpoints"`
 	Resources  []Resource          `yaml:"resources"`
 	Rules      []rules.Rule        `yaml:"rules"`
@@ -29,6 +30,15 @@ type Adapter struct {
 	Grpc       *GrpcSpec           `yaml:"grpc"`
 	Graphql    *GraphqlSpec        `yaml:"graphql"`
 	Websockets []WebsocketEndpoint `yaml:"ws"`
+}
+
+// APISpec records which real upstream API (and which version of it) an adapter
+// simulates. The version should match the real API's version/date stamp so users
+// know exactly what shapes to expect (e.g. Twilio "2010-06-01", Stripe
+// "2024-06-20", Salesforce REST "v60.0").
+type APISpec struct {
+	Name    string `yaml:"name"`    // human-readable upstream API name, e.g. "Twilio API"
+	Version string `yaml:"version"` // specific upstream API version simulated, e.g. "2010-06-01"
 }
 
 // WebsocketEndpoint declares a WebSocket route served by a connection-

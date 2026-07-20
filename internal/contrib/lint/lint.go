@@ -89,6 +89,12 @@ func Lint(dir string) ([]Finding, error) {
 		findings = append(findings, ff...)
 	}
 
+	// Check that adapter.yaml declares the real upstream API + version it
+	// simulates (the `api:` block). Adapters should be versioned to match
+	// the real API version they reproduce.
+	apiFindings := lintAPIBlock(dir)
+	findings = append(findings, apiFindings...)
+
 	// Validate and scan the ws section (handler scripts).
 	wsFindings, err := lintWS(dir)
 	if err != nil {
@@ -280,6 +286,65 @@ func splitGraphqlHandler(h string) (path, fn string) {
 		return h, ""
 	}
 	return h[:idx], h[idx+1:]
+}
+
+// lintAPIBlock checks that adapter.yaml declares the real upstream API +
+// version the adapter simulates via the `api:` block, e.g.:
+//
+//	api:
+//	  name: "Twilio API"
+//	  version: "2010-06-01"
+//
+// Missing or incomplete blocks are warnings (existing adapters without the
+// block are not broken), but every adapter SHOULD declare which real API
+// version it reproduces for fidelity.
+func lintAPIBlock(dir string) []Finding {
+	manifestPath := filepath.Join(dir, "adapter.yaml")
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return nil
+	}
+	var root yaml.Node
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return nil
+	}
+	doc := &root
+	if doc.Kind == yaml.DocumentNode && len(doc.Content) > 0 {
+		doc = doc.Content[0]
+	}
+	if doc.Kind != yaml.MappingNode {
+		return nil
+	}
+	var apiNode *yaml.Node
+	for i := 0; i+1 < len(doc.Content); i += 2 {
+		if doc.Content[i].Value == "api" {
+			apiNode = doc.Content[i+1]
+			break
+		}
+	}
+	if apiNode == nil || apiNode.Kind != yaml.MappingNode {
+		return []Finding{{
+			File: "adapter.yaml", Severity: SeverityWarn,
+			Message: "missing `api:` block — declare the real upstream API + version this adapter simulates (e.g. api: { name: \"Twilio API\", version: \"2010-06-01\" })",
+		}}
+	}
+	name, ver := "", ""
+	for i := 0; i+1 < len(apiNode.Content); i += 2 {
+		switch apiNode.Content[i].Value {
+		case "name":
+			name = strings.TrimSpace(apiNode.Content[i+1].Value)
+		case "version":
+			ver = strings.TrimSpace(apiNode.Content[i+1].Value)
+		}
+	}
+	var ff []Finding
+	if name == "" || ver == "" {
+		ff = append(ff, Finding{
+			File: "adapter.yaml", Severity: SeverityWarn,
+			Message: "`api:` block incomplete — both api.name and api.version should be set to the real upstream API + version simulated",
+		})
+	}
+	return ff
 }
 
 // reDef matches a top-level Starlark function definition, capturing the
