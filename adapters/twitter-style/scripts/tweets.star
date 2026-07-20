@@ -9,22 +9,11 @@ def _next_id(prefix):
     # Atomic increment via store_kv_incr (race-free under concurrent requests).
     return prefix + "_" + str(store_kv_incr("twitter", prefix + "_seq"))
 
-# _now returns a synthetic ISO-8601 timestamp. The value is fixed for
-# determinism in local testing.
-def _now():
-    return "2024-01-15T12:00:00.000Z"
+# _now and _reverse are preloaded from scripts/lib.star.
 
 # _current_user_id returns the synthetic author ID for this local session.
 def _current_user_id():
     return "usr_me"
-
-# _reverse returns a new list with elements in reverse order.
-# Used for reverse-chronological tweet ordering (newest first).
-def _reverse(lst):
-    out = []
-    for item in lst:
-        out = [item] + out
-    return out
 
 # POST /2/tweets — create a tweet (store in the "tweets" collection).
 def on_create(req):

@@ -3,10 +3,7 @@
 # The current user (usr_me) is seeded in the users collection and also
 # hardcoded here as a fallback for the /me endpoint.
 
-# _now returns a synthetic ISO-8601 timestamp. The value is fixed for
-# determinism in local testing.
-def _now():
-    return "2024-01-10T08:00:00.000Z"
+# _now is preloaded from scripts/lib.star.
 
 # _CURRENT_USER is the synthetic "current user" for this local session.
 # The same user is seeded in fixtures/users.jsonl so that /2/users/{id}

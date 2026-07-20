@@ -5,11 +5,7 @@
 # POST /2/tweets), those are included.
 
 # _reverse returns a new list with elements in reverse order.
-def _reverse(lst):
-    out = []
-    for item in lst:
-        out = [item] + out
-    return out
+# _reverse is preloaded from scripts/lib.star.
 
 # GET /2/users/{id}/timelines/reverse_chronological — return tweets.
 def on_timeline(req):
