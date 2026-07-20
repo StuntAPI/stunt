@@ -206,6 +206,65 @@ func TestExitCode(t *testing.T) {
 	}
 }
 
+// --- api: block versioning check ---
+
+func TestAPIBlockMissing(t *testing.T) {
+	dir := scaffold(t)
+	// Strip the api: block the scaffold now emits so we can test the missing case.
+	writeFile(t, dir, "adapter.yaml", `id: test-api
+name: "Test API"
+version: "0.1.0"
+endpoints:
+  - route: /hello
+    method: GET
+`)
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "missing `api:` block") {
+		t.Errorf("expected a warning about missing api: block; got %v", findings)
+	}
+	if hasError(findings) {
+		t.Errorf("missing api: block should be a warning, not an error")
+	}
+}
+
+func TestAPIBlockIncomplete(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "adapter.yaml", `id: test-api
+name: "Test API"
+version: "0.1.0"
+api:
+  name: "Some API"
+endpoints:
+  - route: /hello
+    method: GET
+`)
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	if !hasFinding(findings, "api:") || !hasFinding(findings, "incomplete") {
+		t.Errorf("expected an incomplete api: block warning; got %v", findings)
+	}
+}
+
+func TestAPIBlockPresentNoWarning(t *testing.T) {
+	dir := scaffold(t)
+	// The scaffolded adapter.yaml now includes a complete api: block, so it
+	// should not produce any api-block warning.
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	for _, f := range findings {
+		if strings.Contains(strings.ToLower(f.Message), "api:") {
+			t.Errorf("did not expect an api: block warning for a complete block: %s", f.Message)
+		}
+	}
+}
+
 // --- missing dir is not an error, just no findings ---
 
 func TestEmptyDir(t *testing.T) {
