@@ -1,0 +1,64 @@
+# stunt adapter manifest — Persona Inquiry API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Persona Inquiry API
+# (JSON:API, version 2023-01-05) for LOCAL TESTING ONLY. It does not call
+# the real Persona API. All data is synthetic. See DISCLAIMER.
+id: persona-style
+name: "Persona Inquiry API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Persona Inquiry API"
+  version: "2023-01-05"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Inquiries (JSON:API) ---
+  - route: /api/inquiry/v1/inquiries
+    method: POST
+    handler: scripts/inquiries.star#on_create_inquiry
+
+  # --- Parameterized routes ---
+  - route: /api/inquiry/v1/inquiries/{inquiry_id}
+    method: GET
+    handler: scripts/inquiries.star#on_get_inquiry
+  - route: /api/inquiry/v1/inquiries/{inquiry_id}/resume
+    method: POST
+    handler: scripts/inquiries.star#on_resume_inquiry
+  - route: /api/inquiry/v1/inquiries/{inquiry_id}/verifications
+    method: GET
+    handler: scripts/inquiries.star#on_get_verifications
+
+  # --- Webhook receiver (documents the Persona-Signature flow) ---
+  - route: /api/inquiry/v1/webhooks
+    method: POST
+    handler: scripts/webhooks.star#on_webhook
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: inquiries
+    kind: collection
+  - name: verifications
+    kind: collection
+  - name: webhook_events
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          errors:
+            - status: "404"
+              code: "not_found"
+              title: "Resource not found"
