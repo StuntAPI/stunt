@@ -1,0 +1,42 @@
+# stunt adapter manifest — ERC-4337 bundler RPC simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of an ERC-4337 Account Abstraction
+# bundler RPC (EntryPoint v0.7) for LOCAL TESTING ONLY. It does not call
+# any real bundler or EntryPoint contract. All data is synthetic. See DISCLAIMER.
+id: erc4337-style
+name: "ERC-4337 bundler RPC simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "ERC-4337 Bundler RPC"
+  version: "0.7"
+
+# A single POST endpoint handles ALL bundler JSON-RPC methods by dispatching
+# on the `method` field in the request body. A separate paymaster endpoint
+# handles sponsorship signing.
+endpoints:
+  - route: /
+    method: POST
+    handler: scripts/rpc.star#on_jsonrpc
+  # --- Paymaster ---
+  - route: /paymaster/sign
+    method: POST
+    handler: scripts/paymaster.star#on_sign
+
+# Backing stores for deterministic, stateful bundler simulation.
+resources:
+  - name: userops
+    kind: collection
+  - name: receipts
+    kind: collection
+
+# Catch-all: any unmatched route returns 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: not_found
