@@ -1,0 +1,52 @@
+# stunt adapter manifest — Tenderly Simulation API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Tenderly Simulation API (v1)
+# for LOCAL TESTING ONLY. It does not call the real Tenderly API. All data
+# is synthetic. See DISCLAIMER.
+id: tenderly-style
+name: "Tenderly Simulation API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Tenderly Simulation API"
+  version: "v1"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Simulate single transaction ---
+  - route: /api/v1/account/{account}/project/{project}/simulate
+    method: POST
+    handler: scripts/simulate.star#on_simulate
+
+  # --- Simulate bundle ---
+  - route: /api/v1/account/{account}/project/{project}/simulate-bundle
+    method: POST
+    handler: scripts/simulate.star#on_simulate_bundle
+
+  # --- Networks (literal route, must be before parameterized) ---
+  - route: /api/v1/networks
+    method: GET
+    handler: scripts/networks.star#on_list_networks
+
+# Backing stores — collection for simulation results.
+resources:
+  - name: simulations
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          slug: "not_found"
+          message: "Resource not found"
