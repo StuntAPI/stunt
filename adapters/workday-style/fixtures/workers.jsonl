@@ -1,0 +1,3 @@
+{"id":"1","descriptor":"John Smith (jsmith)","workerID":{"id":"1"},"primaryWorkEmail":"{{ faker.Email }}","primaryEmploymentReference":{"id":"1","descriptor":"Regular Full-Time"}}
+{"id":"2","descriptor":"Mary Johnson (mjohnson)","workerID":{"id":"2"},"primaryWorkEmail":"{{ faker.Email }}","primaryEmploymentReference":{"id":"2","descriptor":"Regular Part-Time"}}
+{"id":"3","descriptor":"Bob Wilson (bwilson)","workerID":{"id":"3"},"primaryWorkEmail":"{{ faker.Email }}","primaryEmploymentReference":{"id":"3","descriptor":"Contractor"}}

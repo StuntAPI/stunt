@@ -1,0 +1,3 @@
+{"id":"1","descriptor":"Base Salary","code":"BASE","currency":{"id":"1","descriptor":"USD"}}
+{"id":"2","descriptor":"Annual Bonus","code":"BONUS","currency":{"id":"1","descriptor":"USD"}}
+{"id":"3","descriptor":"Health Insurance","code":"HEALTH","currency":{"id":"1","descriptor":"USD"}}

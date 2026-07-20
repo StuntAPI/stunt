@@ -1,0 +1,3 @@
+{"id":"1","descriptor":"Operating Cash","accountID":{"id":"1"},"currency":{"id":"1","descriptor":"USD"}}
+{"id":"2","descriptor":"Accounts Receivable","accountID":{"id":"2"},"currency":{"id":"1","descriptor":"USD"}}
+{"id":"3","descriptor":"Payroll Expense","accountID":{"id":"3"},"currency":{"id":"1","descriptor":"USD"}}
