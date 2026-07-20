@@ -1,0 +1,43 @@
+# stunt adapter manifest — Etherscan-style explorer API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of an Etherscan-style block explorer API
+# for LOCAL TESTING ONLY. It does not call the real Etherscan API. All data is
+# synthetic. See DISCLAIMER.
+id: etherscan-style
+name: "Etherscan-style explorer API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Etherscan API"
+  version: "1.0"
+
+# All Etherscan API calls are GET with query params module + action.
+# A single endpoint handles all module/action combinations.
+endpoints:
+  - route: /api
+    method: GET
+    handler: scripts/api.star#on_api
+
+# Backing stores for stateful explorer data.
+resources:
+  - name: accounts
+    kind: collection
+  - name: transactions
+    kind: collection
+  - name: contracts
+    kind: collection
+  - name: token_holders
+    kind: collection
+
+# Catch-all: any unmatched route returns 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          status: "0"
+          message: "NOTOK"
+          result: "404: Not Found"
