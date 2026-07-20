@@ -1,0 +1,74 @@
+# stunt adapter manifest — Google Tasks API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Google Tasks API (v1) for LOCAL
+# TESTING ONLY. It does not call the real Google API. All data is synthetic.
+# See DISCLAIMER.
+id: gtasks-style
+name: "Google Tasks API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Google Tasks API"
+  version: "v1"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Task lists ---
+  - route: /tasks/v1/lists
+    method: GET
+    handler: scripts/lists.star#on_list_tasklists
+  - route: /tasks/v1/lists
+    method: POST
+    handler: scripts/lists.star#on_create_tasklist
+
+  # --- Task move (literal 5th segment) ---
+  - route: /tasks/v1/lists/{tasklistId}/tasks/{taskId}/move
+    method: POST
+    handler: scripts/tasks.star#on_move_task
+
+  # --- Tasks CRUD within a list ---
+  - route: /tasks/v1/lists/{tasklistId}/tasks
+    method: GET
+    handler: scripts/tasks.star#on_list_tasks
+  - route: /tasks/v1/lists/{tasklistId}/tasks
+    method: POST
+    handler: scripts/tasks.star#on_create_task
+  - route: /tasks/v1/lists/{tasklistId}/tasks/{taskId}
+    method: GET
+    handler: scripts/tasks.star#on_get_task
+  - route: /tasks/v1/lists/{tasklistId}/tasks/{taskId}
+    method: PUT
+    handler: scripts/tasks.star#on_update_task
+  - route: /tasks/v1/lists/{tasklistId}/tasks/{taskId}
+    method: PATCH
+    handler: scripts/tasks.star#on_update_task
+  - route: /tasks/v1/lists/{tasklistId}/tasks/{taskId}
+    method: DELETE
+    handler: scripts/tasks.star#on_delete_task
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: tasklists
+    kind: collection
+  - name: tasks
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: 404
+            message: "Method not found."
+            status: "NOT_FOUND"
