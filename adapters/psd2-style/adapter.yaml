@@ -1,0 +1,88 @@
+# stunt adapter manifest — Open Banking / PSD2 (Berlin Group NextGenPSD2) simulator
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Berlin Group NextGenPSD2 API
+# for LOCAL TESTING ONLY. It does not call any real bank API. All data is
+# synthetic. See DISCLAIMER.
+id: psd2-style
+name: "Open Banking / PSD2 (Berlin Group NextGenPSD2) simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Open Banking / PSD2 (Berlin Group NextGenPSD2)"
+  version: "1.3.6"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+endpoints:
+  # --- OAuth2 token (client-credentials for TPP auth) ---
+  - route: /v1/oauth/token
+    method: POST
+    handler: scripts/oauth.star#on_token
+
+  # --- Consents ---
+  - route: /v1/consents
+    method: POST
+    handler: scripts/consents.star#on_create_consent
+  - route: /v1/consents/{consentId}
+    method: GET
+    handler: scripts/consents.star#on_get_consent
+  - route: /v1/consents/{consentId}
+    method: DELETE
+    handler: scripts/consents.star#on_delete_consent
+
+  # --- Authorisations (SCA flow) ---
+  - route: /v1/consents/{consentId}/authorisations
+    method: POST
+    handler: scripts/authorisations.star#on_start_authorisation
+  - route: /v1/consents/{consentId}/authorisations/{authorisationId}
+    method: GET
+    handler: scripts/authorisations.star#on_get_authorisation
+  - route: /v1/consents/{consentId}/authorisations/{authorisationId}
+    method: PUT
+    handler: scripts/authorisations.star#on_update_authorisation
+  - route: /v1/consents/{consentId}/authorisations/{authorisationId}
+    method: POST
+    handler: scripts/authorisations.star#on_update_authorisation
+
+  # --- Accounts (requires valid consent) ---
+  - route: /v1/accounts
+    method: GET
+    handler: scripts/accounts.star#on_list_accounts
+  - route: /v1/accounts/{resourceId}/balances
+    method: GET
+    handler: scripts/accounts.star#on_get_balances
+  - route: /v1/accounts/{resourceId}/transactions
+    method: GET
+    handler: scripts/accounts.star#on_get_transactions
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: consents
+    kind: collection
+  - name: authorisations
+    kind: collection
+  - name: accounts
+    kind: collection
+    seed: fixtures/accounts.jsonl
+  - name: transactions
+    kind: collection
+    seed: fixtures/transactions.jsonl
+  - name: access_tokens
+    kind: collection
+
+# Auth scheme: OAuth2 bearer tokens.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          tppMessages:
+            - category: "ERROR"
+              code: "SERVICE_INVALID"
+              text: "Resource not found"

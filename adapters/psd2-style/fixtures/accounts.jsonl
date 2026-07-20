@@ -1,0 +1,2 @@
+{"id":"acc-001","iban":"DEZZTEST0AA0BB0CC0D01","currency":"EUR","name":"Main Account","product":"Current Account","bic":"STNTDE01","bookedBalance":"5000","availableBalance":"4800"}
+{"id":"acc-002","iban":"DEZZTEST0AA0BB0CC0D02","currency":"EUR","name":"Savings Account","product":"Savings Account","bic":"STNTDE01","bookedBalance":"9000","availableBalance":"9000"}
