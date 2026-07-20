@@ -1,0 +1,106 @@
+# stunt adapter manifest — Gmail API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Gmail API (v1) for LOCAL TESTING
+# ONLY. It does not call the real Google API. All data is synthetic.
+# See DISCLAIMER.
+#
+# NOTE: Gmail has RESTRICTED OAuth scopes. The real consent-verification
+# process can take weeks. This mock mints tokens instantly so you can test
+# your integration locally without that delay.
+id: gmail-style
+name: "Gmail API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Gmail API"
+  version: "v1"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Labels ---
+  - route: /gmail/v1/users/{userId}/labels
+    method: GET
+    handler: scripts/labels.star#on_list_labels
+  - route: /gmail/v1/users/{userId}/labels
+    method: POST
+    handler: scripts/labels.star#on_create_label
+
+  # --- Messages: send (literal, before {messageId}) ---
+  - route: /gmail/v1/users/{userId}/messages/send
+    method: POST
+    handler: scripts/messages.star#on_send_message
+
+  # --- Messages: list + insert ---
+  - route: /gmail/v1/users/{userId}/messages
+    method: GET
+    handler: scripts/messages.star#on_list_messages
+  - route: /gmail/v1/users/{userId}/messages
+    method: POST
+    handler: scripts/messages.star#on_insert_message
+
+  # --- Messages: batch modify (literal) ---
+  - route: /gmail/v1/users/{userId}/messages/batchModify
+    method: POST
+    handler: scripts/messages.star#on_batch_modify
+
+  # --- Messages: trash (literal sub-route) ---
+  - route: /gmail/v1/users/{userId}/messages/{messageId}/trash
+    method: POST
+    handler: scripts/messages.star#on_trash_message
+
+  # --- Messages: modify (literal sub-route) ---
+  - route: /gmail/v1/users/{userId}/messages/{messageId}/modify
+    method: POST
+    handler: scripts/messages.star#on_modify_message
+
+  # --- Messages: attachments (literal sub-route) ---
+  - route: /gmail/v1/users/{userId}/messages/{messageId}/attachments/{attachmentId}
+    method: GET
+    handler: scripts/messages.star#on_get_attachment
+
+  # --- Single message: get ---
+  - route: /gmail/v1/users/{userId}/messages/{messageId}
+    method: GET
+    handler: scripts/messages.star#on_get_message
+
+  # --- Drafts ---
+  - route: /gmail/v1/users/{userId}/drafts
+    method: GET
+    handler: scripts/drafts.star#on_list_drafts
+  - route: /gmail/v1/users/{userId}/drafts
+    method: POST
+    handler: scripts/drafts.star#on_create_draft
+
+  # --- Threads ---
+  - route: /gmail/v1/users/{userId}/threads/{threadId}
+    method: GET
+    handler: scripts/threads.star#on_get_thread
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: messages
+    kind: collection
+  - name: labels
+    kind: collection
+  - name: drafts
+    kind: collection
+
+# Auth scheme metadata (mock: any Bearer token accepted).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: 404
+            message: "Method not found."
+            status: "NOT_FOUND"
