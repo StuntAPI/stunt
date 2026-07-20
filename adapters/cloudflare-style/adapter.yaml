@@ -1,0 +1,108 @@
+# stunt adapter manifest — Cloudflare API + Workers + R2 + D1 simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Cloudflare REST API (v4),
+# including Workers, R2, and D1, for LOCAL TESTING ONLY. It does not call
+# the real Cloudflare API. All data is synthetic. See DISCLAIMER.
+id: cloudflare-style
+name: "Cloudflare API + Workers + R2 + D1 simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Cloudflare API"
+  version: "4"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+#
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Zones ---
+  - route: /zones
+    method: GET
+    handler: scripts/zones.star#on_list_zones
+  - route: /zones
+    method: POST
+    handler: scripts/zones.star#on_create_zone
+  - route: /zones/{zone_id}
+    method: GET
+    handler: scripts/zones.star#on_get_zone
+  - route: /zones/{zone_id}/dns_records
+    method: GET
+    handler: scripts/zones.star#on_list_dns_records
+  - route: /zones/{zone_id}/firewall/rules
+    method: GET
+    handler: scripts/zones.star#on_list_firewall_rules
+  - route: /zones/{zone_id}/page_rules
+    method: GET
+    handler: scripts/zones.star#on_list_page_rules
+  - route: /zones/{zone_id}/purge_cache
+    method: POST
+    handler: scripts/zones.star#on_purge_cache
+
+  # --- Workers ---
+  - route: /accounts/{account_id}/workers/scripts
+    method: GET
+    handler: scripts/workers.star#on_list_scripts
+  - route: /accounts/{account_id}/workers/scripts/{script_name}
+    method: PUT
+    handler: scripts/workers.star#on_deploy_script
+  - route: /accounts/{account_id}/workers/scripts/{script_name}
+    method: GET
+    handler: scripts/workers.star#on_get_script
+
+  # --- R2 ---
+  - route: /accounts/{account_id}/r2/buckets
+    method: GET
+    handler: scripts/r2.star#on_list_buckets
+  - route: /accounts/{account_id}/r2/buckets
+    method: POST
+    handler: scripts/r2.star#on_create_bucket
+
+  # --- D1 ---
+  - route: /accounts/{account_id}/d1/database
+    method: GET
+    handler: scripts/d1.star#on_list_databases
+  - route: /accounts/{account_id}/d1/database
+    method: POST
+    handler: scripts/d1.star#on_create_database
+  - route: /accounts/{account_id}/d1/database/{database_id}/query
+    method: POST
+    handler: scripts/d1.star#on_query_database
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: zones
+    kind: collection
+  - name: workers
+    kind: collection
+  - name: buckets
+    kind: collection
+  - name: databases
+    kind: collection
+
+# Auth scheme: scoped API token (Bearer) or global key (X-Auth-Email +
+# X-Auth-Key). Structural validation only for v1.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a Cloudflare-style error envelope.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          success: false
+          errors:
+            - code: 7003
+              message: "Could not route to /the/requested/resource"
+          messages: []
+          result: null
+
+# Resources notes:
+# - zones: {id, name, account{id,name}, status, name_servers, type}
+# - workers: {name, account_id, created_on, modified_on}
+# - buckets: {name, creation_date}
+# - databases: {uuid, name, created_at}
