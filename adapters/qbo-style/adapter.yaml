@@ -1,0 +1,87 @@
+# stunt adapter manifest — QuickBooks Online-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the QuickBooks Online API (v3) for
+# LOCAL TESTING ONLY. It does not call the real QBO API. All data is
+# synthetic. See DISCLAIMER.
+id: qbo-style
+name: "QuickBooks Online-style API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "QuickBooks Online API"
+  version: "v3"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+endpoints:
+  # --- OAuth2 ---
+  - route: /oauth/v2/authorize
+    method: GET
+    handler: scripts/oauth.star#on_authorize
+  - route: /oauth/v2/tokens/bearer
+    method: POST
+    handler: scripts/oauth.star#on_token
+
+  # --- QBO v3 API (realmId-scoped) ---
+  # Query endpoint — generic SQL-like query handler.
+  - route: /v3/company/{realmId}/query
+    method: GET
+    handler: scripts/query.star#on_query
+  - route: /v3/company/{realmId}/query
+    method: POST
+    handler: scripts/query.star#on_query
+
+  # Customer CRUD.
+  - route: /v3/company/{realmId}/customer
+    method: GET
+    handler: scripts/customer.star#on_read_customer
+  - route: /v3/company/{realmId}/customer
+    method: POST
+    handler: scripts/customer.star#on_create_customer
+  - route: /v3/company/{realmId}/customer/{id}
+    method: GET
+    handler: scripts/customer.star#on_read_customer_by_id
+
+  # Invoice CRUD.
+  - route: /v3/company/{realmId}/invoice
+    method: POST
+    handler: scripts/invoice.star#on_create_invoice
+  - route: /v3/company/{realmId}/invoice/{id}
+    method: GET
+    handler: scripts/invoice.star#on_read_invoice
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: oauth_codes
+    kind: collection
+  - name: access_tokens
+    kind: collection
+  - name: refresh_tokens
+    kind: collection
+  - name: customers
+    kind: collection
+    seed: fixtures/customers.jsonl
+  - name: invoices
+    kind: collection
+    seed: fixtures/invoices.jsonl
+
+# Auth scheme: OAuth2 bearer tokens. Access tokens expire (1hr), refresh
+# tokens rotate on each refresh (the infamous QBO refresh churn).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          Fault:
+            Error:
+              - Message: "Resource not found"
+                code: "NOTFOUND"
+                Detail: "The specified resource does not exist"
+            type: "Service"
+          time: "synthetic-timestamp"
