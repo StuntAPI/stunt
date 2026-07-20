@@ -1,0 +1,59 @@
+# stunt adapter manifest — Pinata IPFS pinning API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Pinata API for LOCAL TESTING
+# ONLY. It does not call the real Pinata API. All data is synthetic.
+# See DISCLAIMER.
+id: pinata-style
+name: "Pinata IPFS pinning API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Pinata API"
+  version: "1.0"
+
+# Auth: pinata_api_key + pinata_secret_api_key headers, OR
+#        Authorization: Bearer <JWT>
+identity:
+  token_scheme: bearer
+
+# Endpoints — each maps a route + method to a Starlark handler.
+endpoints:
+  # --- Pinning ---
+  - route: /pinning/pinFileToIPFS
+    method: POST
+    handler: scripts/pinning.star#on_pin_file
+  - route: /pinning/pinJSONToIPFS
+    method: POST
+    handler: scripts/pinning.star#on_pin_json
+  - route: /pinning/unpin/{cid}
+    method: DELETE
+    handler: scripts/pinning.star#on_unpin
+
+  # --- Data ---
+  - route: /data/pinList
+    method: GET
+    handler: scripts/data.star#on_pin_list
+  - route: /data/testAuthentication
+    method: GET
+    handler: scripts/data.star#on_test_auth
+  - route: /data/pinByHash
+    method: GET
+    handler: scripts/data.star#on_pin_by_hash
+
+# Backing stores — collections for stateful pins.
+resources:
+  - name: pins
+    kind: collection
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            reason: "NOT_FOUND"
+            details: "Endpoint not found"
