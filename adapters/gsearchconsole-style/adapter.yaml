@@ -1,0 +1,59 @@
+# stunt adapter manifest — Google Search Console API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Google Search Console API (v1)
+# for LOCAL TESTING ONLY. It does not call the real Google API. All data is
+# synthetic. See DISCLAIMER.
+id: gsearchconsole-style
+name: "Google Search Console API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Google Search Console API"
+  version: "v1"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Sites (literal path) ---
+  - route: /webmasters/v3/sites
+    method: GET
+    handler: scripts/sites.star#on_list_sites
+
+  # --- Search analytics query (literal 5th segment) ---
+  - route: /webmasters/v3/sites/{siteUrl}/searchAnalytics/query
+    method: POST
+    handler: scripts/analytics.star#on_query
+
+  # --- Sitemaps (literal 5th segment) ---
+  - route: /webmasters/v3/sites/{siteUrl}/sitemaps
+    method: GET
+    handler: scripts/sites.star#on_list_sitemaps
+
+  # --- URL inspection (literal 5th segment) ---
+  - route: /webmasters/v3/sites/{siteUrl}/inspect
+    method: POST
+    handler: scripts/sites.star#on_inspect
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: sites
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: 404
+            message: "Method not found."
+            status: "NOT_FOUND"
