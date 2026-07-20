@@ -1,0 +1,59 @@
+# stunt adapter manifest — Dune Analytics SQL API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Dune Analytics API (v1) for
+# LOCAL TESTING ONLY. It does not call the real Dune API. All data is
+# synthetic. See DISCLAIMER.
+id: dune-style
+name: "Dune Analytics SQL API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Dune Analytics API"
+  version: "v1"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Execute (literal route) ---
+  - route: /api/v1/query/{query_id}/execute
+    method: POST
+    handler: scripts/execute.star#on_execute
+
+  # --- Inline result ---
+  - route: /api/v1/query/{query_id}/result
+    method: POST
+    handler: scripts/execute.star#on_inline_result
+
+  # --- Auth validate (literal route) ---
+  - route: /api/v1/auth/validate
+    method: GET
+    handler: scripts/auth.star#on_validate
+
+  # --- Parameterized routes ---
+  - route: /api/v1/execution/{execution_id}/status
+    method: GET
+    handler: scripts/execute.star#on_get_status
+  - route: /api/v1/execution/{execution_id}/results
+    method: GET
+    handler: scripts/execute.star#on_get_results
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: executions
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: "Not Found"
