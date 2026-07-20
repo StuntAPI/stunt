@@ -8,6 +8,10 @@ id: twitter-style
 name: "X.com / Twitter-style API simulator (unofficial)"
 version: "0.1.0"
 
+api:
+  name: "Twitter/X API"
+  version: "v2"
+
 # Endpoints — each maps a route + method to a Starlark handler.
 # NOTE: specific literal routes (e.g. /2/users/me) must come BEFORE
 # parameterized routes (e.g. /2/users/{id}) so they are matched first.

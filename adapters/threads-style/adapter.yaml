@@ -8,6 +8,10 @@ id: threads-style
 name: "Threads-style API simulator (unofficial)"
 version: "0.1.0"
 
+api:
+  name: "Threads API (Meta)"
+  version: "v1.0"
+
 # Endpoints — each maps a route + method to a Starlark handler.
 # NOTE: route ordering matters for the publish flow: /threads_publish is
 # declared BEFORE /threads so the publish step matches its own route and not

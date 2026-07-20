@@ -7,6 +7,10 @@ id: echo-style
 name: "Echo gRPC example adapter"
 version: "0.1.0"
 
+api:
+  name: "gRPC echo demo"
+  version: "1.0"
+
 # gRPC service — served from the compiled protobuf descriptor.
 # Each method is routed to a Starlark handler. The handler receives the
 # decoded request as req["body"] (a JSON-like map) and returns
