@@ -1,0 +1,3 @@
+{"id":"1","subject":"Login button not working","status":"open","requester_id":"101","assignee_id":"201","created_at":"2024-01-01T10:00:00Z","updated_at":"2024-01-01T11:00:00Z","description":"The login button on the homepage does nothing when clicked."}
+{"id":"2","subject":"Billing question for invoice #SYNTH","status":"pending","requester_id":"102","assignee_id":"202","created_at":"2024-01-02T09:00:00Z","updated_at":"2024-01-02T10:30:00Z","description":"Customer asking about a charge on their latest invoice."}
+{"id":"3","subject":"Feature request: dark mode","status":"open","requester_id":"103","assignee_id":null,"created_at":"2024-01-03T14:00:00Z","updated_at":"2024-01-03T14:00:00Z","description":"Would love to see a dark mode option in the settings."}
