@@ -47,6 +47,12 @@ endpoints:
   - route: /v1/shops/{shop_id}/orders.json
     method: POST
     handler: scripts/orders.star#on_create_order
+  # Shop-scoped single-order fetch (status + tracking polling). The {order_id}
+  # param captures the whole segment including the trailing ".json", which
+  # on_get_order strips.
+  - route: /v1/shops/{shop_id}/orders/{order_id}
+    method: GET
+    handler: scripts/orders.star#on_get_order
   - route: /v1/orders.json
     method: GET
     handler: scripts/orders.star#on_list_orders

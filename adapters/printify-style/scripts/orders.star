@@ -55,6 +55,20 @@ def on_create_order(req):
 
     return respond(200, order)
 
+# on_get_order returns a single order by id (status + tracking polling).
+# The {order_id} route param captures the trailing ".json", so strip it.
+def on_get_order(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
+    order_id = _strip_json(req["params"].get("order_id", ""))
+    c = store_collection("orders")
+    doc = c.get(order_id)
+    if doc == None:
+        return respond(404, {"status": 404, "message": "order not found"})
+    return respond(200, doc)
+
 # on_send_order submits an existing order for fulfillment.
 def on_send_order(req):
     err = _require_auth(req)
