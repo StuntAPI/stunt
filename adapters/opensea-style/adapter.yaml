@@ -1,0 +1,71 @@
+# stunt adapter manifest — OpenSea API v2 + Seaport simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of OpenSea's API v2 + Seaport order
+# protocol for LOCAL TESTING ONLY. It does not call the real OpenSea API.
+# All data is synthetic. See DISCLAIMER.
+id: opensea-style
+name: "OpenSea API v2 + Seaport simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "OpenSea API"
+  version: "2.0.0"
+
+# Endpoints — OpenSea API v2 routes with X-API-KEY auth.
+endpoints:
+  # --- Assets ---
+  - route: /api/v2/assets
+    method: GET
+    handler: scripts/assets.star#on_list_assets
+  - route: /api/v2/assets/{chain}/{address}/{identifier}
+    method: GET
+    handler: scripts/assets.star#on_get_asset
+
+  # --- Collections ---
+  - route: /api/v2/collections/{slug}
+    method: GET
+    handler: scripts/collections.star#on_get_collection
+
+  # --- Events ---
+  - route: /api/v2/events
+    method: GET
+    handler: scripts/events.star#on_list_events
+
+  # --- Orders (Seaport) ---
+  - route: /api/v2/orders/{chain}/{protocol}/listings
+    method: GET
+    handler: scripts/orders.star#on_list_listings
+  - route: /api/v2/orders/{chain}/{protocol}/offers
+    method: GET
+    handler: scripts/orders.star#on_list_offers
+  - route: /api/v2/offers
+    method: POST
+    handler: scripts/orders.star#on_create_offer
+
+# Backing stores for stateful orders and assets.
+resources:
+  - name: assets
+    kind: collection
+  - name: collections
+    kind: collection
+  - name: events
+    kind: collection
+  - name: listings
+    kind: collection
+  - name: offers
+    kind: collection
+
+# Auth: X-API-KEY header (check presence).
+identity:
+  token_scheme: api_key
+
+# Catch-all: any unmatched route returns 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: not_found
