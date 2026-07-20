@@ -30,6 +30,9 @@ def on_list_orders(req):
     })
 
 # on_create_order creates a new fulfillment order.
+# Serves both POST /v1/orders.json and the shop-scoped real Printify route
+# POST /v1/shops/{shop_id}/orders.json (shop_id is captured but not needed —
+# state is global to the sim). The response includes total_price + currency.
 def on_create_order(req):
     err = _require_auth(req)
     if err != None:
@@ -39,28 +42,15 @@ def on_create_order(req):
     if body == None:
         body = {}
 
-    seq = store_kv_incr("printify", "order_seq")
-    oid = _order_id(seq)
-    ts = 1700000000 + seq
-
-    order = {
-        "id": oid,
-        "status": "pending",
-        "shipping_method": body.get("shipping_method", 1),
-        "line_items": body.get("line_items", []),
-        "address_to": body.get("address_to", {}),
-        "created_at": ts,
-        "updated_at": ts,
-        "is_test": True,
-    }
+    order = _new_order(body)
 
     c = store_collection("orders")
     c.insert(order)
 
     # Emit webhook (fire-and-forget).
     events_emit("order:created", {
-        "order_id": oid,
-        "status": "pending",
+        "order_id": order["id"],
+        "status": order["status"],
     })
 
     return respond(200, order)

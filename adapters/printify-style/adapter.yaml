@@ -38,6 +38,11 @@ endpoints:
     handler: scripts/products.star#on_delete_product
 
   # --- Orders ---
+  # Shop-scoped create is the real Printify order-submission route; declared
+  # alongside the legacy /v1/orders.json form. Both share one handler.
+  - route: /v1/shops/{shop_id}/orders.json
+    method: POST
+    handler: scripts/orders.star#on_create_order
   - route: /v1/orders.json
     method: GET
     handler: scripts/orders.star#on_list_orders

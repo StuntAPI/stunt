@@ -11,6 +11,51 @@
 # Shared helpers (_bearer, _require_auth, _to_int, _next_order_id)
 # are preloaded from scripts/lib.star.
 
+# --- Printful v1 order API (result-wrapped) -------------------------------
+# The legacy v1 order endpoints (POST /orders, GET /orders/{id}) wrap the
+# payload in a {"result": {...}} envelope, unlike the v2 store routes above.
+# v1 order ids are integers.
+
+# on_create_v1_order handles POST /orders and returns {"result": {...}}.
+def on_create_v1_order(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
+    body = req["body"]
+    if body == None:
+        body = {}
+
+    oid = _next_order_id()
+    external_id = body.get("external_id", "ext_order_" + str(oid))
+    result = {
+        "id": oid,
+        "external_id": external_id,
+        "status": "draft",
+        "shipping": body.get("shipping", "STANDARD"),
+        "recipient": body.get("recipient", {}),
+        "items": body.get("items", []),
+        "created": 1700000000 + oid,
+    }
+
+    # Persist under a string id so GET /orders/{id} can retrieve it.
+    store_collection("orders").insert({"id": str(oid), "result": result})
+
+    events_emit("order_created", {"order_id": oid, "status": "draft"})
+    return respond(200, {"result": result})
+
+# on_get_v1_order handles GET /orders/{order_id} -> {"result": {...}}.
+def on_get_v1_order(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
+    oid = req["params"].get("order_id", "")
+    doc = store_collection("orders").get(oid)
+    if doc == None or doc.get("result") == None:
+        return respond(404, {"error": {"message": "Order not found", "code": 404}})
+    return respond(200, {"result": doc["result"]})
+
 # on_list_orders returns all store orders.
 def on_list_orders(req):
     err = _require_auth(req)

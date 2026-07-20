@@ -23,7 +23,15 @@ endpoints:
     method: GET
     handler: scripts/products.star#on_get_product
 
-  # --- Store orders ---
+  # --- Orders (v1, result-wrapped) ---
+  - route: /orders
+    method: POST
+    handler: scripts/orders.star#on_create_v1_order
+  - route: /orders/{order_id}
+    method: GET
+    handler: scripts/orders.star#on_get_v1_order
+
+  # --- Store orders (v2) ---
   - route: /v2/store/orders
     method: GET
     handler: scripts/orders.star#on_list_orders

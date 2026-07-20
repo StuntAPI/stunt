@@ -72,3 +72,41 @@ def _product_id(seq):
 # _order_id returns a numeric string order id.
 def _order_id(seq):
     return str(100000 + seq)
+
+# _synth_total returns a synthetic order total (whole USD units) derived from
+# the line-item quantities, so consumers that read total_price get a real
+# number rather than a missing field. Minimum 20.
+def _synth_total(line_items):
+    total = 0
+    for it in line_items:
+        q = it.get("quantity", 1)
+        if type(q) != "int":
+            q = 1
+        total += q * 20
+    if total == 0:
+        total = 20
+    return total
+
+# _new_order builds a synthetic Printify-style order document from a create
+# request body. Accepts either the top-level "shipping_address" key (the real
+# /v1/shops/{shop_id}/orders.json shape) or "address_to", and always includes
+# total_price + currency so downstream parsers have the fields they read.
+def _new_order(body):
+    seq = store_kv_incr("printify", "order_seq")
+    oid = _order_id(seq)
+    ts = 1700000000 + seq
+    line_items = body.get("line_items", [])
+    addr = body.get("shipping_address", body.get("address_to", {}))
+    return {
+        "id": oid,
+        "status": "pending",
+        "total_price": _synth_total(line_items),
+        "currency": "USD",
+        "shipping_method": body.get("shipping_method", 1),
+        "line_items": line_items,
+        "address_to": addr,
+        "shipping_address": addr,
+        "created_at": ts,
+        "updated_at": ts,
+        "is_test": True,
+    }
