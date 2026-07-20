@@ -1,0 +1,59 @@
+# stunt adapter manifest — 1inch DEX Aggregation Protocol API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the 1inch Aggregation Protocol API
+# (v6.0) for LOCAL TESTING ONLY. It does not call the real 1inch API. All
+# data is synthetic. See DISCLAIMER.
+id: oneinch-style
+name: "1inch Aggregation Protocol API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "1inch Aggregation Protocol API"
+  version: "v6.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Approve (literal routes) ---
+  - route: /v6.0/1/approve/spender
+    method: GET
+    handler: scripts/approve.star#on_get_spender
+  - route: /v6.0/1/approve/calldata
+    method: GET
+    handler: scripts/approve.star#on_get_approve_calldata
+
+  # --- Tokens ---
+  - route: /v6.0/1/tokens
+    method: GET
+    handler: scripts/tokens.star#on_get_tokens
+
+  # --- Quote ---
+  - route: /v6.0/1/quote
+    method: GET
+    handler: scripts/swap.star#on_quote
+
+  # --- Swap ---
+  - route: /v6.0/1/swap
+    method: GET
+    handler: scripts/swap.star#on_swap
+
+# Backing stores — KV for token metadata.
+resources: []
+
+# Auth scheme metadata.
+identity:
+  token_scheme: none
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error: "Not Found"
+          statusCode: 404
+          description: "Resource not found"
