@@ -1,0 +1,79 @@
+# stunt adapter manifest — Onfido API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Onfido API (v3.6) for LOCAL
+# TESTING ONLY. It does not call the real Onfido API. All data is synthetic.
+# See DISCLAIMER.
+id: onfido-style
+name: "Onfido API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Onfido API"
+  version: "v3.6"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Applicants ---
+  - route: /v3.6/applicants
+    method: POST
+    handler: scripts/applicants.star#on_create_applicant
+
+  # --- Documents (multipart) ---
+  - route: /v3.6/documents
+    method: POST
+    handler: scripts/documents.star#on_upload_document
+
+  # --- Live photos (selfie) ---
+  - route: /v3.6/live_photos
+    method: POST
+    handler: scripts/documents.star#on_upload_live_photo
+
+  # --- Checks ---
+  - route: /v3.6/checks
+    method: POST
+    handler: scripts/checks.star#on_create_check
+
+  # --- Parameterized routes ---
+  - route: /v3.6/applicants/{applicant_id}
+    method: GET
+    handler: scripts/applicants.star#on_get_applicant
+  - route: /v3.6/checks/{check_id}
+    method: GET
+    handler: scripts/checks.star#on_get_check
+
+  # --- Webhook receiver (X-SHA2-Signature) ---
+  - route: /v3.6/webhooks
+    method: POST
+    handler: scripts/webhooks.star#on_webhook
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: applicants
+    kind: collection
+  - name: documents
+    kind: collection
+  - name: live_photos
+    kind: collection
+  - name: checks
+    kind: collection
+  - name: webhook_events
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: token
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            type: "not_found"
+            message: "Resource not found"
