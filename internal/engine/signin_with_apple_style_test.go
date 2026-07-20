@@ -243,6 +243,27 @@ func TestSignInWithAppleStyleAdapter(t *testing.T) {
 	if idPayload == idPayload2 {
 		t.Fatal("two users should have different id_token payloads")
 	}
+
+	// ===== Regression: malformed client_secret must return 400 (not 500/panic) =====
+	// A non-ASCII base64 segment in the JWT previously caused _b64url_decode to
+	// index out of range. The adapter must reject it gracefully as invalid_client.
+	respMal := siwaGetNoRedirect(t, base+"/auth/authorize?"+
+		url.Values{"client_id": {"com.test"}, "redirect_uri": {"http://localhost/cb"},
+			"response_type": {"code"}, "scope": {"email"}, "state": {"s-mal"}}.Encode())
+	codeMal := siwaExtractParam(respMal.Header.Get("Location"), "code")
+	malBody, malStatus := siwaPostForm(t, base+"/auth/token", url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {codeMal},
+		"client_id":     {"com.test"},
+		"client_secret": {"abc.abc.abc"}, // not a decodable JWT header
+		"redirect_uri":  {"http://localhost/cb"},
+	})
+	if malStatus != 400 {
+		t.Fatalf("malformed client_secret -> status %d, want 400; body %s", malStatus, malBody)
+	}
+	if !strings.Contains(malBody, "invalid_client") {
+		t.Fatalf("malformed client_secret -> body %q, want invalid_client error", malBody)
+	}
 }
 
 // === Sign in with Apple test helpers ===
