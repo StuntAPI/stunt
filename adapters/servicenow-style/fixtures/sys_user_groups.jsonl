@@ -1,0 +1,2 @@
+{"id":"sysid_grp_001","sys_id":"sysid_grp_001","name":"IT Support","manager":"sysid_user_001","manager_display":"Alice Chen","description":"IT Support team","active":true}
+{"id":"sysid_grp_002","sys_id":"sysid_grp_002","name":"Network Operations","manager":"sysid_user_003","manager_display":"David Kim","description":"Network operations team","active":true}

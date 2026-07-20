@@ -1,0 +1,203 @@
+# stunt adapter manifest — ServiceNow Table API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of ServiceNow's Table REST API (v2)
+# for LOCAL TESTING ONLY. It does not call the real ServiceNow API. All data
+# is synthetic. See DISCLAIMER.
+id: servicenow-style
+name: "ServiceNow Table API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "ServiceNow Table API"
+  version: "2"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Table list + CRUD (multi-table handlers) ---
+  # Literal collection routes BEFORE parameterized {sys_id} routes.
+  - route: /api/now/table/incident
+    method: GET
+    handler: scripts/table.star#on_list
+  - route: /api/now/table/incident
+    method: POST
+    handler: scripts/table.star#on_create
+  - route: /api/now/table/incident/{sys_id}
+    method: GET
+    handler: scripts/table.star#on_get
+  - route: /api/now/table/incident/{sys_id}
+    method: PUT
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/incident/{sys_id}
+    method: PATCH
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/incident/{sys_id}
+    method: DELETE
+    handler: scripts/table.star#on_delete
+
+  - route: /api/now/table/task
+    method: GET
+    handler: scripts/table.star#on_list
+  - route: /api/now/table/task
+    method: POST
+    handler: scripts/table.star#on_create
+  - route: /api/now/table/task/{sys_id}
+    method: GET
+    handler: scripts/table.star#on_get
+  - route: /api/now/table/task/{sys_id}
+    method: PUT
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/task/{sys_id}
+    method: PATCH
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/task/{sys_id}
+    method: DELETE
+    handler: scripts/table.star#on_delete
+
+  - route: /api/now/table/change_request
+    method: GET
+    handler: scripts/table.star#on_list
+  - route: /api/now/table/change_request
+    method: POST
+    handler: scripts/table.star#on_create
+  - route: /api/now/table/change_request/{sys_id}
+    method: GET
+    handler: scripts/table.star#on_get
+  - route: /api/now/table/change_request/{sys_id}
+    method: PUT
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/change_request/{sys_id}
+    method: PATCH
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/change_request/{sys_id}
+    method: DELETE
+    handler: scripts/table.star#on_delete
+
+  - route: /api/now/table/cmdb_ci
+    method: GET
+    handler: scripts/table.star#on_list
+  - route: /api/now/table/cmdb_ci
+    method: POST
+    handler: scripts/table.star#on_create
+  - route: /api/now/table/cmdb_ci/{sys_id}
+    method: GET
+    handler: scripts/table.star#on_get
+  - route: /api/now/table/cmdb_ci/{sys_id}
+    method: PUT
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/cmdb_ci/{sys_id}
+    method: PATCH
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/cmdb_ci/{sys_id}
+    method: DELETE
+    handler: scripts/table.star#on_delete
+
+  - route: /api/now/table/sys_user
+    method: GET
+    handler: scripts/table.star#on_list
+  - route: /api/now/table/sys_user
+    method: POST
+    handler: scripts/table.star#on_create
+  - route: /api/now/table/sys_user/{sys_id}
+    method: GET
+    handler: scripts/table.star#on_get
+  - route: /api/now/table/sys_user/{sys_id}
+    method: PUT
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/sys_user/{sys_id}
+    method: PATCH
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/sys_user/{sys_id}
+    method: DELETE
+    handler: scripts/table.star#on_delete
+
+  - route: /api/now/table/sys_user_group
+    method: GET
+    handler: scripts/table.star#on_list
+  - route: /api/now/table/sys_user_group
+    method: POST
+    handler: scripts/table.star#on_create
+  - route: /api/now/table/sys_user_group/{sys_id}
+    method: GET
+    handler: scripts/table.star#on_get
+  - route: /api/now/table/sys_user_group/{sys_id}
+    method: PUT
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/sys_user_group/{sys_id}
+    method: PATCH
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/sys_user_group/{sys_id}
+    method: DELETE
+    handler: scripts/table.star#on_delete
+
+  - route: /api/now/table/sc_req_item
+    method: GET
+    handler: scripts/table.star#on_list
+  - route: /api/now/table/sc_req_item
+    method: POST
+    handler: scripts/table.star#on_create
+  - route: /api/now/table/sc_req_item/{sys_id}
+    method: GET
+    handler: scripts/table.star#on_get
+  - route: /api/now/table/sc_req_item/{sys_id}
+    method: PUT
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/sc_req_item/{sys_id}
+    method: PATCH
+    handler: scripts/table.star#on_update
+  - route: /api/now/table/sc_req_item/{sys_id}
+    method: DELETE
+    handler: scripts/table.star#on_delete
+
+  # --- metadata ---
+  - route: /api/now/table/sys_metadata
+    method: GET
+    handler: scripts/table.star#on_list
+
+  # --- import sets ---
+  - route: /api/now/import/u_my_table
+    method: POST
+    handler: scripts/import.star#on_import
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: incidents
+    kind: collection
+    seed: fixtures/incidents.jsonl
+  - name: tasks
+    kind: collection
+    seed: fixtures/tasks.jsonl
+  - name: change_requests
+    kind: collection
+    seed: fixtures/change_requests.jsonl
+  - name: cmdb_cis
+    kind: collection
+    seed: fixtures/cmdb_cis.jsonl
+  - name: sys_users
+    kind: collection
+    seed: fixtures/sys_users.jsonl
+  - name: sys_user_groups
+    kind: collection
+    seed: fixtures/sys_user_groups.jsonl
+  - name: sc_req_items
+    kind: collection
+    seed: fixtures/sc_req_items.jsonl
+
+# Auth scheme metadata: Basic auth or bearer.
+identity:
+  token_scheme: basic
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            message: "Not Found"
+            detail: "The requested resource does not exist."
+          status: "failure"
