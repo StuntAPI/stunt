@@ -1,0 +1,66 @@
+# stunt adapter manifest — Twilio-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of Twilio's REST API for LOCAL TESTING
+# ONLY. It does not call the real Twilio API. All data is synthetic.
+# See DISCLAIMER.
+id: twilio-style
+name: "Twilio-style API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Twilio API"
+  version: "2010-06-01"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Messages (stateful) ---
+  - route: /2010-06-01/Accounts/{account_sid}/Messages.json
+    method: POST
+    handler: scripts/messages.star#on_send_message
+  - route: /2010-06-01/Accounts/{account_sid}/Messages.json
+    method: GET
+    handler: scripts/messages.star#on_list_messages
+  - route: /2010-06-01/Accounts/{account_sid}/Messages/{sid}
+    method: GET
+    handler: scripts/messages.star#on_get_message
+
+  # --- Calls ---
+  - route: /2010-06-01/Accounts/{account_sid}/Calls.json
+    method: POST
+    handler: scripts/calls.star#on_create_call
+
+  # --- Verify (v2) ---
+  - route: /v2/Services/{service_sid}/Verification
+    method: POST
+    handler: scripts/verify.star#on_create_verification
+  - route: /v2/Services/{service_sid}/VerificationCheck
+    method: POST
+    handler: scripts/verify.star#on_check_verification
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: messages
+    kind: collection
+  - name: calls
+    kind: collection
+  - name: verifications
+    kind: collection
+
+# Auth scheme metadata: HTTP Basic (AccountSid:AuthToken).
+identity:
+  token_scheme: basic
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          code: 0
+          message: "The requested resource was not found"
+          status: 404
