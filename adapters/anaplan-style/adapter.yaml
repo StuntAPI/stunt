@@ -1,0 +1,75 @@
+# stunt adapter manifest — Anaplan API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Anaplan API (v2.0) for LOCAL
+# TESTING ONLY. It does not call the real Anaplan API. All data is synthetic.
+# See DISCLAIMER.
+id: anaplan-style
+name: "Anaplan API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Anaplan API"
+  version: "2.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Workspaces ---
+  - route: /2/0/workspaces
+    method: GET
+    handler: scripts/workspaces.star#on_list_workspaces
+
+  # --- Models (4th segment) ---
+  - route: /2/0/workspaces/{workspaceId}/models
+    method: GET
+    handler: scripts/models.star#on_list_models
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/modules
+    method: GET
+    handler: scripts/models.star#on_list_modules
+
+  # --- Imports: run + task status (literal path segments) ---
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/imports/{importId}/tasks
+    method: POST
+    handler: scripts/tasks.star#on_run_import
+
+  # --- Exports ---
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/exports
+    method: GET
+    handler: scripts/tasks.star#on_list_exports
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/exports/{exportId}/tasks
+    method: POST
+    handler: scripts/tasks.star#on_run_export
+
+  # --- Tasks: get status (literal last segment) ---
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/tasks/{taskId}
+    method: GET
+    handler: scripts/tasks.star#on_get_task
+
+  # --- Get single model ---
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}
+    method: GET
+    handler: scripts/models.star#on_get_model
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: workspaces
+    kind: collection
+  - name: tasks
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: basic_bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          status: "FAILURE"
+          statusMessage: "Resource not found"
