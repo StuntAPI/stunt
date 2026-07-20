@@ -1,0 +1,75 @@
+# stunt adapter manifest — Azure DevOps REST API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Azure DevOps REST API (v7.1)
+# for LOCAL TESTING ONLY. It does not call the real Azure DevOps API. All
+# data is synthetic. See DISCLAIMER.
+id: azure-devops-style
+name: "Azure DevOps REST API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Azure DevOps REST API"
+  version: "7.1"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Projects (org-level) ---
+  - route: /{org}/_apis/projects
+    method: GET
+    handler: scripts/projects.star#on_list_projects
+
+  # --- Git repositories (project-level) ---
+  - route: /{org}/{project}/_apis/git/repositories
+    method: GET
+    handler: scripts/git.star#on_list_repos
+
+  # --- Git items ---
+  - route: /{org}/{project}/_apis/git/repositories/{repoId}/items
+    method: GET
+    handler: scripts/git.star#on_get_item
+
+  # --- Git push (commits) ---
+  - route: /{org}/{project}/_apis/git/repositories/{repoId}/pushes
+    method: POST
+    handler: scripts/git.star#on_push
+
+  # --- Work tracking: iterations ---
+  - route: /{org}/{project}/_apis/work/teamsettings/iterations
+    method: GET
+    handler: scripts/work.star#on_iterations
+
+  # --- Work items: get by id ---
+  - route: /{org}/{project}/_apis/wit/workitems/{id}
+    method: GET
+    handler: scripts/workitems.star#on_get_workitem
+
+  # --- Work items: create ---
+  - route: /{org}/{project}/_apis/wit/workitems
+    method: POST
+    handler: scripts/workitems.star#on_create_workitem
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: projects
+    kind: collection
+  - name: repos
+    kind: collection
+  - name: workitems
+    kind: collection
+
+# Auth scheme metadata.
+identity:
+  token_scheme: basic_bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          messageId: "NotFound"
