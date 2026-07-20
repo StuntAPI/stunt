@@ -1,0 +1,47 @@
+# stunt adapter manifest — Twilio SendGrid-style API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of the Twilio SendGrid v3 API for
+# LOCAL TESTING ONLY. It does not call the real SendGrid API. All data is
+# synthetic. See DISCLAIMER.
+id: sendgrid-style
+name: "Twilio SendGrid-style API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Twilio SendGrid v3 API"
+  version: "v3"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+endpoints:
+  # --- Send mail ---
+  - route: /v3/mail/send
+    method: POST
+    handler: scripts/mail.star#on_send_mail
+
+  # --- List sent mail (debug/retrieval endpoint) ---
+  - route: /v3/messages
+    method: GET
+    handler: scripts/mail.star#on_list_messages
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: mail
+    kind: collection
+
+# Auth scheme: Bearer token (SG.<...>).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          errors:
+            - message: resource not found
+              field: null
+              help: null
