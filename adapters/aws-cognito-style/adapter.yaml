@@ -1,0 +1,66 @@
+# stunt adapter manifest — Amazon Cognito Identity Provider API simulator (unofficial)
+# Docs: https://github.com/stunt-adapters/stunt
+#
+# This adapter mimics the *structure* of Amazon Cognito for LOCAL TESTING ONLY.
+# It does not call the real AWS Cognito API. All data is synthetic. See DISCLAIMER.
+#
+# Cognito has two halves: the hosted-UI OAuth flow and the service API (user
+# pool + identity pool operations via X-Amz-Target).
+id: aws-cognito-style
+name: "Amazon Cognito Identity Provider API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Amazon Cognito Identity Provider API"
+  version: "2016-04-18"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- Hosted UI OAuth flow ---
+  - route: /oauth2/authorize
+    method: GET
+    handler: scripts/oauth.star#on_authorize
+  - route: /oauth2/token
+    method: POST
+    handler: scripts/oauth.star#on_token
+  - route: /oauth2/userInfo
+    method: GET
+    handler: scripts/oauth.star#on_user_info
+  - route: /login
+    method: GET
+    handler: scripts/oauth.star#on_login
+  - route: /logout
+    method: GET
+    handler: scripts/oauth.star#on_logout
+
+  # --- Service API (user pool + identity pool) ---
+  # All service API calls are POST / with X-Amz-Target header.
+  - route: /
+    method: POST
+    handler: scripts/service.star#on_service_api
+
+# Backing stores — collections for stateful data.
+resources:
+  - name: users
+    kind: collection
+  - name: tokens
+    kind: collection
+  - name: oauth_codes
+    kind: collection
+
+# Auth scheme metadata (mock: SigV4 structural check for service API, or
+# hosted-UI OAuth for user auth).
+identity:
+  token_scheme: sigv4
+
+# Catch-all: any unmatched route returns a 404.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          message: "404: Not Found"
