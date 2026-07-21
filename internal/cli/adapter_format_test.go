@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // TestAdapterAddRemovePreservesComments is the core test for the "adapter

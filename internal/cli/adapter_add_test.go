@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/adapterdist"
-	"github.com/stunt-adapters/stunt/internal/catalog"
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/adapterdist"
+	"stuntapi.com/stunt/internal/catalog"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // --- fixture helpers (offline git source) ---

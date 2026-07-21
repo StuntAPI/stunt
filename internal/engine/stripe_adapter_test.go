@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // deleteReq performs an HTTP DELETE and returns the body + status code.

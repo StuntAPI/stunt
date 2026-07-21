@@ -8,10 +8,10 @@ import (
 	"net"
 	"os"
 
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/grpcsim"
-	"github.com/stunt-adapters/stunt/internal/starlark"
 	sk "go.starlark.net/starlark"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/grpcsim"
+	"stuntapi.com/stunt/internal/starlark"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

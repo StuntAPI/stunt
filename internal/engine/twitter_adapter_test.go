@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // TestTwitterStyleAdapter exercises the broader X.com / Twitter-style

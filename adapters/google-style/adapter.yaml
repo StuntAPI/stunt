@@ -1,5 +1,5 @@
 # stunt adapter manifest — Google OAuth2 API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of Google's OAuth2 surface for LOCAL
 # TESTING ONLY. It does not call the real Google API. All data is synthetic.

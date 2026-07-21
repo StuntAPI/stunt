@@ -18,7 +18,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/dynamicpb"
 
-	"github.com/stunt-adapters/stunt/internal/grpcsim"
+	"stuntapi.com/stunt/internal/grpcsim"
 )
 
 // streamDynClient wraps a gRPC client connection and a protobuf file registry

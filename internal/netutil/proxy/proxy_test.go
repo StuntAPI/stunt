@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/netutil"
+	"stuntapi.com/stunt/internal/netutil"
 )
 
 // newTestCA returns a CA in a temp dir for testing.

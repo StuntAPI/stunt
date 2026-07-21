@@ -1,5 +1,5 @@
 # stunt adapter manifest — LinkedIn-style API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of a LinkedIn-style REST + OAuth2 API
 # for LOCAL TESTING ONLY. It does not call the real LinkedIn API. All data is

@@ -1,5 +1,5 @@
 # stunt adapter manifest — Anaplan API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of the Anaplan API (v2.0) for LOCAL
 # TESTING ONLY. It does not call the real Anaplan API. All data is synthetic.

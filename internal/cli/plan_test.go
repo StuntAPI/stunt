@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/contrib"
+	"stuntapi.com/stunt/internal/contrib"
 )
 
 // TestPlanWarnsOnNonExistentAdapter verifies that `stunt plan` prints a

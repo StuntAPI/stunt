@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/stunt-adapters/stunt/internal/netutil"
+	"stuntapi.com/stunt/internal/netutil"
 )
 
 // startWSBackend starts a plain HTTP backend that upgrades to WebSocket and

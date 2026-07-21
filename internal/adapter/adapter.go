@@ -9,8 +9,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/stunt-adapters/stunt/internal/pathutil"
-	"github.com/stunt-adapters/stunt/internal/rules"
+	"stuntapi.com/stunt/internal/pathutil"
+	"stuntapi.com/stunt/internal/rules"
 )
 
 // Adapter is the parsed in-memory representation of an adapter directory.

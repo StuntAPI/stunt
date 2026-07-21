@@ -7,9 +7,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/rules"
 	"gopkg.in/yaml.v3"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/rules"
 )
 
 // SafeName generates a filesystem-safe name from an HTTP method and path.

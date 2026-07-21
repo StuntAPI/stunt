@@ -1,4 +1,4 @@
-module github.com/stunt-adapters/stunt
+module stuntapi.com/stunt
 
 go 1.23.3
 

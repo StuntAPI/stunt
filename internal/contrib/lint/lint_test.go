@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/contrib"
+	"stuntapi.com/stunt/internal/contrib"
 )
 
 // scaffold creates a clean synthetic adapter in a temp dir and returns its

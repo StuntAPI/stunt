@@ -25,7 +25,7 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
 
-	"github.com/stunt-adapters/stunt/internal/grpcsim"
+	"stuntapi.com/stunt/internal/grpcsim"
 )
 
 // compileDescriptor invokes protoc to produce a FileDescriptorSet for the

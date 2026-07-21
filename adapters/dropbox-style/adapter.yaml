@@ -1,5 +1,5 @@
 # stunt adapter manifest — Dropbox-style API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of a Dropbox-style files API for
 # LOCAL TESTING ONLY. It does not call the real Dropbox API. All data is

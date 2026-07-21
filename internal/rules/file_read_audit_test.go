@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/pathutil"
+	"stuntapi.com/stunt/internal/pathutil"
 )
 
 // FileReadAuditEntry is one row in the file-read audit matrix.

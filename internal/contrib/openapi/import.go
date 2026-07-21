@@ -20,10 +20,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/contrib"
-	"github.com/stunt-adapters/stunt/internal/rules"
 	"gopkg.in/yaml.v3"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/contrib"
+	"stuntapi.com/stunt/internal/rules"
 )
 
 // Import parses an OpenAPI 3.x spec (JSON or YAML) and generates stunt adapter

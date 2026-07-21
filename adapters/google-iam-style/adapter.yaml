@@ -1,5 +1,5 @@
 # stunt adapter manifest — Google Cloud IAM + Service Accounts API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of the Google Cloud IAM API (v1)
 # including service accounts, JWT-bearer token exchange, and domain-wide

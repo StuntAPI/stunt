@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package stunt.test;
 
-option go_package = "github.com/stunt-adapters/stunt/internal/grpcsim/testdata;grpcsim_test";
+option go_package = "stuntapi.com/stunt/internal/grpcsim/testdata;grpcsim_test";
 
 // Greeter is a minimal service used to exercise dynamic gRPC serving.
 service Greeter {

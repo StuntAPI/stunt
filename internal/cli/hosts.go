@@ -6,8 +6,8 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
-	"github.com/stunt-adapters/stunt/internal/manifest"
-	"github.com/stunt-adapters/stunt/internal/netutil"
+	"stuntapi.com/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/netutil"
 )
 
 // hostsPath is the hosts file to operate on. Defaults to the system hosts

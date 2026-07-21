@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/expr-lang/expr"
-	"github.com/stunt-adapters/stunt/internal/pathutil"
+	"stuntapi.com/stunt/internal/pathutil"
 )
 
 // Evaluate applies rules in order. The first rule whose Match matches AND

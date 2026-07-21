@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/adapter"
 )
 
 // expectedFiles lists every file the scaffold must create (relative to the

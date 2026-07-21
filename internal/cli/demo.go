@@ -17,9 +17,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/stunt-adapters/stunt/adapters"
-	"github.com/stunt-adapters/stunt/internal/engine"
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/adapters"
+	"stuntapi.com/stunt/internal/engine"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // newDemoCmd creates the "demo" command — a zero-config way to experience

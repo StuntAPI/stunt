@@ -14,11 +14,11 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/engine"
-	"github.com/stunt-adapters/stunt/internal/manifest"
-	"github.com/stunt-adapters/stunt/internal/netutil"
-	"github.com/stunt-adapters/stunt/internal/netutil/proxy"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/engine"
+	"stuntapi.com/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/netutil"
+	"stuntapi.com/stunt/internal/netutil/proxy"
 )
 
 func newUpCmd() *cobra.Command {

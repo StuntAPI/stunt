@@ -19,7 +19,7 @@ stunt_bin := "/tmp/stunt-ci"
 version := `git describe --tags --always --dirty 2>/dev/null || echo dev`
 
 # ldflags to inject the version into the binary.
-ldflags := "-X github.com/stunt-adapters/stunt/internal/cli.Version=" + version
+ldflags := "-X stuntapi.com/stunt/internal/cli.Version=" + version
 
 # default: show available recipes
 default:

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/contrib"
-	"github.com/stunt-adapters/stunt/internal/netutil"
+	"stuntapi.com/stunt/internal/contrib"
+	"stuntapi.com/stunt/internal/netutil"
 )
 
 func TestBuildDoctor_NoCA(t *testing.T) {

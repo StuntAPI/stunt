@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // TestYouTubeStyleAdapter exercises the YouTube Data API v3 reference adapter

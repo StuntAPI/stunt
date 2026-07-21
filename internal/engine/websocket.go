@@ -11,9 +11,9 @@ import (
 	"strings"
 
 	"github.com/coder/websocket"
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/starlark"
 	sk "go.starlark.net/starlark"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/starlark"
 )
 
 // wsMaxSteps is the elevated step budget for WebSocket connection-lifetime

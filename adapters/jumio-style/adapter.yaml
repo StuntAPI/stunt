@@ -1,5 +1,5 @@
 # stunt adapter manifest — Jumio Netverify API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of the Jumio API (v1) for LOCAL
 # TESTING ONLY. It does not call the real Jumio API. All data is synthetic.

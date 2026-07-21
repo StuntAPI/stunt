@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // TestSendGridStyleAdapter exercises the SendGrid-style adapter end-to-end:

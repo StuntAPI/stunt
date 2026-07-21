@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/contrib/openapi"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/contrib/openapi"
 )
 
 // openapiJSONSpec is a minimal OpenAPI 3.0 spec with two paths/methods.

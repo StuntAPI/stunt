@@ -1,5 +1,5 @@
 # stunt adapter manifest — Apple Search Ads API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of the Apple Search Ads API (v4) for
 # LOCAL TESTING ONLY. It does not call the real Apple API. All data is

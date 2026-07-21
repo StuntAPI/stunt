@@ -1,5 +1,5 @@
 # stunt adapter manifest — GitHub App-style API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of GitHub's REST + GraphQL API
 # (X-GitHub-Api-Version: 2022-11-28) for LOCAL TESTING ONLY. It does not call

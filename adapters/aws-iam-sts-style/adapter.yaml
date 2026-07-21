@@ -1,5 +1,5 @@
 # stunt adapter manifest — AWS IAM/STS-style API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of the AWS IAM and STS
 # (Security Token Service) query APIs for LOCAL TESTING ONLY. It does not

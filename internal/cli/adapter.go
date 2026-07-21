@@ -7,13 +7,13 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/contrib"
-	"github.com/stunt-adapters/stunt/internal/contrib/conform"
-	"github.com/stunt-adapters/stunt/internal/contrib/har"
-	"github.com/stunt-adapters/stunt/internal/contrib/lint"
-	"github.com/stunt-adapters/stunt/internal/contrib/openapi"
-	"github.com/stunt-adapters/stunt/internal/contrib/proto"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/contrib"
+	"stuntapi.com/stunt/internal/contrib/conform"
+	"stuntapi.com/stunt/internal/contrib/har"
+	"stuntapi.com/stunt/internal/contrib/lint"
+	"stuntapi.com/stunt/internal/contrib/openapi"
+	"stuntapi.com/stunt/internal/contrib/proto"
 )
 
 // newAdapterCmd creates the "adapter" parent command group. Subcommands:

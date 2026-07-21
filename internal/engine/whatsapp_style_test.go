@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // TestWhatsAppStyleAdapter exercises the WhatsApp Business Cloud API-style

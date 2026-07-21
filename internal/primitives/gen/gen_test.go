@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/rules"
+	"stuntapi.com/stunt/internal/rules"
 )
 
 func newTestRegistry(t *testing.T) *Registry {

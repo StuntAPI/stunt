@@ -1,5 +1,5 @@
 # stunt adapter manifest — ERC-4337 bundler RPC simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of an ERC-4337 Account Abstraction
 # bundler RPC (EntryPoint v0.7) for LOCAL TESTING ONLY. It does not call
