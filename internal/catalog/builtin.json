@@ -2,35 +2,35 @@
   {
     "name": "stripe-style",
     "description": "Stripe-style payment API — charges, customers, subscriptions",
-    "git_url": "https://github.com/stunt-adapters/stripe-style",
+    "git_url": "https://github.com/stuntapi/stripe-style",
     "latest_ref": "v0.1.0",
     "tags": ["payments", "fintech"]
   },
   {
     "name": "drive-style",
     "description": "Google-Drive-style file storage API — files, folders, sharing",
-    "git_url": "https://github.com/stunt-adapters/drive-style",
+    "git_url": "https://github.com/stuntapi/drive-style",
     "latest_ref": "v0.1.0",
     "tags": ["storage", "files"]
   },
   {
     "name": "twitter-style",
     "description": "Twitter/X-style social media API — tweets, users, timelines",
-    "git_url": "https://github.com/stunt-adapters/twitter-style",
+    "git_url": "https://github.com/stuntapi/twitter-style",
     "latest_ref": "v0.1.0",
     "tags": ["social", "media"]
   },
   {
     "name": "dropbox-style",
     "description": "Dropbox-style file storage API — files, folders, sharing",
-    "git_url": "https://github.com/stunt-adapters/dropbox-style",
+    "git_url": "https://github.com/stuntapi/dropbox-style",
     "latest_ref": "v0.1.0",
     "tags": ["storage", "files"]
   },
   {
     "name": "echo-style",
     "description": "Echo gRPC + WebSocket reference adapter — unary, streaming, ws",
-    "git_url": "https://github.com/stunt-adapters/echo-style",
+    "git_url": "https://github.com/stuntapi/echo-style",
     "latest_ref": "v0.1.0",
     "tags": ["grpc", "websocket", "reference"]
   }

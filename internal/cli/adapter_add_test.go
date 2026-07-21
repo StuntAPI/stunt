@@ -778,11 +778,11 @@ func TestResolveCatalogNameUnknownBareName(t *testing.T) {
 // source spec.
 func TestCatalogEntryToSpec(t *testing.T) {
 	e := catalog.Entry{
-		GitURL:    "https://github.com/stunt-adapters/stripe-style",
+		GitURL:    "https://github.com/stuntapi/stripe-style",
 		LatestRef: "v0.1.0",
 	}
 	spec := catalogEntryToSpec(e)
-	if spec != "git:github.com/stunt-adapters/stripe-style@v0.1.0" {
+	if spec != "git:github.com/stuntapi/stripe-style@v0.1.0" {
 		t.Errorf("catalogEntryToSpec = %q", spec)
 	}
 }

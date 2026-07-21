@@ -14,6 +14,10 @@ func newDownCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "down",
 		Short: "Stop a running stunt server",
+		Long: `Stop a stunt server started in the background (e.g. via the system service).
+
+If you started stunt in the foreground with "stunt up", stop it with Ctrl-C
+instead — this command is for background/service-managed instances.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, _ := cmd.Flags().GetString("manifest")
 			return runDown(cmd.OutOrStdout(), manifestDir(path))

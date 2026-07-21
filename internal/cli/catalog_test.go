@@ -25,8 +25,8 @@ func handler200(data []byte) http.Handler {
 func writeCatalogTestServer(t *testing.T) (string, func()) {
 	t.Helper()
 	entries := []catalog.Entry{
-		{Name: "stripe-style", Description: "Stripe-style payment API", GitURL: "https://github.com/stunt-adapters/stripe-style", LatestRef: "v1.0.0", Tags: []string{"payments"}},
-		{Name: "github", Description: "GitHub API", GitURL: "https://github.com/stunt-adapters/github", LatestRef: "v1.0.0", Tags: []string{"devtools"}},
+		{Name: "stripe-style", Description: "Stripe-style payment API", GitURL: "https://github.com/stuntapi/stripe-style", LatestRef: "v1.0.0", Tags: []string{"payments"}},
+		{Name: "github", Description: "GitHub API", GitURL: "https://github.com/stuntapi/github", LatestRef: "v1.0.0", Tags: []string{"devtools"}},
 	}
 	data, err := jsonMarshalCatalog(entries)
 	if err != nil {
@@ -51,7 +51,7 @@ func TestCatalogSearchCmd(t *testing.T) {
 	if !strings.Contains(s, "Stripe-style payment API") {
 		t.Errorf("output should contain description: %q", s)
 	}
-	if !strings.Contains(s, "github.com/stunt-adapters/stripe-style") {
+	if !strings.Contains(s, "github.com/stuntapi/stripe-style") {
 		t.Errorf("output should contain git URL: %q", s)
 	}
 }
@@ -76,7 +76,7 @@ func TestCatalogShowCmd(t *testing.T) {
 		t.Fatalf("runCatalogShow: %v", err)
 	}
 	s := out.String()
-	for _, want := range []string{"stripe-style", "Stripe-style payment API", "v1.0.0", "payments", "github.com/stunt-adapters/stripe-style"} {
+	for _, want := range []string{"stripe-style", "Stripe-style payment API", "v1.0.0", "payments", "github.com/stuntapi/stripe-style"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("output should contain %q: %q", want, s)
 		}

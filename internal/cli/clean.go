@@ -13,6 +13,14 @@ func newCleanCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "clean",
 		Short: "Remove stunt state, CA files, and hosts block",
+		Long: `Remove all stunt-managed state for this manifest: the SQLite-backed adapter
+state directory, the local CA files, and stunt's managed block in /etc/hosts.
+
+This resets the simulation to a clean slate — useful when adapter state has grown
+or when you want to reseed from fixture data on the next "stunt up".
+
+It does NOT remove the manifest (stunt.yaml), installed adapters, or the
+home directory cache (~/.stunt/adapters).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, _ := cmd.Flags().GetString("manifest")
 			mdir := manifestDir(path)
