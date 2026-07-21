@@ -4,7 +4,7 @@
 #   body: { identifier, password }
 #   -> 200 { accessJwt, refreshJwt, did, handle, email }
 #
-# A fresh session is minted per createSession call (***REMOVED***'s adapter does
+# A fresh session is minted per createSession call (the reference client adapter does
 # this — app passwords don't expire, so caching isn't needed). The
 # accessJwt is an opaque token stored in the sessions collection and
 # validated as a Bearer token on subsequent requests.

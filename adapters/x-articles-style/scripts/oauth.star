@@ -1,6 +1,6 @@
 # OAuth2 PKCE handlers — X Articles confidential-client authorization-code flow.
 #
-# Faithful port of ***REMOVED***'s mock_x_api/server.py OAuth surface:
+# Faithful port of a reference X client OAuth surface:
 #
 #   GET  /2/oauth2/authorize  -> 302 redirect with code+state
 #   POST /2/oauth2/token      -> { token_type, access_token, refresh_token, expires_in, scope }

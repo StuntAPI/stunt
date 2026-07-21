@@ -11,7 +11,7 @@ All data is synthetic — no real API data is included.
 ## What it simulates
 
 A faithful behavioral mock of the Threads REST + OAuth2 surface, ported from
-***REMOVED***'s `mock_threads` Python server. It covers the full publish /
+a production Threads client. It covers the full publish /
 analytics / engagement pipeline:
 
 - **OAuth2 (Meta):** authorize redirect, access-token exchange (single-use code).

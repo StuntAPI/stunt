@@ -1,6 +1,6 @@
 # Article handlers — draft → publish → metadata lookup.
 #
-# Faithful port of ***REMOVED***'s mock_x_api/server.py article surface:
+# Faithful port of a reference X client article surface:
 #
 #   POST /2/articles/draft            { title, content_state:{blocks}, cover_media_id? }
 #                                     -> 200 { data:{ id, title } }

@@ -11,7 +11,7 @@ All data is synthetic — no real API data is included.
 ## What it simulates
 
 A faithful behavioral mock of the Product Hunt GraphQL surface, covering the
-launch-publish pipeline that ***REMOVED***'s `producthuntAdapter` uses:
+launch-publish pipeline that the reference client adapter uses:
 
 - **postCreate mutation:** `POST /v2/api/graphql.json` (Bearer) — creates a
   product launch from `{name, tagline, description, url}` variables; returns
@@ -22,7 +22,7 @@ launch-publish pipeline that ***REMOVED***'s `producthuntAdapter` uses:
 
 This is **not a full GraphQL engine** — the single `/v2/api/graphql.json`
 endpoint pattern-matches the operation name in the query string and returns
-the JSON shape that ***REMOVED***'s adapter parses. This is the simplest faithful
+the JSON shape that the reference client adapter parses. This is the simplest faithful
 approach to satisfy the specific mutations/queries the adapter sends.
 
 State persists in SQLite-backed collections, so posts created via `postCreate`
@@ -48,7 +48,7 @@ KV is used for the monotonic `post_seq` counter.
 
 All requests must include `Authorization: Bearer <token>`. Requests without a
 valid bearer token receive `401` with a GraphQL errors array. This mirrors how
-***REMOVED***'s adapter stores `accessToken` in sealed credentials and sends it as
+the reference client adapter stores `accessToken` in sealed credentials and sends it as
 a bearer token.
 
 ## Usage
@@ -61,5 +61,5 @@ services:
     adapter: ./adapters/producthunt-style
 ```
 
-Then `stunt up` and make requests to the served address. Point ***REMOVED*** at it
+Then `stunt up` and make requests to the served address. point your client at it
 via `PRODUCTHUNT_API_BASE_URL=http://<stunt-addr>`.

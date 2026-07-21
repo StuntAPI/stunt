@@ -1,6 +1,6 @@
 # Media upload handler.
 #
-# Faithful port of ***REMOVED***'s mock_x_api/server.py media surface:
+# Faithful port of a reference X client media surface:
 #
 #   POST /2/media/upload  (octet-stream body)  -> 200 { data:{ media_id_string } }
 #

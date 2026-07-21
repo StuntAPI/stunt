@@ -5,7 +5,7 @@
 #   grant_type=authorization_code + duration=permanent -> access + refresh
 #   grant_type=refresh_token                           -> access ONLY (no new refresh)
 #
-# Faithful behaviors ported from ***REMOVED***'s mock_reddit:
+# Faithful behaviors ported from a reference client's mock_reddit:
 #   - Rejects requests without a descriptive User-Agent (429).
 #   - Requires HTTP Basic client credentials (401 invalid_client otherwise).
 #   - refresh_token grant returns NO new refresh_token (Reddit only issues

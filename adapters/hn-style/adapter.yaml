@@ -36,7 +36,7 @@ endpoints:
     method: GET
     handler: scripts/stories.star#on_jobstories
 
-  # --- Auth (login → session cookie, mirrors ***REMOVED*** mock_hn) ---
+  # --- Auth (login → session cookie, mirrors a reference Hacker News client) ---
   - route: /login
     method: POST
     handler: scripts/auth.star#on_login

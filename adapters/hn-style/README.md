@@ -11,7 +11,7 @@ All data is synthetic — no real API data is included.
 ## What it simulates
 
 A faithful behavioral mock of the Hacker News Firebase-style REST surface,
-ported from ***REMOVED***'s `mock_hn` Python server. It covers the public read API
+ported from a production Hacker News client. It covers the public read API
 plus the submit flow:
 
 - **Story lists:** `GET /v0/topstories.json`, `/v0/newstories.json`,
@@ -63,7 +63,7 @@ KV is used for monotonic sequence counters (`item_seq`, `session_seq`,
 
 Reads are public (no auth required), matching the real HN Firebase API. The
 submit endpoint requires a valid session cookie (obtained via `POST /login`),
-mirroring ***REMOVED***'s `mock_hn` server.
+mirroring a reference Hacker News client server.
 
 ## Usage
 

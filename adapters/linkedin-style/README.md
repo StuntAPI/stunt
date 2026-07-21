@@ -11,7 +11,7 @@ All data is synthetic — no real API data is included.
 ## What it simulates
 
 A faithful behavioral mock of LinkedIn's REST + OAuth2 surface, ported from
-***REMOVED***'s `mock_linkedin` Python server. It covers the full publish / ingest /
+a production publish pipeline. It covers the full publish / ingest /
 reply / analytics pipeline:
 
 - **OAuth2 (Arctic):** authorize redirect, access-token exchange, refresh-token

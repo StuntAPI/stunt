@@ -1,6 +1,6 @@
 # Tweet handlers — the x:tweet surface (280-char limit + reply-chain integrity).
 #
-# Faithful port of ***REMOVED***'s mock_x_api/server.py tweet surface:
+# Faithful port of a reference X client tweet surface:
 #
 #   POST /2/tweets  { text, reply?:{ in_reply_to_tweet_id } }
 #                   -> 201 { data:{ id, text } }

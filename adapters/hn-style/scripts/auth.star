@@ -1,4 +1,4 @@
-# Auth handlers — login/logout (mirrors ***REMOVED*** mock_hn).
+# Auth handlers — login/logout (mirrors a reference Hacker News client).
 #
 # POST /login {acct, pw} -> 302 redirect + Set-Cookie: user=<token>
 # GET  /logout            -> 302 redirect (clears session)

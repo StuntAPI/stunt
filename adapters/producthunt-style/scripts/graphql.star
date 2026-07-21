@@ -4,8 +4,7 @@
 #   body: { query: "...", variables: { name, tagline, description, url } }
 #
 # This is NOT a full GraphQL engine. It pattern-matches the operation name
-# in the query string and returns the JSON shape that ***REMOVED***'s
-# producthuntAdapter parses. This is the simplest faithful approach: satisfy
+# in the query string and returns the JSON shape a production client parses.
 # the specific mutations/queries the adapter sends.
 
 # Shared helper (_bearer) is preloaded from scripts/lib.star.
@@ -24,7 +23,7 @@ def on_graphql(req):
     query = body.get("query", "")
 
     # Pattern-match the operation name.
-    # ***REMOVED***'s adapter sends: mutation Create(...)
+    # the reference client adapter sends: mutation Create(...)
     if _contains(query, "postCreate"):
         return _handle_post_create(body)
     if _contains(query, "post"):
@@ -34,7 +33,7 @@ def on_graphql(req):
 
 # _handle_post_create processes the postCreate mutation.
 #
-# ***REMOVED***'s producthuntAdapter sends:
+# the reference client adapter sends:
 #   mutation Create($name, $tagline, $description, $url) {
 #     postCreate(input: { name: $name, ... }) { post { id } errors { message } }
 #   }
