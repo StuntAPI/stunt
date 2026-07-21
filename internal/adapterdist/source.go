@@ -106,6 +106,21 @@ func ParseSource(spec string) (*Source, error) {
 		return parseGitShorthand(spec[len("git:"):])
 	}
 
+	// embedded:<name> — an adapter baked into the binary (no fetch needed).
+	if strings.HasPrefix(spec, "embedded:") {
+		name := spec[len("embedded:"):]
+		if name == "" {
+			return nil, fmt.Errorf("adapterdist: empty embedded adapter name")
+		}
+		// Validate the name against the safe path charset to prevent
+		// cache-directory escape. An embedded name must be a single segment
+		// (no slashes, no "..").
+		if strings.Contains(name, "/") || strings.Contains(name, "..") || !safePath.MatchString(name) {
+			return nil, fmt.Errorf("adapterdist: unsafe embedded adapter name %q", name)
+		}
+		return &Source{Kind: "embedded", URL: name}, nil
+	}
+
 	// Anything else is a local filesystem path.
 	return &Source{Kind: "local", URL: spec}, nil
 }
@@ -282,6 +297,9 @@ func validateRef(ref string) error {
 //
 // The output is always re-parseable by [ParseSource].
 func (s *Source) String() string {
+	if s.Kind == "embedded" {
+		return "embedded:" + s.URL
+	}
 	if s.Kind == "local" {
 		return s.URL
 	}

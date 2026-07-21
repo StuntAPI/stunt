@@ -745,12 +745,11 @@ func TestAdapterUpdateSubcommandRegistered(t *testing.T) {
 // TestResolveCatalogNameResolvesBareName verifies that a bare adapter name
 // matching a bundled catalog entry is resolved to a git source spec.
 func TestResolveCatalogNameResolvesBareName(t *testing.T) {
+	// echo-style is one of the adapters embedded in the binary, so a bare
+	// catalog name resolves to the `embedded:` source kind (no git clone).
 	spec := resolveCatalogName("echo-style")
-	if !strings.HasPrefix(spec, "git:") {
-		t.Errorf("expected git: spec for catalog name 'echo-style', got %q", spec)
-	}
-	if !strings.Contains(spec, "echo-style") {
-		t.Errorf("expected spec to contain 'echo-style', got %q", spec)
+	if spec != "embedded:echo-style" {
+		t.Errorf("expected 'embedded:echo-style' for catalog name 'echo-style', got %q", spec)
 	}
 }
 

@@ -11,7 +11,6 @@ package catalog
 
 import (
 	"context"
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,10 +18,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-)
 
-//go:embed builtin.json
-var builtinIndexData []byte
+	"stuntapi.com/stunt/adapters"
+)
 
 // DefaultIndexURL is the canonical stuntapi.com-hosted catalog index. It
 // can be overridden at construction time (for tests) or via the STUNT_CATALOG_URL
@@ -164,25 +162,25 @@ func (r *RemoteIndex) fetch(ctx context.Context) ([]Entry, error) {
 	return entries, nil
 }
 
-// bundledEntries parses the embedded builtin.json fallback index. This data
-// is compiled into the binary so the catalog works even with no network.
-var bundledErr error
-var bundled []Entry
-
-func init() {
-	bundledErr = json.Unmarshal(builtinIndexData, &bundled)
-}
-
+// bundledEntries returns the index of adapters embedded in the binary
+// (the full set of reference adapters) so the catalog works fully offline.
+// This is the authoritative fallback: it always reflects exactly what the
+// binary ships, so it can never drift from the embedded adapters.
 func bundledEntries() ([]Entry, error) {
-	if bundledErr != nil {
-		return nil, fmt.Errorf("catalog: parse bundled index: %w", bundledErr)
+	metas := adapters.Index()
+	entries := make([]Entry, 0, len(metas))
+	for _, m := range metas {
+		entries = append(entries, Entry{
+			Name:        m.Name,
+			Description: m.Description,
+		})
 	}
-	return bundled, nil
+	return entries, nil
 }
 
-// GetBundled returns the entry with the given name from the bundled fallback
-// index (no network access). It is used for offline catalog-name resolution
-// in `adapter add <name>`.
+// GetBundled returns the entry with the given name from the embedded
+// fallback index (no network access). It is used for offline catalog-name
+// resolution in `adapter add <name>`.
 func GetBundled(name string) (Entry, error) {
 	entries, err := bundledEntries()
 	if err != nil {

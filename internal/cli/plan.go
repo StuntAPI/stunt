@@ -213,7 +213,7 @@ func planResolveAdapter(spec, manifestDir string) (*adapter.Adapter, error) {
 		return nil, fmt.Errorf("adapter %q: %w", spec, err)
 	}
 	var dir string
-	if src.Kind == "git" {
+	if src.Kind == "git" || src.Kind == "embedded" {
 		cacheRoot := defaultAdapterCacheRoot()
 		cache, err := adapterdist.OpenCache(cacheRoot)
 		if err != nil {

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"stuntapi.com/stunt/adapters"
 )
 
 // Default timeouts for git subprocesses. These prevent a slow or
@@ -64,6 +66,9 @@ func (c *Cache) Root() string {
 // replaced with underscores) so that branch refs like "release/2.0"
 // produce a single directory name rather than a nested path.
 func (c *Cache) PathFor(s *Source) string {
+	if s.Kind == "embedded" {
+		return filepath.Join(c.root, "embedded", s.URL)
+	}
 	if s.Kind == "local" {
 		return s.URL
 	}
@@ -78,6 +83,39 @@ func (c *Cache) PathFor(s *Source) string {
 // component. Slashes (e.g. in "release/2.0") are replaced with underscores.
 func refToDirName(ref string) string {
 	return strings.ReplaceAll(ref, "/", "_")
+}
+
+// ensureEmbedded extracts an embedded (binary-baked) adapter into the cache
+// on first use and returns its path. Embedded adapters never need a fetch:
+// they are immutable and shipped with the binary, so once extracted the path
+// is returned as-is on subsequent calls. The extraction is serialized by
+// the cache mutex for safety, and a partial extraction is cleaned up on
+// error so a failed run does not leave a half-written directory that looks
+// complete on the next attempt.
+func (c *Cache) ensureEmbedded(s *Source) (localDir, resolvedRef string, err error) {
+	name := s.URL
+	if !adapters.Has(name) {
+		return "", "", fmt.Errorf("adapterdist: %q is not an embedded adapter", name)
+	}
+	dir := filepath.Join(c.root, "embedded", name)
+	// A complete extraction is marked by an adapter.yaml at its root.
+	if _, err := os.Stat(filepath.Join(dir, "adapter.yaml")); err == nil {
+		return dir, "", nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	// Re-check under the lock (another goroutine may have extracted it).
+	if _, err := os.Stat(filepath.Join(dir, "adapter.yaml")); err == nil {
+		return dir, "", nil
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", "", fmt.Errorf("adapterdist: mkdir embedded %s: %w", name, err)
+	}
+	if err := adapters.Extract(name, dir); err != nil {
+		os.RemoveAll(dir)
+		return "", "", fmt.Errorf("adapterdist: extract embedded %s: %w", name, err)
+	}
+	return dir, "", nil
 }
 
 // Ensure clones the source into the cache (if not already present) and
@@ -95,6 +133,9 @@ func refToDirName(ref string) string {
 // are applied on top (clone: 60s, other ops: 30s) so a hung remote does
 // not block indefinitely. A shorter caller deadline takes precedence.
 func (c *Cache) Ensure(ctx context.Context, s *Source) (localDir, resolvedRef string, err error) {
+	if s.Kind == "embedded" {
+		return c.ensureEmbedded(s)
+	}
 	if s.Kind == "local" {
 		abs, err := filepath.Abs(s.URL)
 		if err != nil {

@@ -2,11 +2,9 @@ package cli
 
 import (
 	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -65,20 +63,17 @@ func runDemo(cmd *cobra.Command, args []string) error {
 // is canceled.
 func runDemoServe(ctx context.Context, out io.Writer, port int, noWebhookSink bool) error {
 	// 1. Extract the embedded adapter to a temp directory.
-	adapterDir, err := extractEmbeddedAdapter(adapters.StripeStyleFS, "stripe-style")
-	if err != nil {
-		return fmt.Errorf("demo: extract adapter: %w", err)
-	}
-	defer os.RemoveAll(adapterDir)
-
-	// 2. Create a temp manifest pointing at the adapter.
 	tmpDir, err := os.MkdirTemp("", "stunt-demo-*")
 	if err != nil {
-		return fmt.Errorf("demo: create temp dir: %w", err)
+		return fmt.Errorf("demo: temp dir: %w", err)
 	}
 	defer os.RemoveAll(tmpDir)
+	adapterDir := filepath.Join(tmpDir, "stripe-style")
+	if err := adapters.Extract("stripe-style", adapterDir); err != nil {
+		return fmt.Errorf("demo: extract adapter: %w", err)
+	}
 
-	// 3. Optionally start the webhook sink.
+	// 2. Optionally start the webhook sink.
 	var sink *webhookSink
 	webhookURL := ""
 	if !noWebhookSink {
@@ -200,50 +195,6 @@ func printDemoCurlMenu(out io.Writer, baseURL string) {
 	// Webhook note
 	fmt.Fprintln(out, "  Webhook events appear above with a [webhook] prefix as you")
 	fmt.Fprintln(out, "  create, capture, and refund charges.")
-}
-
-// --- embedded adapter extraction ---
-
-// extractEmbeddedAdapter writes an embedded adapter directory (from the
-// go:embed FS) to a temporary directory on disk and returns its path. The
-// caller must remove the directory when done (e.g. via defer).
-func extractEmbeddedAdapter(fsys embed.FS, root string) (string, error) {
-	tmpDir, err := os.MkdirTemp("", "stunt-adapter-*")
-	if err != nil {
-		return "", err
-	}
-	target := filepath.Join(tmpDir, root)
-	if err := copyEmbedDir(fsys, root, target); err != nil {
-		os.RemoveAll(tmpDir)
-		return "", err
-	}
-	return target, nil
-}
-
-// copyEmbedDir recursively copies all files under srcRoot in the embed.FS
-// to dstDir on disk.
-func copyEmbedDir(fsys embed.FS, srcRoot, dstDir string) error {
-	return fs.WalkDir(fsys, srcRoot, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		rel, err := filepath.Rel(srcRoot, path)
-		if err != nil {
-			return err
-		}
-		target := filepath.Join(dstDir, rel)
-		if d.IsDir() {
-			return os.MkdirAll(target, 0o755)
-		}
-		data, err := fsys.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("read %s: %w", path, err)
-		}
-		if err := os.WriteFile(target, data, 0o644); err != nil {
-			return fmt.Errorf("write %s: %w", target, err)
-		}
-		return nil
-	})
 }
 
 // --- webhook sink ---

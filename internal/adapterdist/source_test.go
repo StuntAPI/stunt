@@ -441,3 +441,36 @@ func TestStringRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+// --- embedded source kind ---
+
+func TestParseSourceEmbedded(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		s, err := ParseSource("embedded:stripe-style")
+		if err != nil {
+			t.Fatalf("ParseSource: %v", err)
+		}
+		if s.Kind != "embedded" {
+			t.Errorf("Kind = %q, want embedded", s.Kind)
+		}
+		if s.URL != "stripe-style" {
+			t.Errorf("URL = %q, want stripe-style", s.URL)
+		}
+		// Round-trip via String().
+		if got := s.String(); got != "embedded:stripe-style" {
+			t.Errorf("String() = %q, want embedded:stripe-style", got)
+		}
+	})
+	t.Run("empty name rejected", func(t *testing.T) {
+		if _, err := ParseSource("embedded:"); err == nil {
+			t.Error("expected error for empty embedded name")
+		}
+	})
+	t.Run("traversal rejected", func(t *testing.T) {
+		for _, bad := range []string{"embedded:../etc", "embedded:foo/bar", "embedded:.."} {
+			if _, err := ParseSource(bad); err == nil {
+				t.Errorf("expected error for unsafe embedded spec %q", bad)
+			}
+		}
+	})
+}

@@ -34,7 +34,7 @@ services in stunt.yaml; ` + "`stunt up`" + ` serves them on local ports.
   demo                one-shot stateful Stripe-style demo
   doctor              CA + manifest + adapter + port health check
   clean               wipe state, CA, hosts block (keeps manifest + adapters)
-  catalog search|show discover adapters (--json)
+  catalog search|show discover adapters (--json)  # all 91 embedded, works offline
   adapter new|add|lint|test|list   build/validate adapters (lint MUST pass)
   hosts sync|clean    manage /etc/hosts (subdomain TLS mode)
   proxy start         TLS reverse proxy (subdomain mode)
@@ -50,6 +50,7 @@ Global: --manifest <path> (default stunt.yaml). Cache: --cache-dir/$STUNT_ADAPTE
   services:
     svc:
       adapter: ./adapters/svc-style  # local path OR git:github.com/org/repo@ref
+                                    # OR embedded:stripe-style (bundled in binary, no clone)
       config: { webhook_url: ... }   # optional, passed to scripts
       # OR rules-only (no adapter):
       # rules:

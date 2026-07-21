@@ -55,6 +55,12 @@ func resolveCatalogName(sourceSpec string) string {
 	if err != nil {
 		return sourceSpec // not in catalog — treat as local path
 	}
+	// Adapters embedded in the binary (the bundled fallback index) have no
+	// GitURL — resolve to an `embedded:<name>` source so `stunt up` extracts
+	// them from the binary instead of git-cloning.
+	if entry.GitURL == "" {
+		return "embedded:" + entry.Name
+	}
 	return catalogEntryToSpec(entry)
 }
 

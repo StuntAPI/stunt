@@ -168,7 +168,7 @@ func resolveAdapterDir(spec, cacheRoot, manifestDir string) (string, error) {
 		return "", fmt.Errorf("engine: parse adapter source %q: %w", spec, err)
 	}
 
-	if src.Kind == "git" {
+	if src.Kind == "git" || src.Kind == "embedded" {
 		cache, err := adapterdist.OpenCache(cacheRoot)
 		if err != nil {
 			return "", fmt.Errorf("engine: open adapter cache: %w", err)

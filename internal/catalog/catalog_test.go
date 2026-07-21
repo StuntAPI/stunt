@@ -198,8 +198,13 @@ func TestBundledGetReturnsKnownEntry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get via bundled fallback: %v", err)
 	}
-	if !strings.HasPrefix(e.GitURL, "https://github.com/stuntapi/stripe-style") {
-		t.Errorf("GitURL = %q, want a github.com/stuntapi/stripe-style URL", e.GitURL)
+	// The bundled fallback index is now the set of adapters EMBEDDED in the
+	// binary (no git URL — resolved by name via the `embedded:` source kind).
+	if e.Name != "stripe-style" {
+		t.Errorf("Name = %q, want stripe-style", e.Name)
+	}
+	if e.Description == "" {
+		t.Error("embedded entry should have a non-empty description")
 	}
 }
 

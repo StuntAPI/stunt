@@ -671,3 +671,46 @@ func TestEnsureWithContextCancelled(t *testing.T) {
 		t.Fatal("Ensure with cancelled context should fail")
 	}
 }
+
+// TestEnsureEmbedded extracts an embedded adapter via the cache and confirms
+// it lands at the expected path and is loadable on repeat calls. This covers
+// the `embedded:<name>` source kind end to end.
+func TestEnsureEmbedded(t *testing.T) {
+	root := t.TempDir()
+	c, err := OpenCache(root)
+	if err != nil {
+		t.Fatalf("OpenCache: %v", err)
+	}
+	s, err := ParseSource("embedded:stripe-style")
+	if err != nil {
+		t.Fatalf("ParseSource: %v", err)
+	}
+	wantDir := filepath.Join(root, "embedded", "stripe-style")
+
+	dir, ref, err := c.Ensure(context.Background(), s)
+	if err != nil {
+		t.Fatalf("Ensure embedded: %v", err)
+	}
+	if dir != wantDir {
+		t.Errorf("dir = %q, want %q", dir, wantDir)
+	}
+	if ref != "" {
+		t.Errorf("ref = %q, want empty (embedded has no ref)", ref)
+	}
+	// adapter.yaml must be at the root of the extracted dir.
+	if _, err := os.Stat(filepath.Join(dir, "adapter.yaml")); err != nil {
+		t.Fatalf("adapter.yaml missing after Ensure: %v", err)
+	}
+	// A second Ensure must be a no-op that returns the same path without error.
+	dir2, _, err := c.Ensure(context.Background(), s)
+	if err != nil {
+		t.Fatalf("second Ensure: %v", err)
+	}
+	if dir2 != wantDir {
+		t.Errorf("second Ensure dir = %q, want %q", dir2, wantDir)
+	}
+	// PathFor must agree.
+	if got := c.PathFor(s); got != wantDir {
+		t.Errorf("PathFor = %q, want %q", got, wantDir)
+	}
+}

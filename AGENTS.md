@@ -15,6 +15,12 @@ adapters written in a **sandboxed Starlark** scripting layer.
 **Install:** `brew install stuntapi/tap/stunt` · **Run from source:** `go run ./cmd/stunt` ·
 **One-shot demo:** `stunt demo`
 
+> **Adapters are embedded.** All reference adapters ship INSIDE the binary
+> (3.4 MB). `stunt catalog search` lists all 91 offline, and
+> `stunt adapter add <name>` resolves a bundled adapter to an `embedded:<name>`
+> source that `stunt up` extracts from the binary — no git clone, no network.
+> Use `git:` / local-path sources for community or custom adapters.
+
 ## The 5-minute mental model
 
 1. **`stunt.yaml`** (the manifest) declares **services**. Each service is either *rules-only*
@@ -68,6 +74,8 @@ network:
 services:
   myapi:                           # service name (becomes the subdomain in subdomain mode)
     adapter: ./adapters/myapi-style   # adapter source: local path OR git:github.com/org/repo@ref
+                                    #   OR embedded:stripe-style (a bundled adapter shipped
+                                    #     in the binary — no clone needed)
     # rules-only alternative (no adapter):
     # rules:
     #   - name: ok
