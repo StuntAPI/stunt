@@ -41,7 +41,7 @@ func TestCatalogSearchCmd(t *testing.T) {
 	defer cleanup()
 
 	var out bytes.Buffer
-	if err := runCatalogSearch(&out, url, "stripe"); err != nil {
+	if err := runCatalogSearch(&out, url, "stripe", false); err != nil {
 		t.Fatalf("runCatalogSearch: %v", err)
 	}
 	s := out.String()
@@ -59,7 +59,7 @@ func TestCatalogSearchCmd(t *testing.T) {
 func TestCatalogSearchCmdFallsBackToBundled(t *testing.T) {
 	var out bytes.Buffer
 	// Unreachable URL → falls back to bundled index, which has "stripe-style".
-	if err := runCatalogSearch(&out, "http://127.0.0.1:1", "stripe"); err != nil {
+	if err := runCatalogSearch(&out, "http://127.0.0.1:1", "stripe", false); err != nil {
 		t.Fatalf("runCatalogSearch: %v", err)
 	}
 	if !strings.Contains(out.String(), "stripe-style") {

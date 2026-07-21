@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -175,7 +176,7 @@ func PrintDoctor(out io.Writer, r DoctorReport) {
 }
 
 func newDoctorCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "Print a health check (CA status, manifest, adapters, ports)",
 		Long: `Print a diagnostic health check covering everything stunt needs to run:
@@ -186,14 +187,24 @@ func newDoctorCmd() *cobra.Command {
   - Per-service adapter load status and port availability
 
 Run this when something is not working — it surfaces the most common failure
-modes (missing CA, unloadable adapter, port conflict) in one place.`,
+modes (missing CA, unloadable adapter, port conflict) in one place.
+
+Use --json for machine-readable output (e.g. for scripting or LLM consumption).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, _ := cmd.Flags().GetString("manifest")
+			asJSON, _ := cmd.Flags().GetBool("json")
 			r := BuildDoctor(caPath(manifestDir(path)), path)
+			if asJSON {
+				enc := json.NewEncoder(cmd.OutOrStdout())
+				enc.SetIndent("", "  ")
+				return enc.Encode(r)
+			}
 			PrintDoctor(cmd.OutOrStdout(), r)
 			return nil
 		},
 	}
+	cmd.Flags().Bool("json", false, "output the report as JSON")
+	return cmd
 }
 
 // fileExistsCLI checks if a file exists. Local to the CLI package to avoid
