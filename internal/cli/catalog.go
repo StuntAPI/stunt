@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -33,12 +34,14 @@ always works offline.`,
 }
 
 func newCatalogSearchCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "search [query]",
 		Short: "List adapters matching a name, description, or tag",
 		Long: `Search the adapter catalog. The query is matched (case-insensitive) against
 adapter names, descriptions, and tags. With no query, all known adapters are
-listed.`,
+listed.
+
+Use --json for machine-readable output (e.g. for scripting or LLM consumption).`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			query := ""
@@ -46,10 +49,13 @@ listed.`,
 				query = args[0]
 			}
 			flagURL, _ := cmd.Flags().GetString("catalog-url")
+			asJSON, _ := cmd.Flags().GetBool("json")
 			url := resolveCatalogURL(flagURL)
-			return runCatalogSearch(cmd.OutOrStdout(), url, query)
+			return runCatalogSearch(cmd.OutOrStdout(), url, query, asJSON)
 		},
 	}
+	cmd.Flags().Bool("json", false, "output results as JSON")
+	return cmd
 }
 
 func newCatalogShowCmd() *cobra.Command {
@@ -79,11 +85,17 @@ func resolveCatalogURL(flagURL string) string {
 
 // runCatalogSearch queries the catalog and prints matching entries (one line
 // per entry: name, description, git URL).
-func runCatalogSearch(out io.Writer, url, query string) error {
+func runCatalogSearch(out io.Writer, url, query string, asJSON bool) error {
 	idx := catalog.NewRemoteIndexWithClient(url, &http.Client{Timeout: 5 * time.Second}, catalog.DefaultCacheTTL)
 	results, err := idx.Search(context.Background(), query)
 	if err != nil {
 		return err
+	}
+	if asJSON {
+		// Always emit a JSON array (possibly empty) for reliable scripting.
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		return enc.Encode(results)
 	}
 	if len(results) == 0 {
 		fmt.Fprintf(out, "no adapters found\n")

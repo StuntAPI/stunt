@@ -1,8 +1,11 @@
 package cli
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -29,50 +32,136 @@ type planResult struct {
 }
 
 func newPlanCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "plan",
 		Short: "Validate the manifest and show what would run",
 		Long: `Load and validate stunt.yaml, then print a summary of what "stunt up" would
 serve: each service name, its listen address, and whether its adapter loaded.
 
 Use this before "stunt up" to catch manifest errors, unloadable adapters, and
-port conflicts early — without starting any servers.`,
+port conflicts early — without starting any servers.
+
+Use --json for machine-readable output (e.g. for scripting or LLM consumption).`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, _ := cmd.Flags().GetString("manifest")
-			m, err := manifest.Load(path)
-			if err != nil {
-				return fmt.Errorf("load %s: %w", path, err)
-			}
-			if err := manifest.Validate(m); err != nil {
-				return err
-			}
-			m.Network.Defaults()
-
-			out := cmd.OutOrStdout()
-
-			// Warn about unknown manifest fields (typos like `netwrok:`).
-			for _, field := range m.UnknownFields {
-				fmt.Fprintf(out, "  WARNING: unknown manifest field %q (may be a typo)\n", field)
-			}
-
-			// Resolve and validate each adapter so plan surfaces load errors
-			// before `stunt up` crashes. A non-loadable adapter prints a
-			// WARNING but does not abort — the rest of the plan is still
-			// reported.
-			manifestDir := filepath.Dir(path)
-			results := planValidateAdapters(out, m, manifestDir)
-
-			fmt.Fprintf(out, "stunt.yaml OK — %d service(s):\n", len(m.Services))
-
-			switch m.Network.Mode {
-			case "subdomain":
-				printPlanSubdomain(out, m, results)
-			default:
-				printPlanPort(out, m, results)
-			}
-			return nil
+			asJSON, _ := cmd.Flags().GetBool("json")
+			return runPlan(cmd.OutOrStdout(), path, asJSON)
 		},
 	}
+	cmd.Flags().Bool("json", false, "output the plan as JSON")
+	return cmd
+}
+
+// planServiceJSON is the per-service entry in the JSON plan output.
+type planServiceJSON struct {
+	Name      string `json:"name"`
+	Address   string `json:"address"`
+	Adapter   string `json:"adapter,omitempty"`
+	Rules     int    `json:"rules,omitempty"`
+	Endpoints int    `json:"endpoints,omitempty"`
+	Grpc      int    `json:"grpc_methods,omitempty"`
+	WS        int    `json:"ws_routes,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+// planJSON is the top-level JSON plan output.
+type planJSON struct {
+	OK       bool              `json:"ok"`
+	Mode     string            `json:"mode"`
+	Warnings []string          `json:"warnings,omitempty"`
+	Services []planServiceJSON `json:"services"`
+}
+
+// runPlan loads and validates the manifest, then prints either a human or
+// JSON summary of what "stunt up" would serve.
+func runPlan(out io.Writer, path string, asJSON bool) error {
+	m, err := manifest.Load(path)
+	if err != nil {
+		return fmt.Errorf("load %s: %w", path, err)
+	}
+	if err := manifest.Validate(m); err != nil {
+		return err
+	}
+	m.Network.Defaults()
+
+	manifestDir := filepath.Dir(path)
+
+	if asJSON {
+		// For JSON, capture warnings into a buffer so they become part of
+		// the structured output instead of being printed as human text.
+		var warnings []string
+		for _, field := range m.UnknownFields {
+			warnings = append(warnings, fmt.Sprintf("unknown manifest field %q (may be a typo)", field))
+		}
+		var wbuf bytes.Buffer
+		results := planValidateAdapters(&wbuf, m, manifestDir)
+		for _, line := range strings.Split(strings.TrimRight(wbuf.String(), "\n"), "\n") {
+			w := strings.TrimSpace(strings.TrimPrefix(line, "WARNING:"))
+			if w != "" {
+				warnings = append(warnings, w)
+			}
+		}
+		return printPlanJSON(out, m, results, warnings)
+	}
+
+	for _, field := range m.UnknownFields {
+		fmt.Fprintf(out, "  WARNING: unknown manifest field %q (may be a typo)\n", field)
+	}
+
+	// Resolve and validate each adapter so plan surfaces load errors.
+	// Warnings (load errors, missing handler scripts, syntax errors) are
+	// printed to out directly.
+	results := planValidateAdapters(out, m, manifestDir)
+
+	fmt.Fprintf(out, "stunt.yaml OK — %d service(s):\n", len(m.Services))
+	switch m.Network.Mode {
+	case "subdomain":
+		printPlanSubdomain(out, m, results)
+	default:
+		printPlanPort(out, m, results)
+	}
+	return nil
+}
+
+// printPlanJSON emits the plan as machine-readable JSON.
+func printPlanJSON(out io.Writer, m *manifest.Manifest, results map[string]planResult, warnings []string) error {
+	p := planJSON{OK: true, Mode: m.Network.Mode, Warnings: nil, Services: nil}
+	port := m.Network.BasePort
+	tld := m.Network.TLD
+	if tld == "" {
+		tld = "localhost"
+	}
+	scheme := "https"
+	if !manifest.ResolveTLS(&m.Network, false) {
+		scheme = "http"
+	}
+	for _, name := range sortedServiceNames(m.Services) {
+		svc := m.Services[name]
+		r := results[name]
+		var addr string
+		if m.Network.Mode == "subdomain" {
+			addr = fmt.Sprintf("%s://%s.%s", scheme, name, tld)
+		} else {
+			addr = fmt.Sprintf("http://127.0.0.1:%d", port)
+			port++
+		}
+		s := planServiceJSON{
+			Name:      name,
+			Address:   addr,
+			Adapter:   svc.Adapter,
+			Rules:     r.rules,
+			Endpoints: r.endpoints,
+			Grpc:      r.grpcMethods,
+			WS:        r.wsRoutes,
+		}
+		if r.loadError != nil {
+			s.Error = r.loadError.Error()
+		}
+		p.Services = append(p.Services, s)
+	}
+	enc := json.NewEncoder(out)
+	enc.SetIndent("", "  ")
+	return enc.Encode(p)
 }
 
 // planValidateAdapters attempts to load each adapter-backed service. It
