@@ -24,10 +24,10 @@ import (
 //go:embed builtin.json
 var builtinIndexData []byte
 
-// DefaultIndexURL is the canonical stunt-project-hosted catalog index. It
+// DefaultIndexURL is the canonical stuntapi.com-hosted catalog index. It
 // can be overridden at construction time (for tests) or via the STUNT_CATALOG_URL
 // environment variable / --catalog-url flag in the CLI.
-const DefaultIndexURL = "https://stunt-adapters.github.io/catalog/index.json"
+const DefaultIndexURL = "https://stuntapi.com/catalog/index.json"
 
 // DefaultCacheTTL is how long a fetched index is considered fresh.
 const DefaultCacheTTL = 10 * time.Minute
