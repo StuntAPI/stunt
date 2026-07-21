@@ -137,6 +137,7 @@ func (e *Engine) runHandler(
 		Path:    r.URL.Path,
 		Headers: headerMap(r.Header),
 		Body:    bodyMap,
+		RawBody: string(body),
 		Params:  params,
 		Query:   queryMap(r.URL.Query()),
 	}

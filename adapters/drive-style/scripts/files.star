@@ -17,8 +17,11 @@ def _now():
 
 # POST /upload/drive/v3/files — create a file or folder.
 #
-# For a regular file: accepts JSON body with "name" and optional "content".
-# Content is stored via store_blob; metadata goes in the "files" collection.
+# Accepts BOTH request shapes:
+#  - JSON body  {"name","content","mimeType"}                (convenience form)
+#  - a real simple media upload: raw bytes as the request body with
+#    ?uploadType=media&name=<filename> (Content-Type application/octet-stream).
+#    The raw bytes arrive in req["raw_body"]; the name comes from the query.
 #
 # For a folder: set body.mimeType to "application/vnd.google-apps.folder".
 # Folders have no blob content — only metadata.
@@ -26,9 +29,18 @@ def on_upload(req):
     body = req["body"]
     if body == None:
         body = {}
+    query = req.get("query")
+    if query == None:
+        query = {}
+    raw = req.get("raw_body")
+    if raw == None:
+        raw = ""
 
     mime_type = body.get("mimeType", "application/octet-stream")
-    name = body.get("name", "untitled")
+    # Name precedence: JSON body, then ?name= query, then a default.
+    name = body.get("name", None)
+    if name == None:
+        name = query.get("name", "untitled")
     file_id = _next_id("file")
 
     is_folder = mime_type == "application/vnd.google-apps.folder"
@@ -36,9 +48,11 @@ def on_upload(req):
     if is_folder:
         size = 0
     else:
-        content = body.get("content", "")
+        # Content precedence: JSON body.content, else the raw request body
+        # (a real octet-stream media upload).
+        content = body.get("content", None)
         if content == None:
-            content = ""
+            content = raw
         b = store_blob("drive")
         b.put(file_id, content)
         size = len(content)
@@ -56,6 +70,30 @@ def on_upload(req):
     c = store_collection("files")
     c.insert(doc)
     return respond(201, doc)
+
+# POST /drive/v3/files — create file/folder METADATA (no content upload).
+# Used for folder creation during parent resolution. JSON body
+# {"name","mimeType","parents"} -> 200 with the created resource (incl id).
+def on_create_metadata(req):
+    body = req["body"]
+    if body == None:
+        body = {}
+    name = body.get("name", "untitled")
+    mime_type = body.get("mimeType", "application/vnd.google-apps.folder")
+    file_id = _next_id("file")
+    doc = {
+        "id": file_id,
+        "name": name,
+        "mimeType": mime_type,
+        "size": 0,
+        "createdTime": _now(),
+        "modifiedTime": _now(),
+        "trashed": False,
+    }
+    if "parents" in body:
+        doc["parents"] = body["parents"]
+    store_collection("files").insert(doc)
+    return respond(200, doc)
 
 # GET /drive/v3/files/{id} — retrieve file metadata, or download content
 # if ?alt=media is present.

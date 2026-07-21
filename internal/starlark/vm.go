@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	starlarkjson "go.starlark.net/lib/json"
 	sk "go.starlark.net/starlark"
 	"go.starlark.net/syntax"
 )
@@ -19,6 +20,7 @@ type Request struct {
 	Path    string
 	Headers map[string]string
 	Body    map[string]any
+	RawBody string            // raw request body as a string (for non-JSON bodies, e.g. binary uploads)
 	Params  map[string]string // path params extracted from route match
 	Query   map[string]string // query parameters (first value of each key)
 }
@@ -98,6 +100,10 @@ func LoadWithLib(src, libSrc string, builtins sk.StringDict) (*VM, error) {
 func buildPredeclared(builtins sk.StringDict) sk.StringDict {
 	predeclared := sk.StringDict{
 		"respond": sk.NewBuiltin("respond", respondBuiltin),
+		// Standard Starlark json module: json.decode(str) / json.encode(v).
+		// Handlers need it to parse JSON carried in headers (e.g. Dropbox's
+		// Dropbox-API-Arg) rather than the request body.
+		"json": starlarkjson.Module,
 	}
 	for k, v := range builtins {
 		predeclared[k] = v
@@ -153,12 +159,13 @@ func (vm *VM) Call(handlerName string, req Request) (Response, error) {
 	}
 
 	reqVal, err := GoToStarlark(map[string]any{
-		"method":  req.Method,
-		"path":    req.Path,
-		"headers": req.Headers,
-		"body":    req.Body,
-		"params":  req.Params,
-		"query":   req.Query,
+		"method":   req.Method,
+		"path":     req.Path,
+		"headers":  req.Headers,
+		"body":     req.Body,
+		"raw_body": req.RawBody,
+		"params":   req.Params,
+		"query":    req.Query,
 	})
 	if err != nil {
 		return Response{}, fmt.Errorf("starlark: build request value: %w", err)

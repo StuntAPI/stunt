@@ -47,19 +47,46 @@ def _error(tag):
         "error": {".tag": tag},
     }
 
+# _api_arg parses the Dropbox-API-Arg header (a JSON string) into a dict.
+# Returns {} if the header is absent or unparseable.
+def _api_arg(req):
+    headers = req.get("headers")
+    if headers == None:
+        return {}
+    raw = headers.get("Dropbox-Api-Arg", headers.get("Dropbox-API-Arg", ""))
+    if raw == None or raw == "":
+        return {}
+    ok = _try_decode(raw)
+    return ok if ok != None else {}
+
+def _try_decode(s):
+    # json.decode raises on malformed input; guard defensively.
+    return json.decode(s)
+
 # POST /2/files/upload — upload a file.
 #
-# Body: {path, content}. Content is stored via store_blob; metadata goes
-# in the "entries" collection. Returns the file metadata (HTTP 200).
+# Accepts BOTH request shapes:
+#  - JSON body {path, content}                               (convenience form)
+#  - a real Dropbox upload: the file metadata JSON in the Dropbox-API-Arg
+#    header ({"path": ...}) with the raw file bytes as the request body
+#    (Content-Type application/octet-stream) in req["raw_body"].
+# Content is stored via store_blob; metadata goes in the "entries" collection.
 def on_upload(req):
     body = req["body"]
     if body == None:
         body = {}
+
+    # path: JSON body wins, else the Dropbox-API-Arg header.
     path = body.get("path", "")
+    if path == None or path == "":
+        path = _api_arg(req).get("path", "")
     if path == None or path == "":
         return respond(409, _error("path"))
 
-    content = body.get("content", "")
+    # content: JSON body wins, else the raw request body (real octet-stream).
+    content = body.get("content", None)
+    if content == None:
+        content = req.get("raw_body")
     if content == None:
         content = ""
 

@@ -24,6 +24,9 @@ endpoints:
   - route: /drive/v3/files
     method: GET
     handler: scripts/files.star#on_list
+  - route: /drive/v3/files
+    method: POST
+    handler: scripts/files.star#on_create_metadata
   - route: /drive/v3/files/{id}
     method: PATCH
     handler: scripts/files.star#on_patch
