@@ -11,7 +11,7 @@ locally. All data is synthetic — no real API data is included.
 ## What it simulates
 
 A faithful behavioral mock of Discord's bot REST + OAuth2 surface, designed to
-unblock chat-routing integrations (e.g. ***REMOVED***'s Discord channel adapter)
+unblock chat-routing integrations (e.g. a bot that mirrors messages across channels)
 during local development:
 
 - **OAuth2:** authorize redirect, token exchange (auth code), refresh-token grant

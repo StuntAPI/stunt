@@ -10,8 +10,8 @@ All data is synthetic — no real API data is included.
 
 ## What it simulates
 
-A faithful behavioral mock of the two Reddit surfaces ***REMOVED*** uses, ported from
-***REMOVED***'s `mock_reddit` Python server:
+A faithful behavioral mock of the two Reddit surfaces a production client uses, ported from
+a production Reddit client:
 
 - **Token endpoint:** `POST /api/v1/access_token` with HTTP Basic client
   credentials. Supports `authorization_code` (issues access + refresh when
@@ -25,7 +25,7 @@ A faithful behavioral mock of the two Reddit surfaces ***REMOVED*** uses, ported
   User-Agent (real Reddit 429s a generic/absent UA). This mock returns 429 for a
   missing or generic UA, so the refresh path's UA header is verified.
 
-Point ***REMOVED*** at it with `REDDIT_API_BASE_URL` (publish, prod host
+point your client at it with `REDDIT_API_BASE_URL` (publish, prod host
 `oauth.reddit.com`) and `REDDIT_OAUTH_BASE_URL` (refresh, prod host
 `www.reddit.com`) — both set to the stunt-served address.
 
@@ -61,7 +61,7 @@ endpoint requires a **Bearer** token.
 ## User-Agent
 
 Both endpoints require a descriptive User-Agent header containing both `/` and
-`(` (e.g. `***REMOVED***.me/1.0 (by /u/user)`). A missing or generic UA returns
+`(` (e.g. `myapp/1.0 (by /u/user)`). A missing or generic UA returns
 `429 {"message": "Too Many Requests", "error": 429}`.
 
 ## Usage

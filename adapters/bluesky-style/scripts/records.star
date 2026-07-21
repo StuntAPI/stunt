@@ -9,7 +9,7 @@
 #   -> 200 {}
 #
 # Auth: the Bearer token's DID must match the request's repo field. This
-# mirrors ***REMOVED***'s bluesky adapter, which creates a session first, then
+# mirrors a reference client's bluesky adapter, which creates a session first, then
 # sends createRecord with repo = session.did.
 
 # Shared helpers (_did_for_token, _mint_cid, _pad12) are preloaded from

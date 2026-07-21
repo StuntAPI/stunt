@@ -1,4 +1,4 @@
-# Submit handler — create a story (mirrors ***REMOVED*** mock_hn submit flow).
+# Submit handler — create a story (mirrors a reference Hacker News client submit flow).
 #
 # POST /submit (Cookie: user=<token>) {title, url?, text?}
 #   -> 302 redirect to /news (story created; appears in story lists)

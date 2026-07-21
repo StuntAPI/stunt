@@ -1,8 +1,7 @@
 # X Articles API simulator (unofficial)
 
 A **local testing simulator** that mimics the structure of the **X Articles**
-long-form publishing REST surface — the same surface ***REMOVED***'s
-`publishXArticle` adapter targets. It is a faithful port of ***REMOVED***'s
+long-form publishing REST surface — the same surface a production client targets. It is a faithful port of a reference client's
 `mock_x_api/server.py` Python mock into stunt's Starlark adapter format.
 
 > ⚠️ This is **not** the real X API. It runs on your local machine and returns

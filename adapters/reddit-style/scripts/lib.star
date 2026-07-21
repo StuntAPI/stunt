@@ -7,7 +7,7 @@
 
 # _has_ua checks whether the request has a descriptive User-Agent.
 # Reddit bans absent/generic UAs. Accept only a descriptive one (our
-# adapter sends "***REMOVED***.me/1.0 (...)"). This is what makes the
+# adapter sends "myapp/1.0 (...)"). This is what makes the
 # missing-UA bug reproducible.
 def _has_ua(req):
     ua = req["headers"].get("User-Agent", "")

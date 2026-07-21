@@ -11,7 +11,7 @@ All data is synthetic — no real API data is included.
 ## What it simulates
 
 A faithful behavioral mock of the Bluesky AT Protocol XRPC surface, covering the
-publish pipeline that ***REMOVED***'s `blueskyAdapter` uses:
+publish pipeline that the reference client adapter uses:
 
 - **createSession:** `POST /xrpc/com.atproto.server.createSession` — mints an
   opaque `accessJwt` + `refreshJwt` for an `{identifier, password}` pair, plus
@@ -57,7 +57,7 @@ KV is used for monotonic sequence counters (`account_seq`, `rkey_seq`).
 
 `createSession` mints an opaque access token (`accessJwt`). Subsequent write
 calls must send `Authorization: Bearer <accessJwt>`. The token's DID must match
-the request's `repo` field — mirroring how ***REMOVED***'s adapter creates a session
+the request's `repo` field — mirroring how the reference client adapter creates a session
 first, then passes `repo: session.did` to `createRecord`.
 
 ## Usage
@@ -70,5 +70,5 @@ services:
     adapter: ./adapters/bluesky-style
 ```
 
-Then `stunt up` and make requests to the served address. Point ***REMOVED*** at it
+Then `stunt up` and make requests to the served address. point your client at it
 via `BLUESKY_PDS_URL=http://<stunt-addr>`.

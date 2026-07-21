@@ -6,7 +6,7 @@
 # for LOCAL TESTING ONLY. It does not call the real X API. All data is
 # synthetic. See DISCLAIMER.
 #
-# It is a faithful port of ***REMOVED***'s mock_x_api/server.py: same JSON shapes,
+# It is a faithful port of a reference X client: same JSON shapes,
 # status codes, and error conditions. It is a PIPELINE double — it validates
 # the draft→publish flow, media upload, and error handling, not real authz or
 # rendering.

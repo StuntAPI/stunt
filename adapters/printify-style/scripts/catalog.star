@@ -6,7 +6,7 @@
 #     -> 200 [ {id, title, options:{size,color}, price}, ... ]
 #
 # The catalog is static: two blueprints (T-Shirt id=3, Mug id=71) with
-# deterministic variant lists. This supports the ***REMOVED*** getVariantId
+# deterministic variant lists. This supports a client's getVariantId
 # placeholder by returning plausible variant data for each blueprint.
 
 # Shared helpers (_bearer, _require_auth) are preloaded from scripts/lib.star.
