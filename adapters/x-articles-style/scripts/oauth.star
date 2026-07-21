@@ -22,8 +22,7 @@
 #   code_verifier must be PRESENT and non-empty (catching a client that
 #   forgets to send it), but the cryptographic sha256 match is NOT verified.
 #
-#   This is acceptable for a pipeline double: the Python mock's own docstring
-#   says it "validates the pipeline, not real authz." A real client that
+#   This is acceptable for a pipeline double: it validates the pipeline, not real authz. A real client that
 #   generates a valid S256 pair will always pass (the verifier is present),
 #   and a client that omits the verifier fails appropriately. The only gap is
 #   that a deliberately-wrong-but-present verifier is accepted — acceptable

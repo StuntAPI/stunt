@@ -16,23 +16,39 @@ def _current_user_id():
     return "usr_me"
 
 # POST /2/tweets — create a tweet (store in the "tweets" collection).
+#
+# Enforces the real 280-char limit and reply-chain integrity: a client that threads a long post
+# as a single over-length tweet fails here (400) rather than succeeding, and a reply must target
+# a known tweet.
 def on_create(req):
     body = req["body"]
     if body == None:
         body = {}
 
     text = body.get("text", "")
-    tweet_id = _next_id("twt")
+    if text == None or text.strip() == "":
+        return respond(400, {"title": "Invalid Request", "detail": "text is required", "type": "about:blank"})
+    if len(text) > 280:
+        return respond(400, {"title": "Invalid Request", "detail": "text is " + str(len(text)) + " chars (max 280)", "type": "about:blank"})
 
-    doc = {
+    c = store_collection("tweets")
+
+    # A reply must target a known tweet (chain integrity).
+    reply = body.get("reply", None)
+    in_reply_to = None
+    if reply != None:
+        in_reply_to = reply.get("in_reply_to_tweet_id", None)
+        if in_reply_to != None and c.get(in_reply_to) == None:
+            return respond(400, {"title": "Invalid Request", "detail": "in_reply_to_tweet_id " + in_reply_to + " not found", "type": "about:blank"})
+
+    tweet_id = _next_id("twt")
+    c.insert({
         "id": tweet_id,
         "text": text,
         "author_id": _current_user_id(),
         "created_at": _now(),
-    }
-
-    c = store_collection("tweets")
-    c.insert(doc)
+        "in_reply_to_tweet_id": in_reply_to,
+    })
 
     return respond(201, {"data": {"id": tweet_id, "text": text}})
 

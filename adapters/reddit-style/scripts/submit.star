@@ -3,7 +3,7 @@
 # POST /api/submit  (Bearer; form: sr, title, text, kind)
 #   -> { json: { errors: [], data: { id, url, name } } }
 #
-# Faithful behaviors ported from a reference client's mock_reddit:
+# Faithful behaviors ported from a reference client's Reddit mock:
 #   - Rejects requests without a descriptive User-Agent (429).
 #   - Requires Bearer auth (401 USER_REQUIRED otherwise).
 #   - Missing subreddit -> non-empty errors[] (200 status, as Reddit does).
