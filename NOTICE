@@ -1,0 +1,30 @@
+Stunt
+Copyright 2026 The Stunt Authors
+
+This product includes software developed by The Stunt Authors
+(https://github.com/deblasis/stunt).
+
+Licensed under the Apache License, Version 2.0.
+
+== Trademarks ==
+
+"Stunt" and the Stunt project name are not themselves trademarks of any
+third party. Adapter names within this project reference third-party company,
+product, and API names (e.g. "<provider>-style") solely to identify the
+real-world API whose structure is being simulated for local development and
+testing (nominative use). These names are the trademarks of their respective
+owners. Stunt is independent of, and not affiliated with, endorsed by, or
+sponsored by any of those providers. See TRADEMARKS.md for the full policy.
+
+== Third-Party Notices ==
+
+This product includes Go modules and other open-source dependencies under
+their respective licenses (Apache 2.0, MIT, BSD, ISC, MPL). See go.mod for
+the complete dependency list. Notable dependencies:
+
+- Go standard library (BSD-3-Clause)
+- modernc.org/sqlite (BSD-3-Clause) — pure-Go SQLite
+- go.starlark.net (BSD-3-Clause) — Starlark interpreter
+- github.com/coder/websocket (ISC) — WebSocket
+- github.com/vektah/gqlparser/v2 (MIT) — GraphQL parser
+- github.com/bufbuild/protocompile (Apache 2.0) — proto compilation
