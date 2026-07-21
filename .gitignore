@@ -4,3 +4,6 @@
 # GoReleaser build output
 dist/
 
+
+# Internal task tracker (beads) — never public
+.beads/
