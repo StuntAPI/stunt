@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
-	"github.com/stunt-adapters/stunt/internal/rules"
+	"stuntapi.com/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/rules"
 )
 
 // TestHostsSyncOnRealHostsFile exercises the actual cobra command path with

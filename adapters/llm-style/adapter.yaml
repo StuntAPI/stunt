@@ -1,5 +1,5 @@
 # stunt adapter manifest — LLM API simulator (OpenAI + Anthropic, unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of OpenAI and Anthropic chat APIs for
 # LOCAL TESTING ONLY. It does not call any real LLM API. All data is

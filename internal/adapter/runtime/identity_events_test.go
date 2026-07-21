@@ -7,10 +7,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/adapter/runtime"
-	"github.com/stunt-adapters/stunt/internal/primitives/events"
-	"github.com/stunt-adapters/stunt/internal/primitives/identity"
-	"github.com/stunt-adapters/stunt/internal/starlark"
+	"stuntapi.com/stunt/internal/adapter/runtime"
+	"stuntapi.com/stunt/internal/primitives/events"
+	"stuntapi.com/stunt/internal/primitives/identity"
+	"stuntapi.com/stunt/internal/starlark"
 )
 
 // newIssuer creates a test identity issuer.

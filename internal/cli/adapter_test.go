@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/adapter"
 )
 
 func TestNewAdapterNewCmd(t *testing.T) {

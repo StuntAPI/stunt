@@ -7,11 +7,11 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/graphqlsim"
-	"github.com/stunt-adapters/stunt/internal/starlark"
 	"github.com/vektah/gqlparser/v2/ast"
 	sk "go.starlark.net/starlark"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/graphqlsim"
+	"stuntapi.com/stunt/internal/starlark"
 )
 
 // graphqlSchemaCache caches the parsed GraphQL schema per adapter directory.

@@ -10,9 +10,9 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 
-	"github.com/stunt-adapters/stunt/internal/contrib/lint"
-	protoimport "github.com/stunt-adapters/stunt/internal/contrib/proto"
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/contrib/lint"
+	protoimport "stuntapi.com/stunt/internal/contrib/proto"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // demoProto is a sample .proto with one RPC: Echo(EchoRequest) -> EchoReply.

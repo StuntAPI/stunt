@@ -51,14 +51,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/primitives"
-	"github.com/stunt-adapters/stunt/internal/primitives/blob"
-	"github.com/stunt-adapters/stunt/internal/primitives/events"
-	"github.com/stunt-adapters/stunt/internal/primitives/identity"
-	"github.com/stunt-adapters/stunt/internal/primitives/kv"
-	"github.com/stunt-adapters/stunt/internal/starlark"
 	sk "go.starlark.net/starlark"
 	"go.starlark.net/syntax"
+	"stuntapi.com/stunt/internal/primitives"
+	"stuntapi.com/stunt/internal/primitives/blob"
+	"stuntapi.com/stunt/internal/primitives/events"
+	"stuntapi.com/stunt/internal/primitives/identity"
+	"stuntapi.com/stunt/internal/primitives/kv"
+	"stuntapi.com/stunt/internal/starlark"
 )
 
 // BuiltinOptions bundles all the primitives and services that

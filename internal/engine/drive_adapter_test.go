@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // patchJSON sends a PATCH request with a JSON body and returns the body + status.

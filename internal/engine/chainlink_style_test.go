@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // TestChainlinkStyleAdapter exercises the Chainlink off-chain services API:

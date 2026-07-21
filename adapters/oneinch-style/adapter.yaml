@@ -1,5 +1,5 @@
 # stunt adapter manifest — 1inch DEX Aggregation Protocol API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of the 1inch Aggregation Protocol API
 # (v6.0) for LOCAL TESTING ONLY. It does not call the real 1inch API. All

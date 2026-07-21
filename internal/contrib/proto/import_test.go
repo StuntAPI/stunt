@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/contrib/lint"
-	"github.com/stunt-adapters/stunt/internal/contrib/proto"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/contrib/lint"
+	"stuntapi.com/stunt/internal/contrib/proto"
 
 	protoimport "google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"

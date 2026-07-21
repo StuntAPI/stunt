@@ -1,5 +1,5 @@
 # stunt adapter manifest — Google Analytics GA4 Data API + Admin API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of the Google Analytics Data API (v1beta)
 # and Admin API (v1admin) for LOCAL TESTING ONLY. It does not call the real

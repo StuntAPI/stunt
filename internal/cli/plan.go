@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/adapter/runtime"
-	"github.com/stunt-adapters/stunt/internal/adapterdist"
-	"github.com/stunt-adapters/stunt/internal/manifest"
-	"github.com/stunt-adapters/stunt/internal/starlark"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/adapter/runtime"
+	"stuntapi.com/stunt/internal/adapterdist"
+	"stuntapi.com/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/starlark"
 )
 
 const defaultManifestPath = "stunt.yaml"

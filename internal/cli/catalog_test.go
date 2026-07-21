@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/catalog"
+	"stuntapi.com/stunt/internal/catalog"
 )
 
 func jsonMarshalCatalog(entries []catalog.Entry) ([]byte, error) {

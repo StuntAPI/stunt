@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // Twilio synthetic test credentials (must match scripts/lib.star).

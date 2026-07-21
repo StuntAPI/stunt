@@ -46,7 +46,7 @@ verdict. Corrections welcome.)*
 ## Install
 
 ```bash
-go install github.com/stunt-adapters/stunt/cmd/stunt@latest
+go install stuntapi.com/stunt/cmd/stunt@latest
 ```
 
 > Dev-machine note: if `go` commands fail with a stdlib-version mismatch, prefix them

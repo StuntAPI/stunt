@@ -1,5 +1,5 @@
 # stunt adapter manifest — X Articles API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* the X Articles long-form publishing REST
 # surface (draft → publish + media upload + PKCE OAuth2 + the x:tweet surface)

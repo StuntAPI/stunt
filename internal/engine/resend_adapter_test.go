@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // TestResendStyleAdapter exercises the Resend-style email adapter

@@ -3,7 +3,7 @@ package manifest
 import (
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/rules"
+	"stuntapi.com/stunt/internal/rules"
 )
 
 func TestValidateOK(t *testing.T) {

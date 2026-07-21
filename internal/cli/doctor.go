@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/stunt-adapters/stunt/internal/manifest"
-	"github.com/stunt-adapters/stunt/internal/netutil"
+	"stuntapi.com/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/netutil"
 )
 
 // DoctorReport is a structured health check. BuildDoctor fills it in and

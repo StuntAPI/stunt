@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/stunt-adapters/stunt/internal/rules"
 	"gopkg.in/yaml.v3"
+	"stuntapi.com/stunt/internal/rules"
 )
 
 type Network struct {

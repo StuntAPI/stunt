@@ -22,15 +22,15 @@ import (
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
-	"github.com/stunt-adapters/stunt/internal/rules"
+	"stuntapi.com/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/rules"
 )
 
 // greeterProto is a minimal proto for the integration test. It is compiled
 // to a FileDescriptorSet via protoc at test time.
 const greeterProto = `syntax = "proto3";
 package stunt.test;
-option go_package = "github.com/stunt-adapters/stunt/internal/engine;engine";
+option go_package = "stuntapi.com/stunt/internal/engine;engine";
 
 service Greeter {
   rpc SayHello(HelloRequest) returns (HelloReply);

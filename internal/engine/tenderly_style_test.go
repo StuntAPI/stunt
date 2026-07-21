@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // TestTenderlyStyleAdapter exercises the Tenderly-style adapter end-to-end:

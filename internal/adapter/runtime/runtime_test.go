@@ -4,11 +4,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/adapter/runtime"
-	"github.com/stunt-adapters/stunt/internal/primitives"
-	"github.com/stunt-adapters/stunt/internal/primitives/blob"
-	"github.com/stunt-adapters/stunt/internal/primitives/kv"
-	"github.com/stunt-adapters/stunt/internal/starlark"
+	"stuntapi.com/stunt/internal/adapter/runtime"
+	"stuntapi.com/stunt/internal/primitives"
+	"stuntapi.com/stunt/internal/primitives/blob"
+	"stuntapi.com/stunt/internal/primitives/kv"
+	"stuntapi.com/stunt/internal/starlark"
 )
 
 // newStores creates temp-file-backed stores for a test and registers cleanup.

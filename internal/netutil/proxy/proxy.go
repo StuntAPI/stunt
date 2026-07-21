@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/netutil"
+	"stuntapi.com/stunt/internal/netutil"
 )
 
 // Options configures a Proxy.

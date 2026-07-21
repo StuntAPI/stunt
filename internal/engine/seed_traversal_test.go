@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 const seedTraversalAdapterYAML = `

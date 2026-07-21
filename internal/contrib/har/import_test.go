@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/contrib/har"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/contrib/har"
 )
 
 // harJSON returns a minimal HAR 1.2 with two entries: GET /users and

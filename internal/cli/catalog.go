@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/stunt-adapters/stunt/internal/catalog"
+	"stuntapi.com/stunt/internal/catalog"
 )
 
 // newCatalogCmd creates the "catalog" parent command for browsing the adapter

@@ -8,8 +8,8 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	"github.com/stunt-adapters/stunt/internal/netutil"
-	"github.com/stunt-adapters/stunt/internal/netutil/proxy"
+	"stuntapi.com/stunt/internal/netutil"
+	"stuntapi.com/stunt/internal/netutil/proxy"
 )
 
 func newProxyCmd() *cobra.Command {

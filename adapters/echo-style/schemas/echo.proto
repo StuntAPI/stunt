@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package stunt.example;
 
-option go_package = "github.com/stunt-adapters/stunt/adapters/echo-style/schemas;echostyle";
+option go_package = "stuntapi.com/stunt/adapters/echo-style/schemas;echostyle";
 
 // Echo is a trivial stateful service used to demonstrate stunt gRPC adapters.
 service Echo {

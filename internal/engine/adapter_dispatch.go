@@ -10,10 +10,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/manifest"
-	"github.com/stunt-adapters/stunt/internal/rules"
-	"github.com/stunt-adapters/stunt/internal/starlark"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/rules"
+	"stuntapi.com/stunt/internal/starlark"
 )
 
 // dispatchAdapter attempts to handle a request via the adapter's endpoints.

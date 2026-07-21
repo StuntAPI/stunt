@@ -1,5 +1,5 @@
 # stunt adapter manifest — Echo gRPC example (generic, unbranded)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This is a generic gRPC reference adapter. It does NOT mimic a specific
 # company's API, so no DISCLAIMER is needed. All data is synthetic.

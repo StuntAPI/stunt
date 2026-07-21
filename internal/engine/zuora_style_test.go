@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // TestZuoraStyleAdapter exercises the Zuora Billing REST API adapter end-to-end:

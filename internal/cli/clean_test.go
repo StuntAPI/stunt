@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/netutil"
+	"stuntapi.com/stunt/internal/netutil"
 )
 
 func TestRunClean(t *testing.T) {

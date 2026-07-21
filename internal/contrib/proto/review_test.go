@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/contrib/proto"
-	"github.com/stunt-adapters/stunt/internal/starlark"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/contrib/proto"
+	"stuntapi.com/stunt/internal/starlark"
 )
 
 // ---------------------------------------------------------------------------

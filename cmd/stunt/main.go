@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/stunt-adapters/stunt/internal/cli"
+	"stuntapi.com/stunt/internal/cli"
 )
 
 func main() {

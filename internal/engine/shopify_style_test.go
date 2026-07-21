@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // TestShopifyStyleAdapter exercises the Shopify Admin-style adapter end-to-end:

@@ -19,15 +19,15 @@ import (
 
 	"github.com/bufbuild/protocompile"
 	"github.com/bufbuild/protocompile/linker"
-	"github.com/stunt-adapters/stunt/internal/adapter"
-	"github.com/stunt-adapters/stunt/internal/contrib"
-	"github.com/stunt-adapters/stunt/internal/rules"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"gopkg.in/yaml.v3"
+	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/contrib"
+	"stuntapi.com/stunt/internal/rules"
 )
 
 // We use protocompile (github.com/bufbuild/protocompile) to compile .proto

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // TestGoogleAdminStyleAdapter exercises the google-admin-style adapter:

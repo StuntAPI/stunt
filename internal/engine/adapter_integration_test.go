@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
-	"github.com/stunt-adapters/stunt/internal/rules"
+	"stuntapi.com/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/rules"
 )
 
 // writeFile lays out a file in dir, creating parent directories.

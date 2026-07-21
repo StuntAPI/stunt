@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
-	"github.com/stunt-adapters/stunt/internal/rules"
+	"stuntapi.com/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/rules"
 )
 
 // TestRequestLoggerPrintsLogLine verifies that the engine's request logger

@@ -9,9 +9,9 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	"github.com/stunt-adapters/stunt/internal/adapterdist"
-	"github.com/stunt-adapters/stunt/internal/catalog"
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/adapterdist"
+	"stuntapi.com/stunt/internal/catalog"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // defaultCacheDir returns the default adapter cache root (~/.stunt/adapters).

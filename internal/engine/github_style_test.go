@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // TestGitHubStyleAdapter exercises the GitHub App-style adapter end-to-end:

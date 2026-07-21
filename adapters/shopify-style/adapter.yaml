@@ -1,5 +1,5 @@
 # stunt adapter manifest — Shopify Admin-style API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of Shopify's Admin REST + GraphQL API
 # (version 2024-10) for LOCAL TESTING ONLY. It does not call the real Shopify

@@ -5,10 +5,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/primitives"
-	"github.com/stunt-adapters/stunt/internal/primitives/blob"
-	"github.com/stunt-adapters/stunt/internal/primitives/kv"
-	"github.com/stunt-adapters/stunt/internal/starlark"
+	"stuntapi.com/stunt/internal/primitives"
+	"stuntapi.com/stunt/internal/primitives/blob"
+	"stuntapi.com/stunt/internal/primitives/kv"
+	"stuntapi.com/stunt/internal/starlark"
 )
 
 // TestStoreKVIncrAtomic guards against the read-modify-write ID race that

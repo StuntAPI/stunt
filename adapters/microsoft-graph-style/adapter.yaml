@@ -1,5 +1,5 @@
 # stunt adapter manifest — Microsoft Graph API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of the Microsoft Graph data-plane API
 # (Teams / Outlook / OneDrive / SharePoint / Excel) for LOCAL TESTING ONLY.

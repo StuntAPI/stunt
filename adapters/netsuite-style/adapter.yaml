@@ -1,5 +1,5 @@
 # stunt adapter manifest — NetSuite SuiteTalk REST API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of NetSuite's SuiteTalk REST API (v1)
 # for LOCAL TESTING ONLY. It does not call the real NetSuite API. All data is

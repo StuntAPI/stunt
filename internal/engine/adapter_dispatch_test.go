@@ -3,7 +3,7 @@ package engine
 import (
 	"testing"
 
-	"github.com/stunt-adapters/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/adapter"
 )
 
 func TestMatchRoute(t *testing.T) {

@@ -1,5 +1,5 @@
 # stunt adapter manifest — WalletConnect v2 relay simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of the WalletConnect Relay Protocol v2
 # dApp-facing surface for LOCAL TESTING ONLY. It does not call the real

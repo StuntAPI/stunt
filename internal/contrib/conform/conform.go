@@ -26,8 +26,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/engine"
-	"github.com/stunt-adapters/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/engine"
+	"stuntapi.com/stunt/internal/manifest"
 )
 
 // Options controls conformance check behavior.

@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/stunt-adapters/stunt/internal/rules"
+	"stuntapi.com/stunt/internal/rules"
 )
 
 // ErrUnknownGenerator is returned by Generate when no generator is

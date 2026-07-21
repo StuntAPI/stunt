@@ -87,7 +87,7 @@ func scaffoldFiles(name string) map[string]string {
 
 func adapterYAML(id, display string) string {
 	return fmt.Sprintf(`# stunt adapter manifest
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 id: %s
 name: %s
 version: "0.1.0"

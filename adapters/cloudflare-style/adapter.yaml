@@ -1,5 +1,5 @@
 # stunt adapter manifest — Cloudflare API + Workers + R2 + D1 simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of the Cloudflare REST API (v4),
 # including Workers, R2, and D1, for LOCAL TESTING ONLY. It does not call

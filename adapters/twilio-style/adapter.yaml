@@ -1,5 +1,5 @@
 # stunt adapter manifest — Twilio-style API simulator (unofficial)
-# Docs: https://github.com/stunt-adapters/stunt
+# Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of Twilio's REST API for LOCAL TESTING
 # ONLY. It does not call the real Twilio API. All data is synthetic.
