@@ -164,6 +164,8 @@ Found a security issue? See **[SECURITY.md](SECURITY.md)** — do not open a pub
 `internal/netutil{,/proxy}` · `internal/contrib{,/openapi,/har,/lint,/conform,/proto,/scaffold}`
 · `internal/catalog` · `internal/cli` · `internal/adapterdist` · `adapters/`.
 
-## Design & tracking
+## Reference & contributing
 
-- Spec: `docs/specs/2025-07-15-stunt-design.md` · Plans: `docs/plans/` · Dogfood findings: `docs/dogfood/`
+- **Operating guide:** `AGENTS.md` (or run `stunt llm` for the in-binary reference) — the full
+  manifest schema, CLI reference, and the complete Starlark handler API.
+- **Contributing:** see `CONTRIBUTING.md`.
