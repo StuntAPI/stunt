@@ -17,7 +17,7 @@ import (
 
 // TestLinkedInStyleAdapter exercises the LinkedIn-style reference adapter
 // end-to-end through the FULL OAuth2 + publish + ingest + reply + analytics
-// flow, asserting it faithfully reproduces the Python mock_linkedin contract:
+// flow, asserting it faithfully reproduces a reference LinkedIn API mock contract:
 //
 //   - authorize → 302 with code+state; code is single-use
 //   - accessToken (auth code) → token pair; refresh_token grant rotates

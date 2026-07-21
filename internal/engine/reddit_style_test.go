@@ -17,7 +17,7 @@ import (
 
 // TestRedditStyleAdapter exercises the Reddit-style reference adapter
 // end-to-end through the submit + token-refresh + User-Agent surfaces,
-// asserting it faithfully reproduces the Python mock_reddit contract:
+// asserting it faithfully reproduces a reference Reddit API mock contract:
 //
 //   - access_token via authorization_code (duration=permanent) → access + refresh
 //   - access_token via refresh_token (HTTP Basic) → access ONLY, no new refresh

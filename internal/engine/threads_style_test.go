@@ -17,7 +17,7 @@ import (
 
 // TestThreadsStyleAdapter exercises the Threads-style reference adapter
 // end-to-end through the FULL OAuth2 + publish + insights + engagement flow,
-// asserting it faithfully reproduces the Python mock_threads contract:
+// asserting it faithfully reproduces a reference Threads API mock contract:
 //
 //   - authorize → 302 with code+state; code is single-use
 //   - access_token (auth code) → token pair with user_id
