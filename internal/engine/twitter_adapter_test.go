@@ -135,6 +135,77 @@ func TestTwitterStyleAdapter(t *testing.T) {
 		t.Fatalf("tweet list has %d items, want >= 3", len(tweets))
 	}
 
+	// ===== Create validation: 280-char limit, empty text, reply-chain integrity =====
+
+	// Empty text → 400
+	_, status = postJSON(t, base+"/2/tweets", map[string]any{"text": ""})
+	if status != 400 {
+		t.Fatalf("POST empty tweet -> status %d, want 400", status)
+	}
+
+	// Whitespace-only text → 400
+	_, status = postJSON(t, base+"/2/tweets", map[string]any{"text": "   "})
+	if status != 400 {
+		t.Fatalf("POST whitespace-only tweet -> status %d, want 400", status)
+	}
+
+	// Over-280-char text → 400
+	_, status = postJSON(t, base+"/2/tweets", map[string]any{"text": strings.Repeat("a", 281)})
+	if status != 400 {
+		t.Fatalf("POST 281-char tweet -> status %d, want 400", status)
+	}
+
+	// Exactly 280 chars → 201 (the limit is inclusive)
+	_, status = postJSON(t, base+"/2/tweets", map[string]any{"text": strings.Repeat("a", 280)})
+	if status != 201 {
+		t.Fatalf("POST 280-char tweet -> status %d, want 201", status)
+	}
+
+	// Reply to an unknown tweet → 400 (chain integrity)
+	_, status = postJSON(t, base+"/2/tweets", map[string]any{
+		"text":  "replying into the void",
+		"reply": map[string]any{"in_reply_to_tweet_id": "twt_does_not_exist"},
+	})
+	if status != 400 {
+		t.Fatalf("POST reply to unknown tweet -> status %d, want 400", status)
+	}
+
+	// Reply to the known tweet → 201, and in_reply_to_tweet_id persists on retrieval
+	body, status = postJSON(t, base+"/2/tweets", map[string]any{
+		"text":  "replying to a real tweet",
+		"reply": map[string]any{"in_reply_to_tweet_id": tweetID},
+	})
+	if status != 201 {
+		t.Fatalf("POST reply to known tweet -> status %d, want 201; body %s", status, body)
+	}
+	var reply map[string]any
+	if err := json.Unmarshal([]byte(body), &reply); err != nil {
+		t.Fatalf("unmarshal reply: %v (body %s)", err, body)
+	}
+	replyData, ok := reply["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("reply data = %v, want a dict", reply["data"])
+	}
+	replyID, ok := replyData["id"].(string)
+	if !ok || !strings.HasPrefix(replyID, "twt_") {
+		t.Fatalf("reply id = %v, want twt_* prefix", replyData["id"])
+	}
+	body, status = get2(t, base+"/2/tweets/"+replyID)
+	if status != 200 {
+		t.Fatalf("GET reply -> status %d, want 200; body %s", status, body)
+	}
+	var gotReply map[string]any
+	if err := json.Unmarshal([]byte(body), &gotReply); err != nil {
+		t.Fatalf("unmarshal got reply: %v (body %s)", err, body)
+	}
+	gotReplyData, ok := gotReply["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("got reply data = %v, want a dict", gotReply["data"])
+	}
+	if gotReplyData["in_reply_to_tweet_id"] != tweetID {
+		t.Fatalf("reply in_reply_to_tweet_id = %v, want %s", gotReplyData["in_reply_to_tweet_id"], tweetID)
+	}
+
 	// DELETE /2/tweets/{id} → 200, deleted: true
 	body, status = deleteReq(t, base+"/2/tweets/"+tweetID)
 	if status != 200 {

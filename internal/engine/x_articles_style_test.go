@@ -18,7 +18,7 @@ import (
 
 // TestXArticlesStyleAdapter exercises the X Articles reference adapter
 // end-to-end through a real HTTP client, asserting it faithfully reproduces
-// the Python mock_x_api contract:
+// a reference X Articles API mock contract:
 //
 //   - draft (valid -> {data:{id,title}}; empty title -> 400; missing blocks -> 400)
 //   - publish (-> {data:{post_id}}; unknown id -> 404)

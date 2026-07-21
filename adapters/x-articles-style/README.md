@@ -1,8 +1,7 @@
 # X Articles API simulator (unofficial)
 
 A **local testing simulator** that mimics the structure of the **X Articles**
-long-form publishing REST surface — the same surface a production client targets. It is a faithful port of a reference client's
-`mock_x_api/server.py` Python mock into stunt's Starlark adapter format.
+long-form publishing REST surface — the same surface a production client targets. It is a faithful port of a reference client's X Articles API mock into stunt's Starlark adapter format.
 
 > ⚠️ This is **not** the real X API. It runs on your local machine and returns
 > synthetic data. See [DISCLAIMER](DISCLAIMER).
@@ -60,7 +59,6 @@ The real X server verifies `code_verifier` by computing
 base64), so this mock performs a **relaxed** check: `code_verifier` must be
 present and non-empty, but the cryptographic match is not verified.
 
-This is acceptable for a pipeline double — the Python mock's own docstring says
-it "validates the pipeline, not real authz." A real client generating a valid
+This is acceptable for a pipeline double — it validates the pipeline, not real authz. A real client generating a valid
 S256 pair will always pass; a client that omits the verifier fails
 appropriately.
