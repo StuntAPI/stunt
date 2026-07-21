@@ -247,3 +247,43 @@ func TestScaffoldScriptReferencesStoreCollection(t *testing.T) {
 		t.Error("script should reference store_collection")
 	}
 }
+
+// TestScaffoldBrandedGeneratesDisclaimer verifies that the "-style" naming
+// convention (used for branded adapters) produces a DISCLAIMER file with the
+// provider name substituted in, while a non-branded name produces none.
+func TestScaffoldBrandedGeneratesDisclaimer(t *testing.T) {
+	t.Run("branded", func(t *testing.T) {
+		dir := t.TempDir()
+		name := "stripe-style"
+		if err := Scaffold(dir, name, ScaffoldOptions{}); err != nil {
+			t.Fatalf("Scaffold: %v", err)
+		}
+		data, err := os.ReadFile(filepath.Join(dir, name, "DISCLAIMER"))
+		if err != nil {
+			t.Fatalf("branded adapter should have a DISCLAIMER: %v", err)
+		}
+		s := string(data)
+		// The " Style" suffix should be stripped so the provider is "Stripe",
+		// appearing in the non-affiliation line and the trademark line.
+		if !strings.Contains(s, "sponsored by** Stripe.") {
+			t.Errorf("DISCLAIMER should reference provider 'Stripe' (suffix stripped); got:\n%s", s)
+		}
+		if !strings.Contains(s, "\"Stripe\" and related marks") {
+			t.Errorf("DISCLAIMER should contain the trademark line for Stripe; got:\n%s", s)
+		}
+		if !strings.Contains(s, "not affiliated with") {
+			t.Error("DISCLAIMER should contain the non-affiliation statement")
+		}
+	})
+
+	t.Run("non-branded", func(t *testing.T) {
+		dir := t.TempDir()
+		name := "my-api"
+		if err := Scaffold(dir, name, ScaffoldOptions{}); err != nil {
+			t.Fatalf("Scaffold: %v", err)
+		}
+		if _, err := os.Stat(filepath.Join(dir, name, "DISCLAIMER")); err == nil {
+			t.Error("non-branded adapter should NOT have a DISCLAIMER")
+		}
+	})
+}

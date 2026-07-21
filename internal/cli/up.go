@@ -25,7 +25,16 @@ func newUpCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "up",
 		Short: "Start all configured services (foreground)",
-		RunE:  runUp,
+		Long: `Start all services declared in stunt.yaml, in the foreground, until Ctrl-C.
+
+This is stunt's main command. It loads the manifest, mounts each service's
+adapter (if any), opens the listen ports, and serves requests. In subdomain
+mode it also starts the TLS reverse proxy so services are reachable at
+https://<service>.localhost.
+
+Run "stunt plan" first to validate the manifest and check for port conflicts
+without starting servers.`,
+		RunE: runUp,
 	}
 	cmd.Flags().Int("proxy-port", 0, "proxy listen port (subdomain mode only; 0 = OS-assigned high port; use stunt setup/service for :443)")
 	cmd.Flags().Bool("no-tls", false, "disable TLS in subdomain mode")

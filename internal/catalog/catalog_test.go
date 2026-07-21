@@ -12,9 +12,9 @@ import (
 
 // cannedEntries is a known set of entries served by the test HTTP server.
 var cannedEntries = []Entry{
-	{Name: "stripe-style", Description: "Stripe-style payment API", GitURL: "https://github.com/stunt-adapters/stripe-style", LatestRef: "v1.0.0", Tags: []string{"payments", "fintech"}},
-	{Name: "drive-style", Description: "Google-Drive-style file storage API", GitURL: "https://github.com/stunt-adapters/drive-style", LatestRef: "v1.0.0", Tags: []string{"storage", "files"}},
-	{Name: "twitter-style", Description: "Twitter/X-style social media API", GitURL: "https://github.com/stunt-adapters/twitter-style", LatestRef: "v1.0.0", Tags: []string{"social", "media"}},
+	{Name: "stripe-style", Description: "Stripe-style payment API", GitURL: "https://github.com/stuntapi/stripe-style", LatestRef: "v1.0.0", Tags: []string{"payments", "fintech"}},
+	{Name: "drive-style", Description: "Google-Drive-style file storage API", GitURL: "https://github.com/stuntapi/drive-style", LatestRef: "v1.0.0", Tags: []string{"storage", "files"}},
+	{Name: "twitter-style", Description: "Twitter/X-style social media API", GitURL: "https://github.com/stuntapi/twitter-style", LatestRef: "v1.0.0", Tags: []string{"social", "media"}},
 }
 
 func mustMarshalEntries(t *testing.T, entries []Entry) []byte {
@@ -101,7 +101,7 @@ func TestGetReturnsKnownEntry(t *testing.T) {
 	if e.Name != "twitter-style" {
 		t.Errorf("Name = %q, want %q", e.Name, "twitter-style")
 	}
-	if e.GitURL != "https://github.com/stunt-adapters/twitter-style" {
+	if e.GitURL != "https://github.com/stuntapi/twitter-style" {
 		t.Errorf("GitURL = %q", e.GitURL)
 	}
 }
@@ -198,8 +198,8 @@ func TestBundledGetReturnsKnownEntry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get via bundled fallback: %v", err)
 	}
-	if !strings.HasPrefix(e.GitURL, "https://github.com/stunt-adapters/stripe-style") {
-		t.Errorf("GitURL = %q, want a github.com/stunt-adapters/stripe-style URL", e.GitURL)
+	if !strings.HasPrefix(e.GitURL, "https://github.com/stuntapi/stripe-style") {
+		t.Errorf("GitURL = %q, want a github.com/stuntapi/stripe-style URL", e.GitURL)
 	}
 }
 

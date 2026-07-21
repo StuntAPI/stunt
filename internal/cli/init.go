@@ -47,6 +47,15 @@ func newInitCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
 		Short: "Create a sample stunt.yaml in the current directory",
+		Long: `Create a sample stunt.yaml with an inline, rules-only service demonstrating
+stunt's core features: probabilistic faults, templated responses, and
+latency simulation.
+
+This is the fastest way to try stunt — run "stunt init", then "stunt up" and
+make requests to the served address. No adapter is required for rules-only
+services.
+
+To add a stateful adapter service later, see "stunt adapter --help".`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, _ := cmd.Flags().GetString("manifest")
 			if err := writeSampleManifest(path); err != nil {

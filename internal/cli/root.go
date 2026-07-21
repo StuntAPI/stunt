@@ -8,9 +8,13 @@ func NewRootCmd() *cobra.Command {
 	root := &cobra.Command{
 		Use:           "stunt",
 		Short:         "Local API simulators — test against real APIs, locally",
+		Version:       Version,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	// Cobra auto-registers a --version flag when Version is set. Use the
+	// same output format as the `stunt version` subcommand for consistency.
+	root.SetVersionTemplate("stunt {{.Version}}\n")
 	root.PersistentFlags().String("manifest", defaultManifestPath, "path to stunt.yaml")
 	root.AddCommand(newVersionCmd())
 	root.AddCommand(newPlanCmd())

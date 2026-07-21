@@ -32,6 +32,11 @@ func newPlanCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "plan",
 		Short: "Validate the manifest and show what would run",
+		Long: `Load and validate stunt.yaml, then print a summary of what "stunt up" would
+serve: each service name, its listen address, and whether its adapter loaded.
+
+Use this before "stunt up" to catch manifest errors, unloadable adapters, and
+port conflicts early — without starting any servers.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, _ := cmd.Flags().GetString("manifest")
 			m, err := manifest.Load(path)

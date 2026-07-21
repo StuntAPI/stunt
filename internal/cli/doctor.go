@@ -178,6 +178,15 @@ func newDoctorCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
 		Short: "Print a health check (CA status, manifest, adapters, ports)",
+		Long: `Print a diagnostic health check covering everything stunt needs to run:
+
+  - Platform and OS
+  - CA status (generated? installed in the trust store?)
+  - Manifest validity and service count
+  - Per-service adapter load status and port availability
+
+Run this when something is not working — it surfaces the most common failure
+modes (missing CA, unloadable adapter, port conflict) in one place.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, _ := cmd.Flags().GetString("manifest")
 			r := BuildDoctor(caPath(manifestDir(path)), path)

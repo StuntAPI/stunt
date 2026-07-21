@@ -18,6 +18,14 @@ func newHostsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "hosts",
 		Short: "Manage /etc/hosts entries for stunt services",
+		Long: `Manage the /etc/hosts entries stunt uses for subdomain-mode TLS services.
+
+In subdomain mode, stunt maps each service to a <service>.localhost hostname
+served over real TLS on port 443. "hosts sync" adds those entries to /etc/hosts
+(requires privilege); "hosts clean" removes stunt's managed block.
+
+These are managed as a single delimited block so stunt never touches your
+existing hosts entries.`,
 	}
 	cmd.AddCommand(newHostsSyncCmd(), newHostsCleanCmd())
 	return cmd

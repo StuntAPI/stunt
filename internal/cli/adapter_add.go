@@ -39,7 +39,7 @@ func resolveCacheDir(cmd *cobra.Command) string {
 
 // resolveCatalogName checks whether sourceSpec is a bare adapter name that
 // matches a catalog entry. If so, it returns the git source spec from the
-// catalog (e.g. "git:github.com/stunt-adapters/stripe-style@v0.1.0").
+// catalog (e.g. "git:github.com/stuntapi/stripe-style@v0.1.0").
 // If the spec looks like a path, URL, or git shorthand, it is returned
 // unchanged.
 func resolveCatalogName(sourceSpec string) string {
@@ -59,7 +59,7 @@ func resolveCatalogName(sourceSpec string) string {
 }
 
 // catalogEntryToSpec converts a catalog Entry to a git source spec string
-// (e.g. "git:github.com/stunt-adapters/stripe-style@v0.1.0").
+// (e.g. "git:github.com/stuntapi/stripe-style@v0.1.0").
 func catalogEntryToSpec(e catalog.Entry) string {
 	u := e.GitURL
 	u = strings.TrimPrefix(u, "https://")
