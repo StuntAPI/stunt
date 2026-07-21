@@ -1,0 +1,67 @@
+# stunt — release pipeline
+# Triggered by a version tag (v*.*.*). Builds cross-platform binaries via
+# GoReleaser, publishes a GitHub Release, and pushes the Homebrew formula to
+# stuntapi/homebrew-tap (→ `brew install stuntapi/tap/stunt`).
+#
+# Prerequisites (configure in the stuntapi/stunt repo settings → Secrets):
+#   HOMEBREW_TAP_GITHUB_TOKEN  — a fine-grained PAT with `contents:write` on
+#                               the stuntapi/homebrew-tap repo. GoReleaser uses
+#                               it to push Formula/stunt.rb.
+#
+# To cut a release:
+#   git tag v0.1.0
+#   git push --tags
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write # GoReleaser creates the GitHub Release
+  packages: write
+
+jobs:
+  release:
+    name: GoReleaser
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # GoReleaser needs full history + tags for changelog/versioning
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.3"
+          cache: true
+
+      - name: Run the CI gate (never release a broken build)
+        uses: extractions/setup-just@v2
+        with:
+          just-version: "1.39.0"
+
+      - name: just ci
+        run: just ci
+
+      - name: GoReleaser
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: release-artifacts
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/checksums.txt
+            dist/*.sbom.json

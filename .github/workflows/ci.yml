@@ -1,0 +1,48 @@
+# stunt — continuous integration
+# Runs the canonical `just ci` gate on every push and pull request.
+# `just ci` = build + test -race + vet + fmt-check + mod-tidy + lint-adapters.
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: just ci (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # stunt is pure-Go (modernc.org/sqlite is CGO-free), so the exact
+        # host OS doesn't affect the build. Run on Linux for speed; the
+        # race detector covers concurrency correctness.
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history for `git describe` (version ldflags)
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.3"
+          cache: true
+
+      - name: Set up Just
+        uses: extractions/setup-just@v2
+        with:
+          just-version: "1.39.0"
+
+      - name: Run the canonical gate
+        run: just ci

@@ -1,2 +1,6 @@
 .pi/
 .stunt/
+
+# GoReleaser build output
+dist/
+

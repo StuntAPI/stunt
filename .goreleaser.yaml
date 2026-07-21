@@ -1,0 +1,142 @@
+# GoReleaser configuration for stunt.
+# Docs: https://goreleaser.com
+#
+# Module path (vanity): stuntapi.com/stunt  →  https://github.com/stuntapi/stunt
+# Build the release locally (no publish) with:
+#     env -u GOROOT goreleaser build --clean
+# Full snapshot (no tag required, no publish):
+#     env -u GOROOT goreleaser release --snapshot --clean
+# Validate this file:
+#     goreleaser check
+
+version: 2
+
+project_name: stunt
+
+# Mark the current repo as the source of truth for the stuntapi.com/stunt vanity
+# module path. GoReleaser runs `go build` in-tree, so this is informational.
+gomod:
+  proxy: true
+  mod: mod
+
+before:
+  hooks:
+    - go mod tidy
+
+metadata:
+  mod_timestamp: "{{.CommitTimestamp}}"
+
+builds:
+  - id: stunt
+    main: ./cmd/stunt
+    binary: stunt
+    # Pure-Go (modernc.org/sqlite is CGO-free) → static, portable binaries.
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X stuntapi.com/stunt/internal/cli.Version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # windows/arm64 is uncommon for a dev CLI; skip it to keep the matrix tight.
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: default
+    ids: [stunt]
+    # tarball on unix, zip on windows (GoReleaser default), with a clean name.
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- title .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - NOTICE
+      - README.md
+      - CHANGELOG*
+      - adapters/DISCLAIMER.template
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+sboms:
+  - id: default
+    artifacts: archive
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-dev"
+
+changelog:
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"
+  groups:
+    - title: "New features"
+      regexp: "^.*feat[(\\w]?:.*$"
+      order: 0
+    - title: "Bug fixes"
+      regexp: "^.*fix[(\\w]?:.*$"
+      order: 1
+    - title: "Other"
+      order: 999
+
+release:
+  github:
+    owner: stuntapi
+    name: stunt
+  draft: true
+  prerelease: auto
+  name_template: "stunt {{.Version}}"
+  header: |
+    ## stunt {{.Version}}
+
+    **stunt** turns public-facing APIs into local simulators so you can develop
+    and test client code without remote accounts or network access.
+
+    See the [CHANGELOG](https://github.com/stuntapi/stunt/blob/main/CHANGELOG.md) for details.
+
+# Homebrew tap: GoReleaser generates Formula/stunt.rb and pushes it to the
+# stuntapi/homebrew-tap repo on release. Users then install via:
+#     brew install stuntapi/tap/stunt
+brews:
+  - name: stunt
+    repository:
+      owner: stuntapi
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://stuntapi.com"
+    description: "Local simulators for public APIs — mock/stub servers for testing without remote accounts."
+    license: "Apache-2.0"
+    skip_upload: auto
+    install: |
+      bin.install "stunt"
+    test: |
+      system "#{bin}/stunt", "version"
+    caveats: |
+      stunt is a local-only testing tool. Reference adapters ("*-style") are
+      unofficial, synthetic-data simulators, not affiliated with any provider.
+
+# The Go module lives at the vanity path stuntapi.com/stunt (not the GitHub URL).
+# Reference it in docs/issues:
+#   go install stuntapi.com/stunt/cmd/stunt@latest
