@@ -45,13 +45,29 @@ verdict. Corrections welcome.)*
 
 ## Install
 
+**Go (any OS — Linux, macOS, Windows):**
+
 ```bash
 go install stuntapi.com/stunt/cmd/stunt@latest
 ```
 
+**macOS (Homebrew):**
+
+```bash
+brew install --cask stuntapi/tap/stunt
+```
+
+**Windows (winget):**
+
+```powershell
+winget install --manifest https://github.com/stuntapi/winget
+```
+
+Pre-built binaries for every platform are also on the
+[Releases page](https://github.com/stuntapi/stunt/releases).
+
 > Dev-machine note: if `go` commands fail with a stdlib-version mismatch, prefix them
 > with `env -u GOROOT` (a local toolchain quirk; not needed in CI/for end users).
-> *(Homebrew + GitHub Releases binaries are planned — see roadmap.)*
 
 ## Quickstart
 
@@ -151,7 +167,7 @@ lint-adapters). Quick path: `stunt adapter new myapi-style` → edit → `stunt 
 ## Status & roadmap
 
 **Pre-1.0 MVP.** Core is built, self-tested (`just ci` green), and dogfooded. On the roadmap:
-a **public catalog** (today's `stunt catalog` is offline/bundled + git refs), **Homebrew / GitHub
+a **public catalog** (today's `stunt catalog` is offline/bundled + git refs), **GitHub
 Releases** install, `stunt setup` privileged-path hardening, and broader adapter coverage.
 **Not planned for v1**: GraphQL subscriptions, npm adapter distribution.
 

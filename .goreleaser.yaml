@@ -47,10 +47,9 @@ builds:
     goarch:
       - amd64
       - arm64
-    # windows/arm64 is uncommon for a dev CLI; skip it to keep the matrix tight.
-    ignore:
-      - goos: windows
-        goarch: arm64
+    # All six targets ship. modernc.org/sqlite is pure-Go (CGO off) so even
+    # windows/arm64 (Surface Pro, Copilot+ PCs) cross-compiles cleanly.
+    # Confirmed by `just ci` cross-compile matrix + the v0.1.0 release.
 
 archives:
   - id: default
@@ -115,27 +114,59 @@ release:
 
     See the [CHANGELOG](https://github.com/stuntapi/stunt/blob/main/CHANGELOG.md) for details.
 
-# Homebrew tap: GoReleaser generates Formula/stunt.rb and pushes it to the
-# stuntapi/homebrew-tap repo on release. Users then install via:
-#     brew install stuntapi/tap/stunt
-brews:
+# Homebrew (macOS): GoReleaser generates a Cask and pushes it to
+# stuntapi/homebrew-tap on release. Install with:
+#     brew install --cask stuntapi/tap/stunt
+# NOTE: GoReleaser removed `brews` (Formulas) in v2.16 in favour of Casks.
+# Casks are macOS-only, so Linux/Windows users install via `go install`
+# (stuntapi.com/stunt/cmd/stunt@latest) or the release tarball/zip.
+homebrew_casks:
   - name: stunt
-    repository:
-      owner: stuntapi
-      name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    directory: Formula
     homepage: "https://stuntapi.com"
     description: "Local simulators for public APIs — mock/stub servers for testing without remote accounts."
     license: "Apache-2.0"
-    skip_upload: auto
-    install: |
-      bin.install "stunt"
-    test: |
-      system "#{bin}/stunt", "version"
+    binaries: [stunt]
+    # stunt is an unsigned Go binary → strip macOS Gatekeeper quarantine on install.
+    hooks:
+      post:
+        install: |
+          system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/stunt"]
+    repository:
+      owner: stuntapi
+      name: homebrew-tap
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    # Helps `brew audit` pass when homepage differs from the download domain.
+    url:
+      verified: "github.com/stuntapi/stunt"
     caveats: |
       stunt is a local-only testing tool. Reference adapters ("*-style") are
       unofficial, synthetic-data simulators, not affiliated with any provider.
+
+# Windows: winget manifests. GoReleaser generates StuntAPI.Stunt manifests and
+# pushes them to stuntapi/winget on release. Install from a manifest:
+#     winget install --manifest <manifest-dir-or-url>
+# (Default-source `winget install StuntAPI.Stunt` follows once the manifest is
+#  submitted to microsoft/winget-pkgs — see docs/RELEASING.md.)
+winget:
+  - name: stunt
+    package_identifier: StuntAPI.Stunt
+    publisher: StuntAPI
+    publisher_url: https://stuntapi.com
+    homepage: https://stuntapi.com
+    short_description: "Local simulators for public APIs — mock servers for testing without remote accounts."
+    description: "stunt turns public-facing APIs into local simulators (mock/stub servers) so you can develop and test client code without creating remote accounts, provisioning cloud resources, or hitting the network."
+    license: Apache-2.0
+    license_url: https://github.com/stuntapi/stunt/blob/main/LICENSE
+    copyright: Copyright (c) The Stunt Authors
+    tags: [mock, testing, api, simulator, stub, development]
+    repository:
+      owner: stuntapi
+      name: winget
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    # Reference the windows zip archives (portable install — no MSI).
+    ids:
+      - default
+    skip_upload: auto
 
 # The Go module lives at the vanity path stuntapi.com/stunt (not the GitHub URL).
 # Reference it in docs/issues:

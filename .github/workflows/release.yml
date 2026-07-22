@@ -1,12 +1,13 @@
 # stunt — release pipeline
-# Triggered by a version tag (v*.*.*). Builds cross-platform binaries via
-# GoReleaser, publishes a GitHub Release, and pushes the Homebrew formula to
-# stuntapi/homebrew-tap (→ `brew install stuntapi/tap/stunt`).
+# Triggered by a version tag (v*.*.*). Builds all six cross-platform targets
+# via GoReleaser, publishes a GitHub Release, and pushes the packaging metadata:
+#   • Homebrew Cask → stuntapi/homebrew-tap  (macOS: `brew install --cask stuntapi/tap/stunt`)
+#   • winget manifest → stuntapi/winget       (Windows: `winget install --manifest ...`)
 #
 # Prerequisites (configure in the stuntapi/stunt repo settings → Secrets):
-#   HOMEBREW_TAP_GITHUB_TOKEN  — a fine-grained PAT with `contents:write` on
-#                               the stuntapi/homebrew-tap repo. GoReleaser uses
-#                               it to push Formula/stunt.rb.
+#   TAP_GITHUB_TOKEN  — a fine-grained PAT with `contents:write` on BOTH
+#                       stuntapi/homebrew-tap AND stuntapi/winget. GoReleaser
+#                       uses it to push the Cask + winget manifest on release.
 #
 # To cut a release:
 #   git tag v0.1.0
@@ -53,7 +54,7 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
