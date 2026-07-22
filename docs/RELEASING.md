@@ -57,12 +57,20 @@ Make the repo **public** (Settings → General → Danger Zone).
 
 ---
 
-## 3. Homebrew tap
+## 3. Packaging repos
 
-Create a public repo **`stuntapi/homebrew-tap`** (empty — GoReleaser writes
-`Formula/stunt.rb` into it on each release).
+Create two **public** repos (empty — GoReleaser writes into them on each release):
 
-Then `brew install stuntapi/tap/stunt` works.
+- **`stuntapi/homebrew-tap`** — receives `Casks/stunt.rb` (Homebrew Cask, macOS).
+- **`stuntapi/winget`** — receives the `StuntAPI.Stunt` winget manifest (Windows).
+
+Then `brew install --cask stuntapi/tap/stunt` (macOS) and
+`winget install --manifest https://github.com/stuntapi/winget` (Windows) work.
+
+> **Why Casks, not Formulas?** GoReleaser removed `brews` (Formulas) in v2.16 in
+> favour of Casks. Casks are macOS-only, so non-macOS users install via
+> `go install` (works everywhere) or the release archive. This is the standard
+> Go-CLI distribution pattern.
 
 ---
 
@@ -72,7 +80,7 @@ In `stuntapi/stunt` → **Settings → Secrets and variables → Actions**, add:
 
 | Secret | Purpose |
 |---|---|
-| `HOMEBREW_TAP_GITHUB_TOKEN` | Fine-grained PAT with `contents: write` on `stuntapi/homebrew-tap`. GoReleaser uses it to push the formula. |
+| `TAP_GITHUB_TOKEN` | Fine-grained PAT with `contents: write` on **both** `stuntapi/homebrew-tap` **and** `stuntapi/winget`. GoReleaser uses it to push the Cask + winget manifest. |
 
 `GITHUB_TOKEN` is provided automatically (used to create the Release).
 
@@ -90,7 +98,7 @@ The **Release** workflow (`.github/workflows/release.yml`) then:
 1. Runs `just ci` (never releases a broken build).
 2. GoReleaser builds `linux/darwin/windows × amd64/arm64`, archives, checksums, SBOMs.
 3. Publishes a **draft** GitHub Release (review then publish).
-4. Pushes `Formula/stunt.rb` → `stuntapi/homebrew-tap`.
+4. Pushes `Casks/stunt.rb` → `stuntapi/homebrew-tap` and the winget manifest → `stuntapi/winget`.
 
 Release is marked `prerelease: auto` and `draft: true` — review the draft, then
 publish it.
@@ -106,8 +114,10 @@ publish it.
 - [x] `.goreleaser.yaml` (validated, snapshot build passes)
 - [x] CI + Release workflows
 - [x] Vanity redirect page (`.vanity/index.html`)
-- [ ] **Move repo** into `stuntapi` org, make public
-- [ ] **Host vanity page** at `stuntapi.com/stunt` (GitHub Pages)
-- [ ] **Create** `stuntapi/homebrew-tap` repo
-- [ ] **Add** `HOMEBREW_TAP_GITHUB_TOKEN` secret
+- [x] **Move repo** into `stuntapi` org, make public
+- [x] **Host vanity page** at `stuntapi.com/stunt` (served by stuntapi.com)
+- [x] **Create** `stuntapi/homebrew-tap` repo
+- [x] **Create** `stuntapi/winget` repo
+- [x] **Wire** GoReleaser `homebrew_casks` + `winget` (migrated off removed `brews`)
+- [ ] **Add** `TAP_GITHUB_TOKEN` secret (PAT: `contents:write` on homebrew-tap + winget)
 - [ ] **Tag** `v0.1.0` and push
