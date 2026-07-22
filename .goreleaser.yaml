@@ -65,7 +65,6 @@ archives:
       - LICENSE
       - NOTICE
       - README.md
-      - CHANGELOG*
       - adapters/DISCLAIMER.template
 
 checksum:
@@ -111,8 +110,6 @@ release:
 
     **stunt** turns public-facing APIs into local simulators so you can develop
     and test client code without remote accounts or network access.
-
-    See the [CHANGELOG](https://github.com/stuntapi/stunt/blob/main/CHANGELOG.md) for details.
 
 # Homebrew (macOS): GoReleaser generates a Cask and pushes it to
 # stuntapi/homebrew-tap on release. Install with:
