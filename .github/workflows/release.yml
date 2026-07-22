@@ -47,6 +47,9 @@ jobs:
       - name: just ci
         run: just ci
 
+      - name: Install syft (SBOM tool — GoReleaser's `sboms` pipe shells out to it)
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
       - name: GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
