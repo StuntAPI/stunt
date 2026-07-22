@@ -88,6 +88,10 @@ In `stuntapi/stunt` → **Settings → Secrets and variables → Actions**, add:
 
 ## 5. Cut a release
 
+There are **two** paths — both produce the same artifacts.
+
+### Path A — GitHub Actions (default)
+
 ```sh
 git tag v0.1.0
 git push --tags
@@ -99,6 +103,24 @@ The **Release** workflow (`.github/workflows/release.yml`) then:
 2. GoReleaser builds `linux/darwin/windows × amd64/arm64`, archives, checksums, SBOMs.
 3. Publishes a **draft** GitHub Release (review then publish).
 4. Pushes `Casks/stunt.rb` → `stuntapi/homebrew-tap` and the winget manifest → `stuntapi/winget`.
+
+### Path B — local release (no GitHub Actions dependency)
+
+Use this when Actions can't run — billing exhausted, a GitHub outage, or a
+fresh machine. It cuts the identical release from your laptop:
+
+```sh
+export TAP_GITHUB_TOKEN=<PAT: contents:write on stuntapi/homebrew-tap + stuntapi/winget>
+export GITHUB_TOKEN="$(gh auth token)"
+
+git tag v0.x.y          # tag at HEAD (GoReleaser derives the version from it)
+just release            # runs the local CI gate, then goreleaser
+# just release --no-ci  # skip the gate — release even if ci cannot run
+```
+
+`just release` ensures `syft` is installed (the `sboms` pipe needs it),
+gates on `just ci` by default, and runs `goreleaser release --clean` with the
+tokens from your environment. Use **one** path per release — don't run both.
 
 Release is marked `prerelease: auto` and `draft: true` — review the draft, then
 publish it.

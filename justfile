@@ -30,6 +30,31 @@ default:
 ci: build test vet fmt-check mod-tidy lint-adapters
     @echo "✓ all CI checks passed"
 
+# ---- release --------------------------------------------------------------
+# Cut a release NOW from your machine — no GitHub Actions dependency.
+# Works even when Actions can't run (billing exhausted, outage, fresh machine).
+# Requires: a git tag at HEAD, and two tokens in the environment:
+#   export TAP_GITHUB_TOKEN=<PAT: contents:write on stuntapi/homebrew-tap + stuntapi/winget>
+#   export GITHUB_TOKEN="$(gh auth token)"
+# Options:  --no-ci   skip the local CI gate (release even if ci cannot run).
+release *args='':
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tag="$(git describe --exact-match --tags HEAD 2>/dev/null)" || {
+        echo "⚠️  HEAD is not a tagged commit. Tag it first:" >&2
+        echo "      git tag v0.x.y  &&  git push --tags" >&2
+        exit 1
+    }
+    : "${TAP_GITHUB_TOKEN:?TAP_GITHUB_TOKEN required (fine-grained PAT: contents:write on stuntapi/homebrew-tap + stuntapi/winget)}"
+    : "${GITHUB_TOKEN:?GITHUB_TOKEN required  (export GITHUB_TOKEN="\$(gh auth token)")}"
+    command -v syft >/dev/null 2>&1 || {
+        echo ">> syft not found — installing (GoReleaser's sboms pipe needs it)..."
+        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+    }
+    case "{{args}}" in *--no-ci*) echo ">> skipping local CI gate (--no-ci)";; *) just ci;; esac
+    echo ">> cutting release $tag (local — no GitHub Actions)"
+    goreleaser release --clean
+
 # ---- granular recipes ------------------------------------------------------
 
 # Compile everything (including the CLI binary).
