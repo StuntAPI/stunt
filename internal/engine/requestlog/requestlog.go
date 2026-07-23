@@ -5,6 +5,7 @@ package requestlog
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -186,15 +187,44 @@ func (s *Store) persist(e Entry) error {
 // NOT go through the async writer and does not touch the in-flight counter.
 func (s *Store) Insert(e Entry) error { return s.persist(e) }
 
-// List returns entries matching q, newest-first.
+// List returns entries matching q, newest-first. Non-empty filter fields
+// (Service, Method, Path substring, Q free-text) are AND-combined into a
+// WHERE clause; an empty query returns the newest entries up to Limit.
 func (s *Store) List(q Query) ([]Entry, error) {
 	if q.Limit <= 0 || q.Limit > 1000 {
 		q.Limit = 100
 	}
+
+	var where []string
+	var args []any
+	if q.Service != "" {
+		where = append(where, "service = ?")
+		args = append(args, q.Service)
+	}
+	if q.Method != "" {
+		where = append(where, "method = ?")
+		args = append(args, q.Method)
+	}
+	if q.Path != "" {
+		where = append(where, "path LIKE ?")
+		args = append(args, "%"+q.Path+"%")
+	}
+	if q.Q != "" {
+		where = append(where, "(path LIKE ? OR req_body LIKE ? OR resp_body LIKE ?)")
+		args = append(args, "%"+q.Q+"%", "%"+q.Q+"%", "%"+q.Q+"%")
+	}
+
+	clause := ""
+	if len(where) > 0 {
+		clause = "WHERE " + strings.Join(where, " AND ")
+	}
+	args = append(args, q.Limit, q.Offset)
+
 	rows, err := s.db.Query(`SELECT id, seq, ts, service, transport, method, path,
 		status, duration_ms, req_headers, req_body, resp_headers, resp_body
 		FROM request_log
-		ORDER BY seq DESC LIMIT ? OFFSET ?`, q.Limit, q.Offset)
+		`+clause+`
+		ORDER BY seq DESC LIMIT ? OFFSET ?`, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list request_log: %w", err)
 	}
