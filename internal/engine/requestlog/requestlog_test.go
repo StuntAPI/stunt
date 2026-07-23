@@ -1,7 +1,10 @@
 package requestlog_test
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"stuntapi.com/stunt/internal/engine/requestlog"
@@ -28,6 +31,43 @@ func TestAsyncWriteAndRingEviction(t *testing.T) {
 	}
 	if len(got) != 3 || got[0].Seq != 5 || got[2].Seq != 3 {
 		t.Fatalf("ring eviction wrong: %+v", got)
+	}
+}
+
+func TestRecorderCapturesAndRedacts(t *testing.T) {
+	dir := t.TempDir()
+	st, _ := requestlog.Open(filepath.Join(dir, "requests.db"))
+	t.Cleanup(func() { _ = st.Close() })
+
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"id":"ch_1"}`))
+	})
+	rec := requestlog.NewRecorder(st, "api")
+	h := rec.Wrap(inner)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/charge",
+		strings.NewReader(`{"amount":100}`))
+	req.Header.Set("Authorization", "Bearer sk_test_abc")
+	req.Header.Set("Content-Type", "application/json")
+	rw := httptest.NewRecorder()
+	h.ServeHTTP(rw, req)
+
+	st.Flush()
+	got, _ := st.List(requestlog.Query{Limit: 5})
+	if len(got) != 1 {
+		t.Fatalf("want 1 entry, got %d", len(got))
+	}
+	e := got[0]
+	if e.Method != "POST" || e.Path != "/v1/charge" || e.Status != 201 {
+		t.Fatalf("capture wrong: %+v", e)
+	}
+	if strings.Contains(e.ReqHeaders, "sk_test_abc") {
+		t.Fatalf("Authorization not redacted: %s", e.ReqHeaders)
+	}
+	if !strings.Contains(e.ReqHeaders, "[REDACTED]") {
+		t.Fatalf("expected [REDACTED]: %s", e.ReqHeaders)
 	}
 }
 
