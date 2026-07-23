@@ -7,6 +7,30 @@ import (
 	"stuntapi.com/stunt/internal/engine/requestlog"
 )
 
+func TestAsyncWriteAndRingEviction(t *testing.T) {
+	dir := t.TempDir()
+	st, err := requestlog.Open(filepath.Join(dir, "requests.db"),
+		requestlog.WithRing(3))
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	for i := 1; i <= 5; i++ { // write 5, ring keeps 3
+		st.Enqueue(requestlog.Entry{Seq: int64(i), Service: "s", Transport: "http",
+			Method: "GET", Path: "/x", Status: 200})
+	}
+	st.Flush() // wait for the writer to drain
+
+	got, err := st.List(requestlog.Query{Limit: 10})
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(got) != 3 || got[0].Seq != 5 || got[2].Seq != 3 {
+		t.Fatalf("ring eviction wrong: %+v", got)
+	}
+}
+
 func TestStoreInsertAndList(t *testing.T) {
 	dir := t.TempDir()
 	st, err := requestlog.Open(filepath.Join(dir, "requests.db"))

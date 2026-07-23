@@ -5,6 +5,7 @@ package requestlog
 import (
 	"database/sql"
 	"fmt"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -55,8 +56,40 @@ const schema = `CREATE TABLE IF NOT EXISTS request_log (
 );
 CREATE INDEX IF NOT EXISTS idx_request_log_seq ON request_log(seq);`
 
-// Open opens (or creates) the request log at path.
-func Open(path string) (*Store, error) {
+// Options configures the store.
+type Options struct {
+	Ring       int   // keep at most this many newest entries (0 = unlimited)
+	MaxBytes   int64 // rotate (delete oldest) when DB exceeds this (0 = unlimited)
+	WriteQueue int   // async enqueue buffer size (default 1024)
+}
+
+// WithRing sets the ring-bound (newest-N) retention.
+func WithRing(n int) func(*Options) {
+	return func(o *Options) { o.Ring = n }
+}
+
+// Open opens (or creates) the request log at path with the given options.
+// Without options it defaults to Ring=1000, WriteQueue=1024.
+func Open(path string, opts ...func(*Options)) (*Store, error) {
+	o := Options{Ring: 1000, WriteQueue: 1024}
+	for _, fn := range opts {
+		fn(&o)
+	}
+	st, err := openStore(path, o)
+	if err != nil {
+		return nil, err
+	}
+	st.startWriter()
+	return st, nil
+}
+
+// openStore opens the database and applies the schema, storing opts on the
+// struct. It does NOT start the async writer (callers that want a read-only
+// inspection store can use this directly).
+func openStore(path string, opts Options) (*Store, error) {
+	if opts.WriteQueue <= 0 {
+		opts.WriteQueue = 1024
+	}
 	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite %s: %w", path, err)
@@ -70,33 +103,81 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("create request_log: %w", err)
 	}
-	return &Store{db: db}, nil
+	return &Store{db: db, opts: opts}, nil
 }
 
 // Store is the SQLite-backed request log.
 type Store struct {
-	db *sql.DB
+	db       *sql.DB
+	opts     Options
+	ch       chan Entry
+	inFlight sync.WaitGroup
 }
 
-// Close closes the database.
-func (s *Store) Close() error { return s.db.Close() }
+// Close stops the async writer (if running) and closes the database.
+func (s *Store) Close() error {
+	if s.ch != nil {
+		close(s.ch)
+	}
+	return s.db.Close()
+}
 
-// Insert persists an entry (assigning seq + ts if zero).
-func (s *Store) Insert(e Entry) error {
+// startWriter launches the background goroutine that drains s.ch and persists
+// each entry off the request hot path.
+func (s *Store) startWriter() {
+	s.ch = make(chan Entry, s.opts.WriteQueue)
+	go func() {
+		for e := range s.ch {
+			_ = s.persist(e)
+			s.inFlight.Done()
+		}
+	}()
+}
+
+// Enqueue hands an entry to the writer goroutine (non-blocking; drops on full).
+// If no writer is running (store opened read-only), it persists synchronously.
+func (s *Store) Enqueue(e Entry) {
+	if s.ch == nil { // read-only inspection store
+		_ = s.persist(e)
+		return
+	}
+	s.inFlight.Add(1)
+	select {
+	case s.ch <- e:
+	default: // queue full → drop; ring still bounds total on subsequent writes
+		s.inFlight.Done()
+	}
+}
+
+// Flush blocks until all enqueued entries have been written by the writer
+// goroutine. It is a no-op for read-only stores.
+func (s *Store) Flush() { s.inFlight.Wait() }
+
+// persist inserts an entry (assigning ts if empty) and enforces the ring
+// bound. It is pure with respect to the in-flight counter: the writer loop
+// (or the sync Insert path) owns counter management.
+func (s *Store) persist(e Entry) error {
 	if e.Ts == "" {
 		e.Ts = nowRFC3339()
 	}
-	_, err := s.db.Exec(`INSERT INTO request_log
+	if _, err := s.db.Exec(`INSERT INTO request_log
 		(seq, ts, service, transport, method, path, status, duration_ms,
 		 req_headers, req_body, resp_headers, resp_body)
 		VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
 		e.Seq, e.Ts, e.Service, e.Transport, e.Method, e.Path, e.Status, e.DurationMs,
-		e.ReqHeaders, e.ReqBody, e.RespHeaders, e.RespBody)
-	if err != nil {
+		e.ReqHeaders, e.ReqBody, e.RespHeaders, e.RespBody); err != nil {
 		return fmt.Errorf("insert request_log: %w", err)
+	}
+	if s.opts.Ring > 0 {
+		_, _ = s.db.Exec(`DELETE FROM request_log WHERE id NOT IN (
+			SELECT id FROM request_log ORDER BY seq DESC LIMIT ?)`, s.opts.Ring)
 	}
 	return nil
 }
+
+// Insert persists an entry synchronously (back-compat / test path). It does
+// NOT go through the async writer and does not touch the in-flight counter.
+func (s *Store) Insert(e Entry) error { return s.persist(e) }
 
 // List returns entries matching q, newest-first.
 func (s *Store) List(q Query) ([]Entry, error) {
