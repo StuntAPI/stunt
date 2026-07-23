@@ -72,6 +72,19 @@ func TestRecorderCapturesAndRedacts(t *testing.T) {
 	}
 }
 
+func TestStoreGetByID(t *testing.T) {
+	dir := t.TempDir()
+	st, _ := requestlog.Open(filepath.Join(dir, "r.db"))
+	t.Cleanup(func() { _ = st.Close() })
+	st.Enqueue(requestlog.Entry{Seq: 7, Service: "s", Method: "GET", Path: "/x", Status: 200})
+	st.Flush()
+	got, _ := st.List(requestlog.Query{Limit: 1})
+	byID, err := st.Get(got[0].ID)
+	if err != nil || byID.Path != "/x" {
+		t.Fatalf("Get(%d) = %+v err=%v", got[0].ID, byID, err)
+	}
+}
+
 func TestStoreInsertAndList(t *testing.T) {
 	dir := t.TempDir()
 	st, err := requestlog.Open(filepath.Join(dir, "requests.db"))
