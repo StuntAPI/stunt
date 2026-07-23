@@ -3,9 +3,11 @@ package dashboard_test
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -108,6 +110,41 @@ func TestStreamLiveFeed(t *testing.T) {
 	}
 	if !strings.Contains(string(msg), `"/live"`) {
 		t.Fatalf("expected /live in %s", msg)
+	}
+}
+
+func TestReplay(t *testing.T) {
+	st, err := requestlog.Open(filepath.Join(t.TempDir(), "r.db"))
+	if err != nil {
+		t.Fatalf("requestlog.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+	st.Enqueue(requestlog.Entry{Seq: 1, Service: "s", Method: "GET", Path: "/x", Status: 200})
+	st.Flush()
+	orig, err := st.List(requestlog.Query{Limit: 1})
+	if err != nil || len(orig) == 0 {
+		t.Fatalf("List: err=%v len=%d", err, len(orig))
+	}
+
+	d := dashboard.New(st)
+	d.SetTokenForTest("tok")
+	d.SetReplayFunc(func(e requestlog.Entry) (int, string) { return 201, `{"replayed":true}` })
+	srv := httptest.NewServer(d.Handler())
+	t.Cleanup(srv.Close)
+
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/requests/"+strconv.FormatInt(orig[0].ID, 10)+"/replay", nil)
+	req.Header.Set("X-Stunt-Token", "tok")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("want 200, got %d", res.StatusCode)
+	}
+	body, _ := io.ReadAll(res.Body)
+	if !strings.Contains(string(body), `"replayed":true`) {
+		t.Fatalf("unexpected body %s", body)
 	}
 }
 
