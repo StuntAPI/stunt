@@ -9,14 +9,18 @@
 package dashboard
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/coder/websocket"
 
 	"stuntapi.com/stunt/internal/engine/dashboard/assets"
 	"stuntapi.com/stunt/internal/engine/requestlog"
@@ -52,6 +56,7 @@ func (d *Dashboard) SetTokenForTest(t string) { d.token = t }
 // Handler returns the HTTP handler with the auth + Host guards applied.
 func (d *Dashboard) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/requests/stream", d.handleStream)
 	mux.HandleFunc("/api/requests", d.handleRequests)
 	mux.HandleFunc("/", d.handleIndex)
 	return d.guard(mux)
@@ -153,6 +158,67 @@ func (d *Dashboard) handleIndex(w http.ResponseWriter, r *http.Request) {
 	entries, _ := d.store.List(requestlog.Query{Limit: 200})
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = d.tmpl.ExecuteTemplate(w, "dashboard.tmpl", entries)
+}
+
+// handleStream upgrades to a WebSocket and streams captured requests live,
+// gap-free: any entries newer than the client's last seen seq (since_seq) are
+// backfilled oldest-first, then live entries fan out as they are persisted.
+// The endpoint lives under the same guard as the REST API (token + Host), so
+// Accept is reached only for authenticated loopback clients.
+func (d *Dashboard) handleStream(w http.ResponseWriter, r *http.Request) {
+	c, err := websocket.Accept(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer c.Close(websocket.StatusInternalError, "closing")
+
+	ctx := r.Context()
+	since, _ := strconv.ParseInt(r.URL.Query().Get("since_seq"), 10, 64)
+
+	// Subscribe BEFORE backfilling so nothing published in the gap is lost.
+	ch, cancel := d.store.Bus().Subscribe()
+	defer cancel()
+
+	// Gap-free backfill: send entries with seq > since, oldest-first. List
+	// returns newest-first, so iterate in reverse. On first connect (since<=0)
+	// the client fetches its own initial fill via /api/requests; here we only
+	// stream what arrives live.
+	if since > 0 {
+		recent, _ := d.store.List(requestlog.Query{Since: since, Limit: 1000})
+		for i := len(recent) - 1; i >= 0; i-- {
+			if err := wsWriteJSON(ctx, c, toAPI(recent[i])); err != nil {
+				return
+			}
+		}
+	}
+
+	for {
+		select {
+		case e, ok := <-ch:
+			if !ok {
+				return
+			}
+			if e.Seq <= since {
+				continue // already backfilled; skip
+			}
+			if err := wsWriteJSON(ctx, c, toAPI(e)); err != nil {
+				return
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// wsWriteJSON marshals v and writes it as a single WebSocket text frame. A
+// write error (client gone / context cancelled) is returned to the caller,
+// which closes the connection via the deferred Close.
+func wsWriteJSON(ctx context.Context, c *websocket.Conn, v any) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return c.Write(ctx, websocket.MessageText, b)
 }
 
 // newToken returns a random 32-char hex token.
