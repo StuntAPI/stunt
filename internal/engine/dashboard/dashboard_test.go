@@ -80,7 +80,7 @@ func dummyStore(t *testing.T) *requestlog.Store {
 	t.Cleanup(func() { _ = st.Close() })
 	st.Enqueue(requestlog.Entry{
 		Seq: 1, Service: "api", Transport: "http", Method: "GET", Path: "/v1/widgets",
-		Status: 200, DurationMs: 7,
+		Status: 200, DurationUs: 7000,
 	})
 	st.Flush()
 	return st

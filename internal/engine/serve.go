@@ -60,7 +60,7 @@ func (e *Engine) serve(ctx context.Context, freePorts bool) (map[string]string, 
 		}
 		svc := e.manifest.Services[name]
 		handler := e.serviceHandler(name, svc)
-		handler = requestlog.NewRecorder(e.reqLog, name).Wrap(handler)
+		handler = requestlog.NewRecorder(e.reqLog, name, e.seq).Wrap(handler)
 		srv := &http.Server{
 			Handler:           handler,
 			ReadHeaderTimeout: 5 * time.Second,
@@ -108,7 +108,7 @@ func (e *Engine) ServeSingle(ctx context.Context, listenAddr, tld string) (strin
 	handlers := make(map[string]http.Handler)
 	for name, svc := range e.manifest.Services {
 		h := e.serviceHandler(name, svc)
-		handlers[name] = requestlog.NewRecorder(e.reqLog, name).Wrap(h)
+		handlers[name] = requestlog.NewRecorder(e.reqLog, name, e.seq).Wrap(h)
 	}
 
 	root := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

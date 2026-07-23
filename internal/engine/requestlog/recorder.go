@@ -24,12 +24,14 @@ const maxBody = 64 << 10 // 64 KB
 type Recorder struct {
 	store   *Store
 	service string
-	seq     atomic.Int64
+	seq     *atomic.Int64 // shared global sequence (engine-wide) → unique across services
 }
 
-// NewRecorder builds a recorder bound to a service name.
-func NewRecorder(st *Store, service string) *Recorder {
-	return &Recorder{store: st, service: service}
+// NewRecorder builds a recorder bound to a service name. seq is a shared,
+// engine-wide monotonic counter so entry Seq values are globally unique
+// (needed for the live-feed gap-free ordering in Plan 2 and unique row labels).
+func NewRecorder(st *Store, service string, seq *atomic.Int64) *Recorder {
+	return &Recorder{store: st, service: service, seq: seq}
 }
 
 // Wrap returns a handler that records then delegates to next.
@@ -59,7 +61,7 @@ func (r *Recorder) Wrap(next http.Handler) http.Handler {
 			Method:      req.Method,
 			Path:        req.URL.Path,
 			Status:      rw.status,
-			DurationMs:  dur.Milliseconds(),
+			DurationUs:  dur.Microseconds(),
 			ReqHeaders:  redactHeaders(req.Header),
 			ReqBody:     capBody(reqBody),
 			RespHeaders: headerJSON(rw.Header()),

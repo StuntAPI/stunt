@@ -22,7 +22,7 @@ type Entry struct {
 	Method      string `json:"method"`
 	Path        string `json:"path"`
 	Status      int    `json:"status"`
-	DurationMs  int64  `json:"duration_ms"`
+	DurationUs  int64  `json:"duration_us"`  // microseconds (sub-ms resolution)
 	ReqHeaders  string `json:"req_headers"`  // JSON, sensitive values redacted
 	ReqBody     string `json:"req_body"`     // capped
 	RespHeaders string `json:"resp_headers"` // JSON
@@ -49,7 +49,7 @@ const schema = `CREATE TABLE IF NOT EXISTS request_log (
 	method      TEXT NOT NULL,
 	path        TEXT NOT NULL,
 	status      INTEGER NOT NULL,
-	duration_ms INTEGER NOT NULL,
+	duration_us INTEGER NOT NULL,
 	req_headers TEXT NOT NULL DEFAULT '',
 	req_body    TEXT NOT NULL DEFAULT '',
 	resp_headers TEXT NOT NULL DEFAULT '',
@@ -178,10 +178,10 @@ func (s *Store) persist(e Entry) error {
 		e.Ts = nowRFC3339()
 	}
 	if _, err := s.db.Exec(`INSERT INTO request_log
-		(seq, ts, service, transport, method, path, status, duration_ms,
+		(seq, ts, service, transport, method, path, status, duration_us,
 		 req_headers, req_body, resp_headers, resp_body)
 		VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-		e.Seq, e.Ts, e.Service, e.Transport, e.Method, e.Path, e.Status, e.DurationMs,
+		e.Seq, e.Ts, e.Service, e.Transport, e.Method, e.Path, e.Status, e.DurationUs,
 		e.ReqHeaders, e.ReqBody, e.RespHeaders, e.RespBody); err != nil {
 		return fmt.Errorf("insert request_log: %w", err)
 	}
@@ -230,7 +230,7 @@ func (s *Store) List(q Query) ([]Entry, error) {
 	args = append(args, q.Limit, q.Offset)
 
 	rows, err := s.db.Query(`SELECT id, seq, ts, service, transport, method, path,
-		status, duration_ms, req_headers, req_body, resp_headers, resp_body
+		status, duration_us, req_headers, req_body, resp_headers, resp_body
 		FROM request_log
 		`+clause+`
 		ORDER BY seq DESC LIMIT ? OFFSET ?`, args...)
@@ -242,7 +242,7 @@ func (s *Store) List(q Query) ([]Entry, error) {
 	for rows.Next() {
 		var e Entry
 		if err := rows.Scan(&e.ID, &e.Seq, &e.Ts, &e.Service, &e.Transport, &e.Method,
-			&e.Path, &e.Status, &e.DurationMs, &e.ReqHeaders, &e.ReqBody,
+			&e.Path, &e.Status, &e.DurationUs, &e.ReqHeaders, &e.ReqBody,
 			&e.RespHeaders, &e.RespBody); err != nil {
 			return nil, err
 		}
