@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -16,6 +17,7 @@ import (
 	"github.com/spf13/cobra"
 	"stuntapi.com/stunt/internal/adapter"
 	"stuntapi.com/stunt/internal/engine"
+	"stuntapi.com/stunt/internal/engine/dashboard"
 	"stuntapi.com/stunt/internal/manifest"
 	"stuntapi.com/stunt/internal/netutil"
 	"stuntapi.com/stunt/internal/netutil/proxy"
@@ -81,6 +83,11 @@ func runUpPort(ctx context.Context, e *engine.Engine, m *manifest.Manifest, out 
 	}
 	defer cancel()
 
+	dashURL, dashToken := startDashboard(ctx, e)
+	if dashURL != "" {
+		fmt.Fprintf(out, "  dashboard:  %s   (token: %s)\n", dashURL, dashToken)
+	}
+
 	// Write the runtime file so `stunt down` can stop this server.
 	manifestDir := filepath.Dir(m.Path)
 	var addrList []string
@@ -129,6 +136,30 @@ func runUpPort(ctx context.Context, e *engine.Engine, m *manifest.Manifest, out 
 	// like a failure to the user. Print a clean message instead.
 	fmt.Fprintln(out, "stopped.")
 	return nil
+}
+
+// startDashboard runs the localhost admin UI; returns its URL + token. A bind
+// failure is non-fatal: it logs a warning and returns "".
+func startDashboard(ctx context.Context, e *engine.Engine) (string, string) {
+	rl := e.RequestLog()
+	if rl == nil {
+		return "", ""
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: dashboard disabled: %v\n", err)
+		return "", ""
+	}
+	d := dashboard.New(rl)
+	srv := &http.Server{Handler: d.Handler()}
+	go func() {
+		<-ctx.Done()
+		c, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_ = srv.Shutdown(c)
+	}()
+	go func() { _ = srv.Serve(ln) }()
+	return "http://" + ln.Addr().String(), d.Token()
 }
 
 // upServiceSummary renders the parenthesised summary for an adapter-backed
@@ -259,6 +290,10 @@ func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifes
 	sort.Strings(names)
 	for _, name := range names {
 		fmt.Fprintf(out, "  %s  ->  %s://%s.%s:%s\n", name, scheme, name, tld, actualPort)
+	}
+	dashURL, dashToken := startDashboard(ctx, e)
+	if dashURL != "" {
+		fmt.Fprintf(out, "  dashboard:  %s   (token: %s)\n", dashURL, dashToken)
 	}
 	fmt.Fprintln(out, "stunt up (subdomain mode) — Ctrl-C to stop")
 
