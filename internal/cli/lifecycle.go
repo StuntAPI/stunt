@@ -12,11 +12,13 @@ import (
 // <manifest-dir>/.stunt/runtime/up.json when `stunt up` starts and removed
 // on clean shutdown.
 type RuntimeFile struct {
-	PID       int      `json:"pid"`
-	Manifest  string   `json:"manifest"`
-	Mode      string   `json:"mode"`
-	Addresses []string `json:"addresses"`
-	StartedAt string   `json:"started_at"`
+	PID            int      `json:"pid"`
+	Manifest       string   `json:"manifest"`
+	Mode           string   `json:"mode"`
+	Addresses      []string `json:"addresses"`
+	StartedAt      string   `json:"started_at"`
+	DashboardURL   string   `json:"dashboard_url,omitempty"`
+	DashboardToken string   `json:"dashboard_token,omitempty"`
 }
 
 // runtimeDir returns the directory for runtime files under the manifest dir.
