@@ -30,6 +30,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newAdapterCmd())
 	root.AddCommand(newCatalogCmd())
 	root.AddCommand(newDemoCmd())
+	root.AddCommand(newRequestsCmd())
 	root.AddCommand(newLLMCmd())
 	return root
 }
