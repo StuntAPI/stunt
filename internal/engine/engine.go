@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	sk "go.starlark.net/starlark"
@@ -64,6 +65,11 @@ type Engine struct {
 	grpcTargets map[string]string // service name → grpc target (set by serve())
 
 	reqLog *requestlog.Store // shared request/response capture log
+
+	// seq is the engine-wide monotonic sequence counter shared by all request
+	// recorders, so captured entries have globally-unique, ascending Seq values
+	// (unique row labels + gap-free ordering for the live feed).
+	seq *atomic.Int64
 }
 
 // serviceState holds the per-service runtime for an adapter-backed service:
@@ -119,6 +125,7 @@ func newEngine(m *manifest.Manifest, cacheRoot string) (*Engine, error) {
 		return nil, fmt.Errorf("open request log: %w", err)
 	}
 	e.reqLog = rl
+	e.seq = new(atomic.Int64)
 
 	for name, svc := range m.Services {
 		if svc.Adapter == "" {

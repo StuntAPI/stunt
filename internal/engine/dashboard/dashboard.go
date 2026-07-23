@@ -2,7 +2,7 @@
 //
 // It is bound to a requestlog.Store and exposes:
 //   - GET /api/requests — filterable JSON history
-//   - GET /            — minimal server-rendered history page
+//   - GET /            — server-rendered history page (stunt "Rehearsal Grid" aesthetic)
 //
 // Every request must pass two guards: a DNS-rebinding Host-header check
 // (loopback hosts only) and an auth-token check (X-Stunt-Token header).
@@ -12,9 +12,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"net/http"
 	"strings"
+	"time"
 
 	"stuntapi.com/stunt/internal/engine/dashboard/assets"
 	"stuntapi.com/stunt/internal/engine/requestlog"
@@ -37,7 +39,7 @@ type Dashboard struct {
 
 // New builds a dashboard over store and generates a fresh auth token.
 func New(store *requestlog.Store) *Dashboard {
-	tmpl := template.Must(template.ParseFS(assets.Templates, "dashboard.tmpl"))
+	tmpl := template.Must(template.New("").Funcs(tmplFuncs).ParseFS(assets.Templates, "dashboard.tmpl"))
 	return &Dashboard{store: store, token: newToken(), tmpl: tmpl}
 }
 
@@ -75,6 +77,57 @@ func (d *Dashboard) guard(next http.Handler) http.Handler {
 	})
 }
 
+// apiEntry is the JSON shape exposed by /api/requests. Unlike requestlog.Entry
+// (which stores headers as JSON TEXT for SQLite), apiEntry decodes the header
+// blobs into real objects so consumers don't have to double-decode.
+type apiEntry struct {
+	ID          int64               `json:"id"`
+	Seq         int64               `json:"seq"`
+	Ts          string              `json:"ts"`
+	Service     string              `json:"service"`
+	Transport   string              `json:"transport"`
+	Method      string              `json:"method"`
+	Path        string              `json:"path"`
+	Status      int                 `json:"status"`
+	DurationUs  int64               `json:"duration_us"`
+	ReqHeaders  map[string][]string `json:"req_headers"`
+	ReqBody     string              `json:"req_body"`
+	RespHeaders map[string][]string `json:"resp_headers"`
+	RespBody    string              `json:"resp_body"`
+}
+
+// toAPI converts a stored entry to its API shape (headers decoded to objects).
+func toAPI(e requestlog.Entry) apiEntry {
+	return apiEntry{
+		ID:          e.ID,
+		Seq:         e.Seq,
+		Ts:          e.Ts,
+		Service:     e.Service,
+		Transport:   e.Transport,
+		Method:      e.Method,
+		Path:        e.Path,
+		Status:      e.Status,
+		DurationUs:  e.DurationUs,
+		ReqHeaders:  decodeHeaders(e.ReqHeaders),
+		ReqBody:     e.ReqBody,
+		RespHeaders: decodeHeaders(e.RespHeaders),
+		RespBody:    e.RespBody,
+	}
+}
+
+// decodeHeaders parses a stored JSON header blob into a map. A blank or
+// unparseable blob yields nil (renders as JSON null, not a broken string).
+func decodeHeaders(s string) map[string][]string {
+	if s == "" {
+		return nil
+	}
+	var h map[string][]string
+	if err := json.Unmarshal([]byte(s), &h); err != nil {
+		return nil
+	}
+	return h
+}
+
 func (d *Dashboard) handleRequests(w http.ResponseWriter, r *http.Request) {
 	q := requestlog.Query{
 		Service: r.URL.Query().Get("service"),
@@ -88,14 +141,18 @@ func (d *Dashboard) handleRequests(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	out := make([]apiEntry, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, toAPI(e))
+	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(entries)
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 func (d *Dashboard) handleIndex(w http.ResponseWriter, r *http.Request) {
 	entries, _ := d.store.List(requestlog.Query{Limit: 200})
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = d.tmpl.Execute(w, entries)
+	_ = d.tmpl.ExecuteTemplate(w, "dashboard.tmpl", entries)
 }
 
 // newToken returns a random 32-char hex token.
@@ -119,4 +176,37 @@ func atoiDefault(s string, def int) int {
 		return def
 	}
 	return n
+}
+
+// tmplFuncs are template helpers.
+var tmplFuncs = template.FuncMap{
+	// humanize a microsecond duration: "<1ms", "1.2ms", "350µs", "42ms"
+	"humanDur": func(us int64) string {
+		d := time.Duration(us) * time.Microsecond
+		switch {
+		case d < 1*time.Microsecond:
+			return "<1µs"
+		case d < time.Millisecond:
+			return fmt.Sprintf("%dµs", d.Microseconds())
+		case d < time.Second:
+			return strings.TrimSuffix(strings.TrimRight(fmt.Sprintf("%.2f", float64(d.Microseconds())/1000.0), "0"), ".") + "ms"
+		default:
+			return fmt.Sprintf("%.2fs", d.Seconds())
+		}
+	},
+	// statusClass returns a CSS class for a status code (ok / redirect / client-err / server-err).
+	"statusClass": func(status int) string {
+		switch {
+		case status >= 200 && status < 300:
+			return "st-ok"
+		case status >= 300 && status < 400:
+			return "st-redir"
+		case status >= 400 && status < 500:
+			return "st-4xx"
+		default:
+			return "st-5xx"
+		}
+	},
+	// lower lowercases a string (for CSS class derivation in the template).
+	"lower": strings.ToLower,
 }

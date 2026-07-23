@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"stuntapi.com/stunt/internal/engine/requestlog"
@@ -44,7 +45,7 @@ func TestRecorderCapturesAndRedacts(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 		_, _ = w.Write([]byte(`{"id":"ch_1"}`))
 	})
-	rec := requestlog.NewRecorder(st, "api")
+	rec := requestlog.NewRecorder(st, "api", new(atomic.Int64))
 	h := rec.Wrap(inner)
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/charge",
@@ -81,7 +82,7 @@ func TestStoreInsertAndList(t *testing.T) {
 
 	in := requestlog.Entry{
 		Seq: 1, Service: "api", Transport: "http", Method: "POST", Path: "/v1/charge",
-		Status: 200, DurationMs: 12,
+		Status: 200, DurationUs: 12000,
 		ReqHeaders:  `{"Authorization":"[REDACTED]","Content-Type":"application/json"}`,
 		ReqBody:     `{"amount":100}`,
 		RespHeaders: `{"Content-Type":"application/json"}`,
