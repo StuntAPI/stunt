@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>stunt — requests</title>
+<style>
+body{margin:0;background:#0e0e0e;color:#f7f4ec;font:14px/1.5 'JetBrains Mono',ui-monospace,monospace}
+table{border-collapse:collapse;width:100%}td,th{padding:6px 10px;text-align:left;border-bottom:1px solid #2a2a2a}
+a{color:#ffd400}.muted{color:#888}
+</style></head>
+<body>
+<table>
+<tr><th>#</th><th>method</th><th>path</th><th>status</th><th>svc</th><th>ms</th></tr>
+{{range .}}<tr>
+<td class="muted">{{.Seq}}</td><td>{{.Method}}</td><td>{{.Path}}</td>
+<td>{{.Status}}</td><td class="muted">{{.Service}}</td><td class="muted">{{.DurationMs}}</td>
+</tr>{{else}}<tr><td colspan="6" class="muted">no requests yet</td></tr>{{end}}
+</table>
+</body></html>
