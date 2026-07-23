@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -36,9 +37,11 @@ var allowedHosts = map[string]bool{
 
 // Dashboard is the admin server bound to a request log store.
 type Dashboard struct {
-	store *requestlog.Store
-	token string
-	tmpl  *template.Template
+	store  *requestlog.Store
+	token  string
+	tmpl   *template.Template
+	replay ReplayFunc // engine-backed re-issuer; nil = replay unavailable
+	seq    *atomic.Int64 // shared engine sequence counter for replay entries
 }
 
 // New builds a dashboard over store and generates a fresh auth token.
@@ -53,11 +56,24 @@ func (d *Dashboard) Token() string { return d.token }
 // SetTokenForTest sets the token (test seam).
 func (d *Dashboard) SetTokenForTest(t string) { d.token = t }
 
+// ReplayFunc re-issues a captured entry against the simulator, returning the new
+// status + response body. Wired by up.go to the engine. Nil = replay unavailable.
+type ReplayFunc func(e requestlog.Entry) (status int, respBody string)
+
+// SetReplayFunc wires the engine-backed replay (called by up.go).
+func (d *Dashboard) SetReplayFunc(f ReplayFunc) { d.replay = f }
+
+// SetSeq shares the engine's global sequence counter so replay entries get a
+// proper, globally-unique Seq (replay bypasses the recorder).
+func (d *Dashboard) SetSeq(seq *atomic.Int64) { d.seq = seq }
+
 // Handler returns the HTTP handler with the auth + Host guards applied.
 func (d *Dashboard) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/requests/stream", d.handleStream)
 	mux.HandleFunc("/api/requests", d.handleRequests)
+	mux.HandleFunc("/api/requests/{id}", d.handleDetail)
+	mux.HandleFunc("/api/requests/{id}/replay", d.handleReplay)
 	mux.HandleFunc("/", d.handleIndex)
 	return d.guard(mux)
 }
@@ -158,6 +174,67 @@ func (d *Dashboard) handleIndex(w http.ResponseWriter, r *http.Request) {
 	entries, _ := d.store.List(requestlog.Query{Limit: 200})
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = d.tmpl.ExecuteTemplate(w, "dashboard.tmpl", entries)
+}
+
+// handleDetail returns the full stored entry (objects decoded) by DB id.
+func (d *Dashboard) handleDetail(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "bad id", http.StatusBadRequest)
+		return
+	}
+	e, err := d.store.Get(id)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(toAPI(e))
+}
+
+// handleReplay re-issues a captured entry via the wired ReplayFunc and logs a
+// fresh entry (tagged onto the original's service/method/path). POST-only.
+func (d *Dashboard) handleReplay(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "bad id", http.StatusBadRequest)
+		return
+	}
+	e, err := d.store.Get(id)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if d.replay == nil {
+		http.Error(w, "replay not available", http.StatusServiceUnavailable)
+		return
+	}
+	status, body := d.replay(e)
+
+	// Log a fresh entry: replay bypasses the recorder, so pull the next
+	// globally-unique seq from the shared engine counter (if wired).
+	var seq int64
+	if d.seq != nil {
+		seq = d.seq.Add(1)
+	}
+	d.store.Enqueue(requestlog.Entry{
+		Seq: seq, Service: e.Service, Transport: "http", Method: e.Method, Path: e.Path,
+		Status: status, ReqHeaders: e.ReqHeaders, ReqBody: e.ReqBody, RespBody: body,
+	})
+	d.store.Flush()
+
+	w.Header().Set("Content-Type", "application/json")
+	// If the replayed body is itself JSON, embed it raw so clients get a
+	// structured value rather than a doubly-escaped string.
+	if raw := json.RawMessage(body); json.Valid(raw) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "body": raw})
+	} else {
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": status, "body": body})
+	}
 }
 
 // handleStream upgrades to a WebSocket and streams captured requests live,
