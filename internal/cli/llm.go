@@ -41,6 +41,7 @@ services in stunt.yaml; ` + "`stunt up`" + ` serves them on local ports.
   trust               install stunt CA in system trust store (needs privilege)
   service install|status|uninstall   system service unit
   requests [--json] [--limit N]   recent captured requests (talks to the running server's dashboard API)
+  replay <id> [--json]           re-issue a captured request against the running server (uses its dashboard API)
   version | --version
 Global: --manifest <path> (default stunt.yaml). Cache: --cache-dir/$STUNT_ADAPTER_CACHE.
 

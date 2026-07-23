@@ -31,6 +31,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newCatalogCmd())
 	root.AddCommand(newDemoCmd())
 	root.AddCommand(newRequestsCmd())
+	root.AddCommand(newReplayCmd())
 	root.AddCommand(newLLMCmd())
 	return root
 }
