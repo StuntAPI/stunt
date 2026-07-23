@@ -368,6 +368,11 @@ func (e *Engine) Close() error {
 // query it via requestlog.Query / (*Store).List.
 func (e *Engine) RequestLog() *requestlog.Store { return e.reqLog }
 
+// Seq returns the engine-wide monotonic sequence counter shared by all
+// request recorders. Exposed so the dashboard can pull the next seq for
+// replay entries (which bypass the recorder). See (*Dashboard).SetSeq.
+func (e *Engine) Seq() *atomic.Int64 { return e.seq }
+
 // HandlerForTest builds the serving handler for the first service.
 // Tests bind it to a listener of their choosing.
 func (e *Engine) HandlerForTest() http.Handler {

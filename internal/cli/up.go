@@ -2,9 +2,11 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -18,6 +20,7 @@ import (
 	"stuntapi.com/stunt/internal/adapter"
 	"stuntapi.com/stunt/internal/engine"
 	"stuntapi.com/stunt/internal/engine/dashboard"
+	"stuntapi.com/stunt/internal/engine/requestlog"
 	"stuntapi.com/stunt/internal/manifest"
 	"stuntapi.com/stunt/internal/netutil"
 	"stuntapi.com/stunt/internal/netutil/proxy"
@@ -95,11 +98,13 @@ func runUpPort(ctx context.Context, e *engine.Engine, m *manifest.Manifest, out 
 		addrList = append(addrList, addrs[name])
 	}
 	rt := RuntimeFile{
-		PID:       os.Getpid(),
-		Manifest:  m.Path,
-		Mode:      "port",
-		Addresses: addrList,
-		StartedAt: time.Now().Format(time.RFC3339),
+		PID:            os.Getpid(),
+		Manifest:       m.Path,
+		Mode:           "port",
+		Addresses:      addrList,
+		StartedAt:      time.Now().Format(time.RFC3339),
+		DashboardURL:   dashURL,
+		DashboardToken: dashToken,
 	}
 	if wErr := writeRuntimeFile(manifestDir, rt); wErr != nil {
 		fmt.Fprintf(out, "warning: could not write runtime file: %v\n", wErr)
@@ -139,7 +144,13 @@ func runUpPort(ctx context.Context, e *engine.Engine, m *manifest.Manifest, out 
 }
 
 // startDashboard runs the localhost admin UI; returns its URL + token. A bind
-// failure is non-fatal: it logs a warning and returns "".
+// failure is non-fatal: it logs a warning and returns "". The dashboard is
+// wired with the engine's shared seq counter and an engine-backed ReplayFunc
+// that re-issues a captured request in-process through the (unwrapped) service
+// handler. Because HandlerForTestByName returns the raw service handler (the
+// recorder is only added at the real serving site in serve.go), replay does
+// NOT trigger the recorder's Enqueue — so the replayed request is logged
+// exactly once, by handleReplay's own manual Enqueue.
 func startDashboard(ctx context.Context, e *engine.Engine) (string, string) {
 	rl := e.RequestLog()
 	if rl == nil {
@@ -151,6 +162,24 @@ func startDashboard(ctx context.Context, e *engine.Engine) (string, string) {
 		return "", ""
 	}
 	d := dashboard.New(rl)
+	d.SetSeq(e.Seq())
+	d.SetReplayFunc(func(ent requestlog.Entry) (int, string) {
+		rw := httptest.NewRecorder()
+		var body *strings.Reader
+		if ent.ReqBody != "" {
+			body = strings.NewReader(ent.ReqBody)
+		} else {
+			body = strings.NewReader("")
+		}
+		req := httptest.NewRequest(ent.Method, ent.Path, body)
+		for k, vs := range decodeHeaders(ent.ReqHeaders) {
+			for _, v := range vs {
+				req.Header.Add(k, v)
+			}
+		}
+		e.HandlerForTestByName(ent.Service).ServeHTTP(rw, req)
+		return rw.Code, rw.Body.String()
+	})
 	srv := &http.Server{Handler: d.Handler()}
 	go func() {
 		<-ctx.Done()
@@ -160,6 +189,20 @@ func startDashboard(ctx context.Context, e *engine.Engine) (string, string) {
 	}()
 	go func() { _ = srv.Serve(ln) }()
 	return "http://" + ln.Addr().String(), d.Token()
+}
+
+// decodeHeaders parses a stored JSON header blob into a map[string][]string.
+// A blank or unparseable blob yields nil. (Mirrors the unexported helper in
+// the dashboard package; kept local to up.go to avoid an export.)
+func decodeHeaders(s string) map[string][]string {
+	if s == "" {
+		return nil
+	}
+	var h map[string][]string
+	if err := json.Unmarshal([]byte(s), &h); err != nil {
+		return nil
+	}
+	return h
 }
 
 // upServiceSummary renders the parenthesised summary for an adapter-backed
@@ -256,14 +299,20 @@ func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifes
 	}
 	actualPort := portFromListener(ln)
 
-	// Write the runtime file so `stunt down` can stop this server.
+	// Start the dashboard before writing the runtime file so its URL + token
+	// can be recorded for auto-discovery (stunt requests / stunt ui).
 	subMDir := manifestDir(manifestPath)
+	dashURL, dashToken := startDashboard(ctx, e)
+
+	// Write the runtime file so `stunt down` can stop this server.
 	subRt := RuntimeFile{
-		PID:       os.Getpid(),
-		Manifest:  manifestPath,
-		Mode:      "subdomain",
-		Addresses: []string{fmt.Sprintf("%s://%s:%s", map[bool]string{true: "https", false: "http"}[useTLS], tld, actualPort)},
-		StartedAt: time.Now().Format(time.RFC3339),
+		PID:            os.Getpid(),
+		Manifest:       manifestPath,
+		Mode:           "subdomain",
+		Addresses:      []string{fmt.Sprintf("%s://%s:%s", map[bool]string{true: "https", false: "http"}[useTLS], tld, actualPort)},
+		StartedAt:      time.Now().Format(time.RFC3339),
+		DashboardURL:   dashURL,
+		DashboardToken: dashToken,
 	}
 	if wErr := writeRuntimeFile(subMDir, subRt); wErr != nil {
 		fmt.Fprintf(out, "warning: could not write runtime file: %v\n", wErr)
@@ -291,7 +340,6 @@ func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifes
 	for _, name := range names {
 		fmt.Fprintf(out, "  %s  ->  %s://%s.%s:%s\n", name, scheme, name, tld, actualPort)
 	}
-	dashURL, dashToken := startDashboard(ctx, e)
 	if dashURL != "" {
 		fmt.Fprintf(out, "  dashboard:  %s   (token: %s)\n", dashURL, dashToken)
 	}
