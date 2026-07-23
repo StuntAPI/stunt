@@ -41,7 +41,7 @@ type Dashboard struct {
 	store  *requestlog.Store
 	token  string
 	tmpl   *template.Template
-	replay ReplayFunc // engine-backed re-issuer; nil = replay unavailable
+	replay ReplayFunc    // engine-backed re-issuer; nil = replay unavailable
 	seq    *atomic.Int64 // shared engine sequence counter for replay entries
 }
 

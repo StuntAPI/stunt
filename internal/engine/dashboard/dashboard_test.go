@@ -148,6 +148,57 @@ func TestReplay(t *testing.T) {
 	}
 }
 
+// TestIndexRendersLiveInspector asserts the server-rendered dashboard page:
+//   - returns 200 when authed via the bootstrap cookie,
+//   - contains the live ws endpoint URL (so the JS client is present),
+//   - still renders the requests table (no-JS / first-paint fallback),
+//   - NEVER echoes the auth token or cookie name into the HTML.
+func TestIndexRendersLiveInspector(t *testing.T) {
+	d := dashboard.New(dummyStore(t))
+	d.SetTokenForTest("live-inspector-token")
+	srv := httptest.NewServer(d.Handler())
+	t.Cleanup(srv.Close)
+
+	// Bootstrap the cookie (browser-style) so the follow-up GET / is authed.
+	client := noRedirectClient()
+	res, err := client.Get(srv.URL + "/?token=live-inspector-token")
+	if err != nil {
+		t.Fatalf("bootstrap: %v", err)
+	}
+	res.Body.Close()
+
+	// GET / carrying the cookie (no header) — the browser path.
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/", nil)
+	for _, c := range res.Cookies() {
+		req.AddCookie(c)
+	}
+	res2, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	defer res2.Body.Close()
+	if res2.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d", res2.StatusCode)
+	}
+	body, _ := io.ReadAll(res2.Body)
+
+	// The live ws endpoint must be wired into the inline client JS.
+	if !strings.Contains(string(body), "/api/requests/stream") {
+		t.Fatalf("rendered page must reference the live ws endpoint")
+	}
+	// The server-rendered requests table must still be present (first paint).
+	if !strings.Contains(string(body), "class=\"reqs\"") {
+		t.Fatalf("rendered page must contain the requests table")
+	}
+	// The auth token must NEVER be echoed into the HTML body.
+	if strings.Contains(string(body), "live-inspector-token") {
+		t.Fatalf("auth token must not be echoed in the HTML")
+	}
+	if strings.Contains(string(body), "stunt_token") {
+		t.Fatalf("cookie name must not be echoed in the HTML")
+	}
+}
+
 // dummyStore opens a requestlog store in a temp dir, inserts one entry, and
 // returns it. The returned store's Close is registered with t.Cleanup.
 func dummyStore(t *testing.T) *requestlog.Store {

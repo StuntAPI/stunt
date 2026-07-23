@@ -9,6 +9,7 @@
   :root{
     --stunt-yellow:#ffd400; --stunt-yellow-dim:#e8c200;
     --ink:#0e0e0e; --bone:#f7f4ec; --bone-2:#efe9da; --alert:#e5322d;
+    --live:#3fd17b;
     --mono:'JetBrains Mono','SF Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
     --sans:'Inter',ui-sans-serif,system-ui,-apple-system,sans-serif;
     --grid:linear-gradient(to right,rgba(255,255,255,.045) 1px,transparent 1px),
@@ -25,7 +26,12 @@
   .hdr{max-width:1100px;margin:0 auto;padding:16px 20px;display:flex;align-items:center;gap:14px}
   .hdr .logo{width:30px;height:30px;flex:0 0 auto}
   .hdr h1{font-size:20px;margin:0;font-weight:800;letter-spacing:-.02em}
-  .hdr .tag{font-family:var(--mono);font-size:12px;color:var(--ink);opacity:.6;margin-left:auto}
+  .hdr .tag{font-family:var(--mono);font-size:12px;color:var(--ink);opacity:.6}
+  .hdr .live{margin-left:auto;display:flex;align-items:center;gap:7px;
+    font-family:var(--mono);font-size:12px;color:var(--ink);opacity:.7;
+    border:1px solid rgba(0,0,0,.18);padding:3px 9px}
+  .hdr .live .dot{width:8px;height:8px;border-radius:50%;background:#9a9a9a;display:inline-block}
+  .hdr .live.on .dot{background:var(--live);box-shadow:0 0 6px var(--live)}
   .stripe{height:6px;background-image:repeating-linear-gradient(-45deg,var(--ink) 0 12px,var(--stunt-yellow) 12px 24px)}
   /* main */
   main{max-width:1100px;margin:0 auto;padding:22px 20px 60px}
@@ -39,7 +45,9 @@
   .reqs thead th{text-align:left;font-weight:600;opacity:.5;padding:8px 10px;
     border-bottom:1px solid rgba(255,255,255,.16);font-size:11px;text-transform:uppercase;letter-spacing:.06em}
   .reqs td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.07);vertical-align:top}
-  .reqs tr:hover td{background:rgba(255,212,0,.06)}
+  .reqs tbody tr{cursor:pointer}
+  .reqs tbody tr:hover td{background:rgba(255,212,0,.06)}
+  .reqs tbody tr.sel td{background:rgba(255,212,0,.12)}
   .c-seq{opacity:.4;width:46px}
   .c-method{font-weight:700;width:64px}
   .c-status{text-align:center;width:56px}
@@ -47,11 +55,41 @@
   .c-dur{opacity:.55;text-align:right;width:72px;white-space:nowrap}
   .c-path{word-break:break-all}
   .pill{display:inline-block;min-width:38px;border-radius:2px;padding:1px 0;font-size:12px}
-  .st-ok{color:var(--bone)} .st-ok::before{content:"●";color:#3fd17b;margin-right:3px}
+  .st-ok{color:var(--bone)} .st-ok::before{content:"\25CF";color:#3fd17b;margin-right:3px}
   .st-redir{color:var(--stunt-yellow-dim)}
-  .st-4xx{color:var(--stunt-yellow)} .st-4xx::before{content:"●";margin-right:3px}
+  .st-4xx{color:var(--stunt-yellow)} .st-4xx::before{content:"\25CF";margin-right:3px}
   .st-5xx{color:var(--alert)}
   .empty{font-family:var(--mono);font-size:13px;opacity:.5;padding:40px 0;text-align:center}
+  /* detail panel */
+  .detail{margin-top:18px;border:1px solid rgba(255,212,0,.25);background:rgba(255,212,0,.03)}
+  .detail.hidden{display:none}
+  .detail .dhead{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.1)}
+  .detail .dhead .dmethod{font-family:var(--mono);font-weight:700}
+  .detail .dhead .dpath{font-family:var(--mono);word-break:break-all;flex:1;min-width:200px}
+  .detail .dhead .dpill{min-width:38px;text-align:center}
+  .detail .dbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
+  .btn{font-family:var(--mono);font-size:12px;cursor:pointer;color:var(--ink);
+    background:var(--stunt-yellow);border:none;padding:5px 11px;font-weight:600}
+  .btn:hover{background:var(--stunt-yellow-dim)}
+  .btn.ghost{background:transparent;color:var(--bone);border:1px solid rgba(255,255,255,.25)}
+  .btn.ghost:hover{background:rgba(255,255,255,.06)}
+  .flash{font-family:var(--mono);font-size:11px;color:var(--live);min-height:16px}
+  .flash.err{color:var(--alert)}
+  .detail .dcols{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  @media(max-width:760px){.detail .dcols{grid-template-columns:1fr}}
+  .detail .dcol{padding:12px 14px}
+  .detail .dcol+.dcol{border-left:1px solid rgba(255,255,255,.1)}
+  .detail .dcol h4{margin:0 0 8px;font-family:var(--mono);font-size:11px;text-transform:uppercase;
+    letter-spacing:.06em;opacity:.55;font-weight:600}
+  .htab{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;margin-bottom:10px}
+  .htab td{padding:3px 8px;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top}
+  .htab td.k{opacity:.55;white-space:nowrap;width:1%}
+  .htab td.v{word-break:break-all}
+  .bodybox{background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);padding:10px;
+    font-family:var(--mono);font-size:12px;white-space:pre-wrap;word-break:break-word;
+    max-height:320px;overflow:auto;margin:0}
+  .bodybox.empty-body{opacity:.4}
   /* footer */
   footer{border-top:1px solid rgba(255,255,255,.1);font-family:var(--mono);font-size:11px;opacity:.5}
   .ftr{max-width:1100px;margin:0 auto;padding:12px 20px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
@@ -65,24 +103,24 @@
     <img class="logo" src="data:image/svg+xml;utf8,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Cdefs%3E%3Cg%20id='s'%3E%3Crect%20x='20'%20y='12'%20width='30'%20height='10'/%3E%3Crect%20x='20'%20y='12'%20width='10'%20height='20'/%3E%3Crect%20x='20'%20y='22'%20width='24'%20height='10'/%3E%3Crect%20x='34'%20y='22'%20width='10'%20height='20'/%3E%3Crect%20x='14'%20y='32'%20width='30'%20height='10'/%3E%3C/g%3E%3C/defs%3E%3Cuse%20href='%23s'%20transform='translate(5,5)'%20fill='%23ffd400'/%3E%3Cuse%20href='%23s'%20fill='%230e0e0e'/%3E%3C/svg%3E" alt="">
     <h1>stunt</h1>
     <span class="tag">request inspector</span>
+    <span class="live" id="liveBadge"><span class="dot"></span><span id="liveText">connecting</span></span>
   </div>
   <div class="stripe"></div>
 </header>
 
 <main>
-  {{$n := len .}}
   <div class="stats">
-    <div class="stat"><b>{{$n}}</b><span>captured</span></div>
-    <div class="stat"><b>localhost</b><span>read-only history</span></div>
+    <div class="stat"><b id="statCount">{{len .}}</b><span>captured</span></div>
+    <div class="stat"><b>localhost</b><span>live</span></div>
   </div>
-  <div class="hint">live feed + replay + data browsers arrive in Plan 2/3 · refresh to update</div>
+  <div class="hint">click a row for full detail · copy-as-curl · replay · live via websocket</div>
 
   <table class="reqs">
     <thead><tr>
       <th class="c-seq">#</th><th class="c-method">method</th><th class="c-path">path</th>
       <th class="c-status">status</th><th class="c-svc">service</th><th class="c-dur">dur</th>
     </tr></thead>
-    <tbody>
+    <tbody id="reqsBody">
     {{range .}}
       <tr>
         <td class="c-seq">{{.Seq}}</td>
@@ -97,11 +135,357 @@
     {{end}}
     </tbody>
   </table>
+
+  <!-- detail panel (populated by JS) -->
+  <div class="detail hidden" id="detail">
+    <div class="dhead">
+      <span class="dmethod m-method-get" id="dMethod">GET</span>
+      <span class="dpath" id="dPath">/</span>
+      <span class="pill dpill st-ok" id="dStatus">200</span>
+      <div class="dbar">
+        <span class="flash" id="dFlash"></span>
+        <button class="btn ghost" id="btnCopy" type="button">copy as curl</button>
+        <button class="btn" id="btnReplay" type="button">replay</button>
+      </div>
+    </div>
+    <div class="dcols">
+      <div class="dcol">
+        <h4>request headers</h4>
+        <table class="htab" id="dReqHeaders"></table>
+        <h4>request body</h4>
+        <pre class="bodybox empty-body" id="dReqBody">(empty)</pre>
+      </div>
+      <div class="dcol">
+        <h4>response headers</h4>
+        <table class="htab" id="dRespHeaders"></table>
+        <h4>response body</h4>
+        <pre class="bodybox empty-body" id="dRespBody">(empty)</pre>
+      </div>
+    </div>
+  </div>
 </main>
 
 <footer><div class="ftr">
   <span>stunt — local API simulators · the safe stand-in for the real thing</span>
   <span>redacted headers · bodies capped 64KB</span>
 </div></footer>
+
+<script>
+(function(){
+  "use strict";
+  var MAX_ROWS = 300;
+  var FILL_LIMIT = 200;
+  var tbody = document.getElementById("reqsBody");
+  var statCount = document.getElementById("statCount");
+  var liveBadge = document.getElementById("liveBadge");
+  var liveText = document.getElementById("liveText");
+  var detail = document.getElementById("detail");
+  var dMethod = document.getElementById("dMethod");
+  var dPath = document.getElementById("dPath");
+  var dStatus = document.getElementById("dStatus");
+  var dReqHeaders = document.getElementById("dReqHeaders");
+  var dReqBody = document.getElementById("dReqBody");
+  var dRespHeaders = document.getElementById("dRespHeaders");
+  var dRespBody = document.getElementById("dRespBody");
+  var dFlash = document.getElementById("dFlash");
+  var btnCopy = document.getElementById("btnCopy");
+  var btnReplay = document.getElementById("btnReplay");
+
+  // entries keyed by DB id (full apiEntry payloads); rows reference by id.
+  var cache = Object.create(null);
+  var selectedId = null;
+  var lastSeq = 0;
+  var ws = null;
+  var backoff = 0;
+
+  function setLive(state){
+    // state: "on" | "off" (connecting/reconnecting)
+    if(state === "on"){
+      liveBadge.classList.add("on");
+      liveText.textContent = "live";
+    } else {
+      liveBadge.classList.remove("on");
+      liveText.textContent = "reconnecting";
+    }
+  }
+
+  function fmtBody(s){
+    // Pretty-print JSON bodies; redaction/truncation markers pass through.
+    if(!s){ return ""; }
+    var t = s.trim();
+    if((t.charAt(0) === "{" || t.charAt(0) === "[") ){
+      try{ return JSON.stringify(JSON.parse(t), null, 2); }catch(e){}
+    }
+    return s;
+  }
+
+  function esc(s){
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function rowsHTab(headers){
+    // headers: object key -> array of string values (or null)
+    var keys = headers ? Object.keys(headers) : [];
+    if(!keys.length){ return '<tr><td class="k">—</td><td class="v">(none)</td></tr>'; }
+    var out = "";
+    keys.sort();
+    for(var i=0;i<keys.length;i++){
+      var k = keys[i];
+      var vs = headers[k];
+      if(!Array.isArray(vs)){ vs = [vs]; }
+      for(var j=0;j<vs.length;j++){
+        out += '<tr><td class="k">'+esc(k)+'</td><td class="v">'+esc(vs[j])+'</td></tr>';
+      }
+    }
+    return out;
+  }
+
+  function statusClass(s){
+    if(s >= 200 && s < 300) return "st-ok";
+    if(s >= 300 && s < 400) return "st-redir";
+    if(s >= 400 && s < 500) return "st-4xx";
+    return "st-5xx";
+  }
+
+  function rowHTML(e){
+    return '<td class="c-seq">'+e.seq+'</td>'
+      + '<td class="c-method m-method-'+String(e.method).toLowerCase()+'">'+esc(e.method)+'</td>'
+      + '<td class="c-path">'+esc(e.path)+'</td>'
+      + '<td class="c-status"><span class="pill '+statusClass(e.status)+'">'+e.status+'</span></td>'
+      + '<td class="c-svc">'+esc(e.service||"")+'</td>'
+      + '<td class="c-dur">'+humanDur(e.duration_us)+'</td>';
+  }
+
+  function humanDur(us){
+    var ms = us/1000;
+    if(us < 1) return "<1\u00b5s";
+    if(us < 1000) return Math.round(us)+"\u00b5s";
+    if(ms < 1000) return (Math.round(ms*100)/100)+"ms";
+    return (Math.round(ms/10)/100)+"s";
+  }
+
+  function trackSeq(e){
+    if(e.seq && e.seq > lastSeq){ lastSeq = e.seq; }
+  }
+
+  function addRow(e, prepend){
+    cache[e.id] = e;
+    trackSeq(e);
+    var tr = document.createElement("tr");
+    tr.setAttribute("data-id", e.id);
+    tr.innerHTML = rowHTML(e);
+    tr.addEventListener("click", function(){ toggleDetail(e.id); });
+    if(prepend){ tbody.insertBefore(tr, tbody.firstChild); }
+    else { tbody.appendChild(tr); }
+    trimRows();
+    updateCount();
+  }
+
+  function trimRows(){
+    // Drop oldest rows (bottom) once we exceed the cap.
+    while(tbody.children.length > MAX_ROWS){
+      var last = tbody.lastElementChild;
+      if(last){ tbody.removeChild(last); } else { break; }
+    }
+  }
+
+  function updateCount(){
+    statCount.textContent = String(tbody.children.length);
+  }
+
+  function clearPlaceholder(){
+    // Remove the no-JS empty-state row so live rows show cleanly.
+    var empty = tbody.querySelector(".empty");
+    if(empty && empty.parentElement){ tbody.innerHTML = ""; }
+  }
+
+  // ---- detail panel -------------------------------------------------------
+  function toggleDetail(id){
+    if(selectedId === id){ closeDetail(); return; }
+    var e = cache[id];
+    if(!e){
+      // Should not happen (rows are hydrated from cache), but be safe.
+      return;
+    }
+    selectedId = id;
+    markSelected();
+    dMethod.textContent = e.method;
+    dMethod.className = "dmethod m-method-"+String(e.method).toLowerCase();
+    dPath.textContent = e.path;
+    dStatus.textContent = e.status;
+    dStatus.className = "pill dpill "+statusClass(e.status);
+    dReqHeaders.innerHTML = rowsHTab(e.req_headers);
+    setBody(dReqBody, e.req_body);
+    dRespHeaders.innerHTML = rowsHTab(e.resp_headers);
+    setBody(dRespBody, e.resp_body);
+    dFlash.textContent = "";
+    dFlash.className = "flash";
+    detail.classList.remove("hidden");
+  }
+
+  function setBody(el, s){
+    var f = fmtBody(s);
+    if(!f){
+      el.textContent = "(empty)";
+      el.className = "bodybox empty-body";
+    } else {
+      el.textContent = f;
+      el.className = "bodybox";
+    }
+  }
+
+  function closeDetail(){
+    selectedId = null;
+    markSelected();
+    detail.classList.add("hidden");
+  }
+
+  function markSelected(){
+    var rows = tbody.children;
+    for(var i=0;i<rows.length;i++){
+      if(String(rows[i].getAttribute("data-id")) === String(selectedId)){
+        rows[i].classList.add("sel");
+      } else {
+        rows[i].classList.remove("sel");
+      }
+    }
+  }
+
+  function flash(msg, isErr){
+    dFlash.textContent = msg;
+    dFlash.className = "flash" + (isErr ? " err" : "");
+  }
+
+  // ---- copy as curl -------------------------------------------------------
+  function buildCurl(e){
+    var host = location.host;
+    if(e.req_headers){
+      var h = e.req_headers["Host"] || e.req_headers["host"];
+      if(h && h[0]){ host = h[0]; }
+    }
+    var parts = ["curl", "-X", e.method];
+    if(e.req_headers){
+      var keys = Object.keys(e.req_headers).sort();
+      for(var i=0;i<keys.length;i++){
+        var vs = e.req_headers[keys[i]];
+        if(!Array.isArray(vs)){ vs = [vs]; }
+        for(var j=0;j<vs.length;j++){
+          var v = vs[j] === "[REDACTED]" ? "<REDACTED>" : vs[j];
+          parts.push("-H", "'"+keys[i]+": "+v+"'");
+        }
+      }
+    }
+    if(e.req_body && e.req_body.trim()){
+      parts.push("--data-raw", "'"+e.req_body.replace(/'/g,"'\\''")+"'");
+    }
+    parts.push("'http://"+host+e.path+"'");
+    return parts.join(" ");
+  }
+
+  btnCopy.addEventListener("click", function(){
+    var e = cache[selectedId];
+    if(!e){ return; }
+    var cmd = buildCurl(e);
+    var done = function(){ flash("copied!"); };
+    var fail = function(){ flash("copy failed", true); };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(cmd).then(done, fail);
+    } else {
+      // Legacy fallback.
+      var ta = document.createElement("textarea");
+      ta.value = cmd; document.body.appendChild(ta); ta.select();
+      try{ document.execCommand("copy"); done(); }catch(err){ fail(); }
+      document.body.removeChild(ta);
+    }
+  });
+
+  // ---- replay -------------------------------------------------------------
+  btnReplay.addEventListener("click", function(){
+    var e = cache[selectedId];
+    if(!e){ return; }
+    btnReplay.disabled = true;
+    flash("replaying…");
+    fetch("/api/requests/"+e.id+"/replay", {method:"POST"})
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok, status:r.status, body:j}; }); })
+      .then(function(res){
+        btnReplay.disabled = false;
+        if(!res.ok){
+          flash("replay failed ("+res.status+")", true);
+          return;
+        }
+        var st = (res.body && typeof res.body.status === "number") ? res.body.status : res.status;
+        flash("replayed \u2192 "+st);
+      })
+      .catch(function(err){
+        btnReplay.disabled = false;
+        flash("replay error", true);
+      });
+  });
+
+  // ---- live websocket -----------------------------------------------------
+  function connect(){
+    var url = (location.protocol === "https:" ? "wss://" : "ws://")
+      + location.host + "/api/requests/stream?since_seq=" + lastSeq;
+    ws = new WebSocket(url);
+
+    ws.onopen = function(){
+      backoff = 0;
+      setLive("on");
+    };
+
+    ws.onmessage = function(ev){
+      var e;
+      try{ e = JSON.parse(ev.data); }catch(err){ return; }
+      addRow(e, true);
+    };
+
+    ws.onclose = function(){
+      setLive("off");
+      scheduleReconnect();
+    };
+
+    ws.onerror = function(){
+      // onclose will follow; just ensure we look reconnecting.
+      setLive("off");
+    };
+  }
+
+  function scheduleReconnect(){
+    if(backoff < 1000){ backoff = 1000; }
+    setTimeout(connect, backoff);
+    backoff = Math.min(backoff*2, 5000);
+  }
+
+  // ---- bootstrap ----------------------------------------------------------
+  function hydrateFromList(rows){
+    clearPlaceholder();
+    // List is newest-first; render oldest→newest so prepend order stays sane,
+    // but visually we still want newest on top — so render newest-first.
+    for(var i=0;i<rows.length;i++){
+      addRow(rows[i], false); // append in given (newest-first) order
+    }
+  }
+
+  function boot(){
+    // 1) initial fill (gap-free base), then 2) open ws with since_seq=lastSeq.
+    fetch("/api/requests?limit="+FILL_LIMIT)
+      .then(function(r){ return r.json(); })
+      .then(function(rows){
+        if(Array.isArray(rows)){ hydrateFromList(rows); }
+        connect();
+      })
+      .catch(function(){
+        // Network/fetch failure: still try the live socket.
+        connect();
+      });
+  }
+
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+})();
+</script>
 </body>
 </html>{{end}}
