@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -78,8 +79,26 @@ func (d *Dashboard) Handler() http.Handler {
 	return d.guard(mux)
 }
 
+// cookieName is the bootstrap cookie that carries the auth token so a
+// browser (which cannot send a custom header on a plain navigation) can talk
+// to the dashboard after the initial `stunt ui` open. Its value IS the token;
+// that's acceptable for a localhost-only developer tool. Set HttpOnly +
+// SameSite=Strict + Path=/; no Secure because the dashboard serves plain
+// http on loopback (a Secure cookie would be dropped over http).
+const cookieName = "stunt_token"
+
 // guard enforces a loopback Host header (DNS-rebinding defense) and the auth
 // token on every request before delegating to next.
+//
+// A request is authorized if ANY of:
+//   - the X-Stunt-Token header == token (CLI clients like `stunt requests`), OR
+//   - a stunt_token cookie == token (browsers after bootstrap).
+//
+// To bootstrap the cookie, a request carrying ?token=<token> that matches AND
+// has no valid cookie gets a stunt_token cookie set and a 302 redirect to the
+// same path with the token query stripped. Subsequent browser requests (page
+// nav + the ws client) then carry the cookie automatically. The token is never
+// echoed in a response body.
 func (d *Dashboard) guard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		host := r.Host
@@ -90,12 +109,45 @@ func (d *Dashboard) guard(next http.Handler) http.Handler {
 			http.Error(w, "forbidden host", http.StatusForbidden)
 			return
 		}
-		if r.Header.Get("X-Stunt-Token") != d.token {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
+
+		// Header path (CLI clients).
+		if r.Header.Get("X-Stunt-Token") == d.token {
+			next.ServeHTTP(w, r)
 			return
 		}
-		next.ServeHTTP(w, r)
+		// Cookie path (browsers after bootstrap).
+		if c, err := r.Cookie(cookieName); err == nil && c.Value == d.token {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Bootstrap: a ?token=<token> query that matches AND no valid cookie
+		// → set the cookie and redirect to the same path minus the query so the
+		// token doesn't linger in the address bar.
+		if r.URL.Query().Get("token") == d.token {
+			http.SetCookie(w, &http.Cookie{
+				Name:     cookieName,
+				Value:    d.token,
+				Path:     "/",
+				HttpOnly: true,
+				SameSite: http.SameSiteStrictMode,
+			})
+			loc := stripTokenQuery(r.URL)
+			http.Redirect(w, r, loc, http.StatusFound)
+			return
+		}
+
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	})
+}
+
+// stripTokenQuery returns the string form of u with the token query parameter
+// removed (all other query params preserved). It never echoes the token.
+func stripTokenQuery(u *url.URL) string {
+	q := u.Query()
+	q.Del("token")
+	u.RawQuery = q.Encode()
+	return u.String()
 }
 
 // apiEntry is the JSON shape exposed by /api/requests. Unlike requestlog.Entry
