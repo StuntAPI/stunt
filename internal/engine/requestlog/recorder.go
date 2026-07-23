@@ -35,6 +35,13 @@ func NewRecorder(st *Store, service string) *Recorder {
 // Wrap returns a handler that records then delegates to next.
 func (r *Recorder) Wrap(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// WebSocket upgrades are long-lived hijacked connections that do not fit
+		// the request/response capture model (and reading req.Body / wrapping
+		// the ResponseWriter would break the hijack). Delegate directly.
+		if isWebSocketUpgrade(req) {
+			next.ServeHTTP(w, req)
+			return
+		}
 		start := time.Now()
 		var reqBody []byte
 		if req.Body != nil {
@@ -58,7 +65,9 @@ func (r *Recorder) Wrap(next http.Handler) http.Handler {
 			RespHeaders: headerJSON(rw.Header()),
 			RespBody:    capBody(rw.buf.Bytes()),
 		}
-		r.store.Enqueue(e)
+		if r.store != nil {
+			r.store.Enqueue(e)
+		}
 	})
 }
 
@@ -67,6 +76,21 @@ func capBody(b []byte) string {
 		return string(b[:maxBody]) + "\n…[truncated]"
 	}
 	return string(b)
+}
+
+// isWebSocketUpgrade reports whether the request is a WebSocket upgrade
+// (RFC 6455 §4.1). Such requests hijack the connection and must bypass
+// capture (mirrors engine.isWebSocketUpgrade, kept local to avoid a cycle).
+func isWebSocketUpgrade(r *http.Request) bool {
+	if !strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
+		return false
+	}
+	for _, part := range strings.Split(r.Header.Get("Connection"), ",") {
+		if strings.EqualFold(strings.TrimSpace(part), "upgrade") {
+			return true
+		}
+	}
+	return false
 }
 
 func redactHeaders(h http.Header) string {
@@ -94,6 +118,12 @@ type capturingWriter struct {
 func (c *capturingWriter) WriteHeader(code int) {
 	c.status = code
 	c.ResponseWriter.WriteHeader(code)
+}
+
+// Unwrap exposes the underlying ResponseWriter so http.ResponseController can
+// reach Hijack/Flush/etc. on the original writer through this wrapper.
+func (c *capturingWriter) Unwrap() http.ResponseWriter {
+	return c.ResponseWriter
 }
 
 func (c *capturingWriter) Write(b []byte) (int, error) {

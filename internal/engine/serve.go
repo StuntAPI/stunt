@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"stuntapi.com/stunt/internal/engine/requestlog"
 )
 
 // ServeForTest starts one server per service on free ports (ignores
@@ -57,8 +59,10 @@ func (e *Engine) serve(ctx context.Context, freePorts bool) (map[string]string, 
 			return nil, nil, fmt.Errorf("listen for %s: %w", name, err)
 		}
 		svc := e.manifest.Services[name]
+		handler := e.serviceHandler(name, svc)
+		handler = requestlog.NewRecorder(e.reqLog, name).Wrap(handler)
 		srv := &http.Server{
-			Handler:           e.serviceHandler(name, svc),
+			Handler:           handler,
 			ReadHeaderTimeout: 5 * time.Second,
 		}
 		servers = append(servers, srv)
@@ -103,7 +107,8 @@ func (e *Engine) serve(ctx context.Context, freePorts bool) (map[string]string, 
 func (e *Engine) ServeSingle(ctx context.Context, listenAddr, tld string) (string, func(), error) {
 	handlers := make(map[string]http.Handler)
 	for name, svc := range e.manifest.Services {
-		handlers[name] = e.serviceHandler(name, svc)
+		h := e.serviceHandler(name, svc)
+		handlers[name] = requestlog.NewRecorder(e.reqLog, name).Wrap(h)
 	}
 
 	root := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

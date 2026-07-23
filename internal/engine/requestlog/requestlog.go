@@ -108,18 +108,25 @@ func openStore(path string, opts Options) (*Store, error) {
 
 // Store is the SQLite-backed request log.
 type Store struct {
-	db       *sql.DB
-	opts     Options
-	ch       chan Entry
-	inFlight sync.WaitGroup
+	db        *sql.DB
+	opts      Options
+	ch        chan Entry
+	inFlight  sync.WaitGroup
+	closeOnce sync.Once
+	closeErr  error
 }
 
-// Close stops the async writer (if running) and closes the database.
+// Close stops the async writer (if running) and closes the database. It is
+// idempotent: safe to call multiple times (the channel is closed and the DB
+// closed exactly once).
 func (s *Store) Close() error {
-	if s.ch != nil {
-		close(s.ch)
-	}
-	return s.db.Close()
+	s.closeOnce.Do(func() {
+		if s.ch != nil {
+			close(s.ch)
+		}
+		s.closeErr = s.db.Close()
+	})
+	return s.closeErr
 }
 
 // startWriter launches the background goroutine that drains s.ch and persists
