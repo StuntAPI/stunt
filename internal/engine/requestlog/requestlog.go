@@ -36,6 +36,7 @@ type Query struct {
 	Path    string // substring match
 	Status  int    // 0 = any
 	Q       string // free-text over path+req_body+resp_body
+	Since   int64  // only entries with seq > Since (0 = no filter; gap-free backfill)
 	Limit   int
 	Offset  int
 }
@@ -107,13 +108,14 @@ func openStore(path string, opts Options) (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("create request_log: %w", err)
 	}
-	return &Store{db: db, opts: opts}, nil
+	return &Store{db: db, opts: opts, bus: NewBus()}, nil
 }
 
 // Store is the SQLite-backed request log.
 type Store struct {
 	db         *sql.DB
 	opts       Options
+	bus        *Bus // always set (created in openStore); recorders publish here
 	ch         chan Entry
 	writerDone chan struct{}
 	inFlight   sync.WaitGroup
@@ -189,12 +191,34 @@ func (s *Store) persist(e Entry) error {
 		_, _ = s.db.Exec(`DELETE FROM request_log WHERE id NOT IN (
 			SELECT id FROM request_log ORDER BY seq DESC LIMIT ?)`, s.opts.Ring)
 	}
+	// Publish the stored entry to the bus AFTER a successful insert so the live
+	// feed reflects exactly what was persisted. Non-blocking (drops on slow subs).
+	if s.bus != nil {
+		s.bus.Publish(e)
+	}
 	return nil
 }
 
 // Insert persists an entry synchronously (back-compat / test path). It does
 // NOT go through the async writer and does not touch the in-flight counter.
 func (s *Store) Insert(e Entry) error { return s.persist(e) }
+
+// Bus returns the store's publisher (recorders publish captured entries here).
+func (s *Store) Bus() *Bus { return s.bus }
+
+// Get returns a single entry by DB id (for detail + replay).
+func (s *Store) Get(id int64) (Entry, error) {
+	var e Entry
+	err := s.db.QueryRow(`SELECT id, seq, ts, service, transport, method, path,
+		status, duration_us, req_headers, req_body, resp_headers, resp_body
+		FROM request_log WHERE id = ?`, id).
+		Scan(&e.ID, &e.Seq, &e.Ts, &e.Service, &e.Transport, &e.Method, &e.Path,
+			&e.Status, &e.DurationUs, &e.ReqHeaders, &e.ReqBody, &e.RespHeaders, &e.RespBody)
+	if err != nil {
+		return Entry{}, fmt.Errorf("get request_log %d: %w", id, err)
+	}
+	return e, nil
+}
 
 // List returns entries matching q, newest-first. Non-empty filter fields
 // (Service, Method, Path substring, Q free-text) are AND-combined into a
@@ -221,6 +245,10 @@ func (s *Store) List(q Query) ([]Entry, error) {
 	if q.Q != "" {
 		where = append(where, "(path LIKE ? OR req_body LIKE ? OR resp_body LIKE ?)")
 		args = append(args, "%"+q.Q+"%", "%"+q.Q+"%", "%"+q.Q+"%")
+	}
+	if q.Since > 0 {
+		where = append(where, "seq > ?")
+		args = append(args, q.Since)
 	}
 
 	clause := ""
