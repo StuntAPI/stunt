@@ -18,6 +18,7 @@ import (
 	"stuntapi.com/stunt/internal/adapter"
 	"stuntapi.com/stunt/internal/adapter/runtime"
 	"stuntapi.com/stunt/internal/adapterdist"
+	"stuntapi.com/stunt/internal/engine/requestlog"
 	"stuntapi.com/stunt/internal/manifest"
 	"stuntapi.com/stunt/internal/pathutil"
 	"stuntapi.com/stunt/internal/primitives"
@@ -61,6 +62,8 @@ type Engine struct {
 
 	grpcServers []*grpc.Server    // started by serve(), stopped by Close()
 	grpcTargets map[string]string // service name → grpc target (set by serve())
+
+	reqLog *requestlog.Store // shared request/response capture log
 }
 
 // serviceState holds the per-service runtime for an adapter-backed service:
@@ -103,6 +106,19 @@ func newEngine(m *manifest.Manifest, cacheRoot string) (*Engine, error) {
 	// Derive a state directory next to the manifest.
 	stateDir := defaultStateDir(m)
 	manifestDir := filepath.Dir(m.Path)
+
+	// Open the shared request log before per-service state so it is always
+	// available (even for rules-only engines, which create no service DBs).
+	// The dir may already be created by buildServiceState for adapter-backed
+	// services; MkdirAll is idempotent.
+	if err := os.MkdirAll(stateDir, 0o700); err != nil {
+		return nil, fmt.Errorf("create state dir %s: %w", stateDir, err)
+	}
+	rl, err := requestlog.Open(filepath.Join(stateDir, "requests.db"))
+	if err != nil {
+		return nil, fmt.Errorf("open request log: %w", err)
+	}
+	e.reqLog = rl
 
 	for name, svc := range m.Services {
 		if svc.Adapter == "" {
@@ -310,6 +326,12 @@ func (e *Engine) Close() error {
 		srv.GracefulStop()
 	}
 
+	if e.reqLog != nil {
+		if err := e.reqLog.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+
 	for _, st := range e.states {
 		if st.store != nil {
 			if err := st.store.Close(); err != nil && firstErr == nil {
@@ -333,6 +355,11 @@ func (e *Engine) Close() error {
 
 	return firstErr
 }
+
+// RequestLog returns the shared request/response capture store, or nil if
+// the engine was not able to open one (e.g. construction failed). Callers
+// query it via requestlog.Query / (*Store).List.
+func (e *Engine) RequestLog() *requestlog.Store { return e.reqLog }
 
 // HandlerForTest builds the serving handler for the first service.
 // Tests bind it to a listener of their choosing.
