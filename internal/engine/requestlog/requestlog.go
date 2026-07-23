@@ -91,7 +91,10 @@ func openStore(path string, opts Options) (*Store, error) {
 	if opts.WriteQueue <= 0 {
 		opts.WriteQueue = 1024
 	}
-	db, err := sql.Open("sqlite", path)
+	// _pragma=busy_timeout makes SQLite wait up to 5s on lock contention (e.g. a
+	// test reopening the same state dir while a prior engine's writer drains)
+	// instead of failing instantly with SQLITE_BUSY.
+	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)")
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite %s: %w", path, err)
 	}
@@ -109,21 +112,25 @@ func openStore(path string, opts Options) (*Store, error) {
 
 // Store is the SQLite-backed request log.
 type Store struct {
-	db        *sql.DB
-	opts      Options
-	ch        chan Entry
-	inFlight  sync.WaitGroup
-	closeOnce sync.Once
-	closeErr  error
+	db         *sql.DB
+	opts       Options
+	ch         chan Entry
+	writerDone chan struct{}
+	inFlight   sync.WaitGroup
+	closeOnce  sync.Once
+	closeErr   error
 }
 
-// Close stops the async writer (if running) and closes the database. It is
-// idempotent: safe to call multiple times (the channel is closed and the DB
-// closed exactly once).
+// Close drains the async writer (if running), stops it, then closes the DB. It
+// is idempotent. Draining before close guarantees in-flight writes are persisted
+// and the single connection is released, so a caller reopening the same DB (e.g.
+// a test restarting an engine in one state dir) does not hit SQLITE_BUSY.
 func (s *Store) Close() error {
 	s.closeOnce.Do(func() {
 		if s.ch != nil {
-			close(s.ch)
+			s.inFlight.Wait() // finish all in-flight writes
+			close(s.ch)       // signal the writer to exit
+			<-s.writerDone    // wait until it has exited
 		}
 		s.closeErr = s.db.Close()
 	})
@@ -134,7 +141,9 @@ func (s *Store) Close() error {
 // each entry off the request hot path.
 func (s *Store) startWriter() {
 	s.ch = make(chan Entry, s.opts.WriteQueue)
+	s.writerDone = make(chan struct{})
 	go func() {
+		defer close(s.writerDone)
 		for e := range s.ch {
 			_ = s.persist(e)
 			s.inFlight.Done()
