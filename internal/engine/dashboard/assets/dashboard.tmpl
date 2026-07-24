@@ -59,6 +59,9 @@
   .state-body .muted{opacity:.5}
   .state-body .rowlink{color:var(--bone);cursor:pointer}
   .state-body .rowlink:hover{text-decoration:underline}
+  .state-controls{display:flex;gap:8px;align-items:center;margin-bottom:14px}
+  .state-controls .restore-label{display:inline-flex;align-items:center;cursor:pointer}
+  .state-controls .tab:hover{background:rgba(255,212,0,.18)}
   /* table */
   .reqs{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
   .reqs thead th{text-align:left;font-weight:600;opacity:.5;padding:8px 10px;
@@ -187,6 +190,11 @@
 
 <main id="viewState" hidden>
   <div class="hint">browse what your tests created — collections, kv, blobs (read-only)</div>
+  <div class="state-controls">
+    <button class="tab" id="snapBtn">⤓ snapshot</button>
+    <label class="tab restore-label">⤒ restore<input type="file" id="restoreInput" accept=".gz,.tar.gz,application/gzip" hidden></label>
+    <span id="snapStatus" class="muted"></span>
+  </div>
   <div class="state-grid">
     <div class="state-col">
       <div class="state-h">services</div>
@@ -597,6 +605,37 @@ async function showBlobs(svc, ns, body){
   document.getElementById('backSvc').addEventListener('click', () => loadService(svc))
 }
 function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])) }
+
+// ── snapshot / restore controls ──
+const snapStatus = () => document.getElementById('snapStatus')
+// snapshot = GET /api/state/snapshot as a blob, trigger a download.
+document.getElementById('snapBtn').addEventListener('click', async () => {
+  snapStatus().textContent = 'snapshotting…'
+  try{
+    const res = await fetch('/api/state/snapshot')
+    if(!res.ok) throw new Error(res.status+' '+await res.text())
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url
+    a.download = 'stunt-snapshot-' + new Date().toISOString().replace(/[:.]/g,'-') + '.tar.gz'
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+    snapStatus().textContent = 'saved snapshot (' + blob.size + ' bytes)'
+  }catch(e){ snapStatus().textContent = 'error: ' + e.message }
+})
+// restore = POST the chosen file to /api/state/restore, then reload the view.
+document.getElementById('restoreInput').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0]; if(!file) return
+  snapStatus().textContent = 'restoring…'
+  try{
+    const res = await fetch('/api/state/restore', { method:'POST', body: file })
+    if(!res.ok) throw new Error(res.status+' '+await res.text())
+    snapStatus().textContent = 'restored from ' + file.name
+    // reload the current service view to reflect restored state
+    const active = document.querySelector('#svcList li.active')
+    if(active) loadService(active.textContent)
+  }catch(e){ snapStatus().textContent = 'error: ' + e.message }
+  ev.target.value = '' // allow re-picking the same file
+})
 </script>
 </body>
 </html>{{end}}
