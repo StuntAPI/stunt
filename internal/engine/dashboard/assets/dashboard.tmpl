@@ -40,6 +40,12 @@
   .stat b{color:var(--stunt-yellow);font-size:15px}
   .stat span{opacity:.6;margin-left:6px}
   .hint{font-family:var(--mono);font-size:11px;opacity:.5;margin-bottom:14px}
+  .filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:14px}
+  .filter{font-family:var(--mono);font-size:12px;background:rgba(14,14,14,.04);border:1px solid rgba(14,14,14,.18);padding:4px 8px;color:var(--ink);width:90px}
+  .filter:focus{outline:none;border-color:var(--stunt-yellow);background:#fff}
+  .filter.f-text{flex:1;min-width:160px;width:auto}
+  .filters .muted{font-family:var(--mono);font-size:11px;opacity:.5}
+  .filters .tab{padding:3px 8px}
   /* tabs + state browser */
   .tabs{margin-left:14px;display:flex;gap:2px}
   .tab{background:none;border:1px solid transparent;color:var(--ink);opacity:.6;font-family:var(--mono);font-size:12px;padding:3px 10px;cursor:pointer;text-transform:lowercase}
@@ -144,6 +150,17 @@
     <div class="stat"><b>localhost</b><span>live</span></div>
   </div>
   <div class="hint">click a row for full detail · copy-as-curl · replay · live via websocket</div>
+  <div class="filters">
+    <input id="fSvc" class="filter" list="fSvcList" placeholder="service">
+    <datalist id="fSvcList"></datalist>
+    <input id="fMethod" class="filter" list="fMethodList" placeholder="method">
+    <datalist id="fMethodList"></datalist>
+    <input id="fStatus" class="filter" list="fStatusList" placeholder="status">
+    <datalist id="fStatusList"></datalist>
+    <input id="fText" class="filter f-text" type="search" placeholder="path contains…">
+    <button id="fClear" class="tab">clear</button>
+    <span id="fCount" class="muted"></span>
+  </div>
 
   <table class="reqs">
     <thead><tr>
@@ -326,12 +343,17 @@
     trackSeq(e);
     var tr = document.createElement("tr");
     tr.setAttribute("data-id", e.id);
+    tr.setAttribute("data-method", String(e.method||"").toLowerCase());
+    tr.setAttribute("data-service", String(e.service||"").toLowerCase());
+    tr.setAttribute("data-status", String(e.status||""));
     tr.innerHTML = rowHTML(e);
     tr.addEventListener("click", function(){ toggleDetail(e.id); });
     if(prepend){ tbody.insertBefore(tr, tbody.firstChild); }
     else { tbody.appendChild(tr); }
     trimRows();
     updateCount();
+    noteFilterOptions(e);
+    applyFilter(tr);
   }
 
   function trimRows(){
@@ -341,6 +363,39 @@
       if(last){ tbody.removeChild(last); } else { break; }
     }
   }
+
+  // ── request filtering (Plan-2 spec F2; surfaced per QA v0.2.0 ISSUE-1) ──
+  var fSvc=byId("fSvc"), fMethod=byId("fMethod"), fStatus=byId("fStatus"), fText=byId("fText"),
+      fCount=byId("fCount"), fClear=byId("fClear");
+  var seen = {service:{}, method:{}, status:{}};
+  function byId(id){ return document.getElementById(id); }
+  // applyFilter: if a single row is passed, filter just it; else re-filter all.
+  function applyFilter(one){
+    var sv=fSvc.value.trim().toLowerCase(), me=fMethod.value.trim().toLowerCase(),
+        st=fStatus.value.trim(), tx=fText.value.trim().toLowerCase();
+    var rows = one ? [one] : tbody.children;
+    var shown = 0;
+    for(var i=0;i<rows.length;i++){
+      var r=rows[i];
+      if(!r || !r.getAttribute) continue;
+      var ok = (!sv || r.getAttribute("data-service")===sv)
+        && (!me || r.getAttribute("data-method")===me)
+        && (!st || r.getAttribute("data-status")===st)
+        && (!tx || (r.getAttribute("data-id") && cache[r.getAttribute("data-id")] && String(cache[r.getAttribute("data-id")].path||"").toLowerCase().indexOf(tx)>=0));
+      r.style.display = ok ? "" : "none";
+      if(ok) shown++;
+    }
+    fCount.textContent = tbody.children.length ? (shown+" of "+tbody.children.length+" shown") : "";
+  }
+  [fSvc,fMethod,fStatus,fText].forEach(function(el){ el.addEventListener("input", function(){ applyFilter(); }); });
+  fClear.addEventListener("click", function(){ fSvc.value=fMethod.value=fStatus.value=fText.value=""; applyFilter(); });
+  // populate datalists as new values arrive
+  function noteFilterOptions(e){
+    if(e.service && !seen.service[e.service]){ seen.service[e.service]=1; addOpt("fSvcList", e.service); }
+    if(e.method && !seen.method[e.method]){ seen.method[e.method]=1; addOpt("fMethodList", e.method); }
+    if(e.status && !seen.status[e.status]){ seen.status[e.status]=1; addOpt("fStatusList", String(e.status)); }
+  }
+  function addOpt(listId, val){ var o=document.createElement("option"); o.value=val; byId(listId).appendChild(o); }
 
   function updateCount(){
     statCount.textContent = String(tbody.children.length);
@@ -660,7 +715,7 @@ async function loadInstances(){
     if(!insts || !insts.length){ body.innerHTML = '<tr><td colspan="7"><span class="muted">no other running servers.</span></td></tr>'; return }
     body.innerHTML = insts.map(i => {
       const dash = i.dashboard_url
-        ? `<a class="dashlink" href="${esc(i.dashboard_url)}" target="_blank">open ↗</a>`
+        ? `<a class="dashlink" href="${esc(i.dashboard_url)}/?token=${esc(i.dashboard_token||'')}" target="_blank">open ↗</a>`
         : '<span class="muted">-</span>'
       const svcs = (i.services||[]).length ? esc(i.services.join(', ')) : '<span class="muted">-</span>'
       return `<tr><td>${i.pid}</td><td>${esc(i.mode||'-')}</td><td class="muted">${esc(ageOf(i.started_at))}</td><td>${esc(shortMan(i.manifest))}</td><td>${svcs}</td><td>${dash}</td><td><button class="stopbtn" data-pid="${i.pid}">stop</button></td></tr>`
