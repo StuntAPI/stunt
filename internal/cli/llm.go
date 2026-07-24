@@ -46,6 +46,8 @@ services in stunt.yaml; ` + "`stunt up`" + ` serves them on local ports.
   reset [<svc>] [--all]          wipe simulator state (one service or --all)
   snapshot save [-o file]        download a state snapshot (gzip-tar) of a running server
   snapshot load <file>           restore simulator state from a snapshot archive
+  ps [--json]                    list running stunt servers (across all manifests)
+  stop [<pid>]                   stop a running server (by PID, or the current manifest's)
   ui                              open the dashboard in your browser (resolves URL+token from ` + "`stunt up`" + `)
   version | --version
 Global: --manifest <path> (default stunt.yaml). Cache: --cache-dir/$STUNT_ADAPTER_CACHE.
