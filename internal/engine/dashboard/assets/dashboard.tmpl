@@ -40,6 +40,25 @@
   .stat b{color:var(--stunt-yellow);font-size:15px}
   .stat span{opacity:.6;margin-left:6px}
   .hint{font-family:var(--mono);font-size:11px;opacity:.5;margin-bottom:14px}
+  /* tabs + state browser */
+  .tabs{margin-left:14px;display:flex;gap:2px}
+  .tab{background:none;border:1px solid transparent;color:var(--ink);opacity:.6;font-family:var(--mono);font-size:12px;padding:3px 10px;cursor:pointer;text-transform:lowercase}
+  .tab.active{opacity:1;border-color:rgba(14,14,14,.25);background:rgba(14,14,14,.06)}
+  .state-grid{display:grid;grid-template-columns:200px 1fr;gap:16px}
+  .state-col .state-h{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.5;margin-bottom:8px}
+  .picklist{list-style:none;margin:0;padding:0;font-family:var(--mono);font-size:13px}
+  .picklist li{padding:5px 8px;cursor:pointer;border-radius:2px}
+  .picklist li:hover{background:rgba(255,212,0,.1)}
+  .picklist li.active{background:rgba(255,212,0,.18);color:var(--stunt-yellow)}
+  .state-body{font-family:var(--mono);font-size:13px}
+  .state-body .grp{margin-bottom:18px}
+  .state-body .grp-h{color:var(--stunt-yellow);font-size:12px;margin-bottom:6px}
+  .state-body table{width:100%;border-collapse:collapse}
+  .state-body td{padding:4px 8px;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top;word-break:break-word}
+  .state-body .kv-k{opacity:.6}
+  .state-body .muted{opacity:.5}
+  .state-body .rowlink{color:var(--bone);cursor:pointer}
+  .state-body .rowlink:hover{text-decoration:underline}
   /* table */
   .reqs{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
   .reqs thead th{text-align:left;font-weight:600;opacity:.5;padding:8px 10px;
@@ -104,11 +123,12 @@
     <h1>stunt</h1>
     <span class="tag">request inspector</span>
     <span class="live" id="liveBadge"><span class="dot"></span><span id="liveText">connecting</span></span>
+    <nav class="tabs"><button class="tab active" data-view="requests">requests</button><button class="tab" data-view="state">state</button></nav>
   </div>
   <div class="stripe"></div>
 </header>
 
-<main>
+<main id="viewRequests">
   <div class="stats">
     <div class="stat"><b id="statCount">{{len .}}</b><span>captured</span></div>
     <div class="stat"><b>localhost</b><span>live</span></div>
@@ -161,6 +181,19 @@
         <h4>response body</h4>
         <pre class="bodybox empty-body" id="dRespBody">(empty)</pre>
       </div>
+    </div>
+  </div>
+</main>
+
+<main id="viewState" hidden>
+  <div class="hint">browse what your tests created — collections, kv, blobs (read-only)</div>
+  <div class="state-grid">
+    <div class="state-col">
+      <div class="state-h">services</div>
+      <ul id="svcList" class="picklist"></ul>
+    </div>
+    <div class="state-col state-main">
+      <div id="stateBody" class="state-body"><span class="muted">select a service.</span></div>
     </div>
   </div>
 </main>
@@ -486,6 +519,84 @@
     boot();
   }
 })();
+// ── tabs: switch between requests and state views ──
+document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+  b.classList.add('active')
+  const view = b.dataset.view
+  document.getElementById('viewRequests').hidden = (view !== 'requests')
+  document.getElementById('viewState').hidden = (view !== 'state')
+  if (view === 'state') loadServices()
+}))
+
+// ── state browser (read-only) ──
+async function api(path){
+  const r = await fetch(path)
+  if(!r.ok) throw new Error(r.status+' '+await r.text())
+  return r.json()
+}
+async function loadServices(){
+  const data = await api('/api/state')
+  const ul = document.getElementById('svcList')
+  ul.innerHTML = ''
+  ;(data.services||[]).forEach(svc => {
+    const li = document.createElement('li'); li.textContent = svc
+    li.addEventListener('click', () => { ul.querySelectorAll('li').forEach(x=>x.classList.remove('active')); li.classList.add('active'); loadService(svc) })
+    ul.appendChild(li)
+  })
+  if(!ul.children.length) document.getElementById('stateBody').innerHTML = '<span class="muted">no services.</span>'
+}
+async function loadService(svc){
+  const body = document.getElementById('stateBody'); body.innerHTML = '<span class="muted">loading…</span>'
+  try{
+    const st = await api('/api/state/'+encodeURIComponent(svc))
+    let h = ''
+    // collections
+    h += '<div class="grp"><div class="grp-h">collections</div>'
+    if((st.collections||[]).length){
+      h += '<table><tbody>'
+      st.collections.forEach(c => h += `<tr><td class="rowlink" data-svc="${svc}" data-col="${c.name}">${esc(c.name)}</td><td class="muted">${c.count}</td></tr>`)
+      h += '</tbody></table>'
+    } else h += '<span class="muted">none</span>'
+    h += '</div>'
+    // kv
+    h += '<div class="grp"><div class="grp-h">kv</div>'
+    if((st.kv_namespaces||[]).length){
+      h += '<table><tbody>'
+      st.kv_namespaces.forEach(ns => h += `<tr><td class="rowlink" data-svc="${svc}" data-kv="${ns}">${esc(ns)}</td></tr>`)
+      h += '</tbody></table>'
+    } else h += '<span class="muted">none</span>'
+    h += '</div>'
+    // blobs
+    h += '<div class="grp"><div class="grp-h">blobs</div>'
+    if((st.blob_namespaces||[]).length){
+      h += '<table><tbody>'
+      st.blob_namespaces.forEach(ns => h += `<tr><td class="rowlink" data-svc="${svc}" data-blob="${ns}">${esc(ns)}</td></tr>`)
+      h += '</tbody></table>'
+    } else h += '<span class="muted">none</span>'
+    h += '</div>'
+    body.innerHTML = h
+    body.querySelectorAll('[data-col]').forEach(td => td.addEventListener('click', () => showCollection(svc, td.dataset.col, body)))
+    body.querySelectorAll('[data-kv]').forEach(td => td.addEventListener('click', () => showKV(svc, td.dataset.kv, body)))
+    body.querySelectorAll('[data-blob]').forEach(td => td.addEventListener('click', () => showBlobs(svc, td.dataset.blob, body)))
+  }catch(e){ body.innerHTML = '<span class="muted">error: '+esc(e.message)+'</span>' }
+}
+async function showCollection(svc, name, body){
+  const docs = await api(`/api/state/${encodeURIComponent(svc)}/collections/${encodeURIComponent(name)}`)
+  body.innerHTML = `<div class="grp"><div class="grp-h">${esc(svc)} / ${esc(name)} (${docs.length})</div><pre>${esc(JSON.stringify(docs,null,2))}</pre></div><button class="tab" id="backSvc">← back</button>`
+  document.getElementById('backSvc').addEventListener('click', () => loadService(svc))
+}
+async function showKV(svc, ns, body){
+  const pairs = await api(`/api/state/${encodeURIComponent(svc)}/kv/${encodeURIComponent(ns)}`)
+  body.innerHTML = `<div class="grp"><div class="grp-h">${esc(svc)} / kv / ${esc(ns)} (${pairs.length})</div><table><tbody>${pairs.map(p=>`<tr><td class="kv-k">${esc(p[0])}</td><td>${esc(p[1])}</td></tr>`).join('')}</tbody></table></div><button class="tab" id="backSvc">← back</button>`
+  document.getElementById('backSvc').addEventListener('click', () => loadService(svc))
+}
+async function showBlobs(svc, ns, body){
+  const blobs = await api(`/api/state/${encodeURIComponent(svc)}/blobs?ns=${encodeURIComponent(ns)}`)
+  body.innerHTML = `<div class="grp"><div class="grp-h">${esc(svc)} / blobs / ${esc(ns)} (${blobs.length})</div><table><tbody>${blobs.map(b=>`<tr><td>${esc(b.name)}</td><td class="muted">${b.size} B</td></tr>`).join('')}</tbody></table></div><button class="tab" id="backSvc">← back</button>`
+  document.getElementById('backSvc').addEventListener('click', () => loadService(svc))
+}
+function esc(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])) }
 </script>
 </body>
 </html>{{end}}
