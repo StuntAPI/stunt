@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 	"time"
 
@@ -170,7 +169,7 @@ func runUpStartWithArgs(t *testing.T, manifestPath string, extraArgs ...string) 
 	go func() { upDone <- root.Execute() }()
 
 	return func() {
-		_ = syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		selfSIGTERM()
 		select {
 		case <-upDone:
 		case <-time.After(5 * time.Second):

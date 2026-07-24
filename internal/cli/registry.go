@@ -5,12 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
-	"syscall"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 // Instance records one running stunt server in the global registry
@@ -63,25 +59,14 @@ func OpenRegistry() (*Registry, error) {
 }
 
 // withLock runs fn while holding an exclusive flock on the registry file's
-// companion lock file. The lock is held for the whole RMW so concurrent
-// stunt up / stunt down can't clobber each other. On Windows flock is a
-// no-op (atomic rename still guards against torn reads; lost updates are
-// healed by PID-pruning on the next List).
+// companion lock file (Unix). The lock is held for the whole RMW so concurrent
+// stunt up / stunt down can't clobber each other. On Windows flock is a no-op
+// (atomic rename still guards against torn reads; lost updates are healed by
+// PID-pruning on the next List). The platform-specific locking lives in
+// registry_unix.go / registry_windows.go so the unix.Flock symbol is never
+// compiled on Windows.
 func (r *Registry) withLock(fn func() error) error {
-	if runtime.GOOS == "windows" {
-		return fn()
-	}
-	lockPath := r.path + ".lock"
-	lf, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
-	if err != nil {
-		return fmt.Errorf("open lock %s: %w", lockPath, err)
-	}
-	defer lf.Close()
-	if err := unix.Flock(int(lf.Fd()), unix.LOCK_EX); err != nil {
-		return fmt.Errorf("flock %s: %w", lockPath, err)
-	}
-	defer unix.Flock(int(lf.Fd()), unix.LOCK_UN)
-	return fn()
+	return withFlock(r.path+".lock", fn)
 }
 
 // read loads the registry file (or an empty set if it doesn't exist yet).
@@ -202,23 +187,7 @@ func (r *Registry) List(prune bool) ([]Instance, error) {
 	return out, nil
 }
 
-// pidAlive reports whether pid is currently running (signal-0 liveness check).
-// Mirrors stunt down's check. On Windows, signal 0 isn't supported by the
-// syscall package; we optimistically treat the PID as alive (pruning is a
-// best-effort nicety, not a correctness gate).
-func pidAlive(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-	if runtime.GOOS == "windows" {
-		return true
-	}
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-	return proc.Signal(syscall.Signal(0)) == nil
-}
+// pidAlive + withFlock are platform-specific (registry_unix.go / registry_windows.go).
 
 // age returns a human-friendly duration string since the RFC3339 startedAt.
 func age(startedAt string) string {
