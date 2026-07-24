@@ -555,6 +555,76 @@ func (e *Engine) AdapterFor(name string) *adapter.Adapter {
 	return nil
 }
 
+// ServiceNames returns the manifest's service names, sorted (for the dashboard's
+// data-browser service picker).
+func (e *Engine) ServiceNames() []string {
+	names := make([]string, 0, len(e.manifest.Services))
+	for n := range e.manifest.Services {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// StateStores returns the per-service storage handles (document collections,
+// kv, blobs) for a service, or ok=false if the service has no adapter/state.
+// Used by the dashboard's read-only data browser.
+func (e *Engine) StateStores(name string) (col *primitives.Store, k *kv.KV, b *blob.Store, ok bool) {
+	st, found := e.states[name]
+	if !found || st == nil {
+		return nil, nil, nil, false
+	}
+	return st.store, st.kvStore, st.blobStore, true
+}
+
+// ResetService wipes one service's state (collections + kv + blobs) in place.
+// Used by the dashboard/CLI reset for deterministic runs.
+func (e *Engine) ResetService(name string) error {
+	st, ok := e.states[name]
+	if !ok || st == nil {
+		return fmt.Errorf("unknown service %q", name)
+	}
+	var firstErr error
+	if st.store != nil {
+		names, _ := st.store.CollectionNames()
+		for _, n := range names {
+			if c, err := st.store.Collection(n); err == nil {
+				if err := c.Clear(); err != nil && firstErr == nil {
+					firstErr = err
+				}
+			}
+		}
+	}
+	if st.kvStore != nil {
+		if err := st.kvStore.ClearAll(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	if st.blobStore != nil {
+		if err := st.blobStore.ClearAll(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
+// ResetAll wipes every service's state plus the shared request log. Used by the
+// dashboard/CLI reset for a clean slate.
+func (e *Engine) ResetAll() error {
+	var firstErr error
+	for name := range e.states {
+		if err := e.ResetService(name); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	if e.reqLog != nil {
+		if err := e.reqLog.Clear(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
+}
+
 // ServiceLoadError returns a non-empty error message if the named service's
 // adapter failed to load (partial startup). Returns "" if the service loaded
 // successfully or is rules-only.
