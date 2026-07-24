@@ -352,3 +352,35 @@ func TestCollectionCount(t *testing.T) {
 		t.Fatalf("count = %d, want 2", n)
 	}
 }
+
+func TestCollectionNamesAndClear(t *testing.T) {
+	s := newTestStore(t)
+	c1, _ := s.Collection("orders")
+	c1.Insert(map[string]any{"id": "o1"})
+	c2, _ := s.Collection("items")
+	c2.Insert(map[string]any{"id": "i1"})
+
+	names, err := s.CollectionNames()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 2 {
+		t.Fatalf("collection names = %v", names)
+	}
+
+	if err := c1.Clear(); err != nil {
+		t.Fatal(err)
+	}
+	docs, _ := c1.List()
+	if len(docs) != 0 {
+		t.Fatalf("after clear orders = %v", docs)
+	}
+
+	if err := s.DropCollection("items"); err != nil {
+		t.Fatal(err)
+	}
+	names2, _ := s.CollectionNames()
+	if len(names2) != 1 || names2[0] != "orders" {
+		t.Fatalf("after drop names = %v", names2)
+	}
+}

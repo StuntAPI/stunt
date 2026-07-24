@@ -111,3 +111,42 @@ func TestKVPersistsAcrossOpen(t *testing.T) {
 	}
 	k2.Close()
 }
+
+func TestListNamespacesClear(t *testing.T) {
+	k := newTestKV(t)
+	k.Set("ns1", "a", "1")
+	k.Set("ns1", "b", "2")
+	k.Set("ns2", "c", "3")
+
+	ns, err := k.Namespaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ns) != 2 || ns[0] != "ns1" || ns[1] != "ns2" {
+		t.Fatalf("namespaces = %v", ns)
+	}
+
+	l, err := k.List("ns1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(l) != 2 || l[0] != [2]string{"a", "1"} || l[1] != [2]string{"b", "2"} {
+		t.Fatalf("list ns1 = %v", l)
+	}
+
+	if err := k.Clear("ns1"); err != nil {
+		t.Fatal(err)
+	}
+	l2, _ := k.List("ns1")
+	if len(l2) != 0 {
+		t.Fatalf("after clear ns1 = %v", l2)
+	}
+
+	if err := k.ClearAll(); err != nil {
+		t.Fatal(err)
+	}
+	ns2, _ := k.Namespaces()
+	if len(ns2) != 0 {
+		t.Fatalf("after clearall namespaces = %v", ns2)
+	}
+}

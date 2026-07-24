@@ -38,6 +38,39 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
+// CollectionNames returns the names of all collection tables currently in the
+// store (each collection is its own table). Used by the dashboard's data browser.
+// System/internal tables (sqlite_*) are excluded.
+func (s *Store) CollectionNames() ([]string, error) {
+	rows, err := s.db.Query(`SELECT name FROM sqlite_master
+		WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`)
+	if err != nil {
+		return nil, fmt.Errorf("collection names: %w", err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		out = append(out, name)
+	}
+	return out, rows.Err()
+}
+
+// DropCollection removes a collection table. No-op (nil error) if it doesn't exist.
+// Used by reset.
+func (s *Store) DropCollection(name string) error {
+	if !validName.MatchString(name) {
+		return fmt.Errorf("invalid collection name %q", name)
+	}
+	if _, err := s.db.Exec(fmt.Sprintf(`DROP TABLE IF EXISTS %s`, quoteIdent(name))); err != nil {
+		return fmt.Errorf("drop collection %s: %w", name, err)
+	}
+	return nil
+}
+
 // validName matches safe SQL identifiers: a letter or underscore followed
 // by letters, digits, or underscores.
 var validName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -177,6 +210,14 @@ func (c *Collection) Delete(id string) error {
 	)
 	if err != nil {
 		return fmt.Errorf("delete from %s: %w", c.name, err)
+	}
+	return nil
+}
+
+// Clear removes every document from the collection (keeps the table). Used by reset.
+func (c *Collection) Clear() error {
+	if _, err := c.store.db.Exec(fmt.Sprintf(`DELETE FROM %s`, c.name)); err != nil {
+		return fmt.Errorf("clear %s: %w", c.name, err)
 	}
 	return nil
 }
