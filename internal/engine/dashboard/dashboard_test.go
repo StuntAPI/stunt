@@ -1,6 +1,7 @@
 package dashboard_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -269,5 +270,46 @@ func TestStateEndpoints(t *testing.T) {
 	res, _ := http.DefaultClient.Do(req)
 	if res.StatusCode != 200 {
 		t.Errorf("reset all: %d", res.StatusCode)
+	}
+}
+
+func TestSnapshotRestoreEndpoints(t *testing.T) {
+	st, _ := requestlog.Open(filepath.Join(t.TempDir(), "r.db"))
+	t.Cleanup(func() { _ = st.Close() })
+	d := dashboard.New(st)
+	d.SetTokenForTest("tok")
+	// Snapshot provider returns canned bytes; restore provider captures them.
+	var restored bytes.Buffer
+	snapshotBytes := []byte("FAKE-GZIP-TAR")
+	d.SetSnapshot(
+		func(w io.Writer) error { _, err := w.Write(snapshotBytes); return err },
+		func(r io.Reader) error { _, err := io.Copy(&restored, r); return err },
+	)
+	srv := httptest.NewServer(d.Handler())
+	t.Cleanup(srv.Close)
+	hdr := func() http.Header { h := http.Header{}; h.Set("X-Stunt-Token", "tok"); return h }()
+
+	// Snapshot (GET) → attachment stream.
+	req, _ := http.NewRequest("GET", srv.URL+"/api/state/snapshot", nil)
+	req.Header = hdr
+	res, _ := http.DefaultClient.Do(req)
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != 200 || !bytes.Equal(body, snapshotBytes) {
+		t.Fatalf("snapshot: %d %q", res.StatusCode, string(body))
+	}
+	if ct := res.Header.Get("Content-Type"); ct != "application/gzip" {
+		t.Errorf("content-type = %q, want application/gzip", ct)
+	}
+
+	// Restore (POST body).
+	req2, _ := http.NewRequest("POST", srv.URL+"/api/state/restore", bytes.NewReader(snapshotBytes))
+	req2.Header = hdr
+	res2, _ := http.DefaultClient.Do(req2)
+	rb, _ := io.ReadAll(res2.Body)
+	if res2.StatusCode != 200 || !bytes.Contains(rb, []byte("restored")) {
+		t.Fatalf("restore: %d %q", res2.StatusCode, string(rb))
+	}
+	if !bytes.Equal(restored.Bytes(), snapshotBytes) {
+		t.Errorf("restore received %q, want %q", restored.String(), string(snapshotBytes))
 	}
 }

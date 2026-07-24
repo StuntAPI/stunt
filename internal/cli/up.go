@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -256,6 +257,11 @@ func startDashboard(ctx context.Context, e *engine.Engine) (string, string) {
 			}
 			return e.ResetService(svc)
 		},
+	)
+	// Snapshot/restore (Plan 3b): engine-backed archive save/load.
+	d.SetSnapshot(
+		func(w io.Writer) error { return engine.Snapshot(e, "", w) },
+		func(r io.Reader) error { _, err := engine.Restore(e, r); return err },
 	)
 	srv := &http.Server{Handler: d.Handler()}
 	go func() {
