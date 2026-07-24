@@ -1,70 +1,54 @@
 package cli
 
 import (
+	"bytes"
+	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"stuntapi.com/stunt/internal/engine/dashboard"
+	"stuntapi.com/stunt/internal/engine/requestlog"
 )
 
-func TestIsPrivilegedPort(t *testing.T) {
-	cases := []struct {
-		port int
-		want bool
-	}{
-		{0, false},
-		{80, true},
-		{443, true},
-		{1023, true},
-		{1024, false},
-		{8443, false},
-		{-1, false},
-	}
-	for _, c := range cases {
-		got := isPrivilegedPort(c.port)
-		if got != c.want {
-			t.Errorf("isPrivilegedPort(%d) = %v, want %v", c.port, got, c.want)
-		}
-	}
+func newDashboardServer(t *testing.T) (*httptest.Server, string) {
+	t.Helper()
+	st, _ := requestlog.Open(t.TempDir() + "/r.db")
+	t.Cleanup(func() { _ = st.Close() })
+	d := dashboard.New(st)
+	d.SetTokenForTest("tok")
+	d.SetServices([]string{"api"})
+	d.SetState(
+		func(svc string) (dashboard.ServiceState, bool) {
+			return dashboard.ServiceState{Collections: []dashboard.CollectionInfo{{Name: "orders", Count: 3}}, KVNames: []string{"cfg"}}, true
+		},
+		func(svc, name string) ([]map[string]any, error) { return []map[string]any{{"id": "o1"}}, nil },
+		func(svc, ns string) ([][2]string, error) { return [][2]string{{"k", "v"}}, nil },
+		func(svc, ns string) ([]dashboard.BlobInfo, error) { return nil, nil },
+		func(svc string) error { return nil },
+	)
+	srv := httptest.NewServer(d.Handler())
+	t.Cleanup(srv.Close)
+	return srv, "tok"
 }
 
-func TestPortFromAddr(t *testing.T) {
-	cases := []struct {
-		addr string
-		want int
-	}{
-		{":443", 443},
-		{"127.0.0.1:8443", 8443},
-		{":0", 0},
-		{"localhost", 0},
-		{"", 0},
-	}
-	for _, c := range cases {
-		got := portFromAddr(c.addr)
-		if got != c.want {
-			t.Errorf("portFromAddr(%q) = %d, want %d", c.addr, got, c.want)
-		}
-	}
-}
-
-func TestSudoReexecCmd(t *testing.T) {
-	cmd, err := sudoReexecCmd("proxy", "start", "--port", "443")
-	if err != nil {
+func TestStateCollectionsCLI(t *testing.T) {
+	srv, tok := newDashboardServer(t)
+	var out bytes.Buffer
+	if err := runStateCollections(&out, srv.URL, tok, "api", false); err != nil {
 		t.Fatal(err)
 	}
-	if cmd.Args[0] != "sudo" {
-		t.Errorf("first arg = %q, want sudo", cmd.Args[0])
+	if !strings.Contains(out.String(), "orders") {
+		t.Fatalf("expected 'orders' in: %s", out.String())
 	}
-	// The second arg should be the executable path.
-	if cmd.Args[1] == "" {
-		t.Error("executable path is empty")
+}
+
+func TestResetCLI(t *testing.T) {
+	srv, tok := newDashboardServer(t)
+	var out bytes.Buffer
+	if err := runReset(&out, srv.URL, tok, "api", false); err != nil {
+		t.Fatal(err)
 	}
-	// Remaining args should be the passthrough.
-	wantTail := []string{"proxy", "start", "--port", "443"}
-	gotTail := cmd.Args[2:]
-	if len(gotTail) != len(wantTail) {
-		t.Fatalf("tail args = %v, want %v", gotTail, wantTail)
-	}
-	for i := range wantTail {
-		if gotTail[i] != wantTail[i] {
-			t.Errorf("tail[%d] = %q, want %q", i, gotTail[i], wantTail[i])
-		}
+	if !strings.Contains(out.String(), "reset") {
+		t.Fatalf("expected reset confirmation: %s", out.String())
 	}
 }

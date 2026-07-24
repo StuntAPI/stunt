@@ -42,6 +42,8 @@ services in stunt.yaml; ` + "`stunt up`" + ` serves them on local ports.
   service install|status|uninstall   system service unit
   requests [--json] [--limit N]   recent captured requests (talks to the running server's dashboard API)
   replay <id> [--json]           re-issue a captured request against the running server (uses its dashboard API)
+  state collections|collection|kv|blobs <svc> [--json]   browse simulator state of a running server
+  reset [<svc>] [--all]          wipe simulator state (one service or --all)
   ui                              open the dashboard in your browser (resolves URL+token from ` + "`stunt up`" + `)
   version | --version
 Global: --manifest <path> (default stunt.yaml). Cache: --cache-dir/$STUNT_ADAPTER_CACHE.
