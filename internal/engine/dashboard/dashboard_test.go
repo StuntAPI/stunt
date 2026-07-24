@@ -313,3 +313,40 @@ func TestSnapshotRestoreEndpoints(t *testing.T) {
 		t.Errorf("restore received %q, want %q", restored.String(), string(snapshotBytes))
 	}
 }
+
+func TestInstancesEndpoints(t *testing.T) {
+	st, _ := requestlog.Open(filepath.Join(t.TempDir(), "r.db"))
+	t.Cleanup(func() { _ = st.Close() })
+	d := dashboard.New(st)
+	d.SetTokenForTest("tok")
+	stoppedPID := -1
+	d.SetInstances(
+		func() ([]dashboard.InstanceInfo, error) {
+			return []dashboard.InstanceInfo{
+				{PID: 111, Manifest: "/a/stunt.yaml", Mode: "port", StartedAt: "2026-07-23T01:00:00Z"},
+				{PID: 222, Manifest: "/b/stunt.yaml", Mode: "port", StartedAt: "2026-07-23T02:00:00Z"},
+			}, nil
+		},
+		func(pid int) error { stoppedPID = pid; return nil },
+	)
+	srv := httptest.NewServer(d.Handler())
+	t.Cleanup(srv.Close)
+	hdr := func() http.Header { h := http.Header{}; h.Set("X-Stunt-Token", "tok"); return h }()
+
+	// list
+	req, _ := http.NewRequest("GET", srv.URL+"/api/instances", nil)
+	req.Header = hdr
+	res, _ := http.DefaultClient.Do(req)
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != 200 || !bytes.Contains(body, []byte(`"pid":111`)) || !bytes.Contains(body, []byte(`"pid":222`)) {
+		t.Fatalf("instances list: %d %q", res.StatusCode, string(body))
+	}
+
+	// stop one
+	req2, _ := http.NewRequest("POST", srv.URL+"/api/instances/222/stop", nil)
+	req2.Header = hdr
+	res2, _ := http.DefaultClient.Do(req2)
+	if res2.StatusCode != 200 || stoppedPID != 222 {
+		t.Fatalf("stop: status=%d stoppedPID=%d", res2.StatusCode, stoppedPID)
+	}
+}

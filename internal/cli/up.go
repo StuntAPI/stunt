@@ -280,6 +280,29 @@ func startDashboard(ctx context.Context, e *engine.Engine) (string, string) {
 		func(w io.Writer) error { return engine.Snapshot(e, "", w) },
 		func(r io.Reader) error { _, err := engine.Restore(e, r); return err },
 	)
+	// Instances panel (Phase 2): the dashboard lists + stops its siblings via the
+	// global registry. Stop reuses the cli stopPID (SIGTERM→SIGKILL).
+	if reg, err := OpenRegistry(); err == nil {
+		d.SetInstances(
+			func() ([]dashboard.InstanceInfo, error) {
+				insts, err := reg.List(true)
+				if err != nil {
+					return nil, err
+				}
+				out := make([]dashboard.InstanceInfo, len(insts))
+				for i, in := range insts {
+					out[i] = dashboard.InstanceInfo{
+						PID: in.PID, Manifest: in.Manifest, Mode: in.Mode,
+						Services: in.Services, Addresses: in.Addresses,
+						DashboardURL: in.DashboardURL, DashboardToken: in.DashboardToken,
+						StartedAt: in.StartedAt,
+					}
+				}
+				return out, nil
+			},
+			func(pid int) error { return stopPID(pid) },
+		)
+	}
 	srv := &http.Server{Handler: d.Handler()}
 	go func() {
 		<-ctx.Done()

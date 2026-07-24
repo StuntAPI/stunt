@@ -3,8 +3,8 @@ package cli
 import (
 	"bytes"
 	"os"
-	"strings"
 	"strconv"
+	"strings"
 	"testing"
 )
 

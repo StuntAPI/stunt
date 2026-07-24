@@ -59,6 +59,13 @@
   .state-body .muted{opacity:.5}
   .state-body .rowlink{color:var(--bone);cursor:pointer}
   .state-body .rowlink:hover{text-decoration:underline}
+  .inst-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:13px}
+  .inst-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.06em;opacity:.5;border-bottom:1px solid rgba(255,255,255,.14);padding:6px 8px}
+  .inst-table td{padding:6px 8px;border-bottom:1px solid rgba(255,255,255,.06);vertical-align:top}
+  .inst-table .stopbtn{color:#ff6b6b;cursor:pointer;background:none;border:none;font-family:var(--mono);font-size:12px}
+  .inst-table .stopbtn:hover{text-decoration:underline}
+  .inst-table .dashlink{color:var(--stunt-yellow);opacity:.85}
+  .inst-table .muted{opacity:.5}}
   .state-controls{display:flex;gap:8px;align-items:center;margin-bottom:14px}
   .state-controls .restore-label{display:inline-flex;align-items:center;cursor:pointer}
   .state-controls .tab:hover{background:rgba(255,212,0,.18)}
@@ -126,7 +133,7 @@
     <h1>stunt</h1>
     <span class="tag">request inspector</span>
     <span class="live" id="liveBadge"><span class="dot"></span><span id="liveText">connecting</span></span>
-    <nav class="tabs"><button class="tab active" data-view="requests">requests</button><button class="tab" data-view="state">state</button></nav>
+    <nav class="tabs"><button class="tab active" data-view="requests">requests</button><button class="tab" data-view="state">state</button><button class="tab" data-view="instances">instances</button></nav>
   </div>
   <div class="stripe"></div>
 </header>
@@ -204,6 +211,11 @@
       <div id="stateBody" class="state-body"><span class="muted">select a service.</span></div>
     </div>
   </div>
+</main>
+
+<main id="viewInstances" hidden>
+  <div class="hint">running stunt servers across all manifests — stop, or open a dashboard</div>
+  <table class="inst-table"><thead><tr><th>pid</th><th>mode</th><th>age</th><th>manifest</th><th>services</th><th>dashboard</th><th></th></tr></thead><tbody id="instBody"></tbody></table>
 </main>
 
 <footer><div class="ftr">
@@ -527,14 +539,16 @@
     boot();
   }
 })();
-// ── tabs: switch between requests and state views ──
+// ── tabs: switch between requests / state / instances views ──
 document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
   b.classList.add('active')
   const view = b.dataset.view
   document.getElementById('viewRequests').hidden = (view !== 'requests')
   document.getElementById('viewState').hidden = (view !== 'state')
+  document.getElementById('viewInstances').hidden = (view !== 'instances')
   if (view === 'state') loadServices()
+  if (view === 'instances') loadInstances()
 }))
 
 // ── state browser (read-only) ──
@@ -636,6 +650,35 @@ document.getElementById('restoreInput').addEventListener('change', async (ev) =>
   }catch(e){ snapStatus().textContent = 'error: ' + e.message }
   ev.target.value = '' // allow re-picking the same file
 })
+
+// ── instances panel (Phase 2) ──
+async function loadInstances(){
+  const body = document.getElementById('instBody')
+  body.innerHTML = '<tr><td colspan="7"><span class="muted">loading…</span></td></tr>'
+  try{
+    const insts = await fetch('/api/instances').then(r => { if(!r.ok) throw new Error(r.status); return r.json() })
+    if(!insts || !insts.length){ body.innerHTML = '<tr><td colspan="7"><span class="muted">no other running servers.</span></td></tr>'; return }
+    body.innerHTML = insts.map(i => {
+      const dash = i.dashboard_url
+        ? `<a class="dashlink" href="${esc(i.dashboard_url)}" target="_blank">open ↗</a>`
+        : '<span class="muted">-</span>'
+      const svcs = (i.services||[]).length ? esc(i.services.join(', ')) : '<span class="muted">-</span>'
+      return `<tr><td>${i.pid}</td><td>${esc(i.mode||'-')}</td><td class="muted">${esc(ageOf(i.started_at))}</td><td>${esc(shortMan(i.manifest))}</td><td>${svcs}</td><td>${dash}</td><td><button class="stopbtn" data-pid="${i.pid}">stop</button></td></tr>`
+    }).join('')
+    body.querySelectorAll('.stopbtn').forEach(b => b.addEventListener('click', async () => {
+      const pid = b.dataset.pid
+      if(!confirm('stop stunt server pid '+pid+'?')) return
+      b.disabled = true; b.textContent = 'stopping…'
+      try{
+        const res = await fetch('/api/instances/'+pid+'/stop', {method:'POST'})
+        if(!res.ok) throw new Error(res.status)
+        loadInstances()
+      }catch(e){ b.textContent = 'err'; alert('stop failed: '+e.message) }
+    }))
+  }catch(e){ body.innerHTML = '<tr><td colspan="7" class="muted">instances unavailable ('+esc(e.message)+')</td></tr>' }
+}
+function ageOf(s){ if(!s) return '?'; const t = new Date(s); const d = Math.round((Date.now()-t)/1000); if(isNaN(d)) return '?'; return d<60?d+'s':Math.round(d/60)+'m' }
+function shortMan(p){ if(!p) return '-'; const i = p.lastIndexOf('/'); return i>0?p.slice(i+1):p }
 </script>
 </body>
 </html>{{end}}

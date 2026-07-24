@@ -53,6 +53,8 @@ type Dashboard struct {
 	reset         ResetSvcFunc
 	snapshot      SnapshotProvider // nil = unavailable
 	restore       RestoreProvider
+	instances     InstancesProvider // nil = panel hidden
+	stopInstance  StopInstanceFunc
 	services      []string // manifest service names (set by up.go) for the picker
 }
 
@@ -103,9 +105,34 @@ type SnapshotProvider func(w io.Writer) error
 // by up.go to engine.Restore.
 type RestoreProvider func(r io.Reader) error
 
+// InstanceInfo is a serializable running-instance entry (the dashboard's own
+// shape; it can't import the cli package).
+type InstanceInfo struct {
+	PID            int      `json:"pid"`
+	Manifest       string   `json:"manifest"`
+	Mode           string   `json:"mode"`
+	Services       []string `json:"services,omitempty"`
+	Addresses      []string `json:"addresses,omitempty"`
+	DashboardURL   string   `json:"dashboard_url,omitempty"`
+	DashboardToken string   `json:"dashboard_token,omitempty"`
+	StartedAt      string   `json:"started_at"`
+}
+
+// InstancesProvider returns the running instances (PID-pruned). Wired by up.go.
+type InstancesProvider func() ([]InstanceInfo, error)
+
+// StopInstanceFunc stops the instance with the given PID. Wired by up.go.
+type StopInstanceFunc func(pid int) error
+
 // SetSnapshot wires the engine-backed snapshot/restore providers (up.go).
 func (d *Dashboard) SetSnapshot(s SnapshotProvider, r RestoreProvider) {
 	d.snapshot, d.restore = s, r
+}
+
+// SetInstances wires the instance-registry providers (up.go). When left nil,
+// the instances panel/endpoint report unavailable.
+func (d *Dashboard) SetInstances(list InstancesProvider, stop StopInstanceFunc) {
+	d.instances, d.stopInstance = list, stop
 }
 
 // SetServices records the manifest's service names (for the browser picker).
@@ -157,6 +184,8 @@ func (d *Dashboard) Handler() http.Handler {
 	mux.HandleFunc("/api/state/reset", d.handleStateReset) // all-services reset (service=="")
 	mux.HandleFunc("/api/state/snapshot", d.handleStateSnapshot)
 	mux.HandleFunc("/api/state/restore", d.handleStateRestore)
+	mux.HandleFunc("/api/instances", d.handleInstances)
+	mux.HandleFunc("/api/instances/{pid}/stop", d.handleInstanceStop)
 	mux.HandleFunc("/api/state/{service}/reset", d.handleStateReset)
 	mux.HandleFunc("/api/state/{service}/collections/{name}", d.handleStateCollection)
 	mux.HandleFunc("/api/state/{service}/collections", d.handleStateCollections)
@@ -598,6 +627,43 @@ func (d *Dashboard) handleStateRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, map[string]any{"restored": true})
+}
+
+// handleInstances lists running instances (GET), PID-pruned.
+func (d *Dashboard) handleInstances(w http.ResponseWriter, r *http.Request) {
+	if d.instances == nil {
+		http.Error(w, "instances not available", http.StatusServiceUnavailable)
+		return
+	}
+	insts, err := d.instances()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, insts)
+}
+
+// handleInstanceStop stops the instance named by {pid} (POST).
+func (d *Dashboard) handleInstanceStop(w http.ResponseWriter, r *http.Request) {
+	if d.stopInstance == nil {
+		http.Error(w, "stop not available", http.StatusServiceUnavailable)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	pidStr := r.PathValue("pid")
+	pid, err := strconv.Atoi(pidStr)
+	if err != nil {
+		http.Error(w, "invalid pid", http.StatusBadRequest)
+		return
+	}
+	if err := d.stopInstance(pid); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"stopped": pid})
 }
 
 func newToken() string {
