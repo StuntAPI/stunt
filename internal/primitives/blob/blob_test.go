@@ -433,3 +433,26 @@ func TestPutAtomicityContentAndMetaConsistent(t *testing.T) {
 		t.Fatalf("List returned %d blobs, but %d content files on disk", len(infos), len(contentFiles))
 	}
 }
+
+func TestNamespacesAndClearAll(t *testing.T) {
+	s := newTestStore(t)
+	s.PutWith("uploads", "a.txt", "text/plain", bytes.NewReader([]byte("a")))
+	s.PutWith("uploads", "b.txt", "text/plain", bytes.NewReader([]byte("b")))
+	s.PutWith("avatars", "c.png", "image/png", bytes.NewReader([]byte("c")))
+
+	ns, err := s.Namespaces()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ns) != 2 || ns[0] != "avatars" || ns[1] != "uploads" {
+		t.Fatalf("namespaces = %v", ns)
+	}
+
+	if err := s.ClearAll(); err != nil {
+		t.Fatal(err)
+	}
+	ns2, _ := s.Namespaces()
+	if len(ns2) != 0 {
+		t.Fatalf("after clearall = %v", ns2)
+	}
+}

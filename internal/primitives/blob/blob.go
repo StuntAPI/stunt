@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -259,6 +261,67 @@ func (s *Store) List(ns string) ([]Info, error) {
 		})
 	}
 	return infos, nil
+}
+
+// Namespaces returns the distinct namespaces that currently hold at least one
+// blob (one per subdirectory of root with content). Used by the data browser.
+func (s *Store) Namespaces() ([]string, error) {
+	entries, err := os.ReadDir(s.root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("blob: namespaces: %w", err)
+	}
+	var out []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		// only report namespaces that actually contain blobs (.meta files)
+		if has, _ := hasMeta(filepath.Join(s.root, e.Name())); has {
+			out = append(out, e.Name())
+		}
+	}
+	sort.Strings(out)
+	return out, nil
+}
+
+// ClearAll removes every blob across all namespaces. Used by reset.
+func (s *Store) ClearAll() error {
+	entries, err := os.ReadDir(s.root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("blob: clear all: %w", err)
+	}
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		if err := os.RemoveAll(filepath.Join(s.root, e.Name())); err != nil {
+			return fmt.Errorf("blob: clear ns %s: %w", e.Name(), err)
+		}
+	}
+	return nil
+}
+
+// hasMeta reports whether dir contains any *.meta file.
+func hasMeta(dir string) (bool, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	for _, e := range entries {
+		if e.Type().IsRegular() && strings.HasSuffix(e.Name(), ".meta") {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // --- helpers ---

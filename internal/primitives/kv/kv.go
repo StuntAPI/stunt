@@ -97,3 +97,57 @@ func (k *KV) Delete(ns, key string) error {
 	}
 	return nil
 }
+
+// List returns all key/value pairs in namespace ns, ordered by key. Used by the
+// dashboard's kv browser.
+func (k *KV) List(ns string) ([][2]string, error) {
+	rows, err := k.db.Query(`SELECT key, value FROM kv WHERE namespace = ? ORDER BY key`, ns)
+	if err != nil {
+		return nil, fmt.Errorf("kv list %s: %w", ns, err)
+	}
+	defer rows.Close()
+	var out [][2]string
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, err
+		}
+		out = append(out, [2]string{key, value})
+	}
+	return out, rows.Err()
+}
+
+// Namespaces returns the distinct namespaces that currently hold at least one
+// key, ordered by name. Used by the dashboard's kv browser.
+func (k *KV) Namespaces() ([]string, error) {
+	rows, err := k.db.Query(`SELECT DISTINCT namespace FROM kv ORDER BY namespace`)
+	if err != nil {
+		return nil, fmt.Errorf("kv namespaces: %w", err)
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var ns string
+		if err := rows.Scan(&ns); err != nil {
+			return nil, err
+		}
+		out = append(out, ns)
+	}
+	return out, rows.Err()
+}
+
+// Clear removes every key in namespace ns (no-op if ns has none). Used by reset.
+func (k *KV) Clear(ns string) error {
+	if _, err := k.db.Exec(`DELETE FROM kv WHERE namespace = ?`, ns); err != nil {
+		return fmt.Errorf("kv clear %s: %w", ns, err)
+	}
+	return nil
+}
+
+// ClearAll removes every key across all namespaces. Used by reset.
+func (k *KV) ClearAll() error {
+	if _, err := k.db.Exec(`DELETE FROM kv`); err != nil {
+		return fmt.Errorf("kv clear all: %w", err)
+	}
+	return nil
+}

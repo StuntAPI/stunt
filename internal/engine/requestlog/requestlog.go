@@ -172,6 +172,16 @@ func (s *Store) Enqueue(e Entry) {
 // goroutine. It is a no-op for read-only stores.
 func (s *Store) Flush() { s.inFlight.Wait() }
 
+// Clear removes every captured request (used by reset for deterministic runs).
+// It waits for in-flight writes first so the table isn't cleared mid-write.
+func (s *Store) Clear() error {
+	s.inFlight.Wait()
+	if _, err := s.db.Exec(`DELETE FROM request_log`); err != nil {
+		return fmt.Errorf("clear request_log: %w", err)
+	}
+	return nil
+}
+
 // persist inserts an entry (assigning ts if empty) and enforces the ring
 // bound. It is pure with respect to the in-flight counter: the writer loop
 // (or the sync Insert path) owns counter management.

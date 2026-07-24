@@ -113,3 +113,23 @@ func TestStoreInsertAndList(t *testing.T) {
 		t.Fatalf("unexpected: %+v", got)
 	}
 }
+
+func TestClear(t *testing.T) {
+	st, _ := requestlog.Open(filepath.Join(t.TempDir(), "r.db"))
+	t.Cleanup(func() { _ = st.Close() })
+	for i := 1; i <= 3; i++ {
+		st.Enqueue(requestlog.Entry{Seq: int64(i), Service: "s", Method: "GET", Path: "/x", Status: 200})
+	}
+	st.Flush()
+	got, _ := st.List(requestlog.Query{Limit: 10})
+	if len(got) != 3 {
+		t.Fatalf("pre-clear = %d", len(got))
+	}
+	if err := st.Clear(); err != nil {
+		t.Fatal(err)
+	}
+	got2, _ := st.List(requestlog.Query{Limit: 10})
+	if len(got2) != 0 {
+		t.Fatalf("post-clear = %d", len(got2))
+	}
+}
