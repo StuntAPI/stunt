@@ -75,6 +75,11 @@ func runDown(out io.Writer, mDir string) error {
 	}
 
 	removeRuntimeFile(mDir)
+
+	// Deregister from the global instance registry (best-effort).
+	if reg, err := OpenRegistry(); err == nil {
+		_ = reg.Deregister(pid)
+	}
 	return nil
 }
 

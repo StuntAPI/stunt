@@ -112,6 +112,23 @@ func runUpPort(ctx context.Context, e *engine.Engine, m *manifest.Manifest, out 
 	}
 	defer removeRuntimeFile(manifestDir)
 
+	// Register in the global instance registry (~/.stunt/instances.json) so
+	// `stunt ps` can list this server across manifests. Best-effort; a missed
+	// deregister (crash) is healed by PID-pruning on the next `stunt ps`.
+	if reg, err := OpenRegistry(); err == nil {
+		_ = reg.Register(Instance{
+			PID:            os.Getpid(),
+			Manifest:       m.Path,
+			Mode:           "port",
+			Services:       sortedServiceNames(m.Services),
+			Addresses:      addrList,
+			DashboardURL:   dashURL,
+			DashboardToken: dashToken,
+			StartedAt:      rt.StartedAt,
+		})
+		defer reg.Deregister(os.Getpid())
+	}
+
 	for _, name := range sortedServiceNames(m.Services) {
 		svc := m.Services[name]
 		httpAddr := addrs[name]
@@ -401,6 +418,21 @@ func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifes
 		fmt.Fprintf(out, "warning: could not write runtime file: %v\n", wErr)
 	}
 	defer removeRuntimeFile(subMDir)
+
+	// Register in the global instance registry (~/.stunt/instances.json).
+	if reg, err := OpenRegistry(); err == nil {
+		_ = reg.Register(Instance{
+			PID:            os.Getpid(),
+			Manifest:       manifestPath,
+			Mode:           "subdomain",
+			Services:       sortedServiceNames(m.Services),
+			Addresses:      subRt.Addresses,
+			DashboardURL:   dashURL,
+			DashboardToken: dashToken,
+			StartedAt:      subRt.StartedAt,
+		})
+		defer reg.Deregister(os.Getpid())
+	}
 
 	// M5: if sync_hosts is enabled, write *.tld entries to the hosts file.
 	// Uses the hostsPath indirection so tests can override it.
