@@ -180,6 +180,83 @@ func startDashboard(ctx context.Context, e *engine.Engine) (string, string) {
 		e.HandlerForTestByName(ent.Service).ServeHTTP(rw, req)
 		return rw.Code, rw.Body.String()
 	})
+
+	// Data browsers + reset (Plan 3): engine-backed providers over per-service stores.
+	d.SetServices(e.ServiceNames())
+	d.SetState(
+		func(svc string) (dashboard.ServiceState, bool) {
+			col, k, b, ok := e.StateStores(svc)
+			if !ok {
+				return dashboard.ServiceState{}, false
+			}
+			st := dashboard.ServiceState{}
+			if col != nil {
+				names, _ := col.CollectionNames()
+				for _, n := range names {
+					c, err := col.Collection(n)
+					cnt := 0
+					if err == nil {
+						cnt, _ = c.Count()
+					}
+					st.Collections = append(st.Collections, dashboard.CollectionInfo{Name: n, Count: cnt})
+				}
+			}
+			if k != nil {
+				st.KVNames, _ = k.Namespaces()
+			}
+			if b != nil {
+				st.BlobNames, _ = b.Namespaces()
+			}
+			return st, true
+		},
+		func(svc, name string) ([]map[string]any, error) {
+			col, _, _, ok := e.StateStores(svc)
+			if !ok {
+				return nil, fmt.Errorf("no state for service %s", svc)
+			}
+			c, err := col.Collection(name)
+			if err != nil {
+				return nil, err
+			}
+			return c.List()
+		},
+		func(svc, ns string) ([][2]string, error) {
+			_, k, _, ok := e.StateStores(svc)
+			if !ok || k == nil {
+				return nil, fmt.Errorf("no kv for service %s", svc)
+			}
+			return k.List(ns)
+		},
+		func(svc, ns string) ([]dashboard.BlobInfo, error) {
+			_, _, b, ok := e.StateStores(svc)
+			if !ok || b == nil {
+				return nil, fmt.Errorf("no blobs for service %s", svc)
+			}
+			var namespaces []string
+			if ns != "" {
+				namespaces = []string{ns}
+			} else {
+				namespaces, _ = b.Namespaces()
+			}
+			var out []dashboard.BlobInfo
+			for _, n := range namespaces {
+				infos, err := b.List(n)
+				if err != nil {
+					return nil, err
+				}
+				for _, info := range infos {
+					out = append(out, dashboard.BlobInfo{Name: info.Name, Size: info.Size, ContentType: info.ContentType, Modified: info.Modified.Format(time.RFC3339)})
+				}
+			}
+			return out, nil
+		},
+		func(svc string) error {
+			if svc == "" {
+				return e.ResetAll()
+			}
+			return e.ResetService(svc)
+		},
+	)
 	srv := &http.Server{Handler: d.Handler()}
 	go func() {
 		<-ctx.Done()
