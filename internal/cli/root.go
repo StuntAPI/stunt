@@ -34,6 +34,7 @@ func NewRootCmd() *cobra.Command {
 	root.AddCommand(newReplayCmd())
 	root.AddCommand(newStateCmd())
 	root.AddCommand(newResetCmd())
+	root.AddCommand(newSnapshotCmd())
 	root.AddCommand(newUICmd())
 	root.AddCommand(newLLMCmd())
 	return root
