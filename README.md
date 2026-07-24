@@ -62,7 +62,7 @@ brew install --cask stuntapi/tap/stunt
 ```powershell
 # clone the manifest repo, then install from the local manifest dir
 git clone --depth 1 https://github.com/stuntapi/winget
-winget install --manifest winget/manifests/s/StuntAPI/Stunt/0.2.0
+winget install --manifest winget/manifests/s/StuntAPI/Stunt/0.2.1
 ```
 
 > Once stunt is submitted to the default winget source, this becomes simply
@@ -187,7 +187,7 @@ lint-adapters). Quick path: `stunt adapter new myapi-style` → edit → `stunt 
 
 ## Status & roadmap
 
-**v0.2.0 — observability dashboard.** Core plus a full per-server dashboard (live
+**v0.2.1 — observability dashboard.** Core plus a full per-server dashboard (live
 request inspector, state browser, snapshot/restore, instance manager) are built,
 self-tested (`just ci` green), and dogfooded. On the roadmap: a **public catalog**
 (today's `stunt catalog` is offline/bundled + git refs), `stunt setup` privileged-path

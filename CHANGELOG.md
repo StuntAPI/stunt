@@ -4,7 +4,21 @@ All notable changes to **stunt** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] — 2026-07-24
+## [0.2.1] — 2026-07-24
+
+> v0.2.0 was tagged but never published (a Windows cross-compile bug — Unix-only
+> `unix.Flock` compiled under `GOOS=windows` — slipped past the host-only CI gate;
+> and the poisoned version is immutable in the Go module proxy). This is the first
+> published 0.2.x: same features, with the cross-platform build fix.
+
+### Cross-platform build fix
+
+- Build-tagged the Unix-only `unix.Flock` (registry file lock) and the test's
+  `syscall.Kill` (self-SIGTERM) so the **Windows** cross-compile succeeds — they now
+  live in `registry_unix.go` / `registry_windows.go` (Windows = no-op; atomic temp-rename
+  + PID-pruning heals any race) and `sigterm_{unix,windows}_test.go`. All six
+  GoReleaser targets (linux/darwin/windows × amd64/arm64) now build; cross-platform
+  `go vet` is clean.
 
 ### The observability dashboard
 
