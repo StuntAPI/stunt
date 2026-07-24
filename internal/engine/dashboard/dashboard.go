@@ -43,6 +43,67 @@ type Dashboard struct {
 	tmpl   *template.Template
 	replay ReplayFunc    // engine-backed re-issuer; nil = replay unavailable
 	seq    *atomic.Int64 // shared engine sequence counter for replay entries
+
+	// state browsing + reset (engine-backed; nil = unavailable). Wired by up.go.
+	stateOverview StateProvider
+	colDocs       CollectionDocsProvider
+	kvList        KVListProvider
+	blobList      BlobListProvider
+	reset         ResetSvcFunc
+	services      []string // manifest service names (set by up.go) for the picker
+}
+
+// ServiceState is a serializable snapshot of one service's stores, returned by
+// StateProvider for the data browser.
+type ServiceState struct {
+	Collections []CollectionInfo `json:"collections"`
+	KVNames     []string         `json:"kv_namespaces"`
+	BlobNames   []string         `json:"blob_namespaces"`
+}
+
+// CollectionInfo is a collection name + its document count.
+type CollectionInfo struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+// StateProvider returns a serializable snapshot of a service's stores, or
+// ok=false if the service has no adapter/state. Wired by up.go to the engine.
+type StateProvider func(service string) (ServiceState, bool)
+
+// CollectionDocsProvider returns the documents in a service's named collection.
+type CollectionDocsProvider func(service, collection string) ([]map[string]any, error)
+
+// KVListProvider returns the key/value pairs in a service's kv namespace.
+type KVListProvider func(service, ns string) ([][2]string, error)
+
+// BlobListProvider returns the blobs in a service's blob namespace.
+type BlobListProvider func(service, ns string) ([]BlobInfo, error)
+
+// BlobInfo is a serializable blob metadata entry.
+type BlobInfo struct {
+	Name        string `json:"name"`
+	Size        int64  `json:"size"`
+	ContentType string `json:"content_type,omitempty"`
+	Modified    string `json:"modified"`
+}
+
+// ResetSvcFunc wipes one service's state (if service != "") or all services +
+// the request log (if service == ""). Wired by up.go to the engine.
+type ResetSvcFunc func(service string) error
+
+// SetServices records the manifest's service names (for the browser picker).
+func (d *Dashboard) SetServices(names []string) { d.services = names }
+
+// SetState wires the engine-backed state providers (called by up.go).
+func (d *Dashboard) SetState(
+	overview StateProvider,
+	docs CollectionDocsProvider,
+	kv KVListProvider,
+	blobs BlobListProvider,
+	reset ResetSvcFunc,
+) {
+	d.stateOverview, d.colDocs, d.kvList, d.blobList, d.reset = overview, docs, kv, blobs, reset
 }
 
 // New builds a dashboard over store and generates a fresh auth token.
@@ -75,6 +136,16 @@ func (d *Dashboard) Handler() http.Handler {
 	mux.HandleFunc("/api/requests", d.handleRequests)
 	mux.HandleFunc("/api/requests/{id}", d.handleDetail)
 	mux.HandleFunc("/api/requests/{id}/replay", d.handleReplay)
+	// data browsers + reset (Plan 3)
+	mux.HandleFunc("/api/state", d.handleStateServices)
+	mux.HandleFunc("/api/state/reset", d.handleStateReset) // all-services reset (service=="")
+	mux.HandleFunc("/api/state/{service}/reset", d.handleStateReset)
+	mux.HandleFunc("/api/state/{service}/collections/{name}", d.handleStateCollection)
+	mux.HandleFunc("/api/state/{service}/collections", d.handleStateCollections)
+	mux.HandleFunc("/api/state/{service}/kv/{ns}", d.handleStateKV)
+	mux.HandleFunc("/api/state/{service}/kv", d.handleStateKVList)
+	mux.HandleFunc("/api/state/{service}/blobs", d.handleStateBlobs)
+	mux.HandleFunc("/api/state/{service}", d.handleStateService)
 	mux.HandleFunc("/", d.handleIndex)
 	return d.guard(mux)
 }
@@ -351,6 +422,133 @@ func wsWriteJSON(ctx context.Context, c *websocket.Conn, v any) error {
 }
 
 // newToken returns a random 32-char hex token.
+// ── data browsers + reset (Plan 3) ──
+
+// stateUnavailable reports 503 when no engine-backed state provider is wired.
+func (d *Dashboard) stateUnavailable(w http.ResponseWriter) bool {
+	if d.stateOverview == nil {
+		http.Error(w, "state browsing not available", http.StatusServiceUnavailable)
+		return true
+	}
+	return false
+}
+
+// handleStateServices lists the manifest's service names (the picker).
+func (d *Dashboard) handleStateServices(w http.ResponseWriter, r *http.Request) {
+	if d.stateUnavailable(w) {
+		return
+	}
+	writeJSON(w, map[string]any{"services": d.services})
+}
+
+// handleStateService returns the overview (collections + counts, kv/blob ns).
+func (d *Dashboard) handleStateService(w http.ResponseWriter, r *http.Request) {
+	if d.stateUnavailable(w) {
+		return
+	}
+	svc := r.PathValue("service")
+	st, ok := d.stateOverview(svc)
+	if !ok {
+		http.Error(w, "no state for service "+svc, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, st)
+}
+
+// handleStateCollections lists a service's collections + counts.
+func (d *Dashboard) handleStateCollections(w http.ResponseWriter, r *http.Request) {
+	if d.stateUnavailable(w) {
+		return
+	}
+	svc := r.PathValue("service")
+	st, ok := d.stateOverview(svc)
+	if !ok {
+		http.Error(w, "no state for service "+svc, http.StatusNotFound)
+		return
+	}
+	writeJSON(w, st.Collections)
+}
+
+// handleStateCollection returns the documents in one collection.
+func (d *Dashboard) handleStateCollection(w http.ResponseWriter, r *http.Request) {
+	if d.stateUnavailable(w) || d.colDocs == nil {
+		http.Error(w, "not available", http.StatusServiceUnavailable)
+		return
+	}
+	docs, err := d.colDocs(r.PathValue("service"), r.PathValue("name"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, docs)
+}
+
+// handleStateKVList lists a service's kv namespaces.
+func (d *Dashboard) handleStateKVList(w http.ResponseWriter, r *http.Request) {
+	if d.stateUnavailable(w) {
+		return
+	}
+	st, ok := d.stateOverview(r.PathValue("service"))
+	if !ok {
+		http.Error(w, "no state", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, st.KVNames)
+}
+
+// handleStateKV returns the key/value pairs in one kv namespace.
+func (d *Dashboard) handleStateKV(w http.ResponseWriter, r *http.Request) {
+	if d.stateUnavailable(w) || d.kvList == nil {
+		http.Error(w, "not available", http.StatusServiceUnavailable)
+		return
+	}
+	pairs, err := d.kvList(r.PathValue("service"), r.PathValue("ns"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, pairs)
+}
+
+// handleStateBlobs lists a service's blobs (across namespaces or ?ns=).
+func (d *Dashboard) handleStateBlobs(w http.ResponseWriter, r *http.Request) {
+	if d.stateUnavailable(w) || d.blobList == nil {
+		http.Error(w, "not available", http.StatusServiceUnavailable)
+		return
+	}
+	ns := r.URL.Query().Get("ns")
+	infos, err := d.blobList(r.PathValue("service"), ns)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, infos)
+}
+
+// handleStateReset wipes one service (POST) or all (POST /api/state/reset).
+func (d *Dashboard) handleStateReset(w http.ResponseWriter, r *http.Request) {
+	if d.reset == nil {
+		http.Error(w, "reset not available", http.StatusServiceUnavailable)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	svc := r.PathValue("service") // "" when called at /api/state/reset
+	if err := d.reset(svc); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"reset": true, "service": svc})
+}
+
+// writeJSON encodes v as JSON.
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(v)
+}
+
 func newToken() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)

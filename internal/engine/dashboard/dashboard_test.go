@@ -215,3 +215,51 @@ func dummyStore(t *testing.T) *requestlog.Store {
 	st.Flush()
 	return st
 }
+
+func TestStateEndpoints(t *testing.T) {
+	st, _ := requestlog.Open(filepath.Join(t.TempDir(), "r.db"))
+	t.Cleanup(func() { _ = st.Close() })
+	d := dashboard.New(st); d.SetTokenForTest("tok")
+	d.SetServices([]string{"api"})
+	d.SetState(
+		func(svc string) (dashboard.ServiceState, bool) {
+			if svc != "api" { return dashboard.ServiceState{}, false }
+			return dashboard.ServiceState{
+				Collections: []dashboard.CollectionInfo{{Name: "orders", Count: 2}},
+				KVNames:     []string{"cfg"},
+				BlobNames:   []string{"uploads"},
+			}, true
+		},
+		func(svc, name string) ([]map[string]any, error) { return []map[string]any{{"id": "o1"}}, nil },
+		func(svc, ns string) ([][2]string, error) { return [][2]string{{"k", "v"}}, nil },
+		func(svc, ns string) ([]dashboard.BlobInfo, error) { return []dashboard.BlobInfo{{Name: "f.txt", Size: 2}}, nil },
+		func(svc string) error { return nil },
+	)
+	srv := httptest.NewServer(d.Handler()); t.Cleanup(srv.Close)
+	get := func(p string) (int, string) {
+		req, _ := http.NewRequest("GET", srv.URL+p, nil)
+		req.Header.Set("X-Stunt-Token", "tok")
+		res, _ := http.DefaultClient.Do(req)
+		b, _ := io.ReadAll(res.Body)
+		return res.StatusCode, string(b)
+	}
+	for _, c := range []struct{ path, want string }{
+		{"/api/state", "services"},
+		{"/api/state/api", "orders"},
+		{"/api/state/api/collections", "orders"},
+		{"/api/state/api/collections/orders", "o1"},
+		{"/api/state/api/kv", "cfg"},
+		{"/api/state/api/kv/cfg", "\"k\""},
+		{"/api/state/api/blobs", "f.txt"},
+	} {
+		code, body := get(c.path)
+		if code != 200 || !strings.Contains(body, c.want) {
+			t.Errorf("%s: got %d %q (want 200 containing %q)", c.path, code, body, c.want)
+		}
+	}
+	// reset (POST)
+	req, _ := http.NewRequest("POST", srv.URL+"/api/state/reset", nil)
+	req.Header.Set("X-Stunt-Token", "tok")
+	res, _ := http.DefaultClient.Do(req)
+	if res.StatusCode != 200 { t.Errorf("reset all: %d", res.StatusCode) }
+}
