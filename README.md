@@ -156,6 +156,22 @@ exact signatures, gRPC/WebSocket/GraphQL sections): **[`adapters/README.md`](ada
 - **Networking**: optional portless.dev-style TLS proxy on `*.localhost` (HTTP/2, local CA). The privileged
   listener forwards to an **unprivileged** engine, so adapter code never runs as root. WSS passthrough verified.
 
+## Observability dashboard
+
+Every running server serves its **own localhost dashboard** — a live request inspector (HTTP/gRPC/WebSocket, bodies, copy-as-curl, replay), a **state browser** (the collections/kv/blobs your tests created), **snapshot/restore** for deterministic runs, and an **instance manager**. A matching CLI (`--json`) backs every feature.
+
+```
+$ stunt up
+  dashboard:  http://127.0.0.1:54321   (token: 9f3c…)
+$ stunt ui          # open it
+$ stunt requests --follow    # live feed in the terminal
+$ stunt ps          # list running servers across all manifests
+```
+
+Loopback-only, token-authed, DNS-rebinding-guarded; sensitive headers redacted; logging is async (never backpressures requests). Full guide with screenshots: **[`docs/dashboard.md`](docs/dashboard.md)**.
+
+![Request inspector](docs/img/dashboard-hero.png)
+
 ## Safety & trust
 
 The defining property: **a community adapter is safe to install** — adapter logic is sandboxed
@@ -171,9 +187,10 @@ lint-adapters). Quick path: `stunt adapter new myapi-style` → edit → `stunt 
 
 ## Status & roadmap
 
-**Pre-1.0 MVP.** Core is built, self-tested (`just ci` green), and dogfooded. On the roadmap:
-a **public catalog** (today's `stunt catalog` is offline/bundled + git refs), **GitHub
-Releases** install, `stunt setup` privileged-path hardening, and broader adapter coverage.
+**v0.1.0 released.** Core + full observability dashboard (live inspector, state browser,
+snapshot/restore, instance manager) are built, self-tested (`just ci` green), and dogfooded.
+On the roadmap: a **public catalog** (today's `stunt catalog` is offline/bundled + git refs),
+`stunt setup` privileged-path hardening, and broader adapter coverage.
 **Not planned for v1**: GraphQL subscriptions, npm adapter distribution.
 
 Found a security issue? See **[SECURITY.md](SECURITY.md)** — do not open a public issue.

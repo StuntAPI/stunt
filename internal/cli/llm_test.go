@@ -29,6 +29,14 @@ func TestLLMReferenceCoversCriticalAPI(t *testing.T) {
 		}
 	}
 
+	// The dashboard commands (observability + control).
+	for _, want := range []string{"ui", "requests", "replay", "state", "reset",
+		"snapshot", "ps", "stop"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("llm reference should document dashboard command %q", want)
+		}
+	}
+
 	// The manifest schema.
 	for _, want := range []string{"stunt.yaml", "services", "adapter", "rng_seed"} {
 		if !strings.Contains(s, want) {

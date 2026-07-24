@@ -29,6 +29,21 @@ services in stunt.yaml; ` + "`stunt up`" + ` serves them on local ports.
   stunt doctor        # health check (run when something fails)
   stunt catalog search <q>   # find adapters (--json for machine output)
 
+## Dashboard (every ` + "`stunt up`" + `)
+Each running server serves its OWN localhost dashboard (loopback + token auth): a live
+request inspector (HTTP/gRPC/WS, bodies, copy-as-curl, replay), a STATE browser
+(the collections/kv/blobs your tests created), snapshot/restore for deterministic runs,
+and an instance manager. ` + "`stunt ui`" + ` opens it; every command below has ` + "`--json`" + `.
+  ui                              open the dashboard in your browser
+  requests [--json] [--limit N] [--follow]   captured requests (live stream with --follow)
+  replay <id> [--json]           re-issue a captured request against current state
+  state collections|collection|kv|blobs <svc> [--json]   browse what your tests created
+  reset [<svc>] [--all]          wipe simulator state (one service or --all)
+  snapshot save [-o file]        download a state snapshot (gzip-tar)
+  snapshot load <file>           restore simulator state from a snapshot
+  ps [--json]                    list running servers across all manifests
+  stop [<pid>]                   stop a server (SIGTERM→SIGKILL; prunes the registry)
+
 ## Commands
   init/plan/up/down   manifest lifecycle (up is the main command)
   demo                one-shot stateful Stripe-style demo
@@ -40,15 +55,6 @@ services in stunt.yaml; ` + "`stunt up`" + ` serves them on local ports.
   proxy start         TLS reverse proxy (subdomain mode)
   trust               install stunt CA in system trust store (needs privilege)
   service install|status|uninstall   system service unit
-  requests [--json] [--limit N]   recent captured requests (talks to the running server's dashboard API)
-  replay <id> [--json]           re-issue a captured request against the running server (uses its dashboard API)
-  state collections|collection|kv|blobs <svc> [--json]   browse simulator state of a running server
-  reset [<svc>] [--all]          wipe simulator state (one service or --all)
-  snapshot save [-o file]        download a state snapshot (gzip-tar) of a running server
-  snapshot load <file>           restore simulator state from a snapshot archive
-  ps [--json]                    list running stunt servers (across all manifests)
-  stop [<pid>]                   stop a running server (by PID, or the current manifest's)
-  ui                              open the dashboard in your browser (resolves URL+token from ` + "`stunt up`" + `)
   version | --version
 Global: --manifest <path> (default stunt.yaml). Cache: --cache-dir/$STUNT_ADAPTER_CACHE.
 
