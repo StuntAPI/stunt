@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -50,6 +51,8 @@ type Dashboard struct {
 	kvList        KVListProvider
 	blobList      BlobListProvider
 	reset         ResetSvcFunc
+	snapshot      SnapshotProvider // nil = unavailable
+	restore       RestoreProvider
 	services      []string // manifest service names (set by up.go) for the picker
 }
 
@@ -91,6 +94,19 @@ type BlobInfo struct {
 // ResetSvcFunc wipes one service's state (if service != "") or all services +
 // the request log (if service == ""). Wired by up.go to the engine.
 type ResetSvcFunc func(service string) error
+
+// SnapshotProvider writes a full snapshot archive (gzip-tar) to w. Wired by
+// up.go to engine.Snapshot.
+type SnapshotProvider func(w io.Writer) error
+
+// RestoreProvider reads a snapshot archive from r and restores state. Wired
+// by up.go to engine.Restore.
+type RestoreProvider func(r io.Reader) error
+
+// SetSnapshot wires the engine-backed snapshot/restore providers (up.go).
+func (d *Dashboard) SetSnapshot(s SnapshotProvider, r RestoreProvider) {
+	d.snapshot, d.restore = s, r
+}
 
 // SetServices records the manifest's service names (for the browser picker).
 func (d *Dashboard) SetServices(names []string) { d.services = names }
@@ -139,6 +155,8 @@ func (d *Dashboard) Handler() http.Handler {
 	// data browsers + reset (Plan 3)
 	mux.HandleFunc("/api/state", d.handleStateServices)
 	mux.HandleFunc("/api/state/reset", d.handleStateReset) // all-services reset (service=="")
+	mux.HandleFunc("/api/state/snapshot", d.handleStateSnapshot)
+	mux.HandleFunc("/api/state/restore", d.handleStateRestore)
 	mux.HandleFunc("/api/state/{service}/reset", d.handleStateReset)
 	mux.HandleFunc("/api/state/{service}/collections/{name}", d.handleStateCollection)
 	mux.HandleFunc("/api/state/{service}/collections", d.handleStateCollections)
@@ -547,6 +565,39 @@ func (d *Dashboard) handleStateReset(w http.ResponseWriter, r *http.Request) {
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// handleStateSnapshot streams a snapshot archive (gzip-tar) back as an
+// attachment. GET or POST; both trigger a download of the current state.
+func (d *Dashboard) handleStateSnapshot(w http.ResponseWriter, r *http.Request) {
+	if d.snapshot == nil {
+		http.Error(w, "snapshot not available", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "application/gzip")
+	w.Header().Set("Content-Disposition", `attachment; filename="stunt-snapshot.tar.gz"`)
+	if err := d.snapshot(w); err != nil {
+		// Headers already sent (200 + streaming); best we can do is log.
+		fmt.Fprintf(w, "\n[snapshot error: %v]", err)
+	}
+}
+
+// handleStateRestore reads a snapshot archive from the request body and
+// restores it. POST only. Expects a raw gzip-tar body (not multipart).
+func (d *Dashboard) handleStateRestore(w http.ResponseWriter, r *http.Request) {
+	if d.restore == nil {
+		http.Error(w, "restore not available", http.StatusServiceUnavailable)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := d.restore(r.Body); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"restored": true})
 }
 
 func newToken() string {
