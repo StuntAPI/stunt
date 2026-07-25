@@ -4,6 +4,18 @@ All notable changes to **stunt** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] — 2026-07-24
+
+### Housekeeping
+
+- **History scrub:** removed an internal QA/dogfood report
+  (`DOGFOOD_REPORT_PLAN1.md`) that had been accidentally committed. It contained
+  no secrets (only a synthetic test token, `sk_df_SECRET_xyz`) — purely internal
+  process notes. The file is gone from the repo, all history, and `.gitignore`
+  now blocks `DOGFOOD_REPORT*.md` / `*-findings.md`. Released as a new version
+  only because the Go module proxy is immutable (v0.2.1's cached zip still
+  carries the file); v0.2.2 is the first clean version.
+
 ## [0.2.1] — 2026-07-24
 
 > v0.2.0 was tagged but never published (a Windows cross-compile bug — Unix-only
