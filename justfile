@@ -27,7 +27,7 @@ default:
 
 # ---- the canonical CI gate -------------------------------------------------
 # Run every check a PR must pass. Exits non-zero on the first failure.
-ci: build test vet fmt-check mod-tidy lint-adapters
+ci: build test vet fmt-check mod-tidy cross-build lint-adapters
     @echo "✓ all CI checks passed"
 
 # ---- release --------------------------------------------------------------
@@ -60,6 +60,26 @@ release *args='':
 # Compile everything (including the CLI binary).
 build:
     go build -ldflags "{{ldflags}}" ./...
+
+# Cross-compile every release target (linux/darwin/windows × amd64/arm64) to
+# /dev/null. The host `build` only covers the host platform, so a Unix-only
+# symbol (e.g. unix.Flock, syscall.Kill) compiles fine locally but breaks a
+# GOOS=windows cross-compile — which is exactly what poisoned the v0.2.0 tag
+# (caught only at release time, by GoReleaser). Mirrors the GoReleaser matrix
+# (CGO_ENABLED=0, pure-Go) so what CI checks == what ships.
+cross-build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    fail=0
+    for pair in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+        goos="${pair%/*}"; goarch="${pair#*/}"
+        if CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build -o /dev/null ./cmd/stunt; then
+            echo "  ✓ $goos/$goarch"
+        else
+            echo "  ✗ $goos/$goarch"; fail=1
+        fi
+    done
+    exit $fail
 
 # Run the full test suite under the race detector.
 test:

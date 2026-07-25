@@ -125,6 +125,37 @@ tokens from your environment. Use **one** path per release — don't run both.
 Release is marked `prerelease: auto` and `draft: true` — review the draft, then
 publish it.
 
+### Release gotchas (lessons learned)
+
+**1. `just ci` cross-compiles every release target — for a reason.** A Unix-only
+symbol (e.g. `unix.Flock`, `syscall.Kill`) compiles fine on the host but breaks a
+`GOOS=windows` build. The `cross-build` recipe (part of `just ci`) builds all six
+`linux/darwin/windows × amd64/arm64` targets with `CGO_ENABLED=0`, exactly matching
+the GoReleaser matrix — so what CI checks is what ships. **Never tag a release if
+`just ci` hasn't passed locally with this gate.** (This is exactly what poisoned
+the `v0.2.0` tag: the host-only gate let a Windows-only break through, and it was
+caught only when GoReleaser cross-compiled.)
+
+**2. A published Go version is immutable — never reuse one that hit the proxy.**
+Once `git push --tags` makes `stuntapi.com/stunt@vX.Y.Z` resolvable,
+`proxy.golang.org` + `sum.golang.org` cache it **forever** at that commit's content.
+GoReleaser builds from that cached content, not your working tree. So:
+
+- **Tag only after a clean release build** (see #1). Don't tag optimistically.
+- If a release *does* fail on a code bug, the tagged version is **burned** —
+  moving the tag or force-pushing does nothing (the proxy ignores it). **Bump the
+  patch** (`v0.2.0` → `v0.2.1`) and re-cut. The broken version stays in the proxy
+  but is harmless as long as no release/install path references it.
+- First push of a brand-new tag can race `sum.golang.org` and fail with
+  `500 Internal Server Error` on the very first run — it's transient; the checksum
+  DB ingests the version within a minute. Just re-run the workflow.
+
+**3. `go install` shows `0.0.0-dev`.** That's expected — `go install` doesn't apply
+GoReleaser's ldflags, so the `Version` const keeps its default. The **release
+archives** have the real version injected (verify with
+`./stunt --version` on an extracted binary). The version is purely informational;
+functionality is identical.
+
 ---
 
 ## Summary of one-time owner tasks
@@ -141,5 +172,6 @@ publish it.
 - [x] **Create** `stuntapi/homebrew-tap` repo
 - [x] **Create** `stuntapi/winget` repo
 - [x] **Wire** GoReleaser `homebrew_casks` + `winget` (migrated off removed `brews`)
-- [ ] **Add** `TAP_GITHUB_TOKEN` secret (PAT: `contents:write` on homebrew-tap + winget)
-- [ ] **Tag** `v0.1.0` and push
+- [x] **Add** `TAP_GITHUB_TOKEN` secret (PAT: `contents:write` on homebrew-tap + winget)
+- [x] **Tag** `v0.1.0` and push  (then `v0.2.1` — the observability dashboard)
+- [x] **`cross-build`** added to `just ci` (catches Windows cross-compile breaks pre-tag)
