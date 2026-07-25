@@ -7,3 +7,8 @@ dist/
 
 # Internal task tracker (beads) — never public
 .beads/
+
+# Internal QA / dogfood reports — never public
+DOGFOOD_REPORT*.md
+docs/dogfood/
+*-findings.md
