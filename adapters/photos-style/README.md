@@ -96,6 +96,11 @@ Point a `stunt.yaml` service at this directory:
 services:
   photos:
     adapter: ./adapters/photos-style
+    max_body_bytes: 33554432   # uploads over 1 MiB need a raised body limit
 ```
 
 Then `stunt up` and make requests to the served address.
+
+Note: the engine's default request-body limit is 1 MiB and oversize bodies
+get a `413`. Real phone photos routinely run 3-8 MB, so set
+`max_body_bytes` on the service (as above) when testing realistic uploads.

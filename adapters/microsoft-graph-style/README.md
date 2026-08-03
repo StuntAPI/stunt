@@ -112,6 +112,18 @@ envelope (`{error:{code, message}}`).
 services:
   graph:
     adapter: ./adapters/microsoft-graph-style
+    max_body_bytes: 33554432   # uploads over 1 MiB need a raised body limit
 ```
 
 Then `stunt up` and make requests to the served address.
+
+Note: the engine's default request-body limit is 1 MiB and oversize bodies
+get a `413`; set `max_body_bytes` (as above) when testing uploads or chunk
+PUTs over 1 MiB.
+
+Upload session URLs (`/v1.0/_upload/sess-NNNNNN`) carry no bearer check,
+matching real Graph where the upload URL is pre-authenticated. Unlike real
+Graph the session ids here are deterministic monotonic counters, not
+unguessable tokens: stunt ids are deterministic by design (`rng_seed`
+reproducibility) and the sim binds to localhost. Do not expose a stunt
+server to a shared network.
