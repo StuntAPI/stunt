@@ -83,6 +83,7 @@ services:
     #     respond: { status: 200, body: { inline: { message: hi } } }
     config:                         # optional per-service config passed to adapter scripts
       webhook_url: http://127.0.0.1:9999/hooks
+    max_body_bytes: 8388608         # optional request-body cap (default 1 MiB); oversize → 413
 ```
 
 ### Rule fields (inline declarative responses)
@@ -162,6 +163,7 @@ must **return a response** via `respond(...)` (or a dict shaped `{status, body, 
 |---|---|---|
 | `req["method"]` | string | HTTP method (`GET`, `POST`, ...) |
 | `req["path"]` | string | request path |
+| `req["host"]` | string | request Host header (`127.0.0.1:8000`); use it to mint self-referential URLs |
 | `req["headers"]` | dict | request headers (case-insensitive keys); e.g. `req["headers"]["Authorization"]` |
 | `req["body"]` | dict \| list \| None | parsed JSON body (None if no/invalid JSON) |
 | `req["raw_body"]` | string | raw body bytes as a string (for non-JSON/binary uploads) |

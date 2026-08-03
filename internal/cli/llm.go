@@ -67,6 +67,7 @@ Global: --manifest <path> (default stunt.yaml). Cache: --cache-dir/$STUNT_ADAPTE
       adapter: ./adapters/svc-style  # local path OR git:github.com/org/repo@ref
                                     # OR embedded:stripe-style (bundled in binary, no clone)
       config: { webhook_url: ... }   # optional, passed to scripts
+      max_body_bytes: 8388608        # optional request-body cap (default 1 MiB); oversize -> 413
       # OR rules-only (no adapter):
       # rules:
       #   - name: ok
@@ -88,7 +89,8 @@ Rules match in ORDER (first wins); "/**" is the catch-all. Templates: {{ faker.E
   # optional transports: grpc: {service, descriptor, methods[]} | graphql: {schema, resolvers, path} | ws: [{route, handler}]
 
 ## Starlark handler API  (def on_x(req): ... return respond(...))
-req keys: method, path, headers (dict, case-insensitive), body (parsed JSON or None),
+req keys: method, path, host (request Host header, for self-referential URLs),
+          headers (dict, case-insensitive), body (parsed JSON or None),
           raw_body (string, for binary), query (dict), params (path captures).
 Builtins:
   respond(status, body, headers)            # or return {status, body, headers}

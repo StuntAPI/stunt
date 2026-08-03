@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -402,12 +403,20 @@ func (e *Engine) HTTPServerForTest() *http.Server {
 	return &http.Server{Handler: e.HandlerForTest(), ReadHeaderTimeout: 5 * time.Second}
 }
 
+// defaultMaxBodyBytes is the request body cap applied when a service does
+// not set max_body_bytes in the manifest.
+const defaultMaxBodyBytes = 1 << 20 // 1 MiB
+
 func (e *Engine) serviceHandler(name string, svc manifest.Service) http.Handler {
 	rng := rules.NewRNG(e.manifest.RNGSeed)
 	fk := rules.NewFaker(e.manifest.RNGSeed)
 	baseDir := filepath.Dir(e.manifest.Path)
 	st := e.states[name]          // nil for rules-only services
 	loadErr := e.loadErrors[name] // non-empty if adapter failed to load
+	bodyLimit := svc.MaxBodyBytes
+	if bodyLimit <= 0 {
+		bodyLimit = defaultMaxBodyBytes
+	}
 
 	// rng and faker are shared across goroutines; math/rand.Rand and gofakeit
 	// are not concurrency-safe. Guard all access with a mutex (I2).
@@ -444,7 +453,20 @@ func (e *Engine) serviceHandler(name string, svc manifest.Service) http.Handler 
 
 		var body []byte
 		if r.Body != nil {
-			body, _ = io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+			var err error
+			body, err = io.ReadAll(http.MaxBytesReader(w, r.Body, bodyLimit))
+			if err != nil {
+				// Never hand truncated data to a handler. Overflow is 413;
+				// any other read failure is a 400.
+				var maxErr *http.MaxBytesError
+				if errors.As(err, &maxErr) {
+					writeStatus(w, http.StatusRequestEntityTooLarge,
+						fmt.Sprintf(`{"error":"request body exceeds %d bytes"}`, bodyLimit))
+					return
+				}
+				writeStatus(w, http.StatusBadRequest, `{"error":"failed to read request body"}`)
+				return
+			}
 		}
 
 		// --- adapter-backed dispatch ---

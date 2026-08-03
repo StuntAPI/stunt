@@ -45,13 +45,23 @@ func (r *Recorder) Wrap(next http.Handler) http.Handler {
 			return
 		}
 		start := time.Now()
-		var reqBody []byte
+		// Capture the request body by teeing the stream rather than reading
+		// it up front: an up-front read through a LimitReader would TRUNCATE
+		// what downstream handlers see for bodies over the capture cap. The
+		// tee passes every byte through untouched and keeps at most
+		// maxBody+1 bytes for the log (the +1 marks truncation).
+		var capture *teeBody
 		if req.Body != nil {
-			reqBody, _ = io.ReadAll(io.LimitReader(req.Body, maxBody+1))
-			req.Body = io.NopCloser(bytes.NewReader(reqBody))
+			capture = &teeBody{rc: req.Body}
+			req.Body = capture
 		}
 		rw := &capturingWriter{ResponseWriter: w, status: 200}
 		next.ServeHTTP(rw, req)
+
+		var reqBody []byte
+		if capture != nil {
+			reqBody = capture.buf.Bytes()
+		}
 
 		dur := time.Since(start)
 		e := Entry{
@@ -79,6 +89,28 @@ func capBody(b []byte) string {
 	}
 	return string(b)
 }
+
+// teeBody wraps a request body, passing every byte through to the reader
+// while retaining the first maxBody+1 bytes for capture. It never alters
+// what downstream handlers read.
+type teeBody struct {
+	rc  io.ReadCloser
+	buf bytes.Buffer
+}
+
+func (t *teeBody) Read(p []byte) (int, error) {
+	n, err := t.rc.Read(p)
+	if n > 0 && t.buf.Len() <= maxBody {
+		keep := n
+		if room := maxBody + 1 - t.buf.Len(); keep > room {
+			keep = room
+		}
+		t.buf.Write(p[:keep])
+	}
+	return n, err
+}
+
+func (t *teeBody) Close() error { return t.rc.Close() }
 
 // isWebSocketUpgrade reports whether the request is a WebSocket upgrade
 // (RFC 6455 §4.1). Such requests hijack the connection and must bypass

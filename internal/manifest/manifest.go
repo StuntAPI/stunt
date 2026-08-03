@@ -54,6 +54,11 @@ type Service struct {
 	Adapter string         `yaml:"adapter,omitempty"` // adapter source spec (git:... or local path) or dir (optional)
 	Rules   []rules.Rule   `yaml:"rules,omitempty"`
 	Config  map[string]any `yaml:"config,omitempty"` // optional per-service config (e.g. webhook_url)
+
+	// MaxBodyBytes caps the request body size for this service. Bodies over
+	// the cap are rejected with HTTP 413 (never silently truncated). Zero
+	// means the engine default (1 MiB).
+	MaxBodyBytes int64 `yaml:"max_body_bytes,omitempty"`
 }
 
 type Manifest struct {

@@ -18,6 +18,7 @@ const maxExecutionSteps = 1_000_000
 type Request struct {
 	Method  string
 	Path    string
+	Host    string // request host (r.Host) so handlers can mint self-referential URLs
 	Headers map[string]string
 	Body    map[string]any
 	RawBody string            // raw request body as a string (for non-JSON bodies, e.g. binary uploads)
@@ -161,6 +162,7 @@ func (vm *VM) Call(handlerName string, req Request) (Response, error) {
 	reqVal, err := GoToStarlark(map[string]any{
 		"method":   req.Method,
 		"path":     req.Path,
+		"host":     req.Host,
 		"headers":  req.Headers,
 		"body":     req.Body,
 		"raw_body": req.RawBody,

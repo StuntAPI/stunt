@@ -135,6 +135,7 @@ func (e *Engine) runHandler(
 	req := starlark.Request{
 		Method:  r.Method,
 		Path:    r.URL.Path,
+		Host:    r.Host,
 		Headers: headerMap(r.Header),
 		Body:    bodyMap,
 		RawBody: string(body),
