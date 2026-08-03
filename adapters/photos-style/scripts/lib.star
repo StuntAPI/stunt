@@ -58,3 +58,19 @@ def _to_num(v, default=0):
 # _contains reports whether substr appears within s.
 def _contains(s, substr):
     return s.find(substr) >= 0
+
+# _paginate slices items by pageSize/pageToken (an offset-based cursor) and
+# returns (page, next_token). next_token is None when no items remain.
+def _paginate(items, page_size, page_token):
+    start = _to_num(page_token, 0)
+    if start < 0 or start > len(items):
+        start = len(items)
+    if page_size <= 0:
+        page_size = len(items)
+    end = start + page_size
+    if end > len(items):
+        end = len(items)
+    next_token = None
+    if end < len(items):
+        next_token = str(end)
+    return items[start:end], next_token

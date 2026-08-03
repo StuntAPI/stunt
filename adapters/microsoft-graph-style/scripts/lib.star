@@ -205,6 +205,89 @@ def _apply_odata(entities, query, base_url):
         envelope["@odata.nextLink"] = _odata_link(base_url, skip + top)
     return respond(200, envelope)
 
+# --- OneDrive driveItem helpers (shared by drive.star and drive_upload.star) ---
+
+_DRIVE_ID = "b!mock-drive-id-0001"
+
+# _is_digits reports whether s is a non-empty run of ASCII digits.
+def _is_digits(s):
+    if s == None or len(s) == 0:
+        return False
+    for i in range(len(s)):
+        ch = s[i]
+        if ch < "0" or ch > "9":
+            return False
+    return True
+
+# _next_item_id mints a monotonic driveItem id.
+def _next_item_id():
+    return "item-" + _pad6(store_kv_incr("drive", "item_seq"))
+
+# _strip_colon strips the trailing ':' of a colon-addressed path segment
+# ("photo.jpg:" → "photo.jpg"). Returns None if the segment does not end
+# with ':' — the caller should reject the request as malformed addressing.
+def _strip_colon(seg):
+    if seg == None or len(seg) < 2 or seg[-1:] != ":":
+        return None
+    return seg[:-1]
+
+# _find_child_by_name returns the doc under parent_id with the given name,
+# or None.
+def _find_child_by_name(fc, parent_id, name):
+    for d in fc.list():
+        if d.get("parentId", "root") == parent_id and d.get("name", "") == name:
+            return d
+    return None
+
+# _conflict_rename returns the first free " (n)"-suffixed variant of name
+# under parent_id ("photo.jpg" → "photo (1).jpg").
+def _conflict_rename(fc, parent_id, name):
+    dot = name.rfind(".")
+    stem = name
+    ext = ""
+    if dot > 0:
+        stem = name[:dot]
+        ext = name[dot:]
+    n = 1
+    for _ in range(1000):
+        candidate = stem + " (" + str(n) + ")" + ext
+        if _find_child_by_name(fc, parent_id, candidate) == None:
+            return candidate
+        n = n + 1
+    return stem + " (" + str(n) + ")" + ext
+
+# _parent_ref builds the parentReference facet for a parentId.
+def _parent_ref(parent_id):
+    path = "/drive/root:"
+    if parent_id != "root":
+        fc = store_collection("files")
+        parent = fc.get(parent_id)
+        if parent != None:
+            path = "/drive/root:/" + parent.get("name", "")
+    return {
+        "driveId": _DRIVE_ID,
+        "driveType": "business",
+        "id": parent_id,
+        "path": path,
+    }
+
+# _drive_item builds the public driveItem JSON from a stored files doc.
+# Absent facets (file/folder) are omitted, matching real Graph responses.
+def _drive_item(doc):
+    item = {
+        "id": doc["id"],
+        "name": doc["name"],
+        "size": doc.get("size", 0),
+        "parentReference": _parent_ref(doc.get("parentId", "root")),
+        "createdDateTime": doc.get("createdDateTime", "2024-01-01T00:00:00Z"),
+        "lastModifiedDateTime": doc.get("lastModifiedDateTime", "2024-01-01T00:00:00Z"),
+    }
+    if doc.get("file") != None:
+        item["file"] = doc["file"]
+    if doc.get("folder") != None:
+        item["folder"] = doc["folder"]
+    return item
+
 # _me returns the constant mock "me" profile used by /me and as the sender
 # for mail/calendar. This mock uses a fixed identity so tests can assert
 # stable fields.

@@ -63,6 +63,9 @@ func Validate(m *Manifest) error {
 		if s.Adapter == "" && len(s.Rules) == 0 {
 			return fmt.Errorf("manifest: service %q must have at least one of 'adapter' or 'rules'", n)
 		}
+		if s.MaxBodyBytes < 0 {
+			return fmt.Errorf("manifest: service %q max_body_bytes must be >= 0 (0 = default 1 MiB)", n)
+		}
 		// Only validate rules that exist.
 		for i, r := range s.Rules {
 			if r.Respond.Status == 0 && r.Respond.Behavior == "" && r.Respond.Body == nil {

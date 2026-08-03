@@ -57,12 +57,52 @@ endpoints:
     handler: scripts/calendar.star#on_create_event
 
   # --- OneDrive ---
+  # NOTE on colon addressing: the router does not recognize "{param}:" as a
+  # parameter, but a literal ':' inside a captured VALUE is fine. Routes below
+  # use fixed-depth segments where the colon lands inside the captured
+  # segment: /root:/{item}/content matches /root:/photo.jpg:/content with
+  # item="photo.jpg:" and the handler strips the trailing colon.
   - route: /v1.0/me/drive
     method: GET
     handler: scripts/drive.star#on_get_drive
   - route: /v1.0/me/drive/root/children
     method: GET
     handler: scripts/drive.star#on_list_children
+  - route: /v1.0/me/drive/root/children
+    method: POST
+    handler: scripts/drive.star#on_create_child_root
+  - route: /v1.0/me/drive/items/{id}/children
+    method: GET
+    handler: scripts/drive.star#on_list_item_children
+  - route: /v1.0/me/drive/items/{id}/children
+    method: POST
+    handler: scripts/drive.star#on_create_child_item
+  - route: /v1.0/me/drive/items/{id}/content
+    method: GET
+    handler: scripts/drive_upload.star#on_get_content
+  # Simple upload (< 4 MB path): PUT root:/{name}:/content and the
+  # items/{parentId}:/{name}:/content variant.
+  - route: /v1.0/me/drive/root:/{item}/content
+    method: PUT
+    handler: scripts/drive_upload.star#on_simple_upload_root
+  - route: /v1.0/me/drive/items/{parent}/{item}/content
+    method: PUT
+    handler: scripts/drive_upload.star#on_simple_upload_item
+  # Resumable upload sessions.
+  - route: /v1.0/me/drive/root:/{item}/createUploadSession
+    method: POST
+    handler: scripts/drive_upload.star#on_create_session_root
+  - route: /v1.0/me/drive/items/{parent}/{item}/createUploadSession
+    method: POST
+    handler: scripts/drive_upload.star#on_create_session_item
+  - route: /v1.0/_upload/{session}
+    method: PUT
+    handler: scripts/drive_upload.star#on_upload_chunk
+  # Path resolution (GET root:/{path}:/ with ?select=id) — parameterized,
+  # declared after the literal root:/... routes above.
+  - route: /v1.0/me/drive/root:/{item}
+    method: GET
+    handler: scripts/drive_upload.star#on_resolve_path
 
   # --- SharePoint ---
   - route: /v1.0/groups/{id}/sites
@@ -102,6 +142,8 @@ resources:
   - name: chat_messages
     kind: collection
   - name: files
+    kind: collection
+  - name: sessions
     kind: collection
 
 # Auth scheme metadata (mock: any Bearer token accepted; presence checked).

@@ -4,6 +4,34 @@ All notable changes to **stunt** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Engine
+
+- **Configurable request body limit with honest overflow.** Services can set
+  `max_body_bytes` in `stunt.yaml` (default stays 1 MiB). Oversize bodies now
+  return **413** instead of being silently truncated; the request-log recorder
+  tees the body stream (capture stays capped at 64 KB) so handlers always see
+  the full, untruncated bytes.
+- **`req["host"]` in Starlark handlers.** The request Host header is injected
+  into the request dict, so adapters can mint self-referential URLs (media
+  `baseUrl`, upload session `uploadUrl`) that point back at the simulator.
+
+### Adapters
+
+- **photos-style:** real media plane. Uploaded bytes are stored and linked to
+  created media items; `baseUrl` is computed at read time from the request
+  host; new `GET /v1/media-dl/{id}` with strict `=d`/`=dv` semantics (bare
+  baseUrl serves a distinct derivative payload); new `GET /v1/mediaItems/{id}`;
+  list/search honor `pageSize`/`pageToken` and emit `nextPageToken`.
+- **microsoft-graph-style:** strict OneDrive write plane. Simple upload
+  (`PUT root:/{name}:/content` + folder variant) with real conflictBehavior
+  semantics, createFolder, per-parent child listing, path resolution with
+  `?select=id`, `GET items/{id}/content`, and the full resumable upload
+  protocol (`createUploadSession`, self-referential `uploadUrl`, sequential
+  Content-Range chunks with 416 on violations, 202 + `nextExpectedRanges`,
+  201 + driveItem on the final range, session invalidation).
+
 ## [0.2.2] — 2026-07-24
 
 ### Housekeeping
