@@ -39,6 +39,18 @@ endpoints:
   - route: /v1/mediaItems
     method: GET
     handler: scripts/media_items.star#on_list
+  - route: /v1/mediaItems/{id}
+    method: GET
+    handler: scripts/media_items.star#on_get
+
+  # --- Media download (baseUrl target) ---
+  # The {id} segment may carry the Google download suffix as part of the
+  # captured value (e.g. "mock-media-1=d" or "mock-media-1=dv"): the router
+  # matches '=' inside a param. Strict semantics: only =d/=dv serve the
+  # original bytes; a bare baseUrl serves a distinct derivative payload.
+  - route: /v1/media-dl/{id}
+    method: GET
+    handler: scripts/media_items.star#on_media_dl
 
   # --- Albums ---
   - route: /v1/albums
