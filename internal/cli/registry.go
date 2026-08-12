@@ -166,7 +166,7 @@ func (r *Registry) List(prune bool) ([]Instance, error) {
 		if prune {
 			kept := f.Instances[:0]
 			for _, i := range f.Instances {
-				if pidAlive(i.PID) {
+				if procAlive(i.PID) {
 					kept = append(kept, i)
 				}
 			}
@@ -187,7 +187,8 @@ func (r *Registry) List(prune bool) ([]Instance, error) {
 	return out, nil
 }
 
-// pidAlive + withFlock are platform-specific (registry_unix.go / registry_windows.go).
+// procAlive + withFlock are platform-specific (proc_unix.go / proc_windows.go
+// and registry_unix.go / registry_windows.go respectively).
 
 // age returns a human-friendly duration string since the RFC3339 startedAt.
 func age(startedAt string) string {

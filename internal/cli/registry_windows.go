@@ -10,10 +10,7 @@ func withFlock(lockPath string, fn func() error) error {
 	return fn()
 }
 
-// pidAlive optimistically returns true on Windows: signal-0 liveness probing
-// isn't supported by the syscall package, but pruning is a best-effort nicety,
-// not a correctness gate (the entry also stores the manifest path, so a
-// recycled PID is detectable on inspection).
-func pidAlive(pid int) bool {
-	return pid > 0
-}
+// procAlive (the Windows liveness primitive via OpenProcess +
+// GetExitCodeProcess) and gracefulStop live in proc_windows.go. Unlike the
+// earlier optimistic always-true stub, procAlive now reports real liveness,
+// so registry pruning of dead entries actually works on Windows.

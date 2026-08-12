@@ -5,7 +5,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"syscall"
 
 	"golang.org/x/sys/unix"
 )
@@ -24,15 +23,6 @@ func withFlock(lockPath string, fn func() error) error {
 	return fn()
 }
 
-// pidAlive reports whether pid is currently running (signal-0 liveness check,
-// mirroring stunt down). Unix only.
-func pidAlive(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-	return proc.Signal(syscall.Signal(0)) == nil
-}
+// procAlive (the Unix signal-0 liveness primitive) and gracefulStop live in
+// proc_unix.go. The registry shares that same primitive so liveness semantics
+// are identical for `stunt stop`, `stunt down`, and registry pruning.

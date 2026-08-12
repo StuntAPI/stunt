@@ -40,7 +40,7 @@ func TestStartDashboard(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	dashURL, dashToken := startDashboard(ctx, e)
+	dashURL, dashToken := startDashboard(ctx, cancel, e)
 
 	if !strings.HasPrefix(dashURL, "http://127.0.0.1:") {
 		t.Fatalf("expected localhost URL, got %q", dashURL)
@@ -108,7 +108,7 @@ func TestRunUpPortWritesDashboardRuntime(t *testing.T) {
 	safeOut := &lockingWriter{mu: &mu, buf: &out}
 
 	done := make(chan error, 1)
-	go func() { done <- runUpPort(ctx, e, m, safeOut) }()
+	go func() { done <- runUpPort(ctx, cancel, e, m, safeOut) }()
 
 	// Wait for the banner (and dashboard line) to appear.
 	deadline := time.After(5 * time.Second)

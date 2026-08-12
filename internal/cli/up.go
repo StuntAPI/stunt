@@ -65,14 +65,14 @@ func runUp(cmd *cobra.Command, args []string) error {
 
 	switch m.Network.Mode {
 	case "subdomain":
-		return runUpSubdomain(ctx, cmd, m, out)
+		return runUpSubdomain(ctx, stop, cmd, m, out)
 	default:
 		e, err := engine.New(m)
 		if err != nil {
 			return err
 		}
 		defer e.Close()
-		return runUpPort(ctx, e, m, out)
+		return runUpPort(ctx, stop, e, m, out)
 	}
 }
 
@@ -80,14 +80,14 @@ func runUp(cmd *cobra.Command, args []string) error {
 // created by the caller. Banner addresses come from the engine's actual
 // listener ports so they always match what `stunt plan` predicts (both use
 // alphabetical service order).
-func runUpPort(ctx context.Context, e *engine.Engine, m *manifest.Manifest, out interface{ Write([]byte) (int, error) }) error {
+func runUpPort(ctx context.Context, signalCancel context.CancelFunc, e *engine.Engine, m *manifest.Manifest, out interface{ Write([]byte) (int, error) }) error {
 	addrs, cancel, err := e.Start(ctx)
 	if err != nil {
 		return err
 	}
 	defer cancel()
 
-	dashURL, dashToken := startDashboard(ctx, e)
+	dashURL, dashToken := startDashboard(ctx, signalCancel, e)
 	if dashURL != "" {
 		fmt.Fprintf(out, "  dashboard:  %s   (token: %s)\n", dashURL, dashToken)
 	}
@@ -169,7 +169,7 @@ func runUpPort(ctx context.Context, e *engine.Engine, m *manifest.Manifest, out 
 // recorder is only added at the real serving site in serve.go), replay does
 // NOT trigger the recorder's Enqueue — so the replayed request is logged
 // exactly once, by handleReplay's own manual Enqueue.
-func startDashboard(ctx context.Context, e *engine.Engine) (string, string) {
+func startDashboard(ctx context.Context, cancel context.CancelFunc, e *engine.Engine) (string, string) {
 	rl := e.RequestLog()
 	if rl == nil {
 		return "", ""
@@ -180,6 +180,7 @@ func startDashboard(ctx context.Context, e *engine.Engine) (string, string) {
 		return "", ""
 	}
 	d := dashboard.New(rl)
+	d.SetShutdown(cancel) // POST /api/shutdown cancels the server's graceful-shutdown ctx.
 	d.SetSeq(e.Seq())
 	d.SetReplayFunc(func(ent requestlog.Entry) (int, string) {
 		rw := httptest.NewRecorder()
@@ -281,7 +282,10 @@ func startDashboard(ctx context.Context, e *engine.Engine) (string, string) {
 		func(r io.Reader) error { _, err := engine.Restore(e, r); return err },
 	)
 	// Instances panel (Phase 2): the dashboard lists + stops its siblings via the
-	// global registry. Stop reuses the cli stopPID (SIGTERM→SIGKILL).
+	// global registry. Stop reuses the cli stopInstance (graceful HTTP shutdown
+	// first, then graceful stop → hard kill: SIGTERM→SIGKILL on Unix,
+	// TerminateProcess on Windows). Progress text is discarded; the handler
+	// returns its own JSON.
 	if reg, err := OpenRegistry(); err == nil {
 		d.SetInstances(
 			func() ([]dashboard.InstanceInfo, error) {
@@ -300,7 +304,7 @@ func startDashboard(ctx context.Context, e *engine.Engine) (string, string) {
 				}
 				return out, nil
 			},
-			func(pid int) error { return stopPID(pid) },
+			func(pid int, url, token string) error { return stopInstance(io.Discard, pid, url, token) },
 		)
 	}
 	srv := &http.Server{Handler: d.Handler()}
@@ -348,7 +352,7 @@ func upServiceSummary(svc manifest.Service, a *adapter.Adapter) string {
 
 // runUpSubdomain serves all services behind a single TLS proxy.
 // The engine runs on a free high port and the proxy routes by Host.
-func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifest, out interface{ Write([]byte) (int, error) }) error {
+func runUpSubdomain(ctx context.Context, signalCancel context.CancelFunc, cmd *cobra.Command, m *manifest.Manifest, out interface{ Write([]byte) (int, error) }) error {
 	proxyPort, _ := cmd.Flags().GetInt("proxy-port")
 	noTLS, _ := cmd.Flags().GetBool("no-tls")
 
@@ -425,7 +429,7 @@ func runUpSubdomain(ctx context.Context, cmd *cobra.Command, m *manifest.Manifes
 	// Start the dashboard before writing the runtime file so its URL + token
 	// can be recorded for auto-discovery (stunt requests / stunt ui).
 	subMDir := manifestDir(manifestPath)
-	dashURL, dashToken := startDashboard(ctx, e)
+	dashURL, dashToken := startDashboard(ctx, signalCancel, e)
 
 	// Write the runtime file so `stunt down` can stop this server.
 	subRt := RuntimeFile{
