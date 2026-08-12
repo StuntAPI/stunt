@@ -104,6 +104,11 @@ type Endpoint struct {
 	// concurrent calls to this endpoint that share that param's value — the
 	// handler runs under a per-key lock so a read-modify-write across stores is
 	// atomic per key. The route must contain {ConcurrencyKey}.
+	//
+	// Caveat: events_emit delivers synchronously, so a handler that emits a
+	// webhook whose target loops back into this engine on the same key would
+	// self-deadlock until the emit timeout. Don't emit from a concurrency_key'd
+	// handler to a route that re-enters the same key.
 	ConcurrencyKey string `yaml:"concurrency_key,omitempty"`
 }
 
