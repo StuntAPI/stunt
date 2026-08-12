@@ -26,6 +26,7 @@ import (
 	"stuntapi.com/stunt/internal/pathutil"
 	"stuntapi.com/stunt/internal/primitives"
 	"stuntapi.com/stunt/internal/primitives/blob"
+	"stuntapi.com/stunt/internal/primitives/clock"
 	"stuntapi.com/stunt/internal/primitives/events"
 	"stuntapi.com/stunt/internal/primitives/identity"
 	"stuntapi.com/stunt/internal/primitives/kv"
@@ -316,6 +317,7 @@ func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir,
 			Blob:        blobStore,
 			Issuer:      issuer,
 			Emitter:     emitter,
+			Clock:       clock.NewClock(),
 			ServiceName: name,
 		}),
 		vms:          make(map[string]*starlark.VM),

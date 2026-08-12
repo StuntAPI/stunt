@@ -170,6 +170,30 @@ handler. Webhooks are delivered as HTTP POST with a JSON body `{type, payload}`.
 |---------|-----------|---------|-------|
 | `events_register(url)` | `(url: str)` | `None` | Registers a webhook URL for the current service |
 | `events_emit(event_type, payload?, headers?)` | `(event_type: str, payload: dict = {}, headers: dict = {})` | `None` | Emits an event to registered webhook(s). `headers` are set on the POST on top of `Content-Type: application/json` (a caller `Content-Type` overrides it); `Host`/`Content-Length` and any CR/LF are rejected |
+| `events_body(event_type, payload?)` | `(event_type: str, payload: dict = {})` | `str` | The exact JSON body `events_emit(event_type, payload)` will POST. Use it to compute a signature over the real wire bytes (see Signing webhooks below) |
+
+### Signing webhooks (`crypto`, `clock`)
+
+A receiver that verifies a webhook signature (Stripe `Stripe-Signature`, GitHub `X-Hub-Signature-256`, Shopify, Slack, Twilio, Adyen) can now be exercised against stunt. Three primitives — all string-in/string-out (Starlark has no bytes):
+
+| Module | Functions | Notes |
+|--------|-----------|-------|
+| `crypto` | `hmac_sha256(key, data, encoding="hex")`, `hmac_sha1(...)`, `sha256(data, encoding="hex")`, `base64_encode(data)`, `base64_decode(s)` | `encoding` is `"hex"` (default) or `"base64"`. MAC + hash only (no asymmetric/encryption/KDF) |
+| `clock` | `now_unix()`, `now_rfc3339()` | Wall clock from the engine's injectable `clock.Clock` — real today; the virtual mode is the seam for future record/replay |
+
+**Rule:** MAC the `events_body(...)` bytes verbatim — never a re-marshalled copy — so the signer and verifier agree on the exact bytes.
+
+```python
+# Stripe
+body = events_body("charge.succeeded", payload)
+t = clock.now_unix()
+sig = crypto.hmac_sha256(secret, str(t) + "." + body)
+events_emit("charge.succeeded", payload, {"Stripe-Signature": "t=" + str(t) + ",v1=" + sig})
+
+# GitHub
+sig = crypto.hmac_sha256(secret, events_body("push", payload))
+events_emit("push", payload, {"X-Hub-Signature-256": "sha256=" + sig, "X-GitHub-Event": "push"})
+```
 
 To receive events, set `config.webhook_url` in your `stunt.yaml`:
 

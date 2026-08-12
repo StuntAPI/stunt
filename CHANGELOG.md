@@ -6,6 +6,32 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-12
+
+### Starlark handler API
+
+- **Webhook-delivery signing.** Adapters can now compute (not just set) a
+  webhook signature, so a real receiver's signature-verification code path can
+  be exercised against stunt (Stripe, GitHub, Shopify, Slack, Twilio, Adyen).
+  Three additions:
+  - **`crypto` module** — `hmac_sha256`, `hmac_sha1`, `sha256` (with an
+    `encoding="hex"|"base64"` kwarg), plus `base64_encode`/`base64_decode`.
+    Stateless, registered next to `json`. Scope: MAC + hash only.
+  - **`events_body(event_type, payload?)`** — returns the **exact** on-wire
+    JSON body `events_emit` will POST, via a single shared `events.MarshalEnvelope`
+    so a signature computed over it verifies against the bytes the sink receives
+    (the load-bearing invariant, pinned by a byte-equality test).
+  - **`clock` module** — `now_unix()` / `now_rfc3339()`, backed by the engine's
+    injectable `clock.Clock` (real today; the virtual mode is the seam for
+    future record/replay) — no new determinism leak.
+  - Tests: crypto KAT (RFC/HMAC vectors incl. a corrected SHA256("") vector),
+    `clock` determinism, the `events_body`↔`Emit` byte-equality pin, and
+    end-to-end Stripe-style + GitHub-style deliveries verified with the real
+    SDK formulas on an httptest sink.
+  - Out of scope (follow-up): converting the in-repo adapters' documented-but-
+    uncomputed schemes into working code, and retrofitting `identity` onto the
+    injectable clock.
+
 ## [0.4.2] — 2026-08-12
 
 > v0.4.1 was tagged but the release Action failed at the `just ci` gofmt gate
