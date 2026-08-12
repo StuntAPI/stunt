@@ -216,6 +216,9 @@ def on_post(req):
         "upper": req.headers.get("AUTHORIZATION"),
         "sub":   req.headers["AuThOrIzAtIoN"],
         "missing": req.headers.get("nope", "def"),
+        "in_lower": "authorization" in req.headers,
+        "in_canon": "Authorization" in req.headers,
+        "in_absent": "nope" in req.headers,
     })
 `
 	vm, err := Load(src, nil)
@@ -237,6 +240,15 @@ def on_post(req):
 	}
 	if resp.Body["missing"] != "def" {
 		t.Errorf("missing default: want def, got %v", resp.Body["missing"])
+	}
+	if resp.Body["in_lower"] != true {
+		t.Errorf("\"authorization\" in headers: want true, got %v", resp.Body["in_lower"])
+	}
+	if resp.Body["in_canon"] != true {
+		t.Errorf("\"Authorization\" in headers: want true, got %v", resp.Body["in_canon"])
+	}
+	if resp.Body["in_absent"] != false {
+		t.Errorf("\"nope\" in headers: want false, got %v", resp.Body["in_absent"])
 	}
 }
 
