@@ -98,6 +98,7 @@ endpoints:
   - route: /v1.0/_upload/{session}
     method: PUT
     handler: scripts/drive_upload.star#on_upload_chunk
+    concurrency_key: session # serialize concurrent chunks on the same upload session
   # Path resolution (GET root:/{path}:/ with ?select=id) — parameterized,
   # declared after the literal root:/... routes above.
   - route: /v1.0/me/drive/root:/{item}

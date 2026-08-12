@@ -100,6 +100,16 @@ type Endpoint struct {
 	Method  string       `yaml:"method"`  // HTTP verb, or "" for any
 	Handler string       `yaml:"handler"` // "scripts/x.star#on_post"
 	Rules   []rules.Rule `yaml:"rules"`
+	// ConcurrencyKey, when set to a path-param name (e.g. "session"), serializes
+	// concurrent calls to this endpoint that share that param's value — the
+	// handler runs under a per-key lock so a read-modify-write across stores is
+	// atomic per key. The route must contain {ConcurrencyKey}.
+	//
+	// Caveat: events_emit delivers synchronously, so a handler that emits a
+	// webhook whose target loops back into this engine on the same key would
+	// self-deadlock until the emit timeout. Don't emit from a concurrency_key'd
+	// handler to a route that re-enters the same key.
+	ConcurrencyKey string `yaml:"concurrency_key,omitempty"`
 }
 
 // Resource declares a backing store the adapter's handlers can use.
@@ -207,6 +217,12 @@ func (a *Adapter) validate() error {
 // rejects paths that escape the adapter directory via traversal (e.g.
 // ../../etc/passwd), applying the same containment check as ReadFile.
 func (a *Adapter) resolveHandlerPaths() error {
+	for _, ep := range a.Endpoints {
+		if ep.ConcurrencyKey != "" && !strings.Contains(ep.Route, "{"+ep.ConcurrencyKey+"}") {
+			return fmt.Errorf("adapter: endpoint %q: concurrency_key %q is not a path param in route %q", ep.Handler, ep.ConcurrencyKey, ep.Route)
+		}
+	}
+
 	for i := range a.Endpoints {
 		h := a.Endpoints[i].Handler
 		if h == "" {

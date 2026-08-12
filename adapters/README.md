@@ -196,8 +196,21 @@ Every handler receives a `req` argument with:
 | `req.params` | `dict[str, str]` | Path parameters extracted from route (e.g. `{id}` → `{"id": "..."}`) |
 | `req.query` | `dict[str, str]` | Query parameters (first value of each key) |
 
-## State persistence
+## Serializing concurrent handler calls (`concurrency_key`)
 
+When a handler does a read-modify-write across stores (e.g. a resumable-upload chunk that reads a partial blob, appends, and writes it back), concurrent calls that share a path param can race — both read stale state, both write, last write wins. An endpoint opts into per-key serialization:
+
+```yaml
+endpoints:
+  - route: /v1.0/_upload/{session}
+    method: PUT
+    handler: scripts/drive_upload.star#on_upload_chunk
+    concurrency_key: session   # calls with the same {session} run one at a time
+```
+
+The route must contain `{concurrency_key}` (validated at adapter load). Calls with different keys still run in parallel; the lock is released when the handler returns, across every early-return path. This is the recommended fix whenever a handler's correctness depends on more than one store operation being atomic.
+
+## State persistence
 Adapter state (collections, KV stores, blobs) persists on disk in `.stunt/state/` next to your
 `stunt.yaml`. Data survives across `stunt up` restarts — seeds are loaded once, and mutations
 (inserts, updates, deletes) persist between sessions. Run `stunt clean` to reset all state back

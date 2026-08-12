@@ -6,6 +6,19 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-08-12
+
+### Adapters
+
+- **Per-endpoint request serialization (`concurrency_key`).** An endpoint can
+  declare `concurrency_key: <param>` in `adapter.yaml`; concurrent calls sharing
+  that path-param value (e.g. a Graph upload session id) then run under a
+  per-key lock, so a handler's read-modify-write across stores is atomic per
+  key. Closes the microsoft-graph-style resumable-upload TOCTOU (#4): two
+  concurrent chunks on the same session now yield one `202` and one `416`
+  instead of a corrupted/duplicated write. Opt-in; handlers are unchanged, and
+  calls with different keys still run in parallel.
+
 ## [0.4.0] — 2026-08-12
 
 ### Webhooks
