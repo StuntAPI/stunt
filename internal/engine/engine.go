@@ -318,8 +318,8 @@ func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir,
 			Emitter:     emitter,
 			ServiceName: name,
 		}),
-		vms:           make(map[string]*starlark.VM),
-		handlerLocks:  newKeyedMutex(),
+		vms:          make(map[string]*starlark.VM),
+		handlerLocks: newKeyedMutex(),
 	}
 	return st, nil
 }
