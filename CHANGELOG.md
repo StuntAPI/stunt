@@ -6,6 +6,17 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-08-12
+
+### Engine
+
+- **Capped response-body capture.** The request-log recorder no longer buffers
+  the entire response body in memory for the request lifetime — it tees the
+  response stream the way the request side does, retaining at most a 64 KB
+  sample while writing every byte through to the client. Fixes the multi-MB
+  media-response duplication (#5 part 1). Abandoned resumable-upload sessions
+  and quadratic blob rewrites (#5 part 2) remain a low-priority follow-up.
+
 ## [0.5.0] — 2026-08-12
 
 ### Starlark handler API
