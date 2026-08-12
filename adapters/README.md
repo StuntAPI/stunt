@@ -191,7 +191,7 @@ Every handler receives a `req` argument with:
 |-------|------|-------------|
 | `req.method` | `str` | HTTP method (e.g. `"GET"`, `"POST"`) |
 | `req.path` | `str` | Request path (e.g. `/v1/charges/ch_123`) |
-| `req.headers` | `dict[str, str]` | Request headers (keys in Go canonical form, e.g. `"X-Api-Key"`) |
+| `req.headers` | `dict[str, str]` | Request headers (case-insensitive lookups; `req.headers.get("authorization")` finds `Authorization`). `req` also supports dict access (`req["method"]`, `req.get("query")`) |
 | `req.body` | `dict` | Parsed JSON body (empty dict if no body) |
 | `req.params` | `dict[str, str]` | Path parameters extracted from route (e.g. `{id}` → `{"id": "..."}`) |
 | `req.query` | `dict[str, str]` | Query parameters (first value of each key) |

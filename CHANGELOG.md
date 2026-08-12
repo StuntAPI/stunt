@@ -6,6 +6,37 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-08-12
+
+### Server lifecycle (`stunt stop` / `stunt down`)
+
+- **Cross-platform server shutdown.** `stunt stop`/`down` now work on Windows.
+  Previously they failed — Go's `os.Process.Signal` only honors `os.Kill` on
+  Windows, so the Unix signal path errored (`pid not running`) and left the
+  server holding its port. Process control is now build-tag-split
+  (`proc_unix.go` / `proc_windows.go`); the Windows liveness probe uses
+  `OpenProcess` + `GetExitCodeProcess`, and registry pruning of dead entries
+  now works on Windows too.
+- **Graceful shutdown via the dashboard.** A new authenticated `POST /api/shutdown`
+  endpoint cancels the server's shutdown context (the same path Ctrl-C/SIGTERM
+  takes), so `stunt stop`/`down` — and the dashboard's instance-stop button —
+  shut the server down **gracefully** (draining in-flight requests, freeing the
+  port cleanly) on every platform, falling back to a platform signal then a hard
+  kill only if the dashboard is unreachable. Windows stops are no longer
+  hard-kills.
+
+### Starlark handler API
+
+- **`req` supports attribute access.** `req.method`, `req.headers`, `req.body`,
+  … now work alongside the existing dict style (`req["method"]`, `req.get("query")`).
+  Previously `req` was a plain dict, so `req.headers` failed at runtime. Both
+  styles work; no adapter changes required.
+- **Case-insensitive request headers.** `req.headers` lookups are now
+  case-insensitive — `req.headers.get("authorization")`, `.get("Authorization")`,
+  and `req.headers["AUTHORIZATION"]` all resolve to the same value — and rule
+  `match.headers` matching is case-insensitive too. The per-adapter lowercase
+  workarounds in `lib.star` are now harmless redundancy.
+
 ### Engine
 
 - **Configurable request body limit with honest overflow.** Services can set

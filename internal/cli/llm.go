@@ -89,9 +89,11 @@ Rules match in ORDER (first wins); "/**" is the catch-all. Templates: {{ faker.E
   # optional transports: grpc: {service, descriptor, methods[]} | graphql: {schema, resolvers, path} | ws: [{route, handler}]
 
 ## Starlark handler API  (def on_x(req): ... return respond(...))
-req keys: method, path, host (request Host header, for self-referential URLs),
-          headers (dict, case-insensitive), body (parsed JSON or None),
-          raw_body (string, for binary), query (dict), params (path captures).
+req: object with BOTH attribute (req.method, req.headers, req.body) AND dict
+     (req["method"], req.get("query")) access. Fields: method, path, host
+     (request Host header, for self-referential URLs), headers (case-insensitive:
+     req.headers.get("authorization") finds an Authorization header), body
+     (parsed JSON or None), raw_body (string, for binary), query, params.
 Builtins:
   respond(status, body, headers)            # or return {status, body, headers}
   c = store_collection("items"); c.insert(d); c.get(id); c.list(); c.update(id,d); c.delete(id)
