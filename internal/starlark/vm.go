@@ -159,16 +159,7 @@ func (vm *VM) Call(handlerName string, req Request) (Response, error) {
 		return Response{}, fmt.Errorf("starlark: %q is not callable", handlerName)
 	}
 
-	reqVal, err := GoToStarlark(map[string]any{
-		"method":   req.Method,
-		"path":     req.Path,
-		"host":     req.Host,
-		"headers":  req.Headers,
-		"body":     req.Body,
-		"raw_body": req.RawBody,
-		"params":   req.Params,
-		"query":    req.Query,
-	})
+	reqVal, err := buildRequestValue(req)
 	if err != nil {
 		return Response{}, fmt.Errorf("starlark: build request value: %w", err)
 	}
@@ -326,6 +317,35 @@ func starlarkToResponse(v sk.Value) (Response, error) {
 }
 
 // --- conversion helpers: Go → Starlark ---
+
+// buildRequestValue constructs the reqValue handed to Starlark handlers. The
+// resulting value behaves like a dict (req["method"], req.get("query"), …) AND
+// supports attribute access (req.method, req.headers). headers is a
+// case-insensitive headerValue; body/params/query are dicts via GoToStarlark.
+func buildRequestValue(req Request) (*reqValue, error) {
+	bodyVal, err := GoToStarlark(req.Body)
+	if err != nil {
+		return nil, fmt.Errorf("body: %w", err)
+	}
+	paramsVal, err := GoToStarlark(req.Params)
+	if err != nil {
+		return nil, fmt.Errorf("params: %w", err)
+	}
+	queryVal, err := GoToStarlark(req.Query)
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
+	}
+	d := sk.NewDict(8)
+	d.SetKey(sk.String("method"), sk.String(req.Method))
+	d.SetKey(sk.String("path"), sk.String(req.Path))
+	d.SetKey(sk.String("host"), sk.String(req.Host))
+	d.SetKey(sk.String("headers"), newHeaderValue(req.Headers))
+	d.SetKey(sk.String("body"), bodyVal)
+	d.SetKey(sk.String("raw_body"), sk.String(req.RawBody))
+	d.SetKey(sk.String("params"), paramsVal)
+	d.SetKey(sk.String("query"), queryVal)
+	return &reqValue{Dict: d}, nil
+}
 
 // GoToStarlark converts a Go value into the equivalent Starlark value.
 // Supports string, bool, all integer types (int, int8–int64, uint, uint8–uint64),

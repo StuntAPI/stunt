@@ -17,6 +17,7 @@ func TestMatchesMethodPathHeaders(t *testing.T) {
 		{"empty match matches all", Match{}, Request{Method: "DELETE", Path: "/x"}, true},
 		{"header mismatch", Match{Headers: map[string]string{"x-api": "k"}}, Request{Path: "/x", Headers: map[string]string{"x-api": "other"}}, false},
 		{"header match", Match{Headers: map[string]string{"x-api": "k"}}, Request{Path: "/x", Headers: map[string]string{"x-api": "k", "extra": "1"}}, true},
+		{"header name case-insensitive", Match{Headers: map[string]string{"X-Api": "k"}}, Request{Path: "/x", Headers: map[string]string{"x-api": "k"}}, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
