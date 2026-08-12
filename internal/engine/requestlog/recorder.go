@@ -161,6 +161,16 @@ func (c *capturingWriter) Unwrap() http.ResponseWriter {
 }
 
 func (c *capturingWriter) Write(b []byte) (int, error) {
-	c.buf.Write(b)
+	// Retain at most maxBody+1 bytes for capture (the persisted body is capped
+	// to maxBody at enqueue); pass every byte through to the client. Mirrors
+	// teeBody.Read so a multi-MB media response isn't duplicated in memory for
+	// the whole request lifetime just to keep a 64 KB sample.
+	if c.buf.Len() <= maxBody {
+		keep := len(b)
+		if room := maxBody + 1 - c.buf.Len(); keep > room {
+			keep = room
+		}
+		c.buf.Write(b[:keep])
+	}
 	return c.ResponseWriter.Write(b)
 }
