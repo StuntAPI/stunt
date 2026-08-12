@@ -80,6 +80,7 @@ Pre-built binaries for every platform are also on the
 stunt init     # writes a sample stunt.yaml
 stunt plan     # validate + show what will run (warns on unloadable adapters)
 stunt up       # serve all services (Ctrl-C to stop)  — logs every request
+stunt stop     # stop a server by PID or this manifest's — graceful, works on any OS
 stunt down     # stop a backgrounded `stunt up`
 stunt clean    # reset all adapter state to seed fixtures
 ```
@@ -186,6 +187,13 @@ for the workflow and quality gates (`just ci` = build + `test -race` + vet + gof
 lint-adapters). Quick path: `stunt adapter new myapi-style` → edit → `stunt adapter lint` → PR.
 
 ## Status & roadmap
+
+**v0.3.0 — cross-platform lifecycle + Starlark ergonomics.** `stunt stop`/`down`
+now work on **Windows** (previously they errored and left the server holding its
+port) and shut servers down **gracefully** on every platform via a dashboard
+`POST /api/shutdown` endpoint (draining in-flight requests instead of hard-killing).
+In Starlark handlers, `req` supports attribute access (`req.method`, `req.headers`)
+alongside dict access, and header lookups are now case-insensitive.
 
 **v0.2.2 — observability dashboard.** Core plus a full per-server dashboard (live
 request inspector, state browser, snapshot/restore, instance manager) are built,
