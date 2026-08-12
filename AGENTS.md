@@ -157,18 +157,21 @@ rules:                             # top-level rules (unmatched routes)
 Handlers are `def on_xxx(req):` functions in `scripts/*.star`. Each is invoked for its route and
 must **return a response** via `respond(...)` (or a dict shaped `{status, body, headers}`).
 
-### The `req` object (a dict)
+### The `req` object
 
-| Key | Type | Description |
+`req` supports **both** access styles — attribute (`req.method`, `req.headers`, `req.body`,
+…) and dict (`req["method"]`, `req.get("query")`). Use whichever reads best.
+
+| Field | Type | Description |
 |---|---|---|
-| `req["method"]` | string | HTTP method (`GET`, `POST`, ...) |
-| `req["path"]` | string | request path |
-| `req["host"]` | string | request Host header (`127.0.0.1:8000`); use it to mint self-referential URLs |
-| `req["headers"]` | dict | request headers (case-insensitive keys); e.g. `req["headers"]["Authorization"]` |
-| `req["body"]` | dict \| list \| None | parsed JSON body (None if no/invalid JSON) |
-| `req["raw_body"]` | string | raw body bytes as a string (for non-JSON/binary uploads) |
-| `req["query"]` | dict | query-string parameters |
-| `req["params"]` | dict | path parameters (from `{id}` route captures) |
+| `req.method` / `req["method"]` | string | HTTP method (`GET`, `POST`, ...) |
+| `req.path` / `req["path"]` | string | request path |
+| `req.host` / `req["host"]` | string | request Host header (`127.0.0.1:8000`); use it to mint self-referential URLs |
+| `req.headers` / `req["headers"]` | dict | request headers, **case-insensitive** lookups — `req.headers.get("authorization")`, `.get("Authorization")`, and `req.headers["AUTHORIZATION"]` all resolve to the same value |
+| `req.body` / `req["body"]` | dict \| list \| None | parsed JSON body (None if no/invalid JSON) |
+| `req.raw_body` / `req["raw_body"]` | string | raw body bytes as a string (for non-JSON/binary uploads) |
+| `req.query` / `req["query"]` | dict | query-string parameters |
+| `req.params` / `req["params"]` | dict | path parameters (from `{id}` route captures) |
 
 ### Builtins
 
