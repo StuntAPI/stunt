@@ -251,9 +251,14 @@ stunt stop
 stunt down
 ```
 
-`stunt stop` sends SIGTERM, waits for graceful shutdown, and escalates to SIGKILL if
-needed — the same proven path as `stunt down`. It deregisters the instance from the
-registry either way.
+`stunt stop` (and `stunt down`, and the dashboard's stop button) shut a server down
+**gracefully**: they POST to that server's authenticated `POST /api/shutdown`
+endpoint, which cancels the same shutdown context Ctrl-C / SIGTERM does — so the
+server drains in-flight requests and frees its port cleanly. This works on **every
+platform**, including Windows (where cross-process signals don't exist); if the
+dashboard is unreachable it falls back to a `SIGTERM`→`SIGKILL` escalation
+(`TerminateProcess` on Windows). The instance is deregistered from the registry
+either way.
 
 ---
 
