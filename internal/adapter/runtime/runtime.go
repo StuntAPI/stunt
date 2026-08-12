@@ -288,7 +288,8 @@ func buildEventsBuiltins(emitter *events.Emitter, serviceName string) sk.StringD
 		"events_emit": sk.NewBuiltin("events_emit", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
 			var eventType string
 			var payloadVal sk.Value = sk.None
-			if err := sk.UnpackArgs("events_emit", args, kwargs, "event_type", &eventType, "payload?", &payloadVal); err != nil {
+			var headersVal sk.Value = sk.None
+			if err := sk.UnpackArgs("events_emit", args, kwargs, "event_type", &eventType, "payload?", &payloadVal, "headers?", &headersVal); err != nil {
 				return nil, err
 			}
 			if emitter == nil {
@@ -302,11 +303,19 @@ func buildEventsBuiltins(emitter *events.Emitter, serviceName string) sk.StringD
 				}
 				payload = p
 			}
+			var headers map[string]string
+			if headersVal != sk.None {
+				hd, ok := headersVal.(*sk.Dict)
+				if !ok {
+					return nil, fmt.Errorf("events_emit: headers must be a dict, got %s", headersVal.Type())
+				}
+				headers = starlark.ToStringMap(hd)
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), eventsEmitTimeout)
 			defer cancel()
 			// Fire-and-forget: webhook delivery failures (including "not
 			// registered" and HTTP errors) must never break the handler.
-			_ = emitter.Emit(ctx, serviceName, eventType, payload)
+			_ = emitter.Emit(ctx, serviceName, eventType, payload, headers)
 			return sk.None, nil
 		}),
 	}

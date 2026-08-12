@@ -100,7 +100,7 @@ Builtins:
   store_kv_set(ns,k,v); store_kv_get(ns,k); n=store_kv_incr(ns,k); store_kv_delete(ns,k)
   b = store_blob("up"); b.put(name,bytes,ctype); b.get(name); b.stat(name); b.list(); b.delete(name)
   tok = identity_mint(subject, scopes=[...]); sub = identity_validate(token); identity_has_scope(token,scope)
-  events_register(url); events_emit(event_type, payload)
+  events_register(url); events_emit(event_type, payload?, headers?)   # headers: optional dict set on the webhook POST
   json.loads(s) / json.dumps(obj)           # json module predeclared
 lib.star in scripts/ is PRELOADED — its defs are shared across handlers. NO load(). NO fs/net/import.
 Gotchas: literal routes before param routes; IDs via store_kv_incr; ALL data synthetic (adapter lint

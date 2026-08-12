@@ -210,6 +210,7 @@ has = identity_has_scope(token, "write")  # → bool
 # --- events (webhooks) ---
 events_register("http://127.0.0.1:9999/hooks")            # register a webhook sink
 events_emit("charge.created", {"id": "ch_1", "amount": 500})  # POST the event to all sinks
+events_emit("charge.created", {"id": "ch_1"}, {"X-Idempotency-Key": "k"})  # optional delivery headers
 
 # --- standard library ---
 json.loads(s) / json.dumps(obj)          # json module is predeclared

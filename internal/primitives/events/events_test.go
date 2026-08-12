@@ -27,6 +27,7 @@ type receivedReq struct {
 	method      string
 	path        string
 	contentType string
+	headers     http.Header
 	body        map[string]any
 }
 
@@ -49,6 +50,7 @@ func (s *countingSink) handler(w http.ResponseWriter, r *http.Request) {
 		method:      r.Method,
 		path:        r.URL.Path,
 		contentType: r.Header.Get("Content-Type"),
+		headers:     r.Header.Clone(),
 		body:        parsed,
 	})
 	s.mu.Unlock()
@@ -85,7 +87,7 @@ func TestEmitReachesSink(t *testing.T) {
 	err := e.Emit(context.Background(), "stripe", "payment.created", map[string]any{
 		"amount":   1000,
 		"currency": "usd",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("Emit: %v", err)
 	}
@@ -124,7 +126,7 @@ func TestRetryOnFailureThenSucceeds(t *testing.T) {
 	e := newTestEmitter()
 	e.Register("svc", server.URL)
 
-	err := e.Emit(context.Background(), "svc", "test.event", map[string]any{"k": "v"})
+	err := e.Emit(context.Background(), "svc", "test.event", map[string]any{"k": "v"}, nil)
 	if err != nil {
 		t.Fatalf("Emit should have succeeded after retries, got %v", err)
 	}
@@ -146,7 +148,7 @@ func TestRetryExhaustedReturnsError(t *testing.T) {
 	e := newTestEmitter()
 	e.Register("svc", server.URL)
 
-	err := e.Emit(context.Background(), "svc", "test.event", map[string]any{"k": "v"})
+	err := e.Emit(context.Background(), "svc", "test.event", map[string]any{"k": "v"}, nil)
 	if err == nil {
 		t.Fatal("Emit should have returned an error after exhausting retries")
 	}
@@ -155,7 +157,7 @@ func TestRetryExhaustedReturnsError(t *testing.T) {
 func TestMissingRegistrationReturnsError(t *testing.T) {
 	e := newTestEmitter()
 
-	err := e.Emit(context.Background(), "unregistered", "test.event", map[string]any{"k": "v"})
+	err := e.Emit(context.Background(), "unregistered", "test.event", map[string]any{"k": "v"}, nil)
 	if err == nil {
 		t.Fatal("Emit should error when ns is not registered")
 	}
@@ -177,7 +179,7 @@ func TestRegisterOverwrites(t *testing.T) {
 	e.Register("svc", server1.URL)
 	e.Register("svc", server2.URL) // overwrite
 
-	e.Emit(context.Background(), "svc", "test", nil)
+	e.Emit(context.Background(), "svc", "test", nil, nil)
 
 	if sink1.count() != 0 {
 		t.Fatalf("sink1 received %d, want 0 (overwritten)", sink1.count())
@@ -195,7 +197,7 @@ func TestEmitNilPayload(t *testing.T) {
 	e := newTestEmitter()
 	e.Register("svc", server.URL)
 
-	err := e.Emit(context.Background(), "svc", "empty.event", nil)
+	err := e.Emit(context.Background(), "svc", "empty.event", nil, nil)
 	if err != nil {
 		t.Fatalf("Emit: %v", err)
 	}
@@ -218,7 +220,7 @@ func TestEmitRequestBody(t *testing.T) {
 		"nested": map[string]any{"deep": true},
 		"list":   []any{1, 2, 3},
 	}
-	err := e.Emit(context.Background(), "svc", "complex", payload)
+	err := e.Emit(context.Background(), "svc", "complex", payload, nil)
 	if err != nil {
 		t.Fatalf("Emit: %v", err)
 	}
@@ -242,7 +244,7 @@ func TestEmitCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel immediately
 
-	err := e.Emit(ctx, "svc", "test", nil)
+	err := e.Emit(ctx, "svc", "test", nil, nil)
 	if err == nil {
 		t.Fatal("Emit should error on cancelled context")
 	}
@@ -261,7 +263,7 @@ func TestConcurrentEmit(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			e.Emit(context.Background(), "svc", "concurrent", map[string]any{"ok": true})
+			e.Emit(context.Background(), "svc", "concurrent", map[string]any{"ok": true}, nil)
 		}()
 	}
 	wg.Wait()
@@ -279,7 +281,7 @@ func TestEventEnvelopeFormat(t *testing.T) {
 	e := newTestEmitter()
 	e.Register("svc", server.URL)
 
-	e.Emit(context.Background(), "svc", "user.signup", map[string]any{"email": "a@b.com"})
+	e.Emit(context.Background(), "svc", "user.signup", map[string]any{"email": "a@b.com"}, nil)
 
 	// Verify the raw body is a proper JSON envelope.
 	req := sink.lastRequest()
@@ -307,7 +309,7 @@ func TestRetriesHappen(t *testing.T) {
 	e.SetBackoff(1 * time.Millisecond) // speed up test
 
 	start := time.Now()
-	err := e.Emit(context.Background(), "svc", "test", nil)
+	err := e.Emit(context.Background(), "svc", "test", nil, nil)
 	elapsed := time.Since(start)
 
 	if err != nil {
@@ -382,7 +384,7 @@ func TestMaxRetriesZeroStillAttempts(t *testing.T) {
 	e.maxRetries = 0 // simulate misconfiguration
 	e.mu.Unlock()
 
-	err := e.Emit(context.Background(), "svc", "test", map[string]any{"k": "v"})
+	err := e.Emit(context.Background(), "svc", "test", map[string]any{"k": "v"}, nil)
 	if err != nil {
 		t.Fatalf("Emit should succeed with defensive clamp, got: %v", err)
 	}
@@ -420,7 +422,7 @@ func TestConcurrentEmitAndSetMaxRetries(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_ = e.Emit(context.Background(), "svc", "race", map[string]any{"ok": true})
+			_ = e.Emit(context.Background(), "svc", "race", map[string]any{"ok": true}, nil)
 		}()
 	}
 	wg.Wait()
@@ -449,8 +451,76 @@ func TestLargeResponseBodyCapped(t *testing.T) {
 	e.Register("svc", server.URL)
 	e.SetBackoff(1 * time.Millisecond)
 
-	err := e.Emit(context.Background(), "svc", "test", map[string]any{"k": "v"})
+	err := e.Emit(context.Background(), "svc", "test", map[string]any{"k": "v"}, nil)
 	if err != nil {
 		t.Fatalf("Emit should succeed even with large response body: %v", err)
+	}
+}
+
+func TestEmitWithHeaders(t *testing.T) {
+	sink := newSink()
+	server := httptest.NewServer(http.HandlerFunc(sink.handler))
+	defer server.Close()
+
+	e := newTestEmitter()
+	e.Register("svc", server.URL)
+
+	err := e.Emit(context.Background(), "svc", "push", map[string]any{"ref": "main"}, map[string]string{
+		"X-GitHub-Event":      "push",
+		"X-Hub-Signature-256": "sha256=abc",
+	})
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	r := sink.lastRequest()
+	if got := r.headers.Get("X-GitHub-Event"); got != "push" {
+		t.Errorf("X-GitHub-Event = %q, want push", got)
+	}
+	if got := r.headers.Get("X-Hub-Signature-256"); got != "sha256=abc" {
+		t.Errorf("X-Hub-Signature-256 = %q, want sha256=abc", got)
+	}
+	if got := r.contentType; got != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json (default preserved)", got)
+	}
+}
+
+func TestEmitHeadersOverrideContentType(t *testing.T) {
+	sink := newSink()
+	server := httptest.NewServer(http.HandlerFunc(sink.handler))
+	defer server.Close()
+
+	e := newTestEmitter()
+	e.Register("svc", server.URL)
+
+	err := e.Emit(context.Background(), "svc", "e", nil, map[string]string{"Content-Type": "text/plain"})
+	if err != nil {
+		t.Fatalf("Emit: %v", err)
+	}
+	if got := sink.lastRequest().contentType; got != "text/plain" {
+		t.Errorf("Content-Type = %q, want text/plain (caller overrides default)", got)
+	}
+}
+
+func TestEmitRejectsBadHeaders(t *testing.T) {
+	sink := newSink()
+	server := httptest.NewServer(http.HandlerFunc(sink.handler))
+	defer server.Close()
+
+	e := newTestEmitter()
+	e.Register("svc", server.URL)
+
+	for name, headers := range map[string]map[string]string{
+		"CRLF in value":  {"X-Bad": "v\r\nX-Inject: yes"},
+		"CRLF in key":    {"X-Bad\r\nInjected: yes": "v"},
+		"Host":           {"Host": "evil.com"},
+		"Content-Length": {"Content-Length": "999"},
+	} {
+		err := e.Emit(context.Background(), "svc", "e", nil, headers)
+		if err == nil {
+			t.Errorf("%s: Emit should reject reserved/injected header, got nil", name)
+		}
+	}
+	if sink.count() != 0 {
+		t.Errorf("no request should be sent for rejected headers, got %d", sink.count())
 	}
 }

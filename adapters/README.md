@@ -169,7 +169,7 @@ handler. Webhooks are delivered as HTTP POST with a JSON body `{type, payload}`.
 | Builtin | Signature | Returns | Notes |
 |---------|-----------|---------|-------|
 | `events_register(url)` | `(url: str)` | `None` | Registers a webhook URL for the current service |
-| `events_emit(event_type, payload?)` | `(event_type: str, payload: dict = {})` | `None` | Emits an event to registered webhook(s) |
+| `events_emit(event_type, payload?, headers?)` | `(event_type: str, payload: dict = {}, headers: dict = {})` | `None` | Emits an event to registered webhook(s). `headers` are set on the POST on top of `Content-Type: application/json` (a caller `Content-Type` overrides it); `Host`/`Content-Length` and any CR/LF are rejected |
 
 To receive events, set `config.webhook_url` in your `stunt.yaml`:
 
