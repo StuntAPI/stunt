@@ -55,7 +55,8 @@ type Dashboard struct {
 	restore       RestoreProvider
 	instances     InstancesProvider // nil = panel hidden
 	stopInstance  StopInstanceFunc
-	services      []string // manifest service names (set by up.go) for the picker
+	shutdown      context.CancelFunc // cancels the server's graceful-shutdown ctx (POST /api/shutdown)
+	services      []string           // manifest service names (set by up.go) for the picker
 }
 
 // ServiceState is a serializable snapshot of one service's stores, returned by
@@ -121,8 +122,10 @@ type InstanceInfo struct {
 // InstancesProvider returns the running instances (PID-pruned). Wired by up.go.
 type InstancesProvider func() ([]InstanceInfo, error)
 
-// StopInstanceFunc stops the instance with the given PID. Wired by up.go.
-type StopInstanceFunc func(pid int) error
+// StopInstanceFunc stops the instance with the given PID, preferring a
+// graceful dashboard shutdown when the instance's URL+token are known (it
+// falls back to platform signals/Kill otherwise). Wired by up.go.
+type StopInstanceFunc func(pid int, dashboardURL, token string) error
 
 // SetSnapshot wires the engine-backed snapshot/restore providers (up.go).
 func (d *Dashboard) SetSnapshot(s SnapshotProvider, r RestoreProvider) {
@@ -134,6 +137,13 @@ func (d *Dashboard) SetSnapshot(s SnapshotProvider, r RestoreProvider) {
 func (d *Dashboard) SetInstances(list InstancesProvider, stop StopInstanceFunc) {
 	d.instances, d.stopInstance = list, stop
 }
+
+// SetShutdown wires the context-cancel function that triggers this server's
+// graceful shutdown — the same context signal.NotifyContext cancels on
+// SIGTERM/SIGINT. The POST /api/shutdown handler calls it, letting
+// `stunt stop`/`down` request a graceful, cross-platform shutdown (Windows has
+// no cross-process SIGTERM). Optional: when unset the endpoint reports 503.
+func (d *Dashboard) SetShutdown(cancel context.CancelFunc) { d.shutdown = cancel }
 
 // SetServices records the manifest's service names (for the browser picker).
 func (d *Dashboard) SetServices(names []string) { d.services = names }
@@ -186,6 +196,7 @@ func (d *Dashboard) Handler() http.Handler {
 	mux.HandleFunc("/api/state/restore", d.handleStateRestore)
 	mux.HandleFunc("/api/instances", d.handleInstances)
 	mux.HandleFunc("/api/instances/{pid}/stop", d.handleInstanceStop)
+	mux.HandleFunc("/api/shutdown", d.handleShutdown)
 	mux.HandleFunc("/api/state/{service}/reset", d.handleStateReset)
 	mux.HandleFunc("/api/state/{service}/collections/{name}", d.handleStateCollection)
 	mux.HandleFunc("/api/state/{service}/collections", d.handleStateCollections)
@@ -643,7 +654,9 @@ func (d *Dashboard) handleInstances(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, insts)
 }
 
-// handleInstanceStop stops the instance named by {pid} (POST).
+// handleInstanceStop stops the instance named by {pid} (POST). It resolves the
+// target's dashboard URL+token from the instance list so stopInstance can
+// attempt a graceful HTTP shutdown first, falling back to signals/Kill.
 func (d *Dashboard) handleInstanceStop(w http.ResponseWriter, r *http.Request) {
 	if d.stopInstance == nil {
 		http.Error(w, "stop not available", http.StatusServiceUnavailable)
@@ -659,11 +672,50 @@ func (d *Dashboard) handleInstanceStop(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid pid", http.StatusBadRequest)
 		return
 	}
-	if err := d.stopInstance(pid); err != nil {
+	url, token := d.instanceCreds(pid)
+	if err := d.stopInstance(pid, url, token); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, map[string]any{"stopped": pid})
+}
+
+// instanceCreds looks up the dashboard URL+token for pid from the instance
+// list (best-effort). Returns empty strings if unavailable, in which case
+// stopInstance falls back to the platform signal/kill path.
+func (d *Dashboard) instanceCreds(pid int) (string, string) {
+	if d.instances == nil {
+		return "", ""
+	}
+	insts, err := d.instances()
+	if err != nil {
+		return "", ""
+	}
+	for _, in := range insts {
+		if in.PID == pid {
+			return in.DashboardURL, in.DashboardToken
+		}
+	}
+	return "", ""
+}
+
+// handleShutdown requests an in-process graceful shutdown of THIS server
+// (POST). It cancels the same context signal.NotifyContext cancels on
+// SIGTERM/SIGINT, so the engine + dashboard servers drain in-flight requests
+// via http.Server.Shutdown — identical to the signal path, but reachable
+// cross-platform (Windows has no cross-process SIGTERM). The token + loopback
+// guards apply as on every route.
+func (d *Dashboard) handleShutdown(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if d.shutdown == nil {
+		http.Error(w, "shutdown not available", http.StatusServiceUnavailable)
+		return
+	}
+	d.shutdown()
+	writeJSON(w, map[string]any{"shutting_down": true})
 }
 
 func newToken() string {

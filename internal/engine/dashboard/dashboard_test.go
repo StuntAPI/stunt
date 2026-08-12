@@ -33,6 +33,57 @@ func TestRequestsAPIRequiresToken(t *testing.T) {
 	}
 }
 
+func TestShutdownEndpoint(t *testing.T) {
+	d := dashboard.New(dummyStore(t))
+	d.SetTokenForTest("tok")
+	cancelled := false
+	d.SetShutdown(func() { cancelled = true })
+	srv := httptest.NewServer(d.Handler())
+	t.Cleanup(srv.Close)
+	hdr := func() http.Header { h := http.Header{}; h.Set("X-Stunt-Token", "tok"); return h }()
+
+	// POST with token → graceful shutdown triggered, 200.
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/shutdown", nil)
+	req.Header = hdr
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != 200 || !cancelled || !bytes.Contains(body, []byte("shutting_down")) {
+		t.Fatalf("shutdown: status=%d cancelled=%v body=%q", res.StatusCode, cancelled, string(body))
+	}
+
+	// GET → 405.
+	get, _ := http.NewRequest(http.MethodGet, srv.URL+"/api/shutdown", nil)
+	get.Header = hdr
+	gres, _ := http.DefaultClient.Do(get)
+	if gres.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("get: want 405, got %d", gres.StatusCode)
+	}
+
+	// POST without token → 401 (guard rejects before the handler runs).
+	nobody, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/shutdown", nil)
+	nres, _ := http.DefaultClient.Do(nobody)
+	if nres.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("no-token: want 401, got %d", nres.StatusCode)
+	}
+}
+
+// Without SetShutdown wired, the endpoint reports 503.
+func TestShutdownEndpointUnavailable(t *testing.T) {
+	d := dashboard.New(dummyStore(t))
+	d.SetTokenForTest("tok")
+	srv := httptest.NewServer(d.Handler())
+	t.Cleanup(srv.Close)
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/shutdown", nil)
+	req.Header.Set("X-Stunt-Token", "tok")
+	res, _ := http.DefaultClient.Do(req)
+	if res.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("want 503, got %d", res.StatusCode)
+	}
+}
+
 func TestRequestsAPIReturnsJSON(t *testing.T) {
 	d := dashboard.New(dummyStore(t))
 	d.SetTokenForTest("tok")
@@ -327,7 +378,7 @@ func TestInstancesEndpoints(t *testing.T) {
 				{PID: 222, Manifest: "/b/stunt.yaml", Mode: "port", StartedAt: "2026-07-23T02:00:00Z"},
 			}, nil
 		},
-		func(pid int) error { stoppedPID = pid; return nil },
+		func(pid int, url, token string) error { stoppedPID = pid; return nil },
 	)
 	srv := httptest.NewServer(d.Handler())
 	t.Cleanup(srv.Close)

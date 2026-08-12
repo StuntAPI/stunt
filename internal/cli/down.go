@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -40,39 +39,22 @@ func runDown(out io.Writer, mDir string) error {
 
 	pid := rt.PID
 
-	// Check if the process exists (signal 0 is a no-op existence check).
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		// On Unix, os.FindProcess always succeeds; this is for safety.
+	// Stale runtime file: the PID isn't alive, so just clean up. procAlive
+	// returns false for a gone PID on both Unix (signal-0) and Windows
+	// (OpenProcess fails).
+	if !procAlive(pid) {
 		removeRuntimeFile(mDir)
 		fmt.Fprintf(out, "no running stunt server found (stale runtime file removed)\n")
 		return nil
 	}
 
-	if err := proc.Signal(syscall.Signal(0)); err != nil {
-		// Process doesn't exist — clean up stale file.
+	// Stop the server: graceful dashboard shutdown → platform signal → hard
+	// kill. stopInstance writes the step progress ("stopping…"/"forcing").
+	if err := stopInstance(out, pid, rt.DashboardURL, rt.DashboardToken); err != nil {
 		removeRuntimeFile(mDir)
-		fmt.Fprintf(out, "no running stunt server found (stale runtime file removed)\n")
-		return nil
+		return err
 	}
-
-	// Send SIGTERM for graceful shutdown.
-	fmt.Fprintf(out, "stopping stunt server (pid %d)…\n", pid)
-	if err := proc.Signal(syscall.SIGTERM); err != nil {
-		removeRuntimeFile(mDir)
-		return fmt.Errorf("send SIGTERM to pid %d: %w", pid, err)
-	}
-
-	// Wait for the process to exit (poll with timeout).
-	if !waitForExit(pid, 5*time.Second) {
-		// Escalate to SIGKILL.
-		fmt.Fprintf(out, "server did not exit within 5s; sending SIGKILL\n")
-		_ = proc.Signal(syscall.SIGKILL)
-		waitForExit(pid, 3*time.Second)
-		fmt.Fprintf(out, "killed stunt server (pid %d)\n", pid)
-	} else {
-		fmt.Fprintf(out, "stopped stunt server (pid %d)\n", pid)
-	}
+	fmt.Fprintf(out, "stopped stunt server (pid %d)\n", pid)
 
 	removeRuntimeFile(mDir)
 
@@ -84,17 +66,13 @@ func runDown(out io.Writer, mDir string) error {
 }
 
 // waitForExit polls whether the process with the given PID is still running
-// (via signal 0) until it exits or the timeout elapses. Returns true if the
-// process exited within the timeout.
+// (via the cross-platform procAlive liveness check) until it exits or the
+// timeout elapses. Returns true if the process exited within the timeout.
 func waitForExit(pid int, timeout time.Duration) bool {
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return true // can't find it → treat as exited
-	}
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		if err := proc.Signal(syscall.Signal(0)); err != nil {
-			return true // process exited
+		if !procAlive(pid) {
+			return true // process exited (or can't be opened → treat as exited)
 		}
 		time.Sleep(100 * time.Millisecond)
 	}

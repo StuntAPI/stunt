@@ -212,7 +212,7 @@ func TestRunUpPortShowsGrpcTarget(t *testing.T) {
 	safeOut := &lockingWriter{mu: &mu, buf: &out}
 
 	done := make(chan error, 1)
-	go func() { done <- runUpPort(ctx, e, m, safeOut) }()
+	go func() { done <- runUpPort(ctx, cancel, e, m, safeOut) }()
 
 	// Wait for the banner to appear.
 	deadline := time.After(5 * time.Second)

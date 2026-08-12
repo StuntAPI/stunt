@@ -45,7 +45,7 @@ func TestRunUpPortCleanShutdown(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan error, 1)
-	go func() { done <- runUpPort(ctx, e, m, safeOut) }()
+	go func() { done <- runUpPort(ctx, cancel, e, m, safeOut) }()
 
 	// Wait for banner.
 	deadline := time.After(5 * time.Second)

@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -57,7 +56,11 @@ func runStopPID(out io.Writer, pid int, asJSON bool) error {
 	if found == nil {
 		return fmt.Errorf("no running stunt server with pid %d", pid)
 	}
-	if err := stopPID(pid); err != nil {
+	progressOut := out
+	if asJSON {
+		progressOut = io.Discard // keep JSON output clean
+	}
+	if err := stopInstance(progressOut, pid, found.DashboardURL, found.DashboardToken); err != nil {
 		return err
 	}
 	_ = reg.Deregister(pid)
@@ -90,7 +93,11 @@ func runStopManifest(out io.Writer, manifestPath string, asJSON bool) error {
 	if found == nil {
 		return fmt.Errorf("no running stunt server for %s", manifestPath)
 	}
-	if err := stopPID(found.PID); err != nil {
+	progressOut := out
+	if asJSON {
+		progressOut = io.Discard // keep JSON output clean
+	}
+	if err := stopInstance(progressOut, found.PID, found.DashboardURL, found.DashboardToken); err != nil {
 		return err
 	}
 	_ = reg.Deregister(found.PID)
@@ -102,21 +109,43 @@ func runStopManifest(out io.Writer, manifestPath string, asJSON bool) error {
 	return nil
 }
 
-// stopPID sends SIGTERM (escalating to SIGKILL after 5s) to pid. Mirrors
-// stunt down's escalation logic.
-func stopPID(pid int) error {
+// stopInstance stops a running stunt server, writing progress to out. It
+// prefers a graceful dashboard shutdown (POST /api/shutdown — cross-platform,
+// lets the server drain in-flight requests), then escalates to a platform
+// graceful stop (SIGTERM on Unix; Kill on Windows) and finally a hard kill.
+// Used by `stunt stop`, `stunt down`, and the dashboard's instance-stop button.
+//
+// When dashboardURL is empty (no dashboard available), the HTTP step is
+// skipped and the platform signal/kill path is used directly. Returns an error
+// only if the process can't be found or isn't running.
+func stopInstance(out io.Writer, pid int, dashboardURL, token string) error {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
 		return fmt.Errorf("find pid %d: %w", pid, err)
 	}
-	if err := proc.Signal(syscall.Signal(0)); err != nil {
-		return fmt.Errorf("pid %d not running: %w", pid, err)
+	if !procAlive(pid) {
+		return fmt.Errorf("pid %d not running", pid)
 	}
-	if err := proc.Signal(syscall.SIGTERM); err != nil {
-		return fmt.Errorf("send SIGTERM to pid %d: %w", pid, err)
+	fmt.Fprintf(out, "stopping stunt server (pid %d)…\n", pid)
+
+	// 1. Graceful: ask the server's dashboard to shut down in-process.
+	//    This is the only graceful option on Windows (no cross-process
+	//    SIGTERM); on Unix it triggers the same path the signal would.
+	if dashboardURL != "" {
+		if gerr := httpGracefulShutdown(dashboardURL, token); gerr == nil {
+			if waitForExit(pid, 5*time.Second) {
+				return nil
+			}
+		}
+		// HTTP failed or the server didn't exit in time → fall through.
 	}
+
+	// 2. Platform graceful (SIGTERM on Unix; Kill on Windows).
+	_ = gracefulStop(proc)
 	if !waitForExit(pid, 5*time.Second) {
-		_ = proc.Signal(syscall.SIGKILL)
+		// 3. Force.
+		fmt.Fprintf(out, "server did not exit within 5s; forcing\n")
+		_ = proc.Kill()
 		waitForExit(pid, 3*time.Second)
 	}
 	return nil
