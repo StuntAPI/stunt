@@ -308,7 +308,7 @@ func starlarkToResponse(v sk.Value) (Response, error) {
 			}
 		case "headers":
 			if hd, ok := val.(*sk.Dict); ok {
-				resp.Headers = starlarkToStringMap(hd)
+				resp.Headers = ToStringMap(hd)
 			}
 		}
 	}
@@ -494,9 +494,10 @@ func starlarkValueToGo(v sk.Value) (any, error) {
 	}
 }
 
-// starlarkToStringMap converts a Starlark dict of string→string into a Go
-// map[string]string, stringifying non-string values.
-func starlarkToStringMap(d *sk.Dict) map[string]string {
+// ToStringMap converts a Starlark dict of string→string into a Go
+// map[string]string, stringifying non-string values. Shared by respond and
+// events_emit so both header surfaces coerce identically.
+func ToStringMap(d *sk.Dict) map[string]string {
 	out := make(map[string]string, d.Len())
 	for _, item := range d.Items() {
 		key, _ := sk.AsString(item[0])

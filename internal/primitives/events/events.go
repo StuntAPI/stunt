@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -94,10 +95,17 @@ func (e *Emitter) Close() {
 //
 //	{"type": "<eventType>", "payload": { ... }}
 //
+// headers are applied to the delivery on top of the default
+// Content-Type: application/json (a caller Content-Type overrides it). A nil
+// map adds nothing. Unsafe headers — reserved names (Host, Content-Length,
+// Transfer-Encoding, …) and any CR/LF or Unicode line separators — are
+// rejected by validateHeader before the request is sent, to prevent
+// header/request smuggling.
+//
 // On non-2xx response or transport error, the request is retried up to
 // maxRetries times with exponential-ish backoff. Returns the last error
 // if all attempts fail.
-func (e *Emitter) Emit(ctx context.Context, ns, eventType string, payload map[string]any) error {
+func (e *Emitter) Emit(ctx context.Context, ns, eventType string, payload map[string]any, headers map[string]string) error {
 	e.mu.RLock()
 	url, ok := e.targets[ns]
 	e.mu.RUnlock()
@@ -108,6 +116,15 @@ func (e *Emitter) Emit(ctx context.Context, ns, eventType string, payload map[st
 	body, err := json.Marshal(envelope{Type: eventType, Payload: payload})
 	if err != nil {
 		return fmt.Errorf("events: marshal envelope: %w", err)
+	}
+
+	// Fail fast on bad caller headers: these are permanent errors (a malformed
+	// header or a reserved name), not transient delivery failures, so they
+	// must short-circuit before the retry loop sends anything.
+	for k, v := range headers {
+		if err := validateHeader(k, v); err != nil {
+			return err
+		}
 	}
 
 	// Read retry settings under the read-lock to avoid a data race with
@@ -133,7 +150,7 @@ func (e *Emitter) Emit(ctx context.Context, ns, eventType string, payload map[st
 			}
 		}
 
-		lastErr = e.doPost(ctx, url, body)
+		lastErr = e.doPost(ctx, url, body, headers)
 		if lastErr == nil {
 			return nil
 		}
@@ -147,12 +164,15 @@ func (e *Emitter) Emit(ctx context.Context, ns, eventType string, payload map[st
 }
 
 // doPost performs a single HTTP POST and returns nil on 2xx, an error otherwise.
-func (e *Emitter) doPost(ctx context.Context, url string, body []byte) error {
+func (e *Emitter) doPost(ctx context.Context, url string, body []byte, headers map[string]string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := e.client.Do(req)
 	if err != nil {
@@ -165,6 +185,43 @@ func (e *Emitter) doPost(ctx context.Context, url string, body []byte) error {
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
+	}
+	return nil
+}
+
+// validateHeader rejects caller-supplied headers that could hijack the
+// request — header/request smuggling prevention:
+//   - empty key, or a key with CTL/space/NUL/DEL (not an RFC 7230 token);
+//   - a value with CTL (except tab), NUL, DEL, CR, or LF;
+//   - a value with a Unicode line separator (U+0085/U+2028/U+2029) — these
+//     slip past Go's transport and are recognized as request terminators by
+//     some frontends;
+//   - reserved names the transport owns (Host, Content-Length,
+//     Transfer-Encoding, Trailer, Connection).
+//
+// It is a permanent error: Emit checks it once before the retry loop, so a
+// bad header fails fast and never reaches the wire.
+func validateHeader(key, val string) error {
+	if key == "" {
+		return fmt.Errorf("events: invalid header: empty key")
+	}
+	for _, b := range []byte(key) {
+		if b <= 0x20 || b == 0x7f {
+			return fmt.Errorf("events: invalid header key %q", key)
+		}
+	}
+	for _, b := range []byte(val) {
+		if (b < 0x20 && b != '\t') || b == 0x7f {
+			return fmt.Errorf("events: invalid header value for %q", key)
+		}
+	}
+	if strings.ContainsAny(val, "  ") {
+		return fmt.Errorf("events: invalid header value for %q: line separator not allowed", key)
+	}
+	for _, reserved := range []string{"Host", "Content-Length", "Transfer-Encoding", "Trailer", "Connection"} {
+		if strings.EqualFold(key, reserved) {
+			return fmt.Errorf("events: cannot set reserved header %q", key)
+		}
 	}
 	return nil
 }

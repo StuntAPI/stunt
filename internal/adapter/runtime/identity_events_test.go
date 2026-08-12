@@ -291,6 +291,66 @@ def on_post(req):
 	}
 }
 
+// TestEventsEmitWithHeaders proves the events_emit headers kwarg (issue #10)
+// lands on the delivery: caller headers arrive alongside the default
+// Content-Type.
+func TestEventsEmitWithHeaders(t *testing.T) {
+	var mu sync.Mutex
+	var got http.Header
+
+	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		got = r.Header.Clone()
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer sink.Close()
+
+	emitter := events.NewEmitter()
+	defer emitter.Close()
+	builtins := runtime.BuildAllBuiltins(runtime.BuiltinOptions{
+		Emitter:     emitter,
+		ServiceName: "test-svc",
+	})
+
+	src := `
+def on_post(req):
+    events_register(req["body"]["url"])
+    events_emit("push", {"ref": "main"}, {"X-GitHub-Event": "push", "X-Hub-Signature-256": "sha256=abc"})
+    return respond(200, {"ok": True})
+`
+	vm, err := starlark.Load(src, builtins)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	resp, err := vm.Call("on_post", starlark.Request{
+		Method: "POST",
+		Body:   map[string]any{"url": sink.URL},
+	})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if resp.Body["ok"] != true {
+		t.Fatalf("ok = %v, want true", resp.Body["ok"])
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if got == nil {
+		t.Fatal("sink received no request")
+	}
+	if got.Get("X-GitHub-Event") != "push" {
+		t.Errorf("X-GitHub-Event = %q, want push", got.Get("X-GitHub-Event"))
+	}
+	if got.Get("X-Hub-Signature-256") != "sha256=abc" {
+		t.Errorf("X-Hub-Signature-256 = %q, want sha256=abc", got.Get("X-Hub-Signature-256"))
+	}
+	if got.Get("Content-Type") != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", got.Get("Content-Type"))
+	}
+}
+
 // --- events_emit before register errors ---
 
 // TestEventsEmitBeforeRegister proves that calling events_emit without first

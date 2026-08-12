@@ -6,6 +6,20 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-12
+
+### Webhooks
+
+- **Custom headers on `events_emit`.** `events_emit(event_type, payload?, headers?)`
+  now accepts an optional `headers` dict, applied to the outgoing webhook POST
+  on top of the default `Content-Type: application/json` (a caller `Content-Type`
+  overrides it). Adapters can now set `Stripe-Signature`, `X-Hub-Signature-256`,
+  `X-GitHub-Event`, and any other delivery header — closing the asymmetry with
+  `respond`, which already accepted headers. Reserved headers (`Host`,
+  `Content-Length`) and any CR/LF are rejected to prevent header/request
+  smuggling. (Computing a signature in Starlark — HMAC/clock/stable-body
+  primitives — is tracked separately as the webhook-signing follow-up.)
+
 ## [0.3.0] — 2026-08-12
 
 ### Server lifecycle (`stunt stop` / `stunt down`)
