@@ -97,8 +97,10 @@ func (e *Emitter) Close() {
 //
 // headers are applied to the delivery on top of the default
 // Content-Type: application/json (a caller Content-Type overrides it). A nil
-// map adds nothing. Reserved headers (Host, Content-Length) and any CR/LF
-// are rejected by doPost to prevent header/request smuggling.
+// map adds nothing. Unsafe headers — reserved names (Host, Content-Length,
+// Transfer-Encoding, …) and any CR/LF or Unicode line separators — are
+// rejected by validateHeader before the request is sent, to prevent
+// header/request smuggling.
 //
 // On non-2xx response or transport error, the request is retried up to
 // maxRetries times with exponential-ish backoff. Returns the last error
@@ -188,15 +190,38 @@ func (e *Emitter) doPost(ctx context.Context, url string, body []byte, headers m
 }
 
 // validateHeader rejects caller-supplied headers that could hijack the
-// request: CR/LF enable header/request smuggling, and Host/Content-Length
-// are owned by the transport (a caller-supplied Content-Length could
-// mismatch the body).
+// request — header/request smuggling prevention:
+//   - empty key, or a key with CTL/space/NUL/DEL (not an RFC 7230 token);
+//   - a value with CTL (except tab), NUL, DEL, CR, or LF;
+//   - a value with a Unicode line separator (U+0085/U+2028/U+2029) — these
+//     slip past Go's transport and are recognized as request terminators by
+//     some frontends;
+//   - reserved names the transport owns (Host, Content-Length,
+//     Transfer-Encoding, Trailer, Connection).
+//
+// It is a permanent error: Emit checks it once before the retry loop, so a
+// bad header fails fast and never reaches the wire.
 func validateHeader(key, val string) error {
-	if strings.ContainsAny(key, "\r\n") || strings.ContainsAny(val, "\r\n") {
-		return fmt.Errorf("events: invalid header %q: CR/LF not allowed", key)
+	if key == "" {
+		return fmt.Errorf("events: invalid header: empty key")
 	}
-	if strings.EqualFold(key, "Host") || strings.EqualFold(key, "Content-Length") {
-		return fmt.Errorf("events: cannot set reserved header %q", key)
+	for _, b := range []byte(key) {
+		if b <= 0x20 || b == 0x7f {
+			return fmt.Errorf("events: invalid header key %q", key)
+		}
+	}
+	for _, b := range []byte(val) {
+		if (b < 0x20 && b != '\t') || b == 0x7f {
+			return fmt.Errorf("events: invalid header value for %q", key)
+		}
+	}
+	if strings.ContainsAny(val, "  ") {
+		return fmt.Errorf("events: invalid header value for %q: line separator not allowed", key)
+	}
+	for _, reserved := range []string{"Host", "Content-Length", "Transfer-Encoding", "Trailer", "Connection"} {
+		if strings.EqualFold(key, reserved) {
+			return fmt.Errorf("events: cannot set reserved header %q", key)
+		}
 	}
 	return nil
 }

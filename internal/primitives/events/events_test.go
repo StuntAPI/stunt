@@ -510,10 +510,14 @@ func TestEmitRejectsBadHeaders(t *testing.T) {
 	e.Register("svc", server.URL)
 
 	for name, headers := range map[string]map[string]string{
-		"CRLF in value":  {"X-Bad": "v\r\nX-Inject: yes"},
-		"CRLF in key":    {"X-Bad\r\nInjected: yes": "v"},
-		"Host":           {"Host": "evil.com"},
-		"Content-Length": {"Content-Length": "999"},
+		"CRLF in value":      {"X-Bad": "v\r\nX-Inject: yes"},
+		"CRLF in key":        {"X-Bad\r\nInjected: yes": "v"},
+		"Host":               {"Host": "evil.com"},
+		"Content-Length":     {"Content-Length": "999"},
+		"empty key":          {"": "v"},
+		"CTL in value (NUL)": {"X-Bad": "v\x00x"},
+		"Unicode sep value":  {"X-Bad": "vInjected: yes"},
+		"Transfer-Encoding":  {"Transfer-Encoding": "chunked"},
 	} {
 		err := e.Emit(context.Background(), "svc", "e", nil, headers)
 		if err == nil {
