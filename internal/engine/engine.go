@@ -89,6 +89,8 @@ type serviceState struct {
 	mu        sync.Mutex
 	vms       map[string]*starlark.VM // script path → VM (loaded once)
 	gqlSchema any                     // *graphqlSchemaCache (parsed schema cache)
+
+	handlerLocks *keyedMutex // per concurrency_key serialization for handler Calls
 }
 
 // New creates an Engine from a manifest. Git adapter sources are resolved
@@ -316,7 +318,8 @@ func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir,
 			Emitter:     emitter,
 			ServiceName: name,
 		}),
-		vms: make(map[string]*starlark.VM),
+		vms:           make(map[string]*starlark.VM),
+		handlerLocks:  newKeyedMutex(),
 	}
 	return st, nil
 }

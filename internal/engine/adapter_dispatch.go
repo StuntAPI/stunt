@@ -143,6 +143,14 @@ func (e *Engine) runHandler(
 		Query:   queryMap(r.URL.Query()),
 	}
 
+	// Serialize handler calls that share a concurrency key (a path-param name
+	// declared on the endpoint) so a handler's read-modify-write across stores
+	// runs atomically per key. Released on return, across every early return.
+	if ep.ConcurrencyKey != "" {
+		release := st.handlerLocks.acquire(params[ep.ConcurrencyKey])
+		defer release()
+	}
+
 	resp, err := vm.Call(fnName, req)
 	if err != nil {
 		writeError(w, 500, fmt.Sprintf("handler error: %v", err))

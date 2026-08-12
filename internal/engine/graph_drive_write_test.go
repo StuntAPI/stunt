@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -524,5 +525,89 @@ func TestGraphDriveOversizeBody413(t *testing.T) {
 		bytes.Repeat([]byte{0x5A}, 2048), nil)
 	if status != http.StatusRequestEntityTooLarge {
 		t.Fatalf("oversize simple upload -> status %d, want 413", status)
+	}
+}
+
+// TestGraphResumableUpload_ConcurrentRetryIs416 proves the per-session
+// serialization (concurrency_key: session) closes the TOCTOU in on_upload_chunk.
+// N concurrent PUTs of the SAME chunk (bytes 0-999) at the expected offset must
+// yield exactly one 202 (the winner advances next) and N-1 416s (losers re-read
+// next, now advanced, and reject the stale offset). Pre-fix this was a race:
+// both read next=0, both passed validation, both concat-put — last write won,
+// corrupting the assembled blob.
+func TestGraphResumableUpload_ConcurrentRetryIs416(t *testing.T) {
+	base := bootGraphService(t, 0)
+	original := allByteValues(2500)
+	total := len(original)
+
+	sessBody, _ := json.Marshal(map[string]any{
+		"item": map[string]any{"@microsoft.graph.conflictBehavior": "rename", "name": "race.bin"},
+	})
+	status, body := graphDo(t, "POST", base+"/v1.0/me/drive/root:/race.bin:/createUploadSession",
+		graphToken, sessBody, map[string]string{"Content-Type": "application/json"})
+	if status != 200 {
+		t.Fatalf("createUploadSession -> %d: %s", status, body)
+	}
+	uploadURL, _ := graphJSON(t, body)["uploadUrl"].(string)
+
+	putFirstChunk := func() (int, []byte) {
+		return graphDo(t, "PUT", uploadURL, "", original[0:1000], map[string]string{
+			"Content-Range": fmt.Sprintf("bytes 0-999/%d", total),
+			"Content-Type":  "application/octet-stream",
+		})
+	}
+
+	const n = 20
+	results := make(chan int, n)
+	var wg sync.WaitGroup
+	var barrier sync.WaitGroup
+	barrier.Add(1)
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			barrier.Wait() // maximize overlap so the race window is wide
+			st, _ := putFirstChunk()
+			results <- st
+		}()
+	}
+	barrier.Done()
+	wg.Wait()
+	close(results)
+
+	var ok202, err416, other int
+	for s := range results {
+		switch s {
+		case http.StatusAccepted: // 202 — the winner
+			ok202++
+		case http.StatusRequestedRangeNotSatisfiable: // 416 — stale-offset loser
+			err416++
+		default:
+			other++
+		}
+	}
+	// Exactly one winner (202); every other contender must be 416. More than
+	// one 202 is the TOCTOU — the lock is missing or not held.
+	if ok202 != 1 || err416 != n-1 || other != 0 {
+		t.Fatalf("concurrent same-chunk PUTs: %d×202, %d×416, %d×other — want 1×202 and %d×416 (TOCTOU if >1 winner)", ok202, err416, other, n-1)
+	}
+
+	// The session is still usable: the next contiguous chunk and the final
+	// chunk land, and the assembled content is byte-exact (catches corruption).
+	if status, _ = graphDo(t, "PUT", uploadURL, "", original[1000:2000], map[string]string{
+		"Content-Range": fmt.Sprintf("bytes 1000-1999/%d", total),
+	}); status != 202 {
+		t.Fatalf("post-race chunk 2 -> %d, want 202", status)
+	}
+	status, body = graphDo(t, "PUT", uploadURL, "", original[2000:total], map[string]string{
+		"Content-Range": fmt.Sprintf("bytes 2000-%d/%d", total-1, total),
+	})
+	if status != 201 {
+		t.Fatalf("final chunk -> %d, want 201; body %s", status, body)
+	}
+	itemID, _ := graphJSON(t, body)["id"].(string)
+	status, got := graphDo(t, "GET", base+"/v1.0/me/drive/items/"+itemID+"/content", graphToken, nil, nil)
+	if status != 200 || !bytes.Equal(got, original) {
+		t.Fatalf("assembled content corrupted: status=%d got=%dB want=%dB", status, len(got), total)
 	}
 }
