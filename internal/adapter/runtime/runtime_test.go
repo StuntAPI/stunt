@@ -349,6 +349,36 @@ def on_post(req):
 	}
 }
 
+// TestBlobAppend proves the append method creates-if-absent, concatenates, and
+// returns the growing total — the O(chunk) resumable-upload path.
+func TestBlobAppend(t *testing.T) {
+	bs := newBlobStore(t)
+	builtins := runtime.BuildBuiltins(nil, nil, bs)
+
+	src := `
+def on_post(req):
+    b = store_blob("drive")
+    t1 = b.append("up.bin", "foo", "application/octet-stream")
+    t2 = b.append("up.bin", "bar")
+    t3 = b.append("up.bin", "baz")
+    return respond(200, {"t1": t1, "t2": t2, "t3": t3, "content": b.get("up.bin")})
+`
+	vm, err := starlark.Load(src, builtins)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	resp, err := vm.Call("on_post", starlark.Request{Method: "POST"})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if resp.Body["t1"] != int64(3) || resp.Body["t2"] != int64(6) || resp.Body["t3"] != int64(9) {
+		t.Fatalf("totals = %v/%v/%v, want 3/6/9", resp.Body["t1"], resp.Body["t2"], resp.Body["t3"])
+	}
+	if resp.Body["content"] != "foobarbaz" {
+		t.Fatalf("content = %v, want foobarbaz", resp.Body["content"])
+	}
+}
+
 // TestBlobGetStateful proves blob content persists across separate handler
 // calls/VMs.
 func TestBlobGetStateful(t *testing.T) {

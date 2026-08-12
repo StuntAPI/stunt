@@ -90,6 +90,20 @@ func TestClockBuiltins(t *testing.T) {
 	if string(res2.(sk.String)) != "2023-11-14T22:13:20Z" {
 		t.Errorf("now_rfc3339 = %v, want 2023-11-14T22:13:20Z", res2)
 	}
+
+	// unix_to_rfc3339 must accept int OR float: a timestamp stored in a
+	// collection round-trips through JSON as a float, so rejecting floats would
+	// break any adapter that formats a stored timestamp (regression seen in #17).
+	toRFC, _ := cm.Attr("unix_to_rfc3339")
+	for _, arg := range []sk.Value{sk.MakeInt64(1_700_000_000), sk.Float(1_700_000_000)} {
+		got, err := sk.Call(new(sk.Thread), toRFC, sk.Tuple{arg}, nil)
+		if err != nil {
+			t.Fatalf("unix_to_rfc3339(%s): %v", arg.Type(), err)
+		}
+		if string(got.(sk.String)) != "2023-11-14T22:13:20Z" {
+			t.Errorf("unix_to_rfc3339(%s) = %v, want 2023-11-14T22:13:20Z", arg.Type(), got)
+		}
+	}
 }
 
 // TestEventsBodyMatchesEmit is the load-bearing invariant: the bytes

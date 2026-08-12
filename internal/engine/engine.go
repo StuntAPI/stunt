@@ -45,6 +45,7 @@ type Engine struct {
 	states    map[string]*serviceState // keyed by service name
 	cacheRoot string                   // adapter cache root for git sources
 	logger    *log.Logger              // request logger (nil = no logging)
+	clock     *clock.Clock             // injectable clock backing handler clock builtins
 
 	// loadErrors stores per-service adapter load errors for best-effort
 	// startup. A service with a load error has no entry in states and serves
@@ -98,12 +99,21 @@ type serviceState struct {
 // (cloned/fetched if missing) against the adapter cache directory. The cache
 // root defaults to ~/.stunt/adapters and can be overridden with the
 // STUNT_ADAPTER_CACHE environment variable.
-func New(m *manifest.Manifest) (*Engine, error) {
-	return newEngine(m, defaultAdapterCacheRoot())
+// Option configures an Engine at construction.
+type Option func(*Engine)
+
+// WithClock overrides the engine's clock (default real-time). Used by tests to
+// drive time-based adapter behavior deterministically.
+func WithClock(c *clock.Clock) Option {
+	return func(e *Engine) { e.clock = c }
+}
+
+func New(m *manifest.Manifest, opts ...Option) (*Engine, error) {
+	return newEngine(m, defaultAdapterCacheRoot(), opts...)
 }
 
 // newEngine is the testable constructor that accepts an explicit cache root.
-func newEngine(m *manifest.Manifest, cacheRoot string) (*Engine, error) {
+func newEngine(m *manifest.Manifest, cacheRoot string, opts ...Option) (*Engine, error) {
 	e := &Engine{
 		manifest:   m,
 		states:     make(map[string]*serviceState),
@@ -112,6 +122,12 @@ func newEngine(m *manifest.Manifest, cacheRoot string) (*Engine, error) {
 		shutdownCh: make(chan struct{}),
 		logger:     log.New(os.Stderr, "", 0),
 		loadErrors: make(map[string]error),
+		clock:      clock.NewClock(),
+	}
+	// Apply options before any service is built: the clock is baked into each
+	// service's handler builtins during buildServiceState, so it must be final.
+	for _, opt := range opts {
+		opt(e)
 	}
 
 	// Derive a state directory next to the manifest.
@@ -136,7 +152,7 @@ func newEngine(m *manifest.Manifest, cacheRoot string) (*Engine, error) {
 		if svc.Adapter == "" {
 			continue // rules-only service — no state needed
 		}
-		st, err := buildServiceState(name, svc, stateDir, manifestDir, cacheRoot, m.RNGSeed)
+		st, err := buildServiceState(name, svc, stateDir, manifestDir, cacheRoot, m.RNGSeed, e.clock)
 		if err != nil {
 			// Best-effort: log the error and continue serving the rest.
 			// A single broken service must not prevent the good ones from
@@ -222,7 +238,7 @@ func resolveAdapterDir(spec, cacheRoot, manifestDir string) (string, error) {
 // The per-service issuer secret is derived deterministically from
 // sha256(rngSeed:serviceName) so that restarting the engine with the same
 // seed produces a compatible issuer (tokens survive restarts).
-func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir, cacheRoot string, rngSeed int64) (*serviceState, error) {
+func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir, cacheRoot string, rngSeed int64, clk *clock.Clock) (*serviceState, error) {
 	dir, err := resolveAdapterDir(svc.Adapter, cacheRoot, manifestDir)
 	if err != nil {
 		return nil, err
@@ -317,7 +333,7 @@ func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir,
 			Blob:        blobStore,
 			Issuer:      issuer,
 			Emitter:     emitter,
-			Clock:       clock.NewClock(),
+			Clock:       clk,
 			ServiceName: name,
 		}),
 		vms:          make(map[string]*starlark.VM),
