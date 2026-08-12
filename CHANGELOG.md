@@ -22,8 +22,8 @@ All notable changes to **stunt** are documented here. The format is based on
     so a signature computed over it verifies against the bytes the sink receives
     (the load-bearing invariant, pinned by a byte-equality test).
   - **`clock` module** — `now_unix()` / `now_rfc3339()`, backed by the engine's
-    existing injectable `clock.Clock` (real in production, virtual in
-    record/replay) — no new determinism leak.
+    injectable `clock.Clock` (real today; the virtual mode is the seam for
+    future record/replay) — no new determinism leak.
   - Tests: crypto KAT (RFC/HMAC vectors incl. a corrected SHA256("") vector),
     `clock` determinism, the `events_body`↔`Emit` byte-equality pin, and
     end-to-end Stripe-style + GitHub-style deliveries verified with the real
@@ -32,7 +32,11 @@ All notable changes to **stunt** are documented here. The format is based on
     uncomputed schemes into working code, and retrofitting `identity` onto the
     injectable clock.
 
-## [0.4.1] — 2026-08-12
+## [0.4.2] — 2026-08-12
+
+> v0.4.1 was tagged but the release Action failed at the `just ci` gofmt gate
+> (an unformatted `engine.go`); it never published. v0.4.2 is the first
+> published 0.4.x — same #4 change, plus the formatting fix.
 
 ### Adapters
 

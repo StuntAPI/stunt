@@ -179,7 +179,7 @@ A receiver that verifies a webhook signature (Stripe `Stripe-Signature`, GitHub 
 | Module | Functions | Notes |
 |--------|-----------|-------|
 | `crypto` | `hmac_sha256(key, data, encoding="hex")`, `hmac_sha1(...)`, `sha256(data, encoding="hex")`, `base64_encode(data)`, `base64_decode(s)` | `encoding` is `"hex"` (default) or `"base64"`. MAC + hash only (no asymmetric/encryption/KDF) |
-| `clock` | `now_unix()`, `now_rfc3339()` | Wall clock from the engine's injectable clock — real by default, virtual in record/replay |
+| `clock` | `now_unix()`, `now_rfc3339()` | Wall clock from the engine's injectable `clock.Clock` — real today; the virtual mode is the seam for future record/replay |
 
 **Rule:** MAC the `events_body(...)` bytes verbatim — never a re-marshalled copy — so the signer and verifier agree on the exact bytes.
 

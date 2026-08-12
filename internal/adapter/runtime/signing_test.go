@@ -103,7 +103,7 @@ func TestEventsBodyMatchesEmit(t *testing.T) {
 	src := `
 def on_post(req):
     events_register(req["body"]["url"])
-    payload = {"amount": 100, "currency": "usd", "html": "<b>x</b>"}
+    payload = {"amount": 100, "nested": {"a": [1, 2.5, True, None, {"b": "x"}]}, "html": "<b>"}
     body = events_body("charge.created", payload)
     events_emit("charge.created", payload)
     return respond(200, {"body": body})
