@@ -6,7 +6,11 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
-## [0.4.1] — 2026-08-12
+## [0.4.2] — 2026-08-12
+
+> v0.4.1 was tagged but the release Action failed at the `just ci` gofmt gate
+> (an unformatted `engine.go`); it never published. v0.4.2 is the first
+> published 0.4.x — same #4 change, plus the formatting fix.
 
 ### Adapters
 
