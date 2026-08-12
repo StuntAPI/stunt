@@ -104,7 +104,8 @@ func buildPredeclared(builtins sk.StringDict) sk.StringDict {
 		// Standard Starlark json module: json.decode(str) / json.encode(v).
 		// Handlers need it to parse JSON carried in headers (e.g. Dropbox's
 		// Dropbox-API-Arg) rather than the request body.
-		"json": starlarkjson.Module,
+		"json":   starlarkjson.Module,
+		"crypto": cryptoModule,
 	}
 	for k, v := range builtins {
 		predeclared[k] = v

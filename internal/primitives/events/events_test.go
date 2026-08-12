@@ -528,3 +528,24 @@ func TestEmitRejectsBadHeaders(t *testing.T) {
 		t.Errorf("no request should be sent for rejected headers, got %d", sink.count())
 	}
 }
+
+func TestMarshalEnvelopeDeterministic(t *testing.T) {
+	// Map-key insertion order must not change the bytes (json.Marshal sorts).
+	a, _ := MarshalEnvelope("t", map[string]any{"a": 1, "b": 2})
+	b, _ := MarshalEnvelope("t", map[string]any{"b": 2, "a": 1})
+	if !bytes.Equal(a, b) {
+		t.Errorf("envelope bytes differ by map key order")
+	}
+	// Idempotent.
+	c, _ := MarshalEnvelope("t", map[string]any{"a": 1, "b": 2})
+	if !bytes.Equal(a, c) {
+		t.Errorf("envelope not idempotent")
+	}
+	// HTML-escape is on by default and MUST stay on (verifiers MAC raw bytes,
+	// so the only requirement is stability — pin it so a future "fix" doesn't
+	// silently break signatures).
+	h, _ := MarshalEnvelope("t", map[string]any{"html": "<b>&</b>"})
+	if !bytes.Contains(h, []byte("\\u003c")) {
+		t.Errorf("expected HTML-escaped bytes (\\u003c), got %s", h)
+	}
+}

@@ -52,9 +52,11 @@ import (
 	"time"
 
 	sk "go.starlark.net/starlark"
+	"go.starlark.net/starlarkstruct"
 	"go.starlark.net/syntax"
 	"stuntapi.com/stunt/internal/primitives"
 	"stuntapi.com/stunt/internal/primitives/blob"
+	"stuntapi.com/stunt/internal/primitives/clock"
 	"stuntapi.com/stunt/internal/primitives/events"
 	"stuntapi.com/stunt/internal/primitives/identity"
 	"stuntapi.com/stunt/internal/primitives/kv"
@@ -71,6 +73,7 @@ type BuiltinOptions struct {
 	Blob        *blob.Store
 	Issuer      *identity.Issuer
 	Emitter     *events.Emitter
+	Clock       *clock.Clock
 	ServiceName string
 }
 
@@ -86,6 +89,9 @@ func BuildAllBuiltins(opts BuiltinOptions) sk.StringDict {
 		dict[k] = v
 	}
 	for k, v := range buildEventsBuiltins(opts.Emitter, opts.ServiceName) {
+		dict[k] = v
+	}
+	for k, v := range buildClockBuiltins(opts.Clock) {
 		dict[k] = v
 	}
 	return dict
@@ -318,6 +324,50 @@ func buildEventsBuiltins(emitter *events.Emitter, serviceName string) sk.StringD
 			_ = emitter.Emit(ctx, serviceName, eventType, payload, headers)
 			return sk.None, nil
 		}),
+		"events_body": sk.NewBuiltin("events_body", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			var eventType string
+			var payloadVal sk.Value = sk.None
+			if err := sk.UnpackArgs("events_body", args, kwargs, "event_type", &eventType, "payload?", &payloadVal); err != nil {
+				return nil, err
+			}
+			payload := map[string]any{}
+			if d, ok := payloadVal.(*sk.Dict); ok {
+				p, err := starlark.StarlarkToGo(d)
+				if err != nil {
+					return nil, fmt.Errorf("events_body: %w", err)
+				}
+				payload = p
+			}
+			// Same marshal path as Emit, so a signature over this verifies
+			// against the bytes the sink receives. Needs no emitter.
+			body, err := events.MarshalEnvelope(eventType, payload)
+			if err != nil {
+				return nil, fmt.Errorf("events_body: %w", err)
+			}
+			return sk.String(string(body)), nil
+		}),
+	}
+}
+
+// buildClockBuiltins exposes the engine's injectable clock so handlers can mint
+// timestamps for signature schemes with a replay window (Stripe, Slack). nil
+// clock → no clock builtins (rather than a runtime error on every call).
+func buildClockBuiltins(c *clock.Clock) sk.StringDict {
+	if c == nil {
+		return sk.StringDict{}
+	}
+	return sk.StringDict{
+		"clock": &starlarkstruct.Module{
+			Name: "clock",
+			Members: sk.StringDict{
+				"now_unix": sk.NewBuiltin("clock.now_unix", func(_ *sk.Thread, _ *sk.Builtin, _ sk.Tuple, _ []sk.Tuple) (sk.Value, error) {
+					return sk.MakeInt(int(c.Now().Unix())), nil
+				}),
+				"now_rfc3339": sk.NewBuiltin("clock.now_rfc3339", func(_ *sk.Thread, _ *sk.Builtin, _ sk.Tuple, _ []sk.Tuple) (sk.Value, error) {
+					return sk.String(c.Now().UTC().Format(time.RFC3339)), nil
+				}),
+			},
+		},
 	}
 }
 

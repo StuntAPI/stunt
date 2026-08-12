@@ -43,6 +43,18 @@ type envelope struct {
 	Payload map[string]any `json:"payload"`
 }
 
+// MarshalEnvelope returns the exact JSON body Emit POSTs for (eventType,
+// payload). It is the single source of truth for the delivery body: the
+// events_body Starlark builtin calls it, so a signature computed over
+// events_body(...) output verifies against the bytes the sink receives.
+//
+// encoding/json with default settings is deterministic (struct fields in tag
+// order, map[string]any keys sorted, <,>,& HTML-escaped). Signers must MAC
+// these bytes verbatim, never a re-marshalled copy.
+func MarshalEnvelope(eventType string, payload map[string]any) ([]byte, error) {
+	return json.Marshal(envelope{Type: eventType, Payload: payload})
+}
+
 // NewEmitter creates an Emitter with default retry settings.
 func NewEmitter() *Emitter {
 	return &Emitter{
@@ -113,7 +125,7 @@ func (e *Emitter) Emit(ctx context.Context, ns, eventType string, payload map[st
 		return fmt.Errorf("events: emit %s/%s: %w", ns, eventType, ErrNotRegistered)
 	}
 
-	body, err := json.Marshal(envelope{Type: eventType, Payload: payload})
+	body, err := MarshalEnvelope(eventType, payload)
 	if err != nil {
 		return fmt.Errorf("events: marshal envelope: %w", err)
 	}

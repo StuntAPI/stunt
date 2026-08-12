@@ -101,6 +101,10 @@ Builtins:
   b = store_blob("up"); b.put(name,bytes,ctype); b.get(name); b.stat(name); b.list(); b.delete(name)
   tok = identity_mint(subject, scopes=[...]); sub = identity_validate(token); identity_has_scope(token,scope)
   events_register(url); events_emit(event_type, payload?, headers?)   # headers: optional dict set on the webhook POST
+  events_body(type, payload?)               # EXACT on-wire JSON body events_emit will POST — MAC this for signing
+  crypto.hmac_sha256/sha1(key, data, encoding?)  # MAC → hex (default) or "base64"; also sha256, base64_encode/decode
+  clock.now_unix() / clock.now_rfc3339()     # wall clock (injectable; for replay-window signatures like Stripe t=)
+  # sign a webhook: body=events_body(t,p); sig=crypto.hmac_sha256(secret, body); events_emit(t,p,{"X-Sig": sig})
   json.loads(s) / json.dumps(obj)           # json module predeclared
 lib.star in scripts/ is PRELOADED — its defs are shared across handlers. NO load(). NO fs/net/import.
 Gotchas: literal routes before param routes; IDs via store_kv_incr; ALL data synthetic (adapter lint
