@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -531,11 +532,17 @@ func writeStatus(w http.ResponseWriter, status int, body string) {
 	_, _ = w.Write([]byte(body))
 }
 
+// headerMap flattens an http.Header into a map[string]string (first value of
+// each header). Keys are lowercased so Starlark handlers and rule matches can
+// do case-insensitive lookups with a single canonical (lowercase) key — Go's
+// http.Header is case-insensitive but that property is lost the moment we copy
+// into a plain map, so we normalize here at the source. Header NAMES are
+// case-insensitive per RFC 9110; header VALUES are preserved verbatim.
 func headerMap(h http.Header) map[string]string {
 	out := make(map[string]string, len(h))
 	for k, v := range h {
 		if len(v) > 0 {
-			out[k] = v[0]
+			out[strings.ToLower(k)] = v[0]
 		}
 	}
 	return out

@@ -163,6 +163,95 @@ def on_post(req):
 	}
 }
 
+// TestRequestAttributeAccess verifies req supports attribute access
+// (req.method, req.headers) — the documented API — while dict access and the
+// dict .get method still work. Regression for stunt-729 (req was a dict only,
+// so req.headers failed with "dict has no .headers field or method").
+func TestRequestAttributeAccess(t *testing.T) {
+	src := `
+def on_post(req):
+    return respond(200, {
+        "attr_method": req.method,
+        "attr_auth": req.headers.get("authorization"),
+        "sub_method": req["method"],
+        "get_path": req.get("path"),
+    })
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	resp, err := vm.Call("on_post", Request{
+		Method:  "POST",
+		Path:    "/items",
+		Headers: map[string]string{"Authorization": "Bearer t"},
+		Body:    map[string]any{},
+	})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if resp.Body["attr_method"] != "POST" {
+		t.Errorf("req.method = %v, want POST", resp.Body["attr_method"])
+	}
+	if resp.Body["attr_auth"] != "Bearer t" {
+		t.Errorf("req.headers.get(authorization) = %v, want Bearer t", resp.Body["attr_auth"])
+	}
+	if resp.Body["sub_method"] != "POST" {
+		t.Errorf("req[\"method\"] = %v, want POST", resp.Body["sub_method"])
+	}
+	if resp.Body["get_path"] != "/items" {
+		t.Errorf("req.get(path) = %v, want /items", resp.Body["get_path"])
+	}
+}
+
+// TestCaseInsensitiveHeaders verifies header lookups are case-insensitive.
+// Regression for stunt-1zo: .get("authorization") returned nothing for a
+// request carrying "Authorization".
+func TestCaseInsensitiveHeaders(t *testing.T) {
+	src := `
+def on_post(req):
+    return respond(200, {
+        "lower": req.headers.get("authorization"),
+        "canon": req.headers.get("Authorization"),
+        "upper": req.headers.get("AUTHORIZATION"),
+        "sub":   req.headers["AuThOrIzAtIoN"],
+        "missing": req.headers.get("nope", "def"),
+        "in_lower": "authorization" in req.headers,
+        "in_canon": "Authorization" in req.headers,
+        "in_absent": "nope" in req.headers,
+    })
+`
+	vm, err := Load(src, nil)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	resp, err := vm.Call("on_post", Request{
+		Method:  "POST",
+		Headers: map[string]string{"Authorization": "Bearer sekret"},
+		Body:    map[string]any{},
+	})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	for _, k := range []string{"lower", "canon", "upper", "sub"} {
+		if resp.Body[k] != "Bearer sekret" {
+			t.Errorf("%s: want Bearer sekret, got %v", k, resp.Body[k])
+		}
+	}
+	if resp.Body["missing"] != "def" {
+		t.Errorf("missing default: want def, got %v", resp.Body["missing"])
+	}
+	if resp.Body["in_lower"] != true {
+		t.Errorf("\"authorization\" in headers: want true, got %v", resp.Body["in_lower"])
+	}
+	if resp.Body["in_canon"] != true {
+		t.Errorf("\"Authorization\" in headers: want true, got %v", resp.Body["in_canon"])
+	}
+	if resp.Body["in_absent"] != false {
+		t.Errorf("\"nope\" in headers: want false, got %v", resp.Body["in_absent"])
+	}
+}
+
 func TestCustomBuiltin(t *testing.T) {
 	// A caller can inject their own builtins alongside respond.
 	builtins := sk.StringDict{

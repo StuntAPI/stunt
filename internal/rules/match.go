@@ -20,7 +20,9 @@ func (m Match) Matches(req Request) bool {
 		return false
 	}
 	for k, v := range m.Headers {
-		if req.Headers[k] != v {
+		// Header names are case-insensitive (RFC 9110); req.Headers keys are
+		// lowercased at the source (engine.headerMap), so lowercase the match key.
+		if req.Headers[strings.ToLower(k)] != v {
 			return false
 		}
 	}
