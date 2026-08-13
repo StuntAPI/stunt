@@ -99,3 +99,38 @@ def _set_balance(acct_id, amount):
 # _not_found returns a standard Stripe-style 404 error response.
 def _not_found(resource, id):
     return respond(404, {"error": {"message": "No such " + resource + ": " + id, "type": "invalid_request_error"}})
+
+# _list_page applies Stripe cursor pagination (limit + starting_after) to a list
+# of docs via the paginate builtin. Returns (page, has_more, error_response).
+# Stripe does not echo a cursor: the client sets starting_after to the last
+# returned id next time. If starting_after names an id that is not present
+# (deleted object / stale cursor), error_response is a 400 the caller must
+# return — mirroring Stripe's resource_missing, instead of silently paging
+# from the start (which would loop a cursor-following client forever).
+_STRIPE_DEFAULT_LIMIT = 10
+_STRIPE_MAX_LIMIT = 100
+
+def _list_page(req, docs, resource):
+    limit = _STRIPE_DEFAULT_LIMIT
+    offset = ""
+    q = req.get("query")
+    if q != None:
+        n = _to_int(q.get("limit", ""))
+        if n > 0:
+            limit = n
+    if limit > _STRIPE_MAX_LIMIT:
+        limit = _STRIPE_MAX_LIMIT
+    if q != None:
+        sa = q.get("starting_after", "")
+        if sa != None and sa != "":
+            found = False
+            for i in range(len(docs)):
+                if docs[i].get("id") == sa:
+                    offset = str(i + 1)
+                    found = True
+                    break
+            if not found:
+                err = respond(400, {"error": {"type": "invalid_request_error", "message": "No such " + resource + ": " + sa, "param": "starting_after"}})
+                return None, False, err
+    page, nxt = paginate(docs, limit, offset)
+    return page, nxt != None, None

@@ -76,14 +76,17 @@ def on_list_transfers(req):
     c = store_collection("transfers")
     docs = c.list()
 
-    # Optional destination filter.
+    # Optional destination filter (applied before paging).
     query = req.get("query")
     if query != None:
         dest_id = query.get("destination", "")
         if dest_id != "":
             docs = [d for d in docs if d.get("destination") == dest_id]
 
-    return respond(200, {"object": "list", "data": docs, "has_more": False, "url": "/v1/transfers"})
+    page, has_more, err = _list_page(req, docs, "transfer")
+    if err != None:
+        return err
+    return respond(200, {"object": "list", "data": page, "has_more": has_more, "url": "/v1/transfers"})
 
 # POST /v1/transfers/{id}/reversals — reverse (part of) a transfer.
 def on_reverse_transfer(req):

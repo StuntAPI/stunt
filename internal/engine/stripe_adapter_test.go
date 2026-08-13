@@ -601,3 +601,121 @@ func TestStripeStyleSignatureVerifies(t *testing.T) {
 	raw, hdr := sink.awaitDelivery(t, time.Second)
 	verifyStripeSig(t, raw, hdr, secret)
 }
+
+// TestStripeStylePagination verifies the paginate builtin drives Stripe's
+// limit + starting_after + has_more semantics: limit caps the page, has_more
+// reflects remaining items, starting_after advances the cursor, and a full
+// page-walk reconstructs the whole collection.
+func TestStripeStylePagination(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "stripe-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"stripe": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["stripe"]
+
+	// Seed 5 charges on top of the fixture so the collection is non-trivial.
+	var created []string
+	for i := 0; i < 5; i++ {
+		body, status := postJSONAuth(t, base+"/v1/charges", devToken, map[string]any{
+			"amount":   float64(1000 + i),
+			"currency": "usd",
+		})
+		if status != 201 {
+			t.Fatalf("POST charge -> %d, body %s", status, body)
+		}
+		var c map[string]any
+		if err := json.Unmarshal([]byte(body), &c); err != nil {
+			t.Fatal(err)
+		}
+		created = append(created, c["id"].(string))
+	}
+
+	listOf := func(t *testing.T, query string) (map[string]any, []any) {
+		t.Helper()
+		body, status := getAuth(t, base+"/v1/charges"+query, devToken)
+		if status != 200 {
+			t.Fatalf("GET /v1/charges%s -> %d, body %s", query, status, body)
+		}
+		var l map[string]any
+		if err := json.Unmarshal([]byte(body), &l); err != nil {
+			t.Fatal(err)
+		}
+		data, _ := l["data"].([]any)
+		return l, data
+	}
+
+	// limit caps the page and has_more is true (5 created + fixture > 2).
+	l, data := listOf(t, "?limit=2")
+	if len(data) != 2 {
+		t.Fatalf("limit=2 page len = %d, want 2", len(data))
+	}
+	if l["has_more"] != true {
+		t.Fatalf("has_more = %v, want true", l["has_more"])
+	}
+
+	// starting_after advances the cursor; the anchor id must not appear.
+	_, data = listOf(t, "?limit=2&starting_after="+created[0])
+	if len(data) != 2 {
+		t.Fatalf("starting_after page len = %d, want 2", len(data))
+	}
+	for _, d := range data {
+		if d.(map[string]any)["id"] == created[0] {
+			t.Fatalf("starting_after id %s leaked into next page", created[0])
+		}
+	}
+
+	// A complete page-walk reconstructs the unbounded list exactly.
+	_, full := listOf(t, "") // no limit → all
+	total := len(full)
+	seen := 0
+	cursor := ""
+	for {
+		q := "?limit=3"
+		if cursor != "" {
+			q += "&starting_after=" + cursor
+		}
+		pg, pdata := listOf(t, q)
+		seen += len(pdata)
+		if seen > total {
+			t.Fatalf("walked %d items, exceeded total %d", seen, total)
+		}
+		if pg["has_more"] == true {
+			last := pdata[len(pdata)-1].(map[string]any)["id"].(string)
+			if last == cursor {
+				t.Fatal("cursor did not advance between pages")
+			}
+			cursor = last
+		} else {
+			break
+		}
+	}
+	if seen != total {
+		t.Fatalf("page-walk saw %d items, unbounded list has %d", seen, total)
+	}
+
+	// starting_after pointing at a non-existent id → 400, not a silent page-0 restart.
+	bodyBad, statusBad := getAuth(t, base+"/v1/charges?starting_after=ch_no_such_object", devToken)
+	if statusBad != 400 {
+		t.Fatalf("bad starting_after -> %d, want 400; body %s", statusBad, bodyBad)
+	}
+}

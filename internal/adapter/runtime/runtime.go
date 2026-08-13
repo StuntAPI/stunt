@@ -41,6 +41,11 @@
 //
 //	events_register("http://localhost:9090/webhook")      # → None
 //	events_emit("order.created", {"id": "ord-123"})        # → None (fire-and-forget)
+//
+// List pagination — standalone builtin:
+//
+//	page, next = paginate(docs, limit, cursor)   # cursor is an opaque offset
+//	# limit None/<=0 disables paging; next is None when no items remain
 package runtime
 
 import (
@@ -48,6 +53,7 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -94,6 +100,9 @@ func BuildAllBuiltins(opts BuiltinOptions) sk.StringDict {
 	for k, v := range buildClockBuiltins(opts.Clock) {
 		dict[k] = v
 	}
+	for k, v := range buildListBuiltins() {
+		dict[k] = v
+	}
 	return dict
 }
 
@@ -110,6 +119,90 @@ func BuildBuiltins(store *primitives.Store, kvStore *kv.KV, blobStore *blob.Stor
 		KV:    kvStore,
 		Blob:  blobStore,
 	})
+}
+
+// buildListBuiltins registers the list-pagination builtin. It is pure: it
+// holds no backing service, so it is available in every handler VM regardless
+// of configuration.
+//
+//	paginate(items, limit?, cursor?) -> (page, next_cursor)
+//
+// limit is an int; None or <= 0 disables paging (returns the whole list with a
+// None next_cursor) so unmodified handlers keep their current behavior. cursor
+// is an opaque offset token (string) returned by a prior call, or None/"" for
+// the first page. next_cursor is None when no items remain. The adapter owns
+// the provider-specific envelope (has_more / nextPageToken / @odata.nextLink)
+// and maps its cursor query param to this token.
+func buildListBuiltins() sk.StringDict {
+	return sk.StringDict{
+		"paginate": sk.NewBuiltin("paginate", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			var itemsVal sk.Value
+			var limitVal sk.Value = sk.None
+			var cursorVal sk.Value = sk.None
+			if err := sk.UnpackArgs("paginate", args, kwargs, "items", &itemsVal, "limit?", &limitVal, "cursor?", &cursorVal); err != nil {
+				return nil, err
+			}
+
+			// Materialize the iterable so we can slice it.
+			iter := sk.Iterate(itemsVal)
+			if iter == nil {
+				return nil, fmt.Errorf("paginate: items must be iterable, got %s", itemsVal.Type())
+			}
+			var all []sk.Value
+			var item sk.Value
+			for iter.Next(&item) {
+				all = append(all, item)
+			}
+			iter.Done()
+			total := len(all)
+
+			// limit: None or <= 0 disables paging.
+			limit := -1
+			if limitVal != sk.None {
+				li, ok := limitVal.(sk.Int)
+				if !ok {
+					return nil, fmt.Errorf("paginate: limit must be an int, got %s", limitVal.Type())
+				}
+				n, ok := li.Int64()
+				if !ok {
+					return nil, fmt.Errorf("paginate: limit out of int range")
+				}
+				limit = int(n)
+			}
+
+			// cursor: opaque offset token (string) or None/"" for the start.
+			start := 0
+			if cursorVal != sk.None {
+				s, ok := cursorVal.(sk.String)
+				if !ok {
+					return nil, fmt.Errorf("paginate: cursor must be a string or None, got %s", cursorVal.Type())
+				}
+				if string(s) != "" {
+					off, err := strconv.ParseInt(string(s), 10, 64)
+					if err != nil || off < 0 {
+						return nil, fmt.Errorf("paginate: invalid cursor token %q", string(s))
+					}
+					start = int(off)
+				}
+			}
+			if start > total {
+				start = total
+			}
+
+			if limit <= 0 {
+				return sk.Tuple{sk.NewList(all), sk.None}, nil
+			}
+			end := start + limit
+			if end > total {
+				end = total
+			}
+			var next sk.Value = sk.None
+			if end < total {
+				next = sk.String(strconv.Itoa(end))
+			}
+			return sk.Tuple{sk.NewList(all[start:end]), next}, nil
+		}),
+	}
 }
 
 // buildStoreBuiltins registers the collection / KV / blob builtins.
