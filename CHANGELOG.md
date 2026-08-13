@@ -6,6 +6,24 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-08-14
+
+### Adapters
+
+- **entra-id-style issues real RS256 JWTs.** The access token is now signed
+  with RS256 (`rsa_sign` over the real base64url `header.payload`) instead of
+  the literal `"mock-signature-..."`, and the adapter serves
+  `/common/discovery/v2.0/keys` JWKS so a server-side token-verification flow
+  runs end-to-end. The minted token verifies against the served JWKS in a new
+  engine test. Same recipe applies to the remaining JWT adapters.
+
+### Starlark handler API
+
+- **`crypto.rsa_public_jwk(public_key_pem)`** — returns the RSA public key's
+  JWK params `{kty, n, e}` (base64url) for serving JWKS endpoints.
+- **`crypto.base64url_encode(data)`** — real URL-safe base64 (no padding) for
+  JWT header/payload segments.
+
 ## [0.12.0] — 2026-08-13
 
 ### Starlark handler API
