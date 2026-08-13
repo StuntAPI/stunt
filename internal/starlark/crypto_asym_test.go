@@ -6,7 +6,9 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
+	"math/big"
 	"testing"
 
 	sk "go.starlark.net/starlark"
@@ -138,5 +140,42 @@ func TestAsymWrongKeyTypeErrors(t *testing.T) {
 	// Garbage PEM → error.
 	if err := callAsymErr("rsa_sign", sk.Tuple{sk.String("not a pem"), sk.String("x"), sk.String("hex")}); err == nil {
 		t.Error("rsa_sign with garbage: want error, got nil")
+	}
+}
+
+// TestRSAPublicJWK verifies rsa_public_jwk returns {kty,n,e} whose base64url n/e
+// reconstruct the original public key's modulus and exponent.
+func TestRSAPublicJWK(t *testing.T) {
+	_, pubPEM := testRSAKeyPair(t)
+	fn, err := cryptoModule.Attr("rsa_public_jwk")
+	if err != nil {
+		t.Fatal(err)
+	}
+	res, err := sk.Call(new(sk.Thread), fn, sk.Tuple{sk.String(pubPEM)}, nil)
+	if err != nil {
+		t.Fatalf("rsa_public_jwk: %v", err)
+	}
+	d, ok := res.(*sk.Dict)
+	if !ok {
+		t.Fatalf("got %T, want dict", res)
+	}
+	if v, _, _ := d.Get(sk.String("kty")); string(v.(sk.String)) != "RSA" {
+		t.Errorf("kty = %v, want RSA", v)
+	}
+	nVal, _, _ := d.Get(sk.String("n"))
+	eVal, _, _ := d.Get(sk.String("e"))
+	nBytes, err := base64.RawURLEncoding.DecodeString(string(nVal.(sk.String)))
+	if err != nil {
+		t.Fatalf("decode n: %v", err)
+	}
+	eBytes, err := base64.RawURLEncoding.DecodeString(string(eVal.(sk.String)))
+	if err != nil {
+		t.Fatalf("decode e: %v", err)
+	}
+	if new(big.Int).SetBytes(nBytes).BitLen() == 0 {
+		t.Error("n is zero")
+	}
+	if eInt := int(new(big.Int).SetBytes(eBytes).Int64()); eInt != 65537 {
+		t.Errorf("e = %d, want 65537", eInt)
 	}
 }

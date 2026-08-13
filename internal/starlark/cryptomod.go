@@ -34,10 +34,12 @@ var cryptoModule = &starlarkstruct.Module{
 		"sha256":            sk.NewBuiltin("crypto.sha256", sha256Hash),
 		"base64_encode":     sk.NewBuiltin("crypto.base64_encode", base64Encode),
 		"base64_decode":     sk.NewBuiltin("crypto.base64_decode", base64Decode),
+		"base64url_encode":  sk.NewBuiltin("crypto.base64url_encode", base64urlEncode),
 		"ecdsa_sign_p256":   sk.NewBuiltin("crypto.ecdsa_sign_p256", ecdsaSignP256),
 		"ecdsa_verify_p256": sk.NewBuiltin("crypto.ecdsa_verify_p256", ecdsaVerifyP256),
 		"rsa_sign":          sk.NewBuiltin("crypto.rsa_sign", rsaSign),
 		"rsa_verify":        sk.NewBuiltin("crypto.rsa_verify", rsaVerify),
+		"rsa_public_jwk":    sk.NewBuiltin("crypto.rsa_public_jwk", rsaPublicJWK),
 	},
 }
 
@@ -129,4 +131,12 @@ func base64Decode(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple)
 		return nil, fmt.Errorf("crypto.base64_decode: %w", err)
 	}
 	return sk.String(string(out)), nil
+}
+
+func base64urlEncode(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	var data string
+	if err := sk.UnpackArgs(b.Name(), args, kwargs, "data", &data); err != nil {
+		return nil, err
+	}
+	return sk.String(base64.RawURLEncoding.EncodeToString([]byte(data))), nil
 }

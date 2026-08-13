@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/pem"
 	"fmt"
 	"math/big"
@@ -165,4 +166,28 @@ func rsaVerify(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (s
 	}
 	h := sha256.Sum256([]byte(data))
 	return sk.Bool(rsa.VerifyPKCS1v15(pub, crypto.SHA256, h[:], sig) == nil), nil
+}
+
+// rsaPublicJWK returns the JWK parameters of an RSA public key as a dict
+// {kty, n, e} (base64url, no padding) for serving a JWKS endpoint the way JWT
+// issuers (Entra ID, Cognito, Firebase, Google, Apple) do.
+func rsaPublicJWK(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	var pubPEM string
+	if err := sk.UnpackArgs(b.Name(), args, kwargs, "public_key", &pubPEM); err != nil {
+		return nil, err
+	}
+	k, err := parsePublicKeyPEM(pubPEM)
+	if err != nil {
+		return nil, err
+	}
+	pub, ok := k.(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("crypto.rsa_public_jwk: key is not an RSA public key")
+	}
+	eBytes := big.NewInt(int64(pub.E)).Bytes()
+	d := sk.NewDict(3)
+	d.SetKey(sk.String("kty"), sk.String("RSA"))
+	d.SetKey(sk.String("n"), sk.String(base64.RawURLEncoding.EncodeToString(pub.N.Bytes())))
+	d.SetKey(sk.String("e"), sk.String(base64.RawURLEncoding.EncodeToString(eBytes)))
+	return d, nil
 }
