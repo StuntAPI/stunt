@@ -218,7 +218,7 @@ A receiver that verifies a webhook signature (Stripe `Stripe-Signature`, GitHub 
 
 | Module | Functions | Notes |
 |--------|-----------|-------|
-| `crypto` | `hmac_sha256(key, data, encoding="hex")`, `hmac_sha1(...)`, `sha256(data, encoding="hex")`, `base64_encode(data)`, `base64_decode(s)` | `encoding` is `"hex"` (default) or `"base64"`. MAC + hash only (no asymmetric/encryption/KDF) |
+| `crypto` | `hmac_sha256(key, data, encoding="hex")`, `hmac_sha1(...)`, `sha256(data, encoding="hex")`, `base64_encode(data)`, `base64_decode(s)`, `ecdsa_sign_p256(private_key_pem, data, encoding="hex")`, `ecdsa_verify_p256(public_key_pem, data, signature, encoding="hex")`, `rsa_sign(private_key_pem, data, encoding="hex")`, `rsa_verify(public_key_pem, data, signature, encoding="hex")` | `encoding` is `"hex"` (default), `"base64"`, or `"base64url"`. MAC, hash, and asymmetric signature (ECDSA P-256 raw r‖s; RSA-SHA256 PKCS#1 v1.5). Keys arrive as PEM strings the adapter supplies (ship a fixed keypair for determinism). No encryption/KDF/key-gen |
 | `clock` | `now_unix()`, `now_rfc3339()` | Wall clock from the engine's injectable `clock.Clock` — real today; the virtual mode is the seam for future record/replay |
 
 **Rule:** MAC the `events_body(...)` bytes verbatim — never a re-marshalled copy — so the signer and verifier agree on the exact bytes.

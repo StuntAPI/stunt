@@ -12,27 +12,32 @@ import (
 	"go.starlark.net/starlarkstruct"
 )
 
-// cryptoModule is the Starlark `crypto` module — the MAC and hash primitives an
-// adapter needs to compute a webhook signature that a real receiver verifies.
+// cryptoModule is the Starlark `crypto` module — the primitives an adapter
+// needs to compute a signature that a real receiver verifies: symmetric MAC
+// (HMAC), cryptographic hash, and the asymmetric signatures (ECDSA P-256,
+// RSA) that JWT issuers and signed webhooks use.
 //
-// Charter (the scope line for future requests): symmetric MAC (HMAC) and
-// cryptographic hash ONLY. No asymmetric signatures, encryption, KDFs, RNG,
-// constant-time compare, or key management — none appear in webhook-signing
-// schemes, and stunt already runs the same Go crypto in internal/primitives/
-// identity for anything beyond. Keeping the surface to MAC+hash keeps it
-// auditable.
+// Charter (the scope line for future requests): MAC, hash, and asymmetric
+// signature (sign/verify) ONLY. No encryption, KDFs, RNG, constant-time
+// compare, or key management/generation. Keys arrive as PEM strings the caller
+// supplies (adapters ship a fixed, documented keypair for determinism);
+// signatures are returned encoded so they round-trip through a Starlark string.
 //
-// Starlark strings are UTF-8, so raw digest bytes cannot round-trip through a
-// Starlark string. The MAC/hash functions therefore take an `encoding` kwarg
-// ("hex" default | "base64") and return the final string directly.
+// Starlark strings are UTF-8, so raw digest/signature bytes cannot round-trip
+// through a Starlark string. The functions therefore take an `encoding` kwarg
+// ("hex" default | "base64" | "base64url") and return the final string directly.
 var cryptoModule = &starlarkstruct.Module{
 	Name: "crypto",
 	Members: sk.StringDict{
-		"hmac_sha256":   sk.NewBuiltin("crypto.hmac_sha256", hmacSHA256),
-		"hmac_sha1":     sk.NewBuiltin("crypto.hmac_sha1", hmacSHA1),
-		"sha256":        sk.NewBuiltin("crypto.sha256", sha256Hash),
-		"base64_encode": sk.NewBuiltin("crypto.base64_encode", base64Encode),
-		"base64_decode": sk.NewBuiltin("crypto.base64_decode", base64Decode),
+		"hmac_sha256":       sk.NewBuiltin("crypto.hmac_sha256", hmacSHA256),
+		"hmac_sha1":         sk.NewBuiltin("crypto.hmac_sha1", hmacSHA1),
+		"sha256":            sk.NewBuiltin("crypto.sha256", sha256Hash),
+		"base64_encode":     sk.NewBuiltin("crypto.base64_encode", base64Encode),
+		"base64_decode":     sk.NewBuiltin("crypto.base64_decode", base64Decode),
+		"ecdsa_sign_p256":   sk.NewBuiltin("crypto.ecdsa_sign_p256", ecdsaSignP256),
+		"ecdsa_verify_p256": sk.NewBuiltin("crypto.ecdsa_verify_p256", ecdsaVerifyP256),
+		"rsa_sign":          sk.NewBuiltin("crypto.rsa_sign", rsaSign),
+		"rsa_verify":        sk.NewBuiltin("crypto.rsa_verify", rsaVerify),
 	},
 }
 
@@ -43,8 +48,25 @@ func encodeDigest(sum []byte, encoding string) (string, error) {
 		return hex.EncodeToString(sum), nil
 	case "base64":
 		return base64.StdEncoding.EncodeToString(sum), nil
+	case "base64url":
+		return base64.RawURLEncoding.EncodeToString(sum), nil
 	default:
-		return "", fmt.Errorf("crypto: unknown encoding %q (want \"hex\" or \"base64\")", encoding)
+		return "", fmt.Errorf("crypto: unknown encoding %q (want \"hex\", \"base64\", or \"base64url\")", encoding)
+	}
+}
+
+// decodeDigest is the inverse of encodeDigest: it decodes a hex/base64/base64url
+// string into raw bytes.
+func decodeDigest(s, encoding string) ([]byte, error) {
+	switch encoding {
+	case "", "hex":
+		return hex.DecodeString(s)
+	case "base64":
+		return base64.StdEncoding.DecodeString(s)
+	case "base64url":
+		return base64.RawURLEncoding.DecodeString(s)
+	default:
+		return nil, fmt.Errorf("crypto: unknown encoding %q (want \"hex\", \"base64\", or \"base64url\")", encoding)
 	}
 }
 
