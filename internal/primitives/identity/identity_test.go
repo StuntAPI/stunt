@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"stuntapi.com/stunt/internal/primitives/clock"
 )
 
 func newTestIssuer(t *testing.T) *Issuer {
@@ -173,5 +175,41 @@ func TestEmptyScopes(t *testing.T) {
 	}
 	if len(claims.Scopes) != 0 {
 		t.Fatalf("len(Scopes) = %d, want 0", len(claims.Scopes))
+	}
+}
+
+// TestIssuerWithInjectableClock proves mint/validate timing follows the
+// injected clock, so expiry is deterministic for record/replay — no real
+// time.Sleep, no dependence on time.Now.
+func TestIssuerWithInjectableClock(t *testing.T) {
+	start := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
+	vc := clock.NewVirtualClock(start)
+	iss := NewIssuerWithClock([]byte("vc-secret"), vc)
+
+	token, err := iss.Mint("u", []string{"read"}, time.Hour)
+	if err != nil {
+		t.Fatalf("Mint: %v", err)
+	}
+
+	// In-window: valid at mint time and just before the TTL elapses.
+	if _, err := iss.Validate(token); err != nil {
+		t.Fatalf("Validate at start: %v", err)
+	}
+	vc.Advance(59 * time.Minute)
+	if _, err := iss.Validate(token); err != nil {
+		t.Fatalf("Validate at 59m: %v", err)
+	}
+
+	// Past the TTL on the SAME clock → expired, deterministically.
+	vc.Advance(2 * time.Minute)
+	_, err = iss.Validate(token)
+	if !errors.Is(err, ErrExpiredToken) {
+		t.Fatalf("Validate after TTL on virtual clock: err = %v, want ErrExpiredToken", err)
+	}
+
+	// A fresh token minted after the advance is valid again (exp = now+1h).
+	token2, _ := iss.Mint("u", []string{"read"}, time.Hour)
+	if _, err := iss.Validate(token2); err != nil {
+		t.Fatalf("Validate fresh token after advance: %v", err)
 	}
 }

@@ -309,7 +309,7 @@ func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir,
 	//   sha256("<rngSeed>:<serviceName>")
 	// This ensures tokens minted before a restart remain valid after.
 	secretHash := sha256.Sum256([]byte(fmt.Sprintf("%d:%s", rngSeed, name)))
-	issuer := identity.NewIssuer(secretHash[:])
+	issuer := identity.NewIssuerWithClock(secretHash[:], clk)
 
 	// Create the per-service event emitter and register the webhook target
 	// if the service config provides one.
