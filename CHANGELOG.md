@@ -6,6 +6,30 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-08-13
+
+### Adapters
+
+- **List pagination across the REST corpus.** Retrofitted cursor paging onto
+  every REST list endpoint using the `paginate` builtin, each surfacing the
+  next cursor in its provider's own envelope: Google family
+  (`pageSize`/`pageToken` → `nextPageToken`), Slack (`response_metadata.next_cursor`),
+  Square (top-level `cursor`), Shopify REST (`Link: rel="next"` header),
+  OData/Microsoft/Azure (`@odata.nextLink`), HubSpot-style (`after`), and
+  Zendesk/Jira/Twitter/Xero/Google-Workspace/drive/dropbox plus the rest.
+  `limit` missing/`<=0` disables paging, so unmodified callers keep prior
+  behavior. GraphQL connection fields, gRPC unary lists, and non-list
+  endpoints were intentionally skipped.
+
+### Tests
+
+- **`TestQCAllAdapterScriptsParse`** — a permanent guard that parses every
+  reference adapter's Starlark upfront. `TestQCBootAllReferenceAdapters`
+  validates manifests but parses handler scripts lazily at request time, so a
+  Starlark syntax error (e.g. a Python-ism like `try/except`) previously
+  survived boot and surfaced only as a 500. The new guard catches such errors
+  in the test suite instead.
+
 ## [0.9.0] — 2026-08-13
 
 ### Starlark handler API
