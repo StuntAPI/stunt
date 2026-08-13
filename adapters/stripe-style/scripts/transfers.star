@@ -50,7 +50,7 @@ def on_create_transfer(req):
     _set_balance(destination, bal + amount)
 
     # Emit webhook event (fire-and-forget).
-    events_emit("transfer.created", doc)
+    _signed_emit("transfer.created", doc)
 
     return respond(201, doc)
 
@@ -116,6 +116,6 @@ def on_reverse_transfer(req):
         _set_balance(dest, new_bal)
 
     # Emit webhook event (fire-and-forget).
-    events_emit("transfer.reversed", doc)
+    _signed_emit("transfer.reversed", doc)
 
     return respond(200, doc)

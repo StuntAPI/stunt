@@ -161,14 +161,5 @@ def _issue_view(i):
         "updated_at": i.get("updated_at", _now()),
     }
 
-# _emit_if_subscribed emits a webhook event if any hooks are registered for
-# the repo. Events are typed per GitHub's X-GitHub-Event header convention.
-def _emit_if_subscribed(repo_key, event_type, payload):
-    hc = store_collection("hooks")
-    hooks = hc.list()
-    for h in hooks:
-        if h.get("repo", "") == repo_key:
-            events = h.get("events", [])
-            if event_type in events:
-                events_emit(event_type, payload)
-                return
+# _emit_if_subscribed lives in lib.star (shared with actions.star) and now
+# signs deliveries.

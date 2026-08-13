@@ -458,3 +458,63 @@ func ghToInt(v any) int {
 	}
 	return 0
 }
+
+// TestGitHubStyleSignatureVerifies proves the adapter computes an
+// X-Hub-Signature-256 the real GitHub formula accepts, and tags the delivery
+// with X-GitHub-Event. A hook subscribing to "issues" is registered, then an
+// issue is created → _emit_if_subscribed → _signed_emit.
+func TestGitHubStyleSignatureVerifies(t *testing.T) {
+	const secret = "stunt_mock_github_webhook_secret_2026"
+	const anyToken = "token ghp_signature_test"
+	sink := newCaptureSink()
+	defer sink.close()
+
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "github-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"github": {Adapter: adapterDir, Config: map[string]any{"webhook_url": sink.srv.URL}},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["github"]
+
+	// Register a hook that subscribes to "issues" so issue creation emits.
+	// The hook's URL must be the sink: the emitter keeps one target per service
+	// (last Register wins), so the adapter's events_register(hook.url) would
+	// otherwise overwrite the config webhook_url sink registered at boot.
+	hookOwner, hookRepo := "octocat", "hello-world"
+	if _, status := ghPostBearer(t, base+"/repos/"+hookOwner+"/"+hookRepo+"/hooks", anyToken, map[string]any{
+		"config": map[string]any{"url": sink.srv.URL, "content_type": "json"},
+		"events": []string{"issues"},
+	}); status != 201 {
+		t.Fatalf("POST hooks -> %d, want 201", status)
+	}
+
+	// Create an issue → signed "issues" delivery.
+	if _, status := ghPostBearer(t, base+"/repos/"+hookOwner+"/"+hookRepo+"/issues", anyToken, map[string]any{
+		"title": "signature test",
+		"body":  "verify me",
+	}); status != 201 {
+		t.Fatalf("POST issue -> %d, want 201", status)
+	}
+
+	raw, hdr := sink.awaitDelivery(t, time.Second)
+	verifyGitHubSig(t, raw, hdr, secret, "issues")
+}

@@ -106,6 +106,33 @@ The webhook body is a JSON envelope:
 }
 ```
 
+### Webhook signatures
+
+Every delivery is signed with a Stripe-style `Stripe-Signature` header, so your
+receiver's signature-verification code path runs against stunt:
+
+```
+Stripe-Signature: t=<unix>,v1=<hex(HMAC-SHA256(secret, "{t}.{raw_body}"))>
+```
+
+**Mock signing secret** (configure your receiver with this exact string; public
++ low-entropy, local stunt only):
+
+```
+whsec_stunt_mock_0123456789abcdef0123456789abcdef
+```
+
+```go
+// Verify with the real Stripe formula (timestamp is in the t= field):
+mac := hmac.New(sha256.New, []byte("whsec_stunt_mock_0123456789abcdef0123456789abcdef"))
+mac.Write([]byte(fmt.Sprintf("%d.%s", t, rawBody)))
+expected := hex.EncodeToString(mac.Sum(nil))
+if !hmac.Equal([]byte(expected), v1) { return 401 }
+```
+
+Stunt delivers the `{type, payload}` envelope, so the raw-body MAC verifies but
+this exercises your signature-verification path, not Stripe's event-schema parser.
+
 ## Stripe Connect
 
 Stripe Connect is the marketplace/platform surface. It lets a platform create

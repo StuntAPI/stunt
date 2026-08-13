@@ -567,3 +567,74 @@ func shopifyIDToString(v any) string {
 // Guard: ensure we don't accidentally import strings without using it.
 var _ = strings.Contains
 var _ = shopifyOAuthPost
+
+// TestShopifyStyleSignatureVerifies proves the adapter computes an
+// X-Shopify-Hmac-SHA256 the real Shopify formula accepts (base64, NOT hex): a
+// webhook subscribing to "fulfillments/create" is registered, then a fulfillment
+// is created → _emit_fulfillment_event → _signed_emit.
+func TestShopifyStyleSignatureVerifies(t *testing.T) {
+	const secret = "shpss_stunt_mock_api_client_secret"
+	const token = "shpat_test_token"
+	sink := newCaptureSink()
+	defer sink.close()
+
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "shopify-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"shopify": {Adapter: adapterDir, Config: map[string]any{"webhook_url": sink.srv.URL}},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["shopify"]
+
+	// Register a webhook subscribing to fulfillments/create.
+	if _, status := shopifyPostJSON(t, base+"/admin/api/2024-10/webhooks.json", token, map[string]any{
+		"webhook": map[string]any{
+			"topic":   "fulfillments/create",
+			"address": sink.srv.URL,
+		},
+	}); status != 201 {
+		t.Fatalf("POST webhooks -> %d, want 201", status)
+	}
+
+	// Take a seeded order and fulfill it → signed fulfillments/create delivery.
+	listBody, _ := shopifyGet(t, base+"/admin/api/2024-10/orders.json", token)
+	var orderList map[string]any
+	if err := json.Unmarshal([]byte(listBody), &orderList); err != nil {
+		t.Fatalf("unmarshal orders: %v", err)
+	}
+	orders, _ := orderList["orders"].([]any)
+	if len(orders) < 1 {
+		t.Fatalf("expected >=1 seeded order, got %d", len(orders))
+	}
+	orderID := shopifyIDToString(orders[0].(map[string]any)["id"])
+	if _, status := shopifyPostJSON(t, base+"/admin/api/2024-10/orders/"+orderID+"/fulfillments.json", token, map[string]any{
+		"fulfillment": map[string]any{
+			"tracking_number":  "1Z999AA1",
+			"tracking_company": "UPS",
+			"notify_customer":  true,
+		},
+	}); status != 201 {
+		t.Fatalf("POST fulfillment -> %d, want 201", status)
+	}
+
+	raw, hdr := sink.awaitDelivery(t, time.Second)
+	verifyShopifySig(t, raw, hdr, secret)
+}

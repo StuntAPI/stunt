@@ -40,8 +40,8 @@ def on_dispatch(req):
         "updated_at": _now(),
     })
 
-    # Emit push event if any webhooks subscribed.
-    events_emit("workflow_dispatch", {"repo": repo_key})
+    # Emit a signed event only if a hook for this repo subscribes to it.
+    _emit_if_subscribed(repo_key, "workflow_dispatch", {"repo": repo_key})
 
     # GitHub returns 204 No Content for successful dispatch.
     return respond(204)

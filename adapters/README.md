@@ -195,6 +195,19 @@ sig = crypto.hmac_sha256(secret, events_body("push", payload))
 events_emit("push", payload, {"X-Hub-Signature-256": "sha256=" + sig, "X-GitHub-Event": "push"})
 ```
 
+**Signed-delivery roster** — adapters that compute (not just document) a provider signature on every delivery. Mock secrets are public/low-entropy (local stunt only); configure your receiver with the exact string:
+
+| Adapter | Signed? | Header | Mock secret | Enc |
+|---------|:-------:|--------|-------------|:---:|
+| stripe-style | yes | `Stripe-Signature` (`t=,v1=`) | `whsec_stunt_mock_0123456789abcdef0123456789abcdef` | hex |
+| github-style | yes | `X-Hub-Signature-256` | `stunt_mock_github_webhook_secret_2026` | hex |
+| shopify-style | yes | `X-Shopify-Hmac-SHA256` | `shpss_stunt_mock_api_client_secret` | base64 |
+| adyen-style | deferred | — | — | — |
+| braintree-style | deferred | — | — | — |
+| twilio-style | deferred | — | — | — |
+
+Deferred providers need schemes the current primitives don't cover yet: Adyen signs an in-body `hmacSignature` over a derived field-concatenation; Braintree needs SHA-1 + raw-byte HMAC keys + form-encoded delivery; Twilio signs HMAC-SHA-1 over the sink URL + body hash.
+
 To receive events, set `config.webhook_url` in your `stunt.yaml`:
 
 ```yaml

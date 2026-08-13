@@ -48,7 +48,7 @@ def on_create_payout(req):
     c.insert(doc)
 
     # Emit webhook event (fire-and-forget).
-    events_emit("payout.created", doc)
+    _signed_emit("payout.created", doc)
 
     return respond(201, doc)
 

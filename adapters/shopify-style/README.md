@@ -34,8 +34,19 @@ requests for the duration of the server session.
 
 ## Webhook signature scheme
 
-Shopify signs every webhook delivery with HMAC-SHA256. This adapter **documents**
-the exact scheme (see `scripts/lib.star`):
+Shopify signs every webhook delivery with HMAC-SHA256. This adapter **computes
+and attaches** the exact scheme on every delivery (see `scripts/lib.star`):
+
+**Mock signing secret** (configure your receiver with this exact string;
+public + low-entropy, local stunt only):
+
+```
+shpss_stunt_mock_api_client_secret
+```
+
+Stunt delivers the `{type, payload}` envelope, so the raw-body MAC verifies but
+this exercises your signature-verification path, not Shopify's event-schema
+parser. Note Shopify uses **base64** (not hex).
 
 ```
 X-Shopify-Hmac-SHA256: base64(HMAC-SHA256(api_secret_key, raw_body))

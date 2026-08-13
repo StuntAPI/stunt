@@ -37,7 +37,7 @@ def on_create_charge(req):
     c.insert(doc)
 
     # Emit webhook event (fire-and-forget: errors do not break charge creation).
-    events_emit("charge.created", doc)
+    _signed_emit("charge.created", doc)
 
     return respond(201, doc)
 
@@ -81,7 +81,7 @@ def on_capture_charge(req):
     c.update(id, doc)
 
     # Emit webhook event (fire-and-forget).
-    events_emit("charge.updated", doc)
+    _signed_emit("charge.updated", doc)
 
     return respond(200, doc)
 
@@ -103,6 +103,6 @@ def on_refund_charge(req):
     c.update(id, doc)
 
     # Emit webhook event (fire-and-forget).
-    events_emit("charge.refunded", doc)
+    _signed_emit("charge.refunded", doc)
 
     return respond(200, doc)
