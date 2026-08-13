@@ -68,5 +68,7 @@ def on_list_payouts(req):
         if dest_id != "":
             docs = [d for d in docs if d.get("destination") == dest_id]
 
-    page, has_more = _list_page(req, docs)
+    page, has_more, err = _list_page(req, docs, "payout")
+    if err != None:
+        return err
     return respond(200, {"object": "list", "data": page, "has_more": has_more, "url": "/v1/payouts"})

@@ -48,7 +48,9 @@ def on_list_customers(req):
 
     c = store_collection("customers")
     docs = c.list()
-    page, has_more = _list_page(req, docs)
+    page, has_more, err = _list_page(req, docs, "customer")
+    if err != None:
+        return err
     return respond(200, {"object": "list", "data": page, "has_more": has_more, "url": "/v1/customers"})
 
 # POST /v1/customers/{id} — update a customer (merge fields from body).

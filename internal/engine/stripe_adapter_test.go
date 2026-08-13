@@ -712,4 +712,10 @@ func TestStripeStylePagination(t *testing.T) {
 	if seen != total {
 		t.Fatalf("page-walk saw %d items, unbounded list has %d", seen, total)
 	}
+
+	// starting_after pointing at a non-existent id → 400, not a silent page-0 restart.
+	bodyBad, statusBad := getAuth(t, base+"/v1/charges?starting_after=ch_no_such_object", devToken)
+	if statusBad != 400 {
+		t.Fatalf("bad starting_after -> %d, want 400; body %s", statusBad, bodyBad)
+	}
 }

@@ -97,5 +97,7 @@ def on_list_accounts(req):
 
     c = store_collection("connect_accounts")
     docs = c.list()
-    page, has_more = _list_page(req, docs)
+    page, has_more, err = _list_page(req, docs, "account")
+    if err != None:
+        return err
     return respond(200, {"object": "list", "data": page, "has_more": has_more, "url": "/v1/accounts"})

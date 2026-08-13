@@ -62,7 +62,9 @@ def on_list_charges(req):
 
     c = store_collection("charges")
     docs = c.list()
-    page, has_more = _list_page(req, docs)
+    page, has_more, err = _list_page(req, docs, "charge")
+    if err != None:
+        return err
     return respond(200, {"object": "list", "data": page, "has_more": has_more, "url": "/v1/charges"})
 
 # POST /v1/charges/{id}/capture — capture a pending charge (set status succeeded).
