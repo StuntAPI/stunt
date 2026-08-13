@@ -6,6 +6,32 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-08-13
+
+### Adapters
+
+- **Computed webhook signatures.** The stripe-style, github-style, and
+  shopify-style adapters now **compute and attach** their provider's real
+  webhook signature on every delivery (previously documented only), so a
+  receiver's signature-verification code path runs against stunt. Each adapter
+  signs the exact `events_body` bytes with a fixed, documented mock secret
+  (configure your receiver with it):
+  - **stripe-style** — `Stripe-Signature: t=<unix>,v1=<hex>` over
+    `"{t}.{body}"`; secret `whsec_stunt_mock_…`.
+  - **github-style** — `X-Hub-Signature-256: sha256=<hex>` + `X-GitHub-Event`;
+    SHA-256 only (legacy SHA-1 omitted); secret `stunt_mock_github_…`. Routing
+    `workflow_dispatch` through the subscription gate also fixes a pre-existing
+    inconsistency (it emitted even with no hook registered).
+  - **shopify-style** — `X-Shopify-Hmac-SHA256` (**base64**); secret
+    `shpss_stunt_mock_…`.
+  - Each delivery is verified against the real provider formula in a new
+    engine-integration test. Stunt POSTs its `{type, payload}` envelope, so the
+    raw-body MAC verifies but this exercises the signature-verification path,
+    not the provider's event-schema parser.
+  - Deferred (need schemes the current primitives don't cover): adyen-style
+    (in-body derived-field signature), braintree-style (SHA-1 + raw-byte keys +
+    form delivery), twilio-style (SHA-1 over URL + body hash).
+
 ## [0.7.0] — 2026-08-13
 
 ### Starlark handler API

@@ -555,3 +555,49 @@ func TestStripeStyleAuthAndWebhooks(t *testing.T) {
 		t.Fatalf("did not receive charge.refunded event after refund")
 	}
 }
+
+// TestStripeStyleSignatureVerifies proves the adapter computes a Stripe-Signature
+// the real Stripe verification formula accepts: v1 = hex(HMAC-SHA256(secret,
+// "{timestamp}.{rawBody}")). The timestamp is parsed back out of the header, so
+// the test needs no clock injection.
+func TestStripeStyleSignatureVerifies(t *testing.T) {
+	const secret = "whsec_stunt_mock_0123456789abcdef0123456789abcdef"
+	sink := newCaptureSink()
+	defer sink.close()
+
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "stripe-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"stripe": {Adapter: adapterDir, Config: map[string]any{"webhook_url": sink.srv.URL}},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["stripe"]
+
+	if _, status := postJSONAuth(t, base+"/v1/charges", "sk_test_anything", map[string]any{
+		"amount":   1500,
+		"currency": "usd",
+	}); status != 201 {
+		t.Fatalf("POST /v1/charges -> %d, want 201", status)
+	}
+
+	raw, hdr := sink.awaitDelivery(t, time.Second)
+	verifyStripeSig(t, raw, hdr, secret)
+}

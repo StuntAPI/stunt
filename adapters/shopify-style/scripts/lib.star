@@ -40,6 +40,20 @@
 # exchanging the code for an access token.
 # ============================================================================
 
+# Mock webhook signing secret. Configure your Shopify webhook receiver with
+# this exact string to verify stunt's deliveries. Public + low-entropy: local
+# stunt only — never reuse outside the simulator.
+_WEBHOOK_SECRET = "shpss_stunt_mock_api_client_secret"
+
+# _signed_emit MACs the exact on-wire body and delivers with
+# X-Shopify-Hmac-SHA256. The same (topic, payload) feeds events_body (signing
+# input) and events_emit (delivery), so the signature verifies against the bytes
+# the sink receives. Shopify uses base64 (NOT hex).
+def _signed_emit(topic, payload):
+    body = events_body(topic, payload)
+    sig = crypto.hmac_sha256(_WEBHOOK_SECRET, body, encoding="base64")
+    events_emit(topic, payload, {"X-Shopify-Hmac-SHA256": sig})
+
 # _require_token validates the X-Shopify-Access-Token header. Returns None
 # if authorized, or a 401 error-response dict to return from the handler if
 # the token is missing or empty.

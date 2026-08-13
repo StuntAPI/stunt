@@ -34,6 +34,32 @@
 # events_emit using the same type names.
 # ============================================================================
 
+# Mock webhook signing secret. Configure your GitHub webhook receiver with
+# this exact string to verify stunt's deliveries. Public + low-entropy: local
+# stunt only — never reuse outside the simulator.
+_WEBHOOK_SECRET = "stunt_mock_github_webhook_secret_2026"
+
+# _signed_emit MACs the exact on-wire body and delivers with X-Hub-Signature-256
+# and X-GitHub-Event. The same (event_type, payload) feeds events_body (signing
+# input) and events_emit (delivery), so the signature verifies against the bytes
+# the sink receives. (SHA256 only; the legacy SHA1 X-Hub-Signature is omitted.)
+def _signed_emit(event_type, payload):
+    body = events_body(event_type, payload)
+    sig = crypto.hmac_sha256(_WEBHOOK_SECRET, body)
+    events_emit(event_type, payload, {
+        "X-Hub-Signature-256": "sha256=" + sig,
+        "X-GitHub-Event": event_type,
+    })
+
+# _emit_if_subscribed delivers a signed event only if a hook registered for the
+# repo subscribes to event_type. GitHub does not deliver unsubscribed events.
+def _emit_if_subscribed(repo_key, event_type, payload):
+    hc = store_collection("hooks")
+    for h in hc.list():
+        if h.get("repo", "") == repo_key and event_type in h.get("events", []):
+            _signed_emit(event_type, payload)
+            return
+
 # _require_auth checks for an Authorization header. Accepts:
 #   "Bearer <jwt_or_ghs_token>" — GitHub App JWT or installation token
 #   "token <ghp_token>"         — Personal Access Token (PAT)

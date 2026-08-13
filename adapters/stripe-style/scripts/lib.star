@@ -5,6 +5,21 @@
 # they were builtins — without Starlark's load() (which stunt does not
 # support). See internal/starlark/vm.go LoadWithLib.
 
+# Mock webhook signing secret. Configure your Stripe webhook receiver with
+# this exact string to verify stunt's deliveries. Public + low-entropy: local
+# stunt only — never reuse outside the simulator.
+_WEBHOOK_SECRET = "whsec_stunt_mock_0123456789abcdef0123456789abcdef"
+
+# _signed_emit MACs the exact on-wire body and delivers with Stripe-Signature.
+# The same (event_type, payload) feeds events_body (signing input) and
+# events_emit (delivery), so the signature verifies against the bytes the sink
+# receives. Stripe signs "{timestamp}.{body}" and carries t=,v1= in the header.
+def _signed_emit(event_type, payload):
+    t = clock.now_unix()
+    body = events_body(event_type, payload)
+    sig = crypto.hmac_sha256(_WEBHOOK_SECRET, str(t) + "." + body)
+    events_emit(event_type, payload, {"Stripe-Signature": "t=" + str(t) + ",v1=" + sig})
+
 # _bearer_token extracts the bearer token from the Authorization header, or
 # None if absent.
 def _bearer_token(req):

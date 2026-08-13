@@ -150,5 +150,5 @@ def _emit_fulfillment_event(topic, payload):
     hooks = wc.list()
     for h in hooks:
         if h.get("topic", "") == topic:
-            events_emit(topic, payload)
+            _signed_emit(topic, payload)
             return

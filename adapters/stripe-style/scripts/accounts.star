@@ -40,7 +40,7 @@ def on_create_account(req):
     c.insert(doc)
 
     # Emit webhook event (fire-and-forget: errors do not break account creation).
-    events_emit("account.updated", doc)
+    _signed_emit("account.updated", doc)
 
     return respond(201, doc)
 
@@ -85,7 +85,7 @@ def on_update_account(req):
     c.update(id, doc)
 
     # Emit webhook event (fire-and-forget).
-    events_emit("account.updated", doc)
+    _signed_emit("account.updated", doc)
 
     return respond(200, doc)
 

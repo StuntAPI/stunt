@@ -46,8 +46,19 @@ the JWT signature; for local testing any token is accepted).
 
 ## Webhook signature scheme
 
-GitHub signs every webhook delivery with HMAC-SHA256. This adapter **documents**
-the exact scheme (see `scripts/lib.star`):
+GitHub signs every webhook delivery with HMAC-SHA256. This adapter **computes
+and attaches** the exact scheme on every delivery (see `scripts/lib.star`):
+
+**Mock signing secret** (configure your receiver with this exact string;
+public + low-entropy, local stunt only):
+
+```
+stunt_mock_github_webhook_secret_2026
+```
+
+Stunt delivers the `{type, payload}` envelope, so the raw-body MAC verifies but
+this exercises your signature-verification path, not GitHub's event-schema parser.
+SHA-256 only (`X-Hub-Signature-256`); the legacy SHA-1 header is not emitted.
 
 ```
 X-Hub-Signature-256: sha256=<hex(HMAC-SHA256(webhook_secret, raw_body))>
