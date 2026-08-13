@@ -6,6 +6,26 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-08-13
+
+### Starlark handler API
+
+- **List pagination builtin.** New pure `paginate(items, limit?, cursor?)`
+  builtin, available in every handler VM, returns `(page, next_cursor)`.
+  `limit` of `None`/`<=0` disables paging (so unmodified handlers are
+  unchanged); `cursor` is an opaque offset token. The adapter owns the
+  provider envelope (`has_more` / `nextPageToken` / `@odata.nextLink`) and
+  maps its cursor query param to the token — see the new Pagination section
+  in `adapters/README.md`. First slice of closing the cross-adapter
+  pagination gap.
+
+### Adapters
+
+- **stripe-style** list endpoints (charges, customers, accounts, transfers,
+  payouts) now honor `limit` (1–100, default 10) and `starting_after`
+  (cursor by object id) and report `has_more`. An unknown `starting_after`
+  id returns a Stripe-shaped 400 instead of silently paging from the start.
+
 ## [0.8.0] — 2026-08-13
 
 ### Adapters
