@@ -198,3 +198,17 @@ def _list_page(req, items):
     limit = _to_int(_get_query(req, "limit"))
     cursor = _get_query(req, "after")
     return paginate(items, limit, cursor)
+
+# Mock app secret for Meta webhook signing. Configure your WhatsApp/Meta
+# webhook receiver with this exact string to verify stunt's deliveries.
+# Public + low-entropy: local stunt only.
+_WEBHOOK_SECRET = "whatsapp_stunt_mock_app_secret_2026"
+
+# _signed_emit MACs the exact on-wire body and delivers with X-Hub-Signature-256
+# (Meta's scheme): sha256=<hex(HMAC-SHA256(app_secret, body))>. The same
+# (event_type, payload) feeds events_body (signing input) and events_emit
+# (delivery) so the signature verifies against the bytes the sink receives.
+def _signed_emit(event_type, payload):
+    body = events_body(event_type, payload)
+    sig = crypto.hmac_sha256(_WEBHOOK_SECRET, body)
+    events_emit(event_type, payload, {"X-Hub-Signature-256": "sha256=" + sig})

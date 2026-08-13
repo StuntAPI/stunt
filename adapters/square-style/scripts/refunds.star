@@ -46,7 +46,7 @@ def on_create_refund(req):
     _store_idempotency(req, "refunds", refund_id)
 
     # Emit webhook event.
-    events_emit("refund.created", {
+    _signed_emit("refund.created", {
         "type": "refund.created",
         "data": {
             "object": {

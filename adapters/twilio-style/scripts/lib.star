@@ -161,3 +161,15 @@ def _list_page(req, items):
     if cursor == None:
         cursor = ""
     return paginate(items, limit, cursor)
+
+# _signed_emit MACs the exact on-wire body and delivers with X-Twilio-Signature
+# (Twilio's scheme): base64(HMAC-SHA1(AUTH_TOKEN, url + body)). The URL is the
+# webhook destination (events_target) — Twilio MACs the request URL + raw body,
+# so the receiver must validate against the same URL stunt delivered to.
+def _signed_emit(event_type, payload):
+    body = events_body(event_type, payload)
+    url = events_target()
+    if url == None:
+        url = ""
+    sig = crypto.hmac_sha1(AUTH_TOKEN, url + body, encoding="base64")
+    events_emit(event_type, payload, {"X-Twilio-Signature": sig})

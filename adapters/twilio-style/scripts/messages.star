@@ -66,8 +66,8 @@ def on_send_message(req):
     stored["id"] = sid
     c.insert(stored)
 
-    # Emit webhook event (fire-and-forget).
-    events_emit("message.sent", msg)
+    # Emit webhook event (signed, X-Twilio-Signature).
+    _signed_emit("message.sent", msg)
 
     return respond(201, msg)
 

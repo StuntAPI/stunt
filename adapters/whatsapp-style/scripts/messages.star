@@ -63,8 +63,8 @@ def on_send_message(req):
     mc = store_collection("messages")
     mc.insert(msg)
 
-    # Emit inbound-message-style webhook event.
-    events_emit("messages", {"from": wa_id, "id": msg_id})
+    # Emit inbound-message-style webhook event (signed, Meta X-Hub-Signature-256).
+    _signed_emit("messages", {"from": wa_id, "id": msg_id})
 
     return respond(200, {
         "messaging_product": "whatsapp",

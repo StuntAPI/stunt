@@ -384,6 +384,15 @@ func buildEventsBuiltins(emitter *events.Emitter, serviceName string) sk.StringD
 			emitter.Register(serviceName, url)
 			return sk.None, nil
 		}),
+		"events_target": sk.NewBuiltin("events_target", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			if emitter == nil {
+				return sk.None, nil
+			}
+			if url := emitter.Target(serviceName); url != "" {
+				return sk.String(url), nil
+			}
+			return sk.None, nil
+		}),
 		"events_emit": sk.NewBuiltin("events_emit", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
 			var eventType string
 			var payloadVal sk.Value = sk.None

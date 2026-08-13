@@ -48,7 +48,7 @@ def on_create_payment(req):
     _store_idempotency(req, "payments", payment_id)
 
     # Emit webhook event.
-    events_emit("payment.created", {
+    _signed_emit("payment.created", {
         "type": "payment.created",
         "data": {
             "object": {
@@ -99,7 +99,7 @@ def on_complete_payment(req):
     c.update(payment_id, doc)
 
     # Emit webhook event.
-    events_emit("payment.updated", {
+    _signed_emit("payment.updated", {
         "type": "payment.updated",
         "data": {
             "object": {
