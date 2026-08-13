@@ -6,6 +6,25 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-08-13
+
+### Starlark handler API
+
+- **Asymmetric signature primitives.** The `crypto` module gains ECDSA P-256
+  and RSA sign/verify — the algorithms JWT issuers and signed webhooks use that
+  a symmetric MAC cannot satisfy:
+  - `ecdsa_sign_p256` / `ecdsa_verify_p256` — ES256, raw r‖s (64 bytes).
+  - `rsa_sign` / `rsa_verify` — RS256, PKCS#1 v1.5 + SHA-256 (deterministic).
+  - `encoding` now accepts `base64url` (JWT segments); new `decodeDigest` for
+    verify.
+  - Keys arrive as PEM strings the adapter supplies (ship a fixed keypair for
+    determinism); charter expanded to MAC + hash + asymmetric signature (still
+    no encryption/KDF/RNG/key-gen). `verify` returns `False` on a bad
+    signature, errors only on an unparseable/wrong-type key.
+  - Unblocks (per-adapter follow-ups): RS256 JWTs + JWKS for signin-with-apple,
+    entra-id, aws-cognito, firebase, google-style, appstoreconnect; ES256 for
+    sendgrid; the asymmetric webhook signers deferred in v0.8.0/v0.11.0.
+
 ## [0.11.0] — 2026-08-13
 
 ### Adapters
