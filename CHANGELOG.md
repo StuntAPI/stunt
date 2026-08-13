@@ -6,6 +6,16 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-08-13
+
+### Starlark handler API
+
+- **Deterministic identity-token timing.** `identity.Issuer` now mints and
+  validates against the engine's injectable clock (`NewIssuerWithClock`),
+  instead of `time.Now()`. Token expiry no longer leaks wall-clock time, so
+  auth flows are deterministic for record/replay. `NewIssuer` (real clock) is
+  unchanged, so existing callers behave identically.
+
 ## [0.6.0] — 2026-08-13
 
 ### Starlark handler API

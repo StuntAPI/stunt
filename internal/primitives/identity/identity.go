@@ -17,6 +17,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"stuntapi.com/stunt/internal/primitives/clock"
 )
 
 // Sentinel errors returned by Validate.
@@ -49,20 +51,33 @@ type payload struct {
 // Issuer mints and validates opaque HMAC-signed tokens.
 type Issuer struct {
 	secret []byte
+	clock  *clock.Clock
 }
 
-// NewIssuer creates an Issuer that signs tokens with the given secret.
-// The secret is copied so the caller may safely mutate the original slice.
+// NewIssuer creates an Issuer that signs tokens with the given secret and uses
+// the real system clock for expiry. The secret is copied so the caller may
+// safely mutate the original slice.
 func NewIssuer(secret []byte) *Issuer {
+	return NewIssuerWithClock(secret, nil)
+}
+
+// NewIssuerWithClock is like NewIssuer but uses clk for mint/validate timing.
+// A nil clk falls back to the real system clock. An injectable clock makes
+// token expiry deterministic for record/replay instead of depending on
+// time.Now (a determinism leak otherwise).
+func NewIssuerWithClock(secret []byte, clk *clock.Clock) *Issuer {
 	cp := make([]byte, len(secret))
 	copy(cp, secret)
-	return &Issuer{secret: cp}
+	if clk == nil {
+		clk = clock.NewClock()
+	}
+	return &Issuer{secret: cp, clock: clk}
 }
 
 // Mint creates a signed token for subject with the given scopes, valid for ttl.
 // Returns the opaque token string.
 func (i *Issuer) Mint(subject string, scopes []string, ttl time.Duration) (string, error) {
-	exp := time.Now().Add(ttl)
+	exp := i.clock.Now().Add(ttl)
 
 	p := payload{
 		Sub:    subject,
@@ -112,7 +127,7 @@ func (i *Issuer) Validate(token string) (*Claims, error) {
 		ExpiresAt: time.Unix(0, p.Exp),
 	}
 
-	if time.Now().After(claims.ExpiresAt) {
+	if i.clock.Now().After(claims.ExpiresAt) {
 		return nil, ErrExpiredToken
 	}
 
