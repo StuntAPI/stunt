@@ -77,15 +77,20 @@ def on_list_exports(req):
         {"id": "exp002", "name": "Expense Export", "type": "FLAT", "format": "CSV"},
     ]
 
+    page, next_cursor = _list_page(req, exports)
+    paging = {
+        "currentPageSize": len(page),
+        "offset": _to_int(req.get("query", {}).get("offset", "")),
+        "totalSize": len(exports),
+    }
+    if next_cursor != None:
+        paging["nextCursor"] = next_cursor
+
     return respond(200, {
         "meta": {
-            "paging": {
-                "currentPageSize": len(exports),
-                "offset": 0,
-                "totalSize": len(exports),
-            },
+            "paging": paging,
         },
-        "items": exports,
+        "items": page,
     })
 
 # _gen_task_id generates a unique task ID.

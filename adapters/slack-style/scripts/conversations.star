@@ -74,7 +74,11 @@ def on_list_conversations(req):
     for ch in all_channels:
         result.append(ch)
 
-    return _ok({"channels": result})
+    page, next_cursor = _list_page(req, result)
+    body = {"channels": page}
+    if next_cursor != None:
+        body["response_metadata"] = {"next_cursor": next_cursor}
+    return _ok(body)
 
 # on_conversation_history returns messages for the given channel.
 def on_conversation_history(req):
@@ -104,7 +108,11 @@ def on_conversation_history(req):
             "team": m.get("team", ""),
         })
 
-    return _ok({"messages": result})
+    page, next_cursor = _list_page(req, result)
+    body = {"messages": page}
+    if next_cursor != None:
+        body["response_metadata"] = {"next_cursor": next_cursor}
+    return _ok(body)
 
 # _pad8 zero-pads a number to 8 digits.
 def _pad8(n):

@@ -30,10 +30,18 @@ def on_list_worksheets(req):
         },
     ]
 
-    return respond(200, {
+    # Pagination: $top = page size, $skip = opaque cursor token.
+    base_url = "https://graph.microsoft.com/v1.0/me/drive/items/" + item_id + "/workbook/worksheets"
+    top = _to_int(req["query"].get("$top", ""))
+    page, next_cursor = _list_page(worksheets, req["query"])
+
+    envelope = {
         "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#workbook/worksheets",
-        "value": worksheets,
-    })
+        "value": page,
+    }
+    if next_cursor != None and next_cursor != "":
+        envelope["@odata.nextLink"] = _odata_link(base_url, top, next_cursor)
+    return respond(200, envelope)
 
 # on_add_table_row adds a row to a workbook table.
 # POST /v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/add (Bearer)

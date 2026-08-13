@@ -45,6 +45,33 @@ def _to_int(s):
 def _contains(s, substr):
     return s.find(substr) >= 0
 
+# _get_query safely returns a query parameter value, or default_val if the
+# parameter is absent or None.
+def _get_query(req, key, default_val):
+    q = req.get("query")
+    if q == None:
+        return default_val
+    val = q.get(key, default_val)
+    if val == None:
+        return default_val
+    return val
+
+# _list_page reads Azure DevOps OData $top (page size) / $skip (offset cursor)
+# query params, slices the already-filtered docs via the paginate() builtin,
+# and returns (page, continuation_token) where continuation_token is a token
+# string the client round-trips via $skip (and surfaced as the response's
+# top-level continuationToken field), or None when there is no further page.
+# Paging is DISABLED (whole list returned, continuation_token None) when $top
+# is missing or <= 0 — preserving prior unpaginated behavior.
+def _list_page(req, docs):
+    top = _to_int(_get_query(req, "$top", ""))
+    skip = _get_query(req, "$skip", "")
+    if skip == None:
+        skip = ""
+
+    page, next_cursor = paginate(docs, top, skip)
+    return page, next_cursor
+
 # _seed populates default projects, repos, and a work item.
 def _seed():
     if store_kv_get("azure-devops", "seeded") == "yes":

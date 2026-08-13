@@ -35,4 +35,8 @@ def on_list_events(req):
             "created_date": evt.get("created_date", ""),
         })
 
-    return respond(200, {"asset_events": result})
+    page, next_cursor = _list_page(req, result)
+    body = {"asset_events": page}
+    if next_cursor != None:
+        body["next"] = next_cursor
+    return respond(200, body)

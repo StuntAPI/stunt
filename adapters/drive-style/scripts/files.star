@@ -126,7 +126,12 @@ def on_list(req):
     for d in docs:
         if not d.get("trashed", False):
             visible.append(d)
-    return respond(200, {"files": visible})
+    # Apply Drive-style paging (pageSize / pageToken) after filtering.
+    page, next_token = _list_page(req, visible)
+    result = {"files": page}
+    if next_token != None:
+        result["nextPageToken"] = next_token
+    return respond(200, result)
 
 # PATCH /drive/v3/files/{id} — update file metadata (e.g., name, trashed).
 def on_patch(req):

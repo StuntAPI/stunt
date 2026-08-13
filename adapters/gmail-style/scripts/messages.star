@@ -24,14 +24,10 @@ def on_list_messages(req):
 
     user_id = req["params"]["userId"]
     q = req["query"].get("q", "")
-    max_results = _to_int(req["query"].get("maxResults", "100"))
-    if max_results == 0:
-        max_results = 100
     label_ids = req["query"].get("labelIds", "")
 
     mc = store_collection("messages")
     messages = []
-    count = 0
     for doc in mc.list():
         # Filter by labelIds if specified.
         if label_ids != "" and label_ids != None:
@@ -53,14 +49,18 @@ def on_list_messages(req):
             "id": doc["id"],
             "threadId": doc["threadId"],
         })
-        count = count + 1
-        if count >= max_results:
-            break
 
-    return respond(200, {
-        "messages": messages,
-        "resultSizeEstimate": len(messages),
-    })
+    # Apply Gmail pagination (maxResults + pageToken) after filtering.
+    page, next_cursor = _list_page(req, messages)
+
+    result = {
+        "messages": page,
+        "resultSizeEstimate": len(page),
+    }
+    if next_cursor != None:
+        result["nextPageToken"] = next_cursor
+
+    return respond(200, result)
 
 # on_get_message returns a single message with the requested format.
 # format=full (default): full payload with headers + parts.

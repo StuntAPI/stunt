@@ -39,12 +39,21 @@ def on_list_accounts(req):
             },
         })
 
+    # Apply Berlin Group NextGenPSD2 pagination (page/size) to the account list.
+    page, next_cursor = _list_page(req, result)
+
+    self_href = "https://api.stunt.test/v1/accounts"
+    size_hint = str(_to_int(_get_query(req).get("size", "")))
+
+    links = {
+        "self": {"href": self_href},
+    }
+    links.update(_page_links(self_href, next_cursor, size_hint))
+
     return respond(200, {
-        "accounts": result,
+        "accounts": page,
         "balances": [],
-        "_links": {
-            "self": {"href": "https://api.stunt.test/v1/accounts"},
-        },
+        "_links": links,
     })
 
 # on_get_balances returns the balances for a specific account.

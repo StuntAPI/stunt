@@ -24,7 +24,8 @@ def on_list_scripts(req):
         if w.get("account_id", "") == account_id:
             result.append(_worker_result(w))
 
-    return _cf_ok_with_info(result, len(result))
+    page, next_cursor = _list_page(req, result)
+    return _cf_ok_with_info(page, len(result), next_cursor)
 
 # on_deploy_script deploys (creates or updates) a Worker script.
 # PUT /accounts/{account_id}/workers/scripts/{script_name}

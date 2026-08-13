@@ -95,20 +95,17 @@ def on_send_mail(req):
     })
 
 # on_list_messages returns sent mail for assertion/testing.
+#
+# GET /v3/messages?limit=N&offset=<token>
+#   -> {messages: [...], next_offset: "<token>"}  (next_offset only when more)
+#
+# SendGrid-style offset pagination: limit (page size, default 50) and offset
+# (the opaque cursor token returned by a prior call). Paging is applied after
+# the full result list is assembled.
 def on_list_messages(req):
     err = _require_auth(req)
     if err != None:
         return err
-
-    query = req.get("query")
-    if query == None:
-        query = {}
-    limit_str = query.get("limit", "50")
-    if limit_str == None:
-        limit_str = "50"
-    limit = _to_int(limit_str)
-    if limit == 0:
-        limit = 50
 
     c = store_collection("mail")
     all_mail = c.list()
@@ -125,7 +122,8 @@ def on_list_messages(req):
             "status": m.get("status", ""),
         })
 
-    if len(result) > limit:
-        result = result[:limit]
-
-    return respond(200, {"messages": result})
+    page, next_cursor = _list_page(req, result)
+    body = {"messages": page}
+    if next_cursor != None and next_cursor != "":
+        body["next_offset"] = next_cursor
+    return respond(200, body)

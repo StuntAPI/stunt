@@ -104,7 +104,7 @@ def on_list_payments(req):
                 return respond(200, _payment_public(p))
         return _adyen_err(422, "010", "Payment not found", "validation")
 
-    # No reference: return list of pspReferences.
+    # No reference: return a paginated list of pspReferences.
     items = []
     for p in all_payments:
         items.append({
@@ -113,9 +113,14 @@ def on_list_payments(req):
             "reference": p.get("reference", ""),
         })
 
-    return respond(200, {
-        "paymentData": items,
-    })
+    # Apply cursor pagination (pageSize + cursor) after building the list.
+    page, next_cursor = _list_page(req, items)
+    body = {
+        "paymentData": page,
+    }
+    if next_cursor != None:
+        body["nextCursor"] = next_cursor
+    return respond(200, body)
 
 # on_capture creates a capture modification for a payment.
 def on_capture(req):

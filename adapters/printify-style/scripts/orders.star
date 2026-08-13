@@ -19,14 +19,18 @@ def on_list_orders(req):
     c = store_collection("orders")
     docs = c.list()
     total = len(docs)
+    page, next_page = _list_page(req, docs)
+    offset = _page_offset(req)
+    page_len = len(page)
     return respond(200, {
-        "data": docs,
+        "data": page,
         "total": total,
         "current_page": 1,
         "per_page": 10,
         "last_page": 1,
-        "from": 1 if total > 0 else None,
-        "to": total,
+        "from": offset + 1 if page_len > 0 else None,
+        "to": offset + page_len,
+        "next_page": next_page,
     })
 
 # on_create_order creates a new fulfillment order.

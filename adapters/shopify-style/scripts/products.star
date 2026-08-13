@@ -12,7 +12,10 @@
 # Shared helpers (_require_token, _shopify_err, _not_found, _next_id,
 # _make_product, _seed, _now) are preloaded from scripts/lib.star.
 
-# on_list_products returns all products as {products:[...]}.
+# on_list_products returns products as {products:[...]}. Shopify REST pages
+# via the `limit` (page size) and `page_info` (opaque cursor) query params;
+# the next cursor round-trips through a 'Link: <url>; rel="next"' header. When
+# `limit` is missing paging is disabled and the whole list is returned.
 def on_list_products(req):
     err = _require_token(req)
     if err != None:
@@ -25,7 +28,12 @@ def on_list_products(req):
     for p in all_prods:
         result.append(_product_view(p))
 
-    return respond(200, {"products": result})
+    page, next_cursor = _list_page(req, result)
+    headers = None
+    link = _next_link(req, next_cursor, _to_int(_get_query(req, "limit")))
+    if link != None:
+        headers = {"Link": link}
+    return respond(200, {"products": page}, headers)
 
 # on_create_product creates a product from the request body.
 def on_create_product(req):

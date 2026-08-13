@@ -22,7 +22,8 @@ def on_list_contacts(req):
     for doc in docs:
         contacts.append(_contact_public(doc))
 
-    return _envelope("Contacts", contacts)
+    contacts, next_page = _list_page(req, contacts)
+    return _envelope("Contacts", contacts, next_page)
 
 # on_put_contacts creates or updates contacts.
 def on_put_contacts(req):

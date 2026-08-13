@@ -243,19 +243,25 @@ def on_list_or_location(req):
         return respond(200, xml, {"Content-Type": "application/xml"})
 
     # ListObjectsV2 (default)
-    return _list_objects_v2(bucket, query)
+    return _list_objects_v2(bucket, req)
 
-# _list_objects_v2 returns a ListObjectsV2 XML response.
-def _list_objects_v2(bucket, query):
+# _list_objects_v2 returns a ListObjectsV2 XML response. Paging (max-keys +
+# continuation-token) is applied AFTER the bucket/prefix filtering.
+def _list_objects_v2(bucket, req):
+    query = req.get("query")
+    if query == None:
+        query = {}
     list_type = query.get("list-type", "")
     if list_type == None:
         list_type = ""
-    max_keys = query.get("max-keys", "1000")
-    if max_keys == None:
-        max_keys = "1000"
     prefix = query.get("prefix", "")
     if prefix == None:
         prefix = ""
+
+    # Echo the requested continuation-token, if any.
+    cont_token = query.get("continuation-token", "")
+    if cont_token == None:
+        cont_token = ""
 
     oc = store_collection("objects")
     all_objects = oc.list()
@@ -270,18 +276,34 @@ def _list_objects_v2(bucket, query):
             continue
         matching.append(o)
 
-    key_count = len(matching)
+    # Apply S3 ListObjectsV2 pagination (max-keys + continuation-token).
+    page, next_cursor = _list_page(req, matching)
+    truncated = next_cursor != ""
+
+    # Effective MaxKeys to echo (requested value, or S3 default).
+    mk = query.get("max-keys", "")
+    if mk == None:
+        mk = ""
+    max_keys_echo = _to_int(mk)
+    if max_keys_echo <= 0:
+        max_keys_echo = _S3_DEFAULT_MAX_KEYS
 
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml = xml + '<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
     xml = xml + "<Name>" + _xml_escape(bucket) + "</Name>"
     xml = xml + "<Prefix>" + _xml_escape(prefix) + "</Prefix>"
+    if cont_token != "":
+        xml = xml + "<ContinuationToken>" + _xml_escape(cont_token) + "</ContinuationToken>"
     if list_type == "2":
-        xml = xml + "<KeyCount>" + str(key_count) + "</KeyCount>"
-    xml = xml + "<MaxKeys>" + _xml_escape(max_keys) + "</MaxKeys>"
-    xml = xml + "<IsTruncated>false</IsTruncated>"
+        xml = xml + "<KeyCount>" + str(len(page)) + "</KeyCount>"
+    xml = xml + "<MaxKeys>" + str(max_keys_echo) + "</MaxKeys>"
+    if truncated:
+        xml = xml + "<IsTruncated>true</IsTruncated>"
+        xml = xml + "<NextContinuationToken>" + _xml_escape(next_cursor) + "</NextContinuationToken>"
+    else:
+        xml = xml + "<IsTruncated>false</IsTruncated>"
 
-    for o in matching:
+    for o in page:
         key = o.get("key", "")
         etag = o.get("etag", "")
         size = o.get("size", 0)

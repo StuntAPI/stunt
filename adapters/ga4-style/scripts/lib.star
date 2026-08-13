@@ -58,3 +58,24 @@ def _to_int(s):
         else:
             return 0
     return n
+
+# _list_page applies the engine's paginate() builtin to a full list of
+# resources using GA4's canonical query params: pageSize (page size) and
+# pageToken (opaque cursor returned as nextPageToken by a prior call).
+# Returns (page, next_cursor); next_cursor is None when there is no more
+# data or when paging is disabled (pageSize unset / <= 0).
+def _list_page(req, docs):
+    limit = _to_int(req["query"].get("pageSize", ""))
+    cursor = req["query"].get("pageToken", "")
+    if cursor == None:
+        cursor = ""
+    return paginate(docs, limit, cursor)
+
+# _page_body returns a response body dict for a paged list: the provided
+# field name mapped to the page, plus nextPageToken only when a next
+# cursor exists. Mirrors the Google API list response shape.
+def _page_body(field, page, next_cursor):
+    body = {field: page}
+    if next_cursor != None and next_cursor != "":
+        body["nextPageToken"] = next_cursor
+    return body

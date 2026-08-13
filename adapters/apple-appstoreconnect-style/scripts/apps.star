@@ -72,29 +72,18 @@ def on_list_apps(req):
         return err
 
     _seed()
-    limit = _to_int(req["query"].get("limit", "50"))
-    if limit == 0:
-        limit = 50
-
     c = store_collection("apps")
     docs = c.list()
     data = []
     for d in docs:
         data.append(_app_entity(d))
-    if len(data) > limit:
-        data = data[:limit]
+
+    page, next_cursor, limit = _list_page(req, data)
 
     return respond(200, {
-        "data": data,
-        "links": {
-            "self": "/v1/apps",
-        },
-        "meta": {
-            "paging": {
-                "total": len(docs),
-                "limit": limit,
-            },
-        },
+        "data": page,
+        "links": _page_links("/v1/apps", next_cursor),
+        "meta": _page_meta(len(data), limit, next_cursor),
     })
 
 # on_get_app handles GET /v1/apps/{id}.

@@ -210,3 +210,44 @@ def _to_int(s):
         else:
             return 0
     return n
+
+# _get_query safely returns a query parameter value.
+def _get_query(req, key, default_val):
+    query = req.get("query")
+    if query == None:
+        query = {}
+    v = query.get(key, default_val)
+    if v == None:
+        v = default_val
+    return v
+
+# _list_page slices an already-filtered list of docs by GitHub's REST
+# pagination query params (per_page = page size, page = 1-based page number)
+# via the paginate() builtin, and returns (page, next_link) where next_link
+# is the value for a Link rel="next" header — a URL the client can follow to
+# round-trip per_page/page — or None when there is no further page. Paging is
+# DISABLED (whole list returned, next_link None) when per_page is missing or
+# <= 0, preserving prior unpaginated behavior. GitHub's page number maps to
+# the builtin's opaque offset cursor as (page - 1) * per_page.
+def _list_page(req, docs):
+    per_page = _to_int(_get_query(req, "per_page", ""))
+    page = _to_int(_get_query(req, "page", "1"))
+    if page < 1:
+        page = 1
+    if per_page <= 0:
+        return docs, None
+    cursor = str((page - 1) * per_page)
+    page_docs, next_cursor = paginate(docs, per_page, cursor)
+    next_link = None
+    if next_cursor != None:
+        next_page = _to_int(next_cursor) // per_page + 1
+        base = "https://api.github.com" + req.get("path", "")
+        next_link = "<" + base + "?per_page=" + str(per_page) + "&page=" + str(next_page) + '>; rel="next"'
+    return page_docs, next_link
+
+# _gh_link_headers returns a headers dict carrying the Link rel="next" value,
+# or None when next_link is None (no further page).
+def _gh_link_headers(next_link):
+    if next_link == None:
+        return None
+    return {"Link": next_link}

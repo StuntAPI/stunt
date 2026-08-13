@@ -30,11 +30,15 @@ def on_list_programs(req):
             "updatedAt": d.get("updatedAt", _now()),
         })
 
+    # Apply Marketo paging (batchSize + nextPageToken).
+    page, next_cursor, more = _list_page(req, result)
+
     return respond(200, {
         "requestId": _request_id(),
         "success": True,
-        "result": result,
-        "moreResult": False,
+        "result": page,
+        "nextPageToken": next_cursor,
+        "moreResult": more,
     })
 
 def on_list_folders(req):
@@ -65,9 +69,13 @@ def on_list_folders(req):
             "updatedAt": d.get("updatedAt", _now()),
         })
 
+    # Apply Marketo paging (batchSize + nextPageToken) after root filtering.
+    page, next_cursor, more = _list_page(req, result)
+
     return respond(200, {
         "requestId": _request_id(),
         "success": True,
-        "result": result,
-        "moreResult": False,
+        "result": page,
+        "nextPageToken": next_cursor,
+        "moreResult": more,
     })

@@ -67,7 +67,11 @@ def on_list_playlists(req):
             continue
         items.append(_public_playlist(doc))
 
-    return respond(200, {"items": items})
+    page, next_token = _list_page(req, items)
+    result = {"items": page}
+    if next_token != None:
+        result["nextPageToken"] = next_token
+    return respond(200, result)
 
 # on_add_playlist_item adds a video to a playlist.
 def on_add_playlist_item(req):

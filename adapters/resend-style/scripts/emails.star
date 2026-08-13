@@ -65,7 +65,10 @@ def on_get_email(req):
         })
     return respond(200, doc)
 
-# on_list_emails lists all sent emails.
+# on_list_emails lists sent emails with Resend-style cursor pagination
+# (limit = page size, after = opaque cursor token). The response envelope
+# matches Resend's: {object: "list", has_more: bool, data: [...]} with the
+# opaque next cursor surfaced for round-tripping.
 def on_list_emails(req):
     err = _require_auth(req)
     if err != None:
@@ -73,7 +76,16 @@ def on_list_emails(req):
 
     c = store_collection("emails")
     docs = c.list()
-    return respond(200, {"data": docs})
+
+    page, next_cursor = _list_page(req, docs)
+    body = {
+        "object": "list",
+        "has_more": next_cursor != None and next_cursor != "",
+        "data": page,
+    }
+    if next_cursor != None and next_cursor != "":
+        body["next_cursor"] = next_cursor
+    return respond(200, body)
 
 # _normalize_recipients coerces the "to" field into a list of strings.
 # Resend accepts either a single address (string) or an array.

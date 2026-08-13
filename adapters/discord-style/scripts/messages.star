@@ -79,9 +79,6 @@ def on_list_messages(req):
         return respond(401, {"code": 0, "message": "401: Unauthorized"})
 
     channel_id = req["params"]["channel_id"]
-    limit = _to_int(req["query"].get("limit", "50"))
-    if limit == 0:
-        limit = 50
 
     mc = store_collection("messages")
     all_msgs = mc.list()
@@ -107,12 +104,17 @@ def on_list_messages(req):
             "flags": m.get("flags", 0),
         })
 
-    # Reverse so newest is first (Discord default), then apply limit.
+    # Reverse so newest is first (Discord default), then apply cursor
+    # pagination. Discord's messages endpoint always pages with a default
+    # page size of 50, so default_limit=50 preserves the prior behavior while
+    # the `after` cursor token round-trips via the Link header.
     result = _reverse(result)
-    if len(result) > limit:
-        result = result[:limit]
-
-    return respond(200, result)
+    page, next_cursor = _list_page(req, result, 50)
+    headers = None
+    link = _next_link(req, next_cursor)
+    if link != None:
+        headers = {"Link": link}
+    return respond(200, page, headers)
 
 # on_react adds a reaction. Discord returns 204 No Content.
 def on_react(req):

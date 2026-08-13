@@ -18,6 +18,51 @@ def _require_bearer(req):
         })
     return None
 
+# _to_int parses a decimal string to int. Returns 0 for None, empty string,
+# or any non-numeric input (never crashes on None).
+def _to_int(s):
+    if s == None or s == "":
+        return 0
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch >= "0" and ch <= "9":
+            n = n * 10 + (ord(ch) - ord("0"))
+        else:
+            return 0
+    return n
+
+# _get_query safely returns a query parameter value.
+def _get_query(req, key, default_val):
+    query = req.get("query")
+    if query == None:
+        query = {}
+    v = query.get(key, default_val)
+    if v == None:
+        v = default_val
+    return v
+
+# _list_page reads the Power Platform OData $top (page size) / $skipToken
+# (opaque cursor) query params, slices the already-filtered docs via the
+# paginate() builtin, and returns (page, next_link) where next_link is an
+# @odata.nextLink URL string the client can follow to round-trip
+# $top/$skipToken, or None when there is no further page. Paging is DISABLED
+# (whole list returned, next_link None) when $top is missing or <= 0 —
+# preserving prior unpaginated behavior. base_path is the route used to build
+# the next-link URL.
+def _list_page(req, docs, base_path):
+    top = _to_int(_get_query(req, "$top", ""))
+    skip_token = _get_query(req, "$skipToken", "")
+    if skip_token == None:
+        skip_token = ""
+
+    page, next_cursor = paginate(docs, top, skip_token)
+
+    next_link = None
+    if next_cursor != None:
+        next_link = base_path + "?$top=" + str(top) + "&$skipToken=" + next_cursor
+    return page, next_link
+
 # _seed populates default environments and accounts.
 _ENVS = [
     {

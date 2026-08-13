@@ -110,3 +110,37 @@ def _modification_public(mod_psp, payment_psp):
         "status": "received",
         "paymentPspReference": payment_psp,
     }
+
+# _to_int parses a decimal integer from a string; returns 0 on None/empty/
+# non-digit input. Used for pagination query params.
+def _to_int(s):
+    if s == None or s == "":
+        return 0
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch >= "0" and ch <= "9":
+            n = n * 10 + (ord(ch) - ord("0"))
+        else:
+            return 0
+    return n
+
+# _list_page applies Adyen-style cursor pagination to a list of docs via the
+# paginate builtin. The `pageSize` query param sets the page size (Adyen
+# default 10); the `cursor` query param is the opaque token returned by a
+# prior call (None/"" for the first page). Returns (page, next_cursor) where
+# next_cursor is the opaque token for the next page, or None when done.
+_ADYEN_DEFAULT_PAGE_SIZE = 10
+
+def _list_page(req, docs):
+    query = req.get("query", {})
+    if query == None:
+        query = {}
+    page_size = _to_int(query.get("pageSize", ""))
+    if page_size <= 0:
+        page_size = _ADYEN_DEFAULT_PAGE_SIZE
+    cursor = query.get("cursor", "")
+    if cursor == None:
+        cursor = ""
+    page, next_cursor = paginate(docs, page_size, cursor)
+    return page, next_cursor

@@ -12,24 +12,28 @@ def on_list_messages(req):
     if err != None:
         return err
 
-    return respond(200, {
-        "data": [
-            {
-                "messageID": "0xccip-001",
-                "srcChain": "ethereum",
-                "dstChain": "arbitrum",
-                "status": "delivered",
-                "tokenAmounts": [{"token": "LINK", "amount": "1000000000000000000"}],
-            },
-            {
-                "messageID": "0xccip-002",
-                "srcChain": "polygon",
-                "dstChain": "ethereum",
-                "status": "in_flight",
-                "tokenAmounts": [{"token": "USDC", "amount": "5000000"}],
-            },
-        ],
-    })
+    messages = [
+        {
+            "messageID": "0xccip-001",
+            "srcChain": "ethereum",
+            "dstChain": "arbitrum",
+            "status": "delivered",
+            "tokenAmounts": [{"token": "LINK", "amount": "1000000000000000000"}],
+        },
+        {
+            "messageID": "0xccip-002",
+            "srcChain": "polygon",
+            "dstChain": "ethereum",
+            "status": "in_flight",
+            "tokenAmounts": [{"token": "USDC", "amount": "5000000"}],
+        },
+    ]
+
+    page, next_cursor = _list_page(req, messages)
+    body = {"data": page}
+    if next_cursor != None:
+        body["nextCursor"] = next_cursor
+    return respond(200, body)
 
 # on_lane returns the status of a CCIP lane between two chains.
 def on_lane(req):

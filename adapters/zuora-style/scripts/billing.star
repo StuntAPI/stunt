@@ -53,10 +53,15 @@ def on_list_payments(req):
             "currency": d.get("currency", "USD"),
         })
 
-    return respond(200, {
+    payments, next_cursor = _list_page(req, payments)
+
+    resp = {
         "success": True,
         "payments": payments,
-    })
+    }
+    if next_cursor != None:
+        resp["nextPage"] = next_cursor
+    return respond(200, resp)
 
 def on_create_payment_method(req):
     ok, err = _require_auth(req)

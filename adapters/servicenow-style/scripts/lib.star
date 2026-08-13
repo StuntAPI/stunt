@@ -342,13 +342,15 @@ def _int_to_str(n):
 
 # _list_response returns a ServiceNow-style list response:
 #   {result:[...]}
-# Pagination via sysparm_limit + sysparm_offset.
+# Pagination via sysparm_limit (page size) + sysparm_offset (cursor).
+# The next offset is round-tripped through a Link rel="next" header since
+# the Table API envelope carries no next-page field.
 def _list_response(req, docs):
     query = req.get("query")
     if query == None:
         query = {}
 
-    # Encoded query filtering.
+    # Encoded query filtering (applied BEFORE paging).
     sysparm_query = query.get("sysparm_query", "")
     clauses = _parse_snow_query(sysparm_query)
     if len(clauses) > 0:
@@ -358,25 +360,46 @@ def _list_response(req, docs):
                 filtered.append(d)
         docs = filtered
 
-    # Pagination.
-    limit = _parse_int(query.get("sysparm_limit", "10000"), 10000)
-    offset = _parse_int(query.get("sysparm_offset", "0"), 0)
+    # Pagination via the builtin.
+    page, next_cursor = _list_page(req, docs)
 
     total = len(docs)
-    if offset >= total:
-        page = []
-    else:
-        end = offset + limit
-        if end > total:
-            end = total
-        page = docs[offset:end]
-
     headers = {}
     headers["X-Total-Count"] = _int_to_str(total)
+    if next_cursor != None:
+        headers["Link"] = _next_link_header(req, next_cursor)
 
     return respond(200, {
         "result": page,
     }, headers)
+
+# _list_page reads the ServiceNow page-size (sysparm_limit) and cursor
+# (sysparm_offset) query params and delegates to the paginate() builtin.
+# Returns (page, next_cursor).
+def _list_page(req, docs):
+    query = req.get("query")
+    if query == None:
+        query = {}
+    limit = _parse_int(query.get("sysparm_limit", "10000"), 10000)
+    cursor = query.get("sysparm_offset", "")
+    if cursor == None:
+        cursor = ""
+    return paginate(docs, limit, cursor)
+
+# _next_link_header builds a Link rel="next" header carrying the next
+# offset cursor so clients can round-trip the next page.
+def _next_link_header(req, next_cursor):
+    path = req.get("path", "")
+    if path == None:
+        path = ""
+    query = req.get("query")
+    if query == None:
+        query = {}
+    limit = query.get("sysparm_limit", "")
+    qs = "sysparm_offset=" + next_cursor
+    if limit != None and limit != "":
+        qs = "sysparm_limit=" + limit + "&" + qs
+    return "<" + path + "?" + qs + ">; rel=\"next\""
 
 def _parse_int(s, default_val):
     if s == None:

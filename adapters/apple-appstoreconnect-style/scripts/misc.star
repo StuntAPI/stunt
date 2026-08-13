@@ -39,17 +39,12 @@ def on_list_users(req):
         },
     ]
 
+    page, next_cursor, limit = _list_page(req, users)
+
     return respond(200, {
-        "data": users,
-        "links": {
-            "self": "/v1/users",
-        },
-        "meta": {
-            "paging": {
-                "total": len(users),
-                "limit": 50,
-            },
-        },
+        "data": page,
+        "links": _page_links("/v1/users", next_cursor),
+        "meta": _page_meta(len(users), limit, next_cursor),
     })
 
 # on_sales_reports handles GET /v1/salesReports.

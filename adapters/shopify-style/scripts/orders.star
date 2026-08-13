@@ -10,7 +10,10 @@
 # Shared helpers (_require_token, _shopify_err, _not_found, _next_id,
 # _seed, _now) are preloaded from scripts/lib.star.
 
-# on_list_orders returns all orders as {orders:[...]}.
+# on_list_orders returns orders as {orders:[...]}. Shopify REST pages via the
+# `limit` (page size) and `page_info` (opaque cursor) query params; the next
+# cursor round-trips through a 'Link: <url>; rel="next"' header. When `limit`
+# is missing paging is disabled and the whole list is returned.
 def on_list_orders(req):
     err = _require_token(req)
     if err != None:
@@ -23,7 +26,12 @@ def on_list_orders(req):
     for o in all_orders:
         result.append(_order_view(o))
 
-    return respond(200, {"orders": result})
+    page, next_cursor = _list_page(req, result)
+    headers = None
+    link = _next_link(req, next_cursor, _to_int(_get_query(req, "limit")))
+    if link != None:
+        headers = {"Link": link}
+    return respond(200, {"orders": page}, headers)
 
 # on_get_order returns a single order by id.
 def on_get_order(req):

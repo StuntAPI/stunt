@@ -29,7 +29,12 @@ def on_list_flows(req):
             },
         })
 
-    return respond(200, {"value": items})
+    page, next_link = _list_page(req, items, "/v2/environments/" + env + "/flows")
+
+    resp = {"value": page}
+    if next_link != None:
+        resp["@odata.nextLink"] = next_link
+    return respond(200, resp)
 
 def on_create_flow(req):
     err = _require_bearer(req)

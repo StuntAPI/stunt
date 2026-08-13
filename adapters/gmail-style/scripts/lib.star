@@ -94,6 +94,19 @@ def _to_int(s):
 def _seq(name):
     return store_kv_incr("gmail", name)
 
+# === Pagination ===
+
+# _list_page applies Gmail pagination (maxResults + pageToken) to a full list
+# and returns (page, next_cursor). Delegates to the builtin
+# paginate(items, limit, cursor): limit None/<=0 disables paging (returns all
+# items, next_cursor None); cursor is the opaque token from a prior call.
+def _list_page(req, items):
+    limit = _to_int(req["query"].get("maxResults", ""))
+    cursor = req["query"].get("pageToken", "")
+    if cursor == None:
+        cursor = ""
+    return paginate(items, limit, cursor)
+
 # === base64url encode/decode ===
 # Adapted from the signin-with-apple adapter. Each adapter has its own
 # lib.star (no cross-adapter loading).

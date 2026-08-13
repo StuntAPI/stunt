@@ -165,3 +165,15 @@ def _quota_err():
         "requestId": _request_id(),
         "errors": [{"code": "602", "message": "Daily quota exceeded"}],
     })
+
+# _list_page applies Marketo-style paging to a list of items using the builtin
+# paginate(). It reads batchSize (page size) and nextPageToken (cursor) from the
+# request query and returns (page, next_cursor, more) where page is the slice
+# for the current page, next_cursor is the opaque token for the next page (or
+# None when done), and more is the Marketo moreResult boolean.
+def _list_page(req, items):
+    limit = _to_int(_get_query(req, "batchSize", ""))
+    cursor = _get_query(req, "nextPageToken", "")
+    page, next_cursor = paginate(items, limit, cursor)
+    more = next_cursor != None and next_cursor != ""
+    return page, next_cursor, more

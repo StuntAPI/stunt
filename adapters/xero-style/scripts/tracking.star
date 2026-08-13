@@ -12,7 +12,7 @@ def on_list_tracking(req):
     if err != None:
         return err
 
-    return _envelope("TrackingCategories", [
+    docs = [
         {
             "TrackingCategoryID": _guid(501),
             "Name": "Region",
@@ -22,4 +22,7 @@ def on_list_tracking(req):
                 {"TrackingOptionID": _guid(602), "Name": "South", "Status": "ACTIVE"},
             ],
         },
-    ])
+    ]
+
+    docs, next_page = _list_page(req, docs)
+    return _envelope("TrackingCategories", docs, next_page)

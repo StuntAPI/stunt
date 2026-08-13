@@ -24,10 +24,17 @@ def on_list_drafts(req):
             },
         })
 
-    return respond(200, {
-        "drafts": drafts,
-        "resultSizeEstimate": len(drafts),
-    })
+    # Apply Gmail pagination (maxResults + pageToken).
+    page, next_cursor = _list_page(req, drafts)
+
+    result = {
+        "drafts": page,
+        "resultSizeEstimate": len(page),
+    }
+    if next_cursor != None:
+        result["nextPageToken"] = next_cursor
+
+    return respond(200, result)
 
 # on_create_draft creates a draft from a raw message.
 def on_create_draft(req):

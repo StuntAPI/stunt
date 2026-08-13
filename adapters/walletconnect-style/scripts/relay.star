@@ -95,13 +95,17 @@ def on_propose_session(req):
         "expiry": SESSION_EXPIRY,
     })
 
-# on_list_sessions returns all active sessions as an array.
+# on_list_sessions returns active sessions as a bare JSON array, capped by an
+# optional `limit` query param (no limit → all). A bare array has no envelope
+# field for a continuation cursor, so cursor-based paging is not surfaced here;
+# `limit` still caps the page size.
 def on_list_sessions(req):
     sc = store_collection("sessions")
     result = []
     for s in sc.list():
         result.append(_session_view(s))
-    return respond(200, result)
+    page, _next = _list_page(req, result)
+    return respond(200, page)
 
 # on_approve_session acknowledges (approves) a session, simulating the
 # wallet's approval response.

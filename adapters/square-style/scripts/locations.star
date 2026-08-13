@@ -56,4 +56,8 @@ def on_list_locations(req):
         },
     ]
 
-    return respond(200, {"locations": locations})
+    page, next_cursor = _list_page(req, locations)
+    return respond(200, {
+        "locations": page,
+        "cursor": _sq_cursor(next_cursor),
+    })

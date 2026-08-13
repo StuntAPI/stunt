@@ -244,3 +244,51 @@ def _reverse(lst):
     for i in range(len(lst) - 1, -1, -1):
         out.append(lst[i])
     return out
+
+# --- pagination (App Store Connect JSON:API shape) ---
+#
+# App Store Connect list endpoints page via a `limit` page-size query param
+# (default 50, max 200) and an opaque `cursor` query param returned by a prior
+# call. The next cursor is surfaced in meta.paging.next_cursor and mirrored as
+# a links.next URL carrying the cursor (per ASC convention). A `limit` <= 0
+# disables paging and returns the whole list.
+_ASC_DEFAULT_LIMIT = 50
+_ASC_MAX_LIMIT = 200
+
+# _list_page applies ASC cursor pagination to a list of docs via the paginate
+# builtin. Returns (page, next_cursor, limit) where next_cursor is the opaque
+# token for the next page (or None when done) and limit is the effective page
+# size used, for echoing back in meta.paging.
+def _list_page(req, docs):
+    q = req.get("query")
+    if q == None:
+        q = {}
+    limit = _to_int(q.get("limit", ""))
+    if limit <= 0:
+        limit = _ASC_DEFAULT_LIMIT
+    if limit > _ASC_MAX_LIMIT:
+        limit = _ASC_MAX_LIMIT
+    cursor = q.get("cursor", "")
+    if cursor == None:
+        cursor = ""
+    page, next_cursor = paginate(docs, limit, cursor)
+    return page, next_cursor, limit
+
+# _page_meta builds the JSON:API meta.paging block for a paged list. total is
+# the FULL result count (before slicing); next_cursor is omitted when None.
+def _page_meta(total, limit, next_cursor):
+    paging = {
+        "total": total,
+        "limit": limit,
+    }
+    if next_cursor != None:
+        paging["next_cursor"] = next_cursor
+    return {"paging": paging}
+
+# _page_links builds the JSON:API links block, appending a `next` URL carrying
+# the cursor when another page remains (per App Store Connect convention).
+def _page_links(self_path, next_cursor):
+    links = {"self": self_path}
+    if next_cursor != None:
+        links["next"] = self_path + "?cursor=" + next_cursor
+    return links

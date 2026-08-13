@@ -16,7 +16,11 @@ def on_list_projects(req):
     for p in pc.list():
         items.append(_project_resource(p))
 
-    return respond(200, {"projects": items})
+    page, next_token = _list_page(req, items)
+    result = {"projects": page}
+    if next_token != None:
+        result["nextPageToken"] = next_token
+    return respond(200, result)
 
 def on_create_project(req):
     err = _require_bearer(req)

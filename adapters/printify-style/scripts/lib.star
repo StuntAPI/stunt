@@ -73,6 +73,29 @@ def _product_id(seq):
 def _order_id(seq):
     return str(100000 + seq)
 
+# _list_page applies Printify-style pagination to a list of docs via the
+# paginate() builtin. Printify's page-size query param is "limit" and its
+# cursor query param is "page", which we treat as an opaque offset token
+# (the value of next_page from a prior response). Returns (page, next_page):
+# next_page is the opaque cursor to send back as ?page=<token>, or None when
+# no items remain. A missing/empty limit disables paging (returns the whole
+# list with next_page None), so callers that omit ?limit keep prior behavior.
+def _list_page(req, docs):
+    q = req.get("query")
+    if q == None:
+        q = {}
+    limit = _to_int(q.get("limit", ""))
+    cursor = q.get("page", "")
+    return paginate(docs, limit, cursor)
+
+# _page_offset returns the item offset implied by the ?page= cursor (0 when
+# absent/empty), used to keep the from/to envelope fields page-accurate.
+def _page_offset(req):
+    q = req.get("query")
+    if q == None:
+        return 0
+    return _to_int(q.get("page", ""))
+
 # _synth_total returns a synthetic order total (whole USD units) derived from
 # the line-item quantities, so consumers that read total_price get a real
 # number rather than a missing field. Minimum 20.

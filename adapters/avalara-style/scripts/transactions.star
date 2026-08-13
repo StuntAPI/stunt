@@ -106,10 +106,16 @@ def on_list_transactions(req):
             "status": doc.get("status", "Saved"),
         })
 
-    return respond(200, {
+    # Apply OData $top/$skip paging after filtering.
+    page, next_link = _list_page(req, value, "/v2/transactions")
+
+    resp = {
         "@recordsetCount": len(value),
-        "value": value,
-    })
+        "value": page,
+    }
+    if next_link != None:
+        resp["@odata.nextLink"] = next_link
+    return respond(200, resp)
 
 # on_get_transaction returns a single transaction by ID.
 def on_get_transaction(req):

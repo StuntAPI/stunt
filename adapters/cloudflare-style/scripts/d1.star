@@ -24,7 +24,8 @@ def on_list_databases(req):
         if d.get("account_id", "") == account_id:
             result.append(_db_result(d))
 
-    return _cf_ok_with_info(result, len(result))
+    page, next_cursor = _list_page(req, result)
+    return _cf_ok_with_info(page, len(result), next_cursor)
 
 # on_create_database creates a new D1 database.
 def on_create_database(req):

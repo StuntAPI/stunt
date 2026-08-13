@@ -19,6 +19,9 @@ def on_list_containers(req):
     cc = store_collection("containers")
     containers = cc.list()
 
+    # Apply paging (maxresults + marker) after collecting the full list.
+    containers, next_marker = _list_page(req, containers)
+
     xml = '<?xml version="1.0" encoding="utf-8"?>\n'
     xml = xml + '<EnumerationResults ServiceEndpoint="http://stunt.local/">\n'
     xml = xml + "  <Containers>\n"
@@ -36,7 +39,10 @@ def on_list_containers(req):
         xml = xml + "      </Properties>\n"
         xml = xml + "    </Container>\n"
     xml = xml + "  </Containers>\n"
-    xml = xml + "  <NextMarker />\n"
+    if next_marker == "":
+        xml = xml + "  <NextMarker />\n"
+    else:
+        xml = xml + "  <NextMarker>" + _xml_escape(next_marker) + "</NextMarker>\n"
     xml = xml + "</EnumerationResults>"
     return respond(200, xml, {"Content-Type": "application/xml", "x-ms-request-id": _req_id()})
 

@@ -105,6 +105,22 @@ def _ticket_shape(doc):
 def _has_more(total, page_size, offset):
     return offset + page_size < total
 
-# _next_link builds the links.next URL for cursor pagination.
+# _next_link builds the links.next URL for cursor pagination. The cursor
+# passed in next_offset is the opaque token returned by paginate() and is
+# round-tripped via the page query param.
 def _next_link(path, next_offset, page_size):
     return path + "?page=" + str(next_offset) + "&per_page=" + str(page_size)
+
+# _list_page applies builtin cursor pagination to a full list of docs.
+# Reads the Zendesk page-size (per_page) and cursor (page) query params
+# from the request and delegates to the paginate() builtin. Returns
+# (page_docs, next_cursor). When per_page is absent it defaults to 100;
+# when per_page <= 0 paging is disabled and all docs are returned with
+# next_cursor None. Apply this AFTER any handler-side filtering.
+def _list_page(req, docs):
+    page_size = _to_int(_get_query(req, "per_page", "100"))
+    cursor = _get_query(req, "page", "")
+    if cursor == None:
+        cursor = ""
+    page_docs, next_cursor = paginate(docs, page_size, cursor)
+    return page_docs, next_cursor

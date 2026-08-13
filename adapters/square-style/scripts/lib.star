@@ -173,6 +173,37 @@ def _refund_public(doc):
         "reason": doc.get("reason", ""),
     }
 
+# === Pagination ===
+
+# _get_query safely returns a query parameter value.
+def _get_query(req, key, default_val):
+    q = req.get("query")
+    if q == None:
+        return default_val
+    val = q.get(key, default_val)
+    if val == None:
+        return default_val
+    return val
+
+# _list_page applies Square cursor pagination to a full list and returns
+# (page, next_cursor). Square's list endpoints page via the `cursor` query
+# param (the opaque token returned by a prior call) and surface the next
+# cursor as a top-level `cursor` field in the response. A `limit` query
+# param, when present and > 0, sets the page size; absent or <= 0 disables
+# paging (returns all items, next_cursor None). Delegates to the builtin
+# paginate(items, limit, cursor).
+def _list_page(req, items):
+    limit = _safe_int(_get_query(req, "limit", ""), 0)
+    cursor = _get_query(req, "cursor", "")
+    return paginate(items, limit, cursor)
+
+# _sq_cursor normalizes a next_cursor token into Square's response shape:
+# the empty string when there is no next page, or the opaque token otherwise.
+def _sq_cursor(next_cursor):
+    if next_cursor == None or next_cursor == "":
+        return ""
+    return next_cursor
+
 # _order_public returns the Square-shaped order object.
 def _order_public(doc):
     return {

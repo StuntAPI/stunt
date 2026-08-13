@@ -24,10 +24,14 @@ def on_list_groups(req):
     for d in docs:
         groups.append(_group_entity(d))
 
-    return respond(200, {
+    page, next_token = _list_page(req, groups)
+    result = {
         "kind": "admin#directory#groups",
-        "groups": groups,
-    })
+        "groups": page,
+    }
+    if next_token != None:
+        result["nextPageToken"] = next_token
+    return respond(200, result)
 
 # on_create_group creates a new group.
 # POST /admin/directory/v1/groups (Bearer)
@@ -125,10 +129,14 @@ def on_list_members(req):
                 "status": "ACTIVE",
             })
 
-    return respond(200, {
+    page, next_token = _list_page(req, members)
+    result = {
         "kind": "admin#directory#members",
-        "members": members,
-    })
+        "members": page,
+    }
+    if next_token != None:
+        result["nextPageToken"] = next_token
+    return respond(200, result)
 
 # on_add_member adds a member to a group.
 # POST /admin/directory/v1/groups/{groupKey}/members (Bearer)

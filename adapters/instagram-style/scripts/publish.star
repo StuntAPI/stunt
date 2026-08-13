@@ -92,4 +92,13 @@ def on_list_media(req):
         if doc.get("user_id") == user_id:
             user_media.append(doc)
 
-    return respond(200, {"data": user_media})
+    page, next_cursor = _list_page(req, user_media)
+
+    result = {"data": page}
+    if next_cursor != None and next_cursor != "":
+        result["paging"] = {
+            "cursors": {"after": next_cursor},
+            "next": "v21.0/" + user_id + "/media?after=" + next_cursor,
+        }
+
+    return respond(200, result)

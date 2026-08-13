@@ -64,7 +64,19 @@ def on_list_orders(req):
 
     c = store_collection("orders")
     docs = c.list()
-    return respond(200, {"data": docs})
+    page, next_cursor = _list_page(req, docs)
+    limit = _to_int(_get_query(req, "limit"))
+    body = {"data": page}
+    if limit > 0:
+        paging = {
+            "total": len(docs),
+            "limit": limit,
+            "offset": _to_int(_get_query(req, "offset")),
+        }
+        if next_cursor != None:
+            paging["next"] = next_cursor
+        body["paging"] = paging
+    return respond(200, body)
 
 # on_create_order creates a new fulfillment order.
 def on_create_order(req):

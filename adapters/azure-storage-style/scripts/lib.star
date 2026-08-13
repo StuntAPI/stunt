@@ -239,6 +239,47 @@ def _to_int_str(val):
         return s[:dot]
     return s
 
+# _to_int parses a non-negative integer from a value. Returns None on
+# failure or empty input.
+def _to_int(val):
+    if val == None:
+        return None
+    s = _strip(str(val))
+    if len(s) == 0:
+        return None
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch < "0" or ch > "9":
+            return None
+        n = n * 10 + (ord(ch) - ord("0"))
+    return n
+
+# _get_query returns the query value for key, or "" if absent.
+def _get_query(req, key):
+    query = req.get("query")
+    if query == None:
+        return ""
+    val = query.get(key, "")
+    if val == None:
+        return ""
+    return val
+
+# _list_page applies Azure Storage pagination conventions (maxresults page
+# size + marker continuation token) to a list of resources via the paginate
+# builtin. Returns (page, next_marker) where next_marker is "" when there
+# is no following page.
+def _list_page(req, docs):
+    limit = _to_int(_get_query(req, "maxresults"))
+    cursor = _get_query(req, "marker")
+    if cursor == "":
+        cursor = None
+    page, next_cursor = paginate(docs, limit, cursor)
+    nm = ""
+    if next_cursor != None:
+        nm = next_cursor
+    return page, nm
+
 # ====================================================================
 # Error responses (Azure Storage XML shape)
 # ====================================================================

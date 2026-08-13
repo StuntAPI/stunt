@@ -22,4 +22,10 @@ def on_list_projects(req):
             "revision": p.get("revision", 1),
         })
 
-    return respond(200, {"value": items, "count": len(items)})
+    # Apply OData $top/$skip paging.
+    page, continuation = _list_page(req, items)
+
+    resp = {"value": page, "count": len(page)}
+    if continuation != None:
+        resp["continuationToken"] = continuation
+    return respond(200, resp)

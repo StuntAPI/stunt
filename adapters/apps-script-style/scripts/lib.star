@@ -75,3 +75,36 @@ def _find_project(script_id):
         if p.get("scriptId") == script_id or p.get("id") == script_id:
             return p
     return None
+
+# _to_int parses a decimal string to int. Returns 0 for None, empty string,
+# or any non-numeric input (never crashes on None).
+def _to_int(s):
+    if s == None or s == "":
+        return 0
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch >= "0" and ch <= "9":
+            n = n * 10 + (ord(ch) - ord("0"))
+        else:
+            return 0
+    return n
+
+# _query_get returns req's query param `key`, or `default` when absent/None.
+def _query_get(req, key, default=""):
+    q = req.get("query")
+    if q == None:
+        return default
+    v = q.get(key, default)
+    if v == None:
+        return default
+    return v
+
+# _list_page slices docs by Google's pageSize/pageToken query params and the
+# builtin paginate(), returning (page, next_page_token). next_page_token is
+# None when no items remain. pageSize <= 0 / absent disables paging.
+def _list_page(req, docs):
+    page_size = _to_int(_query_get(req, "pageSize", ""))
+    page_token = _query_get(req, "pageToken", "")
+    page, next_token = paginate(docs, page_size, page_token)
+    return page, next_token

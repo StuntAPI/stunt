@@ -51,8 +51,14 @@ def on_list_calendars(req):
             "etag": '"mock-cal-list-etag"',
         })
 
-    return respond(200, {
+    page, next_cursor = _list_page(req, items)
+
+    result = {
         "kind": "calendar#calendarList",
         "etag": '"mock-cal-list"',
-        "items": items,
-    })
+        "items": page,
+    }
+    if next_cursor != None:
+        result["nextPageToken"] = next_cursor
+
+    return respond(200, result)

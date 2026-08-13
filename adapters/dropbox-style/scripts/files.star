@@ -145,9 +145,13 @@ def on_download(req):
 
 # POST /2/files/list_folder — list entries under a path prefix.
 #
-# Body: {path}. Returns {entries, has_more:false}. When path is empty or
-# "/", all entries are returned. Otherwise, entries whose path is equal to
-# or nested under the given path are returned.
+# Body: {path, limit, cursor}. Returns {entries, cursor, has_more}. When
+# path is empty or "/", all entries are returned. Otherwise, entries whose
+# path is equal to or nested under the given path are returned. Paging is
+# applied AFTER the path filter: limit is the page size and cursor is the
+# opaque token returned by a prior call (round-tripped via the response
+# cursor field). When limit is absent or <= 0 paging is disabled and the
+# whole (filtered) list is returned with has_more:false.
 def on_list_folder(req):
     body = req["body"]
     if body == None:
@@ -167,7 +171,12 @@ def on_list_folder(req):
             if d_path == prefix or d_path.startswith(prefix + "/"):
                 entries.append(d)
 
-    return respond(200, {"entries": entries, "has_more": False})
+    page, next_cursor = _list_page(req, entries)
+    return respond(200, {
+        "entries": page,
+        "cursor": next_cursor if next_cursor != None else "",
+        "has_more": next_cursor != None,
+    })
 
 # POST /2/files/get_metadata — get entry metadata.
 #

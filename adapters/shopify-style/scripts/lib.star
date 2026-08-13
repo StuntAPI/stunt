@@ -198,3 +198,46 @@ def _to_int(s):
         else:
             return 0
     return n
+
+# _get_query reads a single query-param value from req, returning "" for a
+# missing param or a None value (mirrors the adapter's existing conventions).
+def _get_query(req, key):
+    q = req.get("query")
+    if q == None:
+        return ""
+    v = q.get(key, "")
+    if v == None:
+        return ""
+    return v
+
+# _list_page applies Shopify-style cursor pagination to a list of docs via the
+# pure paginate() builtin. The `limit` query param sets the page size; when it
+# is missing or <= 0 paging is DISABLED (the whole list is returned with a None
+# next_cursor, preserving the prior unpaginated behavior). The `page_info`
+# query param is the opaque cursor token returned by a prior call (None/"" for
+# the first page). Returns (page, next_cursor) where next_cursor is the opaque
+# token for the next page, or None when done. Shopify surfaces continuation via
+# a 'Link: <url>; rel="next"' header built by _next_link.
+def _list_page(req, docs):
+    limit = _to_int(_get_query(req, "limit"))
+    cursor = _get_query(req, "page_info")
+    return paginate(docs, limit, cursor)
+
+# _next_link builds a Shopify-style 'Link: <url>; rel="next"' header value
+# carrying the next-page cursor (and the same limit), or None when there is no
+# further page. The client round-trips the page_info token (plus limit) as
+# query params on the returned URL.
+def _next_link(req, next_cursor, limit):
+    if next_cursor == None:
+        return None
+    scheme = "https"
+    host = req.get("host", "")
+    if host == None:
+        host = ""
+    path = req.get("path", "")
+    if path == None:
+        path = ""
+    url = scheme + "://" + host + path + "?page_info=" + next_cursor
+    if limit > 0:
+        url = url + "&limit=" + str(limit)
+    return "<" + url + '>; rel="next"'
