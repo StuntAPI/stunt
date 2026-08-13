@@ -56,7 +56,9 @@ func writeFixtureRepo(t *testing.T) (cloneURL, firstSha, headSha string) {
 
 	dir := t.TempDir()
 
-	runGit(t, dir, "init")
+	// Pin the branch name so the fixture is independent of the host's
+	// init.defaultBranch (some systems default to "master", others "main").
+	runGit(t, dir, "init", "-b", "main")
 	runGit(t, dir, "config", "user.email", "test@example.com")
 	runGit(t, dir, "config", "user.name", "Test")
 	runGit(t, dir, "config", "commit.gpgsign", "false")
@@ -567,7 +569,7 @@ func TestReconcileReturnsMergeError(t *testing.T) {
 	c, _ := OpenCache(t.TempDir())
 
 	// Use a branch ref so Reconcile attempts a merge --ff-only.
-	s := newFixtureSource(cloneURL, "master")
+	s := newFixtureSource(cloneURL, "main")
 	dir, _, err := c.Ensure(context.Background(), s)
 	if err != nil {
 		t.Fatalf("Ensure: %v", err)
