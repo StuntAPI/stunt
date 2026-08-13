@@ -23,8 +23,14 @@ def on_list_buckets(req):
         if b.get("account_id", "") == account_id:
             result.append(_bucket_result(b))
 
-    # R2 uses a flat {buckets: [...]} result, not the standard envelope
-    return _cf_ok({"buckets": result})
+    # R2 uses a flat {buckets: [...]} result, not the standard envelope.
+    # Pagination is via the per_page + cursor query params; the next cursor
+    # is returned as a top-level "cursor" field alongside buckets.
+    page, next_cursor = _list_page(req, result)
+    res = {"buckets": page}
+    if next_cursor != None and next_cursor != "":
+        res["cursor"] = next_cursor
+    return _cf_ok(res)
 
 # on_create_bucket creates a new R2 bucket.
 def on_create_bucket(req):

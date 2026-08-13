@@ -29,7 +29,11 @@ def on_list_service_accounts(req):
         if d.get("projectId", "") == project or project == "":
             accounts.append(_sa_entity(d))
 
-    return respond(200, {"accounts": accounts})
+    page, next_token = _list_page(req, accounts)
+    resp = {"accounts": page}
+    if next_token != None:
+        resp["nextPageToken"] = next_token
+    return respond(200, resp)
 
 # on_create_service_account creates a new service account.
 # POST /v1/projects/{project}/serviceAccounts (Bearer)
@@ -153,7 +157,11 @@ def on_list_keys(req):
                 "keyType": d.get("keyType", "USER_MANAGED"),
             })
 
-    return respond(200, {"keys": keys})
+    page, next_token = _list_page(req, keys)
+    resp = {"keys": page}
+    if next_token != None:
+        resp["nextPageToken"] = next_token
+    return respond(200, resp)
 
 # on_sa_post_dispatch routes POST requests with verb suffixes.
 # The Google API uses ":generateAccessToken" on the SA resource path. Since

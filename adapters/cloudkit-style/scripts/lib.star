@@ -58,6 +58,19 @@ def _to_int(s):
 def _contains(s, substr):
     return s.find(substr) >= 0
 
+# _list_page slices a list of docs by CloudKit's pagination params
+# (resultsLimit = page size, continuationMarker = opaque cursor token) read
+# from the request body, via the paginate() builtin, and returns
+# (page, next_cursor). A missing/empty resultsLimit disables paging.
+# next_cursor is None when no items remain.
+def _list_page(req, docs):
+    body = req.get("body")
+    if body == None:
+        body = {}
+    limit = _to_int(body.get("resultsLimit", ""))
+    cursor = body.get("continuationMarker", "")
+    return paginate(docs, limit, cursor)
+
 # _seed populates default zones and sample records.
 def _seed():
     if store_kv_get("cloudkit", "seeded") == "yes":

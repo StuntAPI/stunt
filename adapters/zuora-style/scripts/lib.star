@@ -85,6 +85,20 @@ def _get_query(req, key, default_val):
         return default_val
     return val
 
+# _list_page applies Zuora cursor pagination to a full list of items using the
+# builtin paginate(). It reads the provider query params — `pageSize` for the
+# page size and `cursor` for the opaque next-page token — and returns
+# (page, next_cursor). When pageSize is unset/<=0 paging is disabled and the
+# full list is returned with next_cursor None. next_cursor is the opaque token
+# to echo back as the top-level `nextPage` field; it is None when done.
+def _list_page(req, items):
+    limit = _to_int(_get_query(req, "pageSize", ""))
+    cursor = _get_query(req, "cursor", "")
+    if cursor == None:
+        cursor = ""
+    page, next_cursor = paginate(items, limit, cursor)
+    return page, next_cursor
+
 # _get_body safely returns the request body dict.
 def _get_body(req):
     body = req.get("body")

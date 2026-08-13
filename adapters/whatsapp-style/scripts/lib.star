@@ -176,3 +176,25 @@ def _to_int(s):
         else:
             return 0
     return n
+
+# _get_query reads a single query-param value from req, returning "" for a
+# missing param or a None value (mirrors the adapter's existing conventions).
+def _get_query(req, key):
+    q = req.get("query")
+    if q == None:
+        return ""
+    v = q.get(key, "")
+    if v == None:
+        return ""
+    return v
+
+# _list_page applies WhatsApp/Meta Graph API cursor pagination (limit + after)
+# to a full list and returns (page, next_cursor). Delegates to the builtin
+# paginate(items, limit, cursor): limit None/<=0 disables paging (returns all
+# items, next_cursor None); cursor is the opaque token from a prior call. The
+# `after` query param is the opaque cursor token returned by a prior call
+# (None/"" for the first page).
+def _list_page(req, items):
+    limit = _to_int(_get_query(req, "limit"))
+    cursor = _get_query(req, "after")
+    return paginate(items, limit, cursor)

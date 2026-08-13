@@ -15,7 +15,14 @@ def on_list_tasklists(req):
     for tl in lc.list():
         items.append(_tasklist_resource(tl))
 
-    return respond(200, {"items": items})
+    # Apply Google Tasks pagination (maxResults + pageToken).
+    page, next_cursor = _list_page(req, items)
+
+    result = {"items": page}
+    if next_cursor != None:
+        result["nextPageToken"] = next_cursor
+
+    return respond(200, result)
 
 def on_create_tasklist(req):
     err = _require_bearer(req)

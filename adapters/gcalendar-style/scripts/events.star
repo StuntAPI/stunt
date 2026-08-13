@@ -29,9 +29,6 @@ def on_list_events(req):
 
     time_min = req["query"].get("timeMin", "")
     time_max = req["query"].get("timeMax", "")
-    max_results = _to_int(req["query"].get("maxResults", "250"))
-    if max_results == 0:
-        max_results = 250
     single_events = req["query"].get("singleEvents", "")
     order_by = req["query"].get("orderBy", "")
 
@@ -68,21 +65,17 @@ def on_list_events(req):
                 filtered.append(e)
         items = filtered
 
-    # Apply maxResults.
-    total = len(items)
-    has_more = False
-    if total > max_results:
-        items = items[:max_results]
-        has_more = True
+    # Apply Google Calendar pagination (maxResults + pageToken).
+    page, next_cursor = _list_page(req, items)
 
     result = {
         "kind": "calendar#events",
         "etag": '"mock-events-etag"',
         "summary": cal_id,
-        "items": items,
+        "items": page,
     }
-    if has_more:
-        result["nextPageToken"] = "mock-page-token"
+    if next_cursor != None:
+        result["nextPageToken"] = next_cursor
 
     return respond(200, result)
 
@@ -271,12 +264,19 @@ def on_list_instances(req):
 
     instances = _expand_recurring(doc)
 
-    return respond(200, {
+    # Apply Google Calendar pagination (maxResults + pageToken).
+    page, next_cursor = _list_page(req, instances)
+
+    result = {
         "kind": "calendar#events",
         "etag": '"mock-instances-etag"',
         "summary": doc.get("summary", ""),
-        "items": instances,
-    })
+        "items": page,
+    }
+    if next_cursor != None:
+        result["nextPageToken"] = next_cursor
+
+    return respond(200, result)
 
 # on_quick_add creates an event from natural-language text.
 def on_quick_add(req):

@@ -148,3 +148,16 @@ def _to_int(s):
         else:
             return n
     return n
+
+# _list_page applies Twilio-style pagination (PageSize + PageToken) to a full
+# list and returns (page, next_cursor). Delegates to the builtin
+# paginate(items, limit, cursor): limit None/<=0 disables paging (returns all
+# items, next_cursor None); cursor is the opaque token from a prior call.
+# Twilio list resources accept `PageSize` (page size) and `PageToken` (the
+# opaque token carried in next_page_uri from a prior call).
+def _list_page(req, items):
+    limit = _to_int(req["query"].get("PageSize", ""))
+    cursor = req["query"].get("PageToken", "")
+    if cursor == None:
+        cursor = ""
+    return paginate(items, limit, cursor)

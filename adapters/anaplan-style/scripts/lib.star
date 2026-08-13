@@ -34,6 +34,18 @@ def _to_int(s):
             return 0
     return n
 
+# _list_page slices a list of docs by the Anaplan pagination query params
+# (limit = page size, offset = opaque cursor token) via the paginate() builtin
+# and returns (page, next_cursor). A missing/empty limit disables paging.
+# next_cursor is None when no items remain.
+def _list_page(req, docs):
+    q = req.get("query")
+    if q == None:
+        q = {}
+    limit = _to_int(q.get("limit", ""))
+    cursor = q.get("offset", "")
+    return paginate(docs, limit, cursor)
+
 # _seed populates default workspaces.
 def _seed():
     if store_kv_get("anaplan", "seeded") == "yes":

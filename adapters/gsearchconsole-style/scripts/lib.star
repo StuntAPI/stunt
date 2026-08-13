@@ -46,6 +46,27 @@ def _to_int(s):
             return 0
     return n
 
+# _query_get reads a string query param from req, returning default when the
+# param is absent or None (handles missing "query" dict gracefully).
+def _query_get(req, key, default=""):
+    q = req.get("query")
+    if q == None:
+        return default
+    v = q.get(key, default)
+    if v == None:
+        return default
+    return v
+
+# _list_page slices docs by the Search Console API's maxResults/pageToken
+# query params via the builtin paginate(), returning (page, next_page_token).
+# next_page_token is None when no items remain. maxResults <= 0 / absent
+# disables paging (returns all, next None).
+def _list_page(req, docs):
+    max_results = _to_int(_query_get(req, "maxResults", ""))
+    page_token = _query_get(req, "pageToken", "")
+    page, next_token = paginate(docs, max_results, page_token)
+    return page, next_token
+
 # _seed populates default sites.
 def _seed():
     if store_kv_get("gsc", "seeded") == "yes":

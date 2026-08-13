@@ -34,10 +34,15 @@ def on_list_accounts(req):
     for d in docs:
         accounts.append(_account_shape(d))
 
-    return respond(200, {
+    accounts, next_cursor = _list_page(req, accounts)
+
+    resp = {
         "success": True,
         "accounts": accounts,
-    })
+    }
+    if next_cursor != None:
+        resp["nextPage"] = next_cursor
+    return respond(200, resp)
 
 def on_get_account(req):
     ok, err = _require_auth(req)

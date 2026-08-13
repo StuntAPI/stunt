@@ -58,7 +58,7 @@ def on_list_installations(req):
     if err != None:
         return err
 
-    return respond(200, [
+    docs = [
         {
             "id": 1,
             "account": {
@@ -77,7 +77,9 @@ def on_list_installations(req):
             "created_at": _now(),
             "updated_at": _now(),
         },
-    ])
+    ]
+    page, next_link = _list_page(req, docs)
+    return respond(200, page, _gh_link_headers(next_link))
 
 # on_create_installation_token exchanges an app JWT for an installation
 # access token (ghs_ prefixed).

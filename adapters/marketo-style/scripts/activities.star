@@ -71,16 +71,13 @@ def on_list_activities(req):
             "attributes": d.get("attributes", {}),
         })
 
-    # Determine if there are more results. This mock returns all results in
-    # one page unless a page size is simulated. We set moreResult=False since
-    # we return everything.
-    more = False
-    next_token = None
+    # Apply Marketo paging (batchSize + nextPageToken) after type filtering.
+    page, next_cursor, more = _list_page(req, result)
 
     return respond(200, {
         "requestId": _request_id(),
         "success": True,
-        "result": result,
-        "nextPageToken": next_token,
+        "result": page,
+        "nextPageToken": next_cursor,
         "moreResult": more,
     })

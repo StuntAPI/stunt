@@ -32,7 +32,8 @@ def on_list_accounts(req):
             "regionCode": d.get("regionCode", "US"),
         })
 
-    return respond(200, {"accounts": accounts})
+    page, next_cursor = _list_page(req, accounts)
+    return respond(200, _page_body("accounts", page, next_cursor))
 
 # on_list_properties returns all GA4 properties.
 # GET /v1admin/properties (Bearer)
@@ -65,7 +66,8 @@ def on_list_properties(req):
             "createTime": d.get("createTime", "2024-01-01T00:00:00Z"),
         })
 
-    return respond(200, {"properties": properties})
+    page, next_cursor = _list_page(req, properties)
+    return respond(200, _page_body("properties", page, next_cursor))
 
 # on_list_datastreams returns all data streams for a property.
 # GET /v1admin/properties/{property}/dataStreams (Bearer)
@@ -98,7 +100,8 @@ def on_list_datastreams(req):
             "webStreamData": d.get("webStreamData", {}),
         })
 
-    return respond(200, {"dataStreams": streams})
+    page, next_cursor = _list_page(req, streams)
+    return respond(200, _page_body("dataStreams", page, next_cursor))
 
 # --- seed hierarchy ---
 

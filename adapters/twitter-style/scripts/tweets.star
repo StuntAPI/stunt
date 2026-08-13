@@ -66,7 +66,11 @@ def on_list(req):
     c = store_collection("tweets")
     docs = c.list()
     tweets = _reverse(docs)
-    return respond(200, {"data": tweets, "meta": {"result_count": len(tweets)}})
+    page, next_cursor = _list_page(req, tweets)
+    meta = {"result_count": len(page)}
+    if next_cursor != None:
+        meta["next_token"] = next_cursor
+    return respond(200, {"data": page, "meta": meta})
 
 # DELETE /2/tweets/{id} — delete a tweet.
 def on_delete(req):

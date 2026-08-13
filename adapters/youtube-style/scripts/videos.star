@@ -76,7 +76,11 @@ def on_list_videos(req):
                 continue
             items.append(_public_video(doc))
 
-    return respond(200, {"items": items})
+    page, next_token = _list_page(req, items)
+    result = {"items": page}
+    if next_token != None:
+        result["nextPageToken"] = next_token
+    return respond(200, result)
 
 # on_delete_video deletes a video by id.
 def on_delete_video(req):

@@ -38,3 +38,33 @@ _CAMPAIGNS = [
     {"id": "cmp001", "name": "Welcome Email", "status": "Active"},
     {"id": "cmp002", "name": "Weekly Newsletter", "status": "Active"},
 ]
+
+# _to_int parses an int from a string; empty/invalid -> 0.
+def _to_int(s):
+    if s == None or s == "":
+        return 0
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch >= "0" and ch <= "9":
+            n = n * 10 + (ord(ch) - ord("0"))
+        else:
+            return 0
+    return n
+
+# _list_page applies Braze-style cursor pagination to a list of docs via the
+# paginate builtin. The `limit` query param sets the page size (a missing/empty
+# value disables paging -> returns all items); the `cursor` query param is the
+# opaque token returned by a prior call (None/"" for the first page). Returns
+# (page, next_cursor) where next_cursor is the opaque token for the next page,
+# or None when done.
+def _list_page(req, docs):
+    query = req.get("query", {})
+    if query == None:
+        query = {}
+    limit = _to_int(query.get("limit", ""))
+    cursor = query.get("cursor", "")
+    if cursor == None:
+        cursor = ""
+    page, next_cursor = paginate(docs, limit, cursor)
+    return page, next_cursor

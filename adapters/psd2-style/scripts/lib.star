@@ -20,6 +20,60 @@ def _bearer(req):
         return auth[7:]
     return ""
 
+# _get_query safely returns the request query-string dict.
+def _get_query(req):
+    q = req.get("query")
+    if q == None:
+        return {}
+    return q
+
+# _to_int parses a loose query-string value into an int.
+# Returns 0 for None / "" / non-numeric strings.
+def _to_int(v):
+    if v == None:
+        return 0
+    s = str(v)
+    if s == "":
+        return 0
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch >= "0" and ch <= "9":
+            n = n * 10 + (ord(ch) - ord("0"))
+        else:
+            return 0
+    return n
+
+# === List pagination ===
+
+# _list_page applies Berlin Group NextGenPSD2 paging to a full list of
+# resources. It reads the provider's size (page size) and page (cursor, an
+# opaque offset token carried via _links.next.href) query params and delegates
+# to the pure paginate() builtin.
+#
+# Returns (page, next_cursor) where next_cursor is an opaque string token for
+# the next page, or None when no items remain. When size is absent or <= 0
+# paging is disabled and the whole list is returned with next_cursor None,
+# preserving the unpaginated behavior.
+def _list_page(req, docs):
+    q = _get_query(req)
+    limit = _to_int(q.get("size", ""))
+    cursor = q.get("page", "")
+    if cursor == None:
+        cursor = ""
+    return paginate(docs, limit, cursor)
+
+# _page_links returns the _links block additions for paginated list responses.
+# When next_cursor is not None it adds a "next" link with the cursor encoded as
+# the page query param, matching the NextGenPSD2 _links.next.href convention.
+# size_hint is the page size echoed back into the next href (string).
+def _page_links(base_href, next_cursor, size_hint):
+    if next_cursor == None or next_cursor == "":
+        return {}
+    return {
+        "next": {"href": base_href + "?page=" + next_cursor + "&size=" + size_hint},
+    }
+
 # _psd2_err returns a NextGenPSD2-style error response.
 # Shape: { tppMessages: [{ category, code, text }] }
 def _psd2_err(status, category, code, text):

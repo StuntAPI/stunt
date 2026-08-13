@@ -12,7 +12,7 @@ def on_list_bank_transactions(req):
     if err != None:
         return err
 
-    return _envelope("BankTransactions", [
+    docs = [
         {
             "BankTransactionID": _guid(301),
             "Type": "RECEIVE",
@@ -29,4 +29,7 @@ def on_list_bank_transactions(req):
             "Status": "AUTHORISED",
             "LineItems": [{"Description": "Office supplies", "LineAmount": "75.50"}],
         },
-    ])
+    ]
+
+    docs, next_page = _list_page(req, docs)
+    return _envelope("BankTransactions", docs, next_page)

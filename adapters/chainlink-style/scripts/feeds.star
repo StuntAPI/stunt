@@ -21,9 +21,11 @@ def on_list_feeds(req):
         if network == "" or doc.get("network", "") == network:
             feeds.append(_feed_public(doc))
 
-    return respond(200, {
-        "data": feeds,
-    })
+    page, next_cursor = _list_page(req, feeds)
+    body = {"data": page}
+    if next_cursor != None:
+        body["nextCursor"] = next_cursor
+    return respond(200, body)
 
 # on_get_feed returns a single feed by its feedID.
 def on_get_feed(req):

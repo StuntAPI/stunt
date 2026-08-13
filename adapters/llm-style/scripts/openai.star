@@ -66,14 +66,19 @@ def on_chat_completions(req):
     })
 
 # on_list_models returns the list of synthetic models.
+# Supports OpenAI cursor pagination: limit (page size) + after (the id of the
+# last object returned). The response carries the OpenAI-canonical has_more
+# flag; the client passes the last id back as `after` to fetch the next page.
 def on_list_models(req):
     err = _require_bearer(req)
     if err != None:
         return err
 
+    page, has_more = _list_page(req, _MODELS)
     return respond(200, {
         "object": "list",
-        "data": _MODELS,
+        "data": page,
+        "has_more": has_more,
     })
 
 # _stream_response returns a single SSE chunk then [DONE].

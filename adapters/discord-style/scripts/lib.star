@@ -120,3 +120,35 @@ def _to_int(s):
         else:
             return 0
     return n
+
+# _list_page applies Discord-style cursor pagination to a list of docs via
+# the paginate builtin. The `limit` query param sets the page size; when it
+# is missing or <= 0 the helper falls back to default_limit — pass 0 (the
+# default) to DISABLE paging (the whole list is returned with a None
+# next_cursor, preserving prior unpaginated behavior). The `after` query
+# param is the opaque cursor token returned by a prior call (None/"" for the
+# first page). Returns (page, next_cursor) where next_cursor is the opaque
+# token for the next page, or None when done.
+def _list_page(req, docs, default_limit=0):
+    query = req.get("query", {})
+    if query == None:
+        query = {}
+    limit = _to_int(query.get("limit", ""))
+    if limit <= 0:
+        limit = default_limit
+    after = query.get("after", "")
+    if after == None:
+        after = ""
+    page, next_cursor = paginate(docs, limit, after)
+    return page, next_cursor
+
+# _next_link builds a Discord-style 'Link: <url>; rel="next"' header value
+# carrying the next-page cursor, or None when there is no further page.
+# Discord surfaces continuation of bare-array list endpoints (e.g. guild
+# members) via this header; the client round-trips the after token as a query
+# param on the returned URL.
+def _next_link(req, next_cursor):
+    if next_cursor == None:
+        return None
+    path = req.get("path", "")
+    return "<https://discord.com/api/v10" + path + "?after=" + next_cursor + '>; rel="next"'

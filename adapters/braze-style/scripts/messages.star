@@ -30,13 +30,18 @@ def on_scheduled(req):
     if err != None:
         return err
 
-    return respond(200, {
-        "scheduled_messages": [
-            {
-                "dispatch_id": "scheduled-disp-001",
-                "name": "Scheduled Broadcast",
-                "schedule_time": "2024-01-15T12:00:00.000Z",
-                "status": "scheduled",
-            },
-        ],
-    })
+    scheduled = [
+        {
+            "dispatch_id": "scheduled-disp-001",
+            "name": "Scheduled Broadcast",
+            "schedule_time": "2024-01-15T12:00:00.000Z",
+            "status": "scheduled",
+        },
+    ]
+    page, next_cursor = _list_page(req, scheduled)
+    body = {
+        "scheduled_messages": page,
+    }
+    if next_cursor != None:
+        body["next_cursor"] = next_cursor
+    return respond(200, body)

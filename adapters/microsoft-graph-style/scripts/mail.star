@@ -34,10 +34,18 @@ def on_list_folders(req):
         if count > 0:
             f["totalItemCount"] = count
 
-    return respond(200, {
+    # Pagination: $top = page size, $skip = opaque cursor token.
+    base_url = "https://graph.microsoft.com/v1.0/me/mailFolders"
+    top = _to_int(req["query"].get("$top", ""))
+    page, next_cursor = _list_page(folders, req["query"])
+
+    envelope = {
         "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('me')/mailFolders",
-        "value": folders,
-    })
+        "value": page,
+    }
+    if next_cursor != None and next_cursor != "":
+        envelope["@odata.nextLink"] = _odata_link(base_url, top, next_cursor)
+    return respond(200, envelope)
 
 # on_list_messages returns messages for the current user.
 # GET /v1.0/me/messages (Bearer)

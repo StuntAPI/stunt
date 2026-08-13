@@ -59,9 +59,11 @@ def on_list_upkeeps(req):
             "status": doc.get("status", "active"),
         })
 
-    return respond(200, {
-        "data": upkeeps,
-    })
+    page, next_cursor = _list_page(req, upkeeps)
+    body = {"data": page}
+    if next_cursor != None:
+        body["nextCursor"] = next_cursor
+    return respond(200, body)
 
 # on_get_upkeep returns a single upkeep by ID.
 def on_get_upkeep(req):

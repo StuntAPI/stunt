@@ -19,15 +19,20 @@ def on_list_workspaces(req):
             "size": ws.get("size", 0),
         })
 
+    page, next_cursor = _list_page(req, items)
+    paging = {
+        "currentPageSize": len(page),
+        "offset": _to_int(req.get("query", {}).get("offset", "")),
+        "totalSize": len(items),
+    }
+    if next_cursor != None:
+        paging["nextCursor"] = next_cursor
+
     return respond(200, {
         "meta": {
-            "paging": {
-                "currentPageSize": len(items),
-                "offset": 0,
-                "totalSize": len(items),
-            },
+            "paging": paging,
         },
-        "items": items,
+        "items": page,
         "links": [
             {"rel": "self", "href": "https://api.anaplan.com/2/0/workspaces"},
         ],

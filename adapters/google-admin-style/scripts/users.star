@@ -27,10 +27,14 @@ def on_list_users(req):
     for d in docs:
         users.append(_user_entity(d))
 
-    return respond(200, {
+    page, next_token = _list_page(req, users)
+    result = {
         "kind": "admin#directory#users",
-        "users": users,
-    })
+        "users": page,
+    }
+    if next_token != None:
+        result["nextPageToken"] = next_token
+    return respond(200, result)
 
 # on_create_user creates a new user.
 # POST /admin/directory/v1/users (Bearer)
@@ -180,10 +184,14 @@ def on_list_tokens(req):
                 "scopes": d.get("scopes", []),
             })
 
-    return respond(200, {
+    page, next_token = _list_page(req, tokens)
+    result = {
         "kind": "admin#directory#tokenList",
-        "items": tokens,
-    })
+        "items": page,
+    }
+    if next_token != None:
+        result["nextPageToken"] = next_token
+    return respond(200, result)
 
 # --- helpers ---
 

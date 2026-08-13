@@ -37,7 +37,11 @@ def on_list_assets(req):
             "collection": asset.get("collection", {}),
         })
 
-    return respond(200, {"assets": result})
+    page, next_cursor = _list_page(req, result)
+    body = {"assets": page}
+    if next_cursor != None:
+        body["next"] = next_cursor
+    return respond(200, body)
 
 def on_get_asset(req):
     auth_err = _require_xapikey(req)

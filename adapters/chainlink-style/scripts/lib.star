@@ -134,6 +134,36 @@ def _encrypted_secrets():
     n = store_kv_incr("chainlink", "enc_seq")
     return "0x" + _hex_pad(n, 64)
 
+# _to_int parses a non-negative int from a string; "" / None / invalid -> 0.
+def _to_int(s):
+    if s == "" or s == None:
+        return 0
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        code = ord(ch)
+        if code >= 48 and code <= 57:
+            n = n * 10 + (code - 48)
+        else:
+            return 0
+    return n
+
+# _list_page applies pagination to a (already-filtered) list of docs via the
+# paginate builtin. The `limit` query param sets the page size (a missing/empty
+# value disables paging -> returns all items); the `cursor` query param is the
+# opaque token returned by a prior call (None/"" for the first page). Returns
+# (page, next_cursor) where next_cursor is the opaque token for the next page,
+# or None when done.
+def _list_page(req, docs):
+    q = req.get("query", {})
+    if q == None:
+        q = {}
+    limit = _to_int(q.get("limit", ""))
+    cursor = q.get("cursor", "")
+    if cursor == None:
+        cursor = ""
+    return paginate(docs, limit, cursor)
+
 # _hex_pad returns a hex string padded to a minimum length.
 def _hex_pad(n, length):
     hexchars = "0123456789abcdef"

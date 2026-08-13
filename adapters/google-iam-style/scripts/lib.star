@@ -59,6 +59,27 @@ def _unique_id(seq):
     base = 1000000000000000000
     return str(base + seq)
 
+# _query_get reads a string query param from req, returning default when the
+# param is absent or None (handles missing "query" dict gracefully).
+def _query_get(req, key, default=""):
+    q = req.get("query")
+    if q == None:
+        return default
+    v = q.get(key, default)
+    if v == None:
+        return default
+    return v
+
+# _list_page slices docs by the IAM API's pageSize/pageToken query params via
+# the builtin paginate(), returning (page, next_page_token). next_page_token is
+# None when no items remain. pageSize <= 0 / absent disables paging (returns
+# all, next None).
+def _list_page(req, docs):
+    page_size = _to_int(_query_get(req, "pageSize", ""))
+    page_token = _query_get(req, "pageToken", "")
+    page, next_token = paginate(docs, page_size, page_token)
+    return page, next_token
+
 # _not_found returns a Google-style 404 error response body.
 def _not_found(kind, key):
     return {

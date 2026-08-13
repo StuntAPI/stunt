@@ -139,3 +139,36 @@ def _hex_pad(n, length):
 # _hex_pad_str pads a decimal string to hex.
 def _hex_pad_str(s, length):
     return _hex_pad(_to_int(s), length)
+
+# _get_query reads a single query param from req, with a default.
+def _get_query(req, key, default_val):
+    q = req.get("query")
+    if q == None:
+        return default_val
+    val = q.get(key, default_val)
+    if val == None:
+        return default_val
+    return val
+
+# _list_page applies Tenderly-style pagination to a full list and returns
+# (page, next_page, paged). Tenderly's list endpoints use perPage (page size)
+# and page (1-based page number). When perPage is missing or <= 0 paging is
+# disabled: the whole list is returned, next_page is None and paged is False
+# (preserving the prior unpaginated behavior). Otherwise the list is sliced
+# via the builtin paginate(items, limit, cursor) — page number is mapped to
+# the builtin's opaque offset cursor — and next_page is the next page number
+# to request, or None on the last page. paged is True whenever paging is
+# active so the handler knows to use its envelope shape.
+def _list_page(req, items):
+    per_page = _to_int(_get_query(req, "perPage", ""))
+    page = _to_int(_get_query(req, "page", ""))
+    if per_page <= 0:
+        return items, None, False
+    if page < 1:
+        page = 1
+    cursor = "" if page == 1 else str((page - 1) * per_page)
+    page_items, next_cursor = paginate(items, per_page, cursor)
+    next_page = None
+    if next_cursor != None:
+        next_page = page + 1
+    return page_items, next_page, True

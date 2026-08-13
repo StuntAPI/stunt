@@ -91,3 +91,29 @@ def _extract_emails(personalization_list):
             if email != None and email != "":
                 result.append({"email": email})
     return result
+
+# === Pagination ===
+
+# _get_query reads a single value from the request query string.
+# Returns "" if the query dict or key is absent (never crashes on None).
+def _get_query(req, key):
+    q = req.get("query")
+    if q == None:
+        return ""
+    v = q.get(key, "")
+    if v == None:
+        return ""
+    return v
+
+# _list_page applies SendGrid-style offset pagination (limit = page size,
+# offset = opaque cursor token) to a full list and returns (page, next_cursor)
+# via the builtin paginate(items, limit, cursor). A missing/empty limit
+# defaults to 50 (this simulator's historical default); offset is the opaque
+# token returned by a prior call ("" for the first page). next_cursor is the
+# opaque offset token for the next page, or None when no items remain.
+def _list_page(req, docs):
+    limit = _to_int(_get_query(req, "limit"))
+    if limit == 0:
+        limit = 50
+    cursor = _get_query(req, "offset")
+    return paginate(docs, limit, cursor)

@@ -22,33 +22,20 @@ def on_list(req):
     docs = col.list()
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
-    if page_size <= 0:
-        page_size = 100
-    page = _to_int(_get_query(req, "page", "1"))
-    if page <= 0:
-        page = 1
-    offset = (page - 1) * page_size
-
-    total = len(docs)
-    end = offset + page_size
-    if end > total:
-        end = total
-    if offset > total:
-        offset = total
-
-    paged = docs[offset:end]
+    paged, next_cursor = _list_page(req, docs)
 
     tickets = []
     for d in paged:
         tickets.append(_ticket_shape(d))
 
+    has_more = next_cursor != None
     resp = {
         "tickets": tickets,
-        "meta": {"has_more": _has_more(total, page_size, offset)},
+        "meta": {"has_more": has_more},
     }
 
-    if _has_more(total, page_size, offset):
-        resp["links"] = {"next": _next_link("/api/v2/tickets", end, page_size)}
+    if has_more:
+        resp["links"] = {"next": _next_link("/api/v2/tickets", next_cursor, page_size)}
     else:
         resp["links"] = {"next": None}
 
@@ -231,7 +218,18 @@ def on_list_comments(req):
                 "public": d.get("public", True),
             })
 
-    return respond(200, {"comments": comments})
+    page_size = _to_int(_get_query(req, "per_page", "100"))
+    paged, next_cursor = _list_page(req, comments)
+
+    resp = {
+        "comments": paged,
+        "meta": {"has_more": next_cursor != None},
+    }
+    if next_cursor != None:
+        resp["links"] = {"next": _next_link("/api/v2/tickets/" + ticket_id + "/comments", next_cursor, page_size)}
+    else:
+        resp["links"] = {"next": None}
+    return respond(200, resp)
 
 def on_set_tags(req):
     ok, err = _require_auth(req)
@@ -304,14 +302,36 @@ def on_list_requests(req):
             "description": d.get("description", ""),
         })
 
-    return respond(200, {"requests": requests})
+    page_size = _to_int(_get_query(req, "per_page", "100"))
+    paged, next_cursor = _list_page(req, requests)
+
+    resp = {
+        "requests": paged,
+        "meta": {"has_more": next_cursor != None},
+    }
+    if next_cursor != None:
+        resp["links"] = {"next": _next_link("/api/v2/requests", next_cursor, page_size)}
+    else:
+        resp["links"] = {"next": None}
+    return respond(200, resp)
 
 def on_list_suspended(req):
     ok, err = _require_auth(req)
     if not ok:
         return err
 
-    return respond(200, {"suspended_tickets": []})
+    page_size = _to_int(_get_query(req, "per_page", "100"))
+    paged, next_cursor = _list_page(req, [])
+
+    resp = {
+        "suspended_tickets": paged,
+        "meta": {"has_more": next_cursor != None},
+    }
+    if next_cursor != None:
+        resp["links"] = {"next": _next_link("/api/v2/suspended_tickets", next_cursor, page_size)}
+    else:
+        resp["links"] = {"next": None}
+    return respond(200, resp)
 
 # _contains returns True if haystack contains needle (case-sensitive).
 def _contains(haystack, needle):

@@ -29,7 +29,8 @@ def on_list_pulls(req):
             continue
         result.append(_pull_view(p))
 
-    return respond(200, result)
+    page, next_link = _list_page(req, result)
+    return respond(200, page, _gh_link_headers(next_link))
 
 # on_create_pull creates a new PR.
 def on_create_pull(req):
@@ -87,7 +88,7 @@ def on_list_reviews(req):
 
     # Return seeded reviews for the default repo's PR #1.
     if repo_key == "octocat/hello-world" and number == 1:
-        return respond(200, [
+        docs = [
             {
                 "id": _to_int(_next_id("review_id")),
                 "user": {"login": "octocat", "id": 1, "type": "User"},
@@ -95,9 +96,12 @@ def on_list_reviews(req):
                 "state": "APPROVED",
                 "submitted_at": _now(),
             },
-        ])
+        ]
+        page, next_link = _list_page(req, docs)
+        return respond(200, page, _gh_link_headers(next_link))
 
-    return respond(200, [])
+    page, next_link = _list_page(req, [])
+    return respond(200, page, _gh_link_headers(next_link))
 
 # --- helpers ---
 

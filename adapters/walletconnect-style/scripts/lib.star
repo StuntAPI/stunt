@@ -147,3 +147,37 @@ def _rpc_ok(id, result):
 # _rpc_err builds an error JSON-RPC 2.0 response object.
 def _rpc_err(id, code, message):
     return {"jsonrpc": "2.0", "id": id, "error": {"code": code, "message": message}}
+
+# --- pagination helpers ---
+
+# _to_int parses a non-negative int from a string; returns 0 on any failure
+# (empty, None, non-digit, negative). 0 disables paging in paginate().
+def _to_int(s):
+    if s == None:
+        return 0
+    if type(s) == "int":
+        return s
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        code = ord(ch)
+        if code >= 48 and code <= 57:
+            n = n * 10 + (code - 48)
+        else:
+            return 0
+    return n
+
+# _list_page slices an already-filtered list of docs via the paginate builtin.
+# The simulated relay REST surface accepts `limit` (page size; missing/empty/<=0
+# disables paging -> returns all items) and `cursor` (the opaque token returned
+# by a prior call; None/"" for the first page). Returns (page, next_cursor)
+# where next_cursor is the opaque token for the next page, or None when done.
+def _list_page(req, docs):
+    q = req.get("query", {})
+    if q == None:
+        q = {}
+    limit = _to_int(q.get("limit", ""))
+    cursor = q.get("cursor", "")
+    if cursor == None:
+        cursor = ""
+    return paginate(docs, limit, cursor)

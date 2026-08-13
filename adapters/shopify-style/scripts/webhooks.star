@@ -14,7 +14,11 @@
 # Shared helpers (_require_token, _shopify_err, _next_id, _seed, _now) are
 # preloaded from scripts/lib.star.
 
-# on_list_webhooks returns all registered webhook subscriptions.
+# on_list_webhooks returns registered webhook subscriptions as {webhooks:[...]}.
+# Shopify REST pages via the `limit` (page size) and `page_info` (opaque
+# cursor) query params; the next cursor round-trips through a
+# 'Link: <url>; rel="next"' header. When `limit` is missing paging is disabled
+# and the whole list is returned.
 def on_list_webhooks(req):
     err = _require_token(req)
     if err != None:
@@ -27,7 +31,12 @@ def on_list_webhooks(req):
     for h in hooks:
         result.append(_webhook_view(h))
 
-    return respond(200, {"webhooks": result})
+    page, next_cursor = _list_page(req, result)
+    headers = None
+    link = _next_link(req, next_cursor, _to_int(_get_query(req, "limit")))
+    if link != None:
+        headers = {"Link": link}
+    return respond(200, {"webhooks": page}, headers)
 
 # on_create_webhook registers a webhook subscription.
 def on_create_webhook(req):

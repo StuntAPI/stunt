@@ -111,3 +111,46 @@ def _est_tokens(text):
     without_spaces = text.replace(" ", "")
     word_count = len(text) - len(without_spaces) + 1
     return (word_count + 3) // 4
+
+# === Pagination ===
+
+# _to_int parses a non-negative int from a query-param string. Returns 0 on
+# any missing/empty/non-numeric value (the paginate builtin treats limit <= 0
+# as "paging disabled", which preserves the default "list everything" behavior).
+def _to_int(s):
+    if s == None or s == "":
+        return 0
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch >= "0" and ch <= "9":
+            n = n * 10 + (ord(ch) - ord("0"))
+        else:
+            return 0
+    return n
+
+# _list_page applies OpenAI cursor pagination (limit + after) to a list of docs
+# via the paginate builtin. Returns (page, has_more).
+#
+# OpenAI does not echo a cursor token in the response: the client passes the
+# last returned object's id as `after` next time, so we resolve that id to an
+# internal offset for the builtin (which uses an opaque offset token). A
+# missing/empty limit disables paging (returns all docs, has_more False) —
+# matching GET /v1/models' default "list everything" behavior.
+def _list_page(req, docs):
+    q = req.get("query")
+    limit = 0
+    after = ""
+    if q != None:
+        limit = _to_int(q.get("limit", ""))
+        after = q.get("after", "")
+        if after == None:
+            after = ""
+    offset = ""
+    if after != "":
+        for i in range(len(docs)):
+            if docs[i].get("id") == after:
+                offset = str(i + 1)
+                break
+    page, nxt = paginate(docs, limit, offset)
+    return page, nxt != None

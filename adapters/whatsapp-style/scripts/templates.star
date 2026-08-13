@@ -27,7 +27,17 @@ def on_list_templates(req):
     for t in all_tmpls:
         result.append(_template_view(t))
 
-    return respond(200, {"data": result})
+    page, next_cursor = _list_page(req, result)
+
+    resp = {"data": page}
+    if next_cursor != None and next_cursor != "":
+        waba_id = req["params"].get("waba_id", "")
+        resp["paging"] = {
+            "cursors": {"after": next_cursor},
+            "next": "v21.0/" + waba_id + "/message_templates?after=" + next_cursor,
+        }
+
+    return respond(200, resp)
 
 # on_create_template creates a new message template (status PENDING).
 def on_create_template(req):

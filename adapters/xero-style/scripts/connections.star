@@ -10,21 +10,25 @@ def on_list_connections(req):
     if err != None:
         return err
 
-    return respond(200, {
-        "connections": [
-            {
-                "id": "00000000-0000-0000-0000-000000000001",
-                "tenantId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                "tenantType": "ORGANISATION",
-                "tenantName": "Demo Company (US)",
-                "createdDateUtc": "2024-01-01T00:00:00.000Z",
-            },
-            {
-                "id": "00000000-0000-0000-0000-000000000002",
-                "tenantId": "b2c3d4e5-f678-901a-bcde-f12345678901",
-                "tenantType": "ORGANISATION",
-                "tenantName": "Demo Company (UK)",
-                "createdDateUtc": "2024-01-01T00:00:00.000Z",
-            },
-        ],
-    })
+    docs = [
+        {
+            "id": "00000000-0000-0000-0000-000000000001",
+            "tenantId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "tenantType": "ORGANISATION",
+            "tenantName": "Demo Company (US)",
+            "createdDateUtc": "2024-01-01T00:00:00.000Z",
+        },
+        {
+            "id": "00000000-0000-0000-0000-000000000002",
+            "tenantId": "b2c3d4e5-f678-901a-bcde-f12345678901",
+            "tenantType": "ORGANISATION",
+            "tenantName": "Demo Company (UK)",
+            "createdDateUtc": "2024-01-01T00:00:00.000Z",
+        },
+    ]
+
+    docs, next_page = _list_page(req, docs)
+    body = {"connections": docs}
+    if next_page != None:
+        body["nextPage"] = next_page
+    return respond(200, body)

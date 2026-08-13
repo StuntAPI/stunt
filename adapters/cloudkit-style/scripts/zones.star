@@ -18,4 +18,8 @@ def on_list_zones(req):
             "zoneType": z.get("zoneType", ""),
         })
 
-    return respond(200, {"zones": zones})
+    page, next_cursor = _list_page(req, zones)
+    resp = {"zones": page}
+    if next_cursor != None:
+        resp["continuationMarker"] = next_cursor
+    return respond(200, resp)

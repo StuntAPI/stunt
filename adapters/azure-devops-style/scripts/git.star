@@ -19,7 +19,13 @@ def on_list_repos(req):
         if proj.get("name", "") == project_name or project_name == "_apis":
             items.append(_repo_resource(r))
 
-    return respond(200, {"value": items, "count": len(items)})
+    # Apply OData $top/$skip paging (after filtering by project).
+    page, continuation = _list_page(req, items)
+
+    resp = {"value": page, "count": len(page)}
+    if continuation != None:
+        resp["continuationToken"] = continuation
+    return respond(200, resp)
 
 def on_get_item(req):
     token, err = _require_auth(req)

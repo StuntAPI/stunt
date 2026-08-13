@@ -12,7 +12,7 @@ def on_list_items(req):
     if err != None:
         return err
 
-    return _envelope("Items", [
+    docs = [
         {
             "ItemID": _guid(401),
             "Code": "PROD-001",
@@ -29,4 +29,7 @@ def on_list_items(req):
             "UnitPrice": "35.00",
             "TaxType": "TAX002",
         },
-    ])
+    ]
+
+    docs, next_page = _list_page(req, docs)
+    return _envelope("Items", docs, next_page)

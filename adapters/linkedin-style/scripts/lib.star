@@ -38,3 +38,18 @@ def _to_int(s):
         else:
             return 0
     return n
+
+# _list_page slices a list of docs by the LinkedIn pagination query params
+# (count = page size, start = opaque offset cursor token) via the paginate()
+# builtin and returns (page, next_cursor). A missing/empty count disables
+# paging (returns all items, next_cursor None). next_cursor is None when no
+# items remain.
+def _list_page(req, docs):
+    q = req.get("query")
+    if q == None:
+        q = {}
+    count = _to_int(q.get("count", ""))
+    cursor = q.get("start", "")
+    if cursor == None:
+        cursor = ""
+    return paginate(docs, count, cursor)

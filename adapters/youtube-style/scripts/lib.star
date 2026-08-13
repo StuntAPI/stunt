@@ -56,3 +56,23 @@ def _to_num(v, default=0):
 # _contains reports whether substr appears within s.
 def _contains(s, substr):
     return s.find(substr) >= 0
+
+# _query_get returns req's query param `key`, or `default` when absent/None.
+def _query_get(req, key, default=""):
+    q = req.get("query")
+    if q == None:
+        return default
+    v = q.get(key, default)
+    if v == None:
+        return default
+    return v
+
+# _list_page slices docs by YouTube Data API v3 pagination: maxResults (page
+# size) and pageToken (opaque cursor), via the builtin paginate(). Returns
+# (page, next_page_token). next_page_token is None when no items remain.
+# maxResults <= 0 / absent disables paging (returns all, next None).
+def _list_page(req, docs):
+    max_results = _to_int(_query_get(req, "maxResults", ""))
+    page_token = _query_get(req, "pageToken", "")
+    page, next_token = paginate(docs, max_results, page_token)
+    return page, next_token

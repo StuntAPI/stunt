@@ -30,7 +30,15 @@ def on_list_sites(req):
         },
     ]
 
-    return respond(200, {
+    # Pagination: $top = page size, $skip = opaque cursor token.
+    base_url = "https://graph.microsoft.com/v1.0/groups/" + group_id + "/sites"
+    top = _to_int(req["query"].get("$top", ""))
+    page, next_cursor = _list_page(sites, req["query"])
+
+    envelope = {
         "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#groups('" + group_id + "')/sites",
-        "value": sites,
-    })
+        "value": page,
+    }
+    if next_cursor != None and next_cursor != "":
+        envelope["@odata.nextLink"] = _odata_link(base_url, top, next_cursor)
+    return respond(200, envelope)

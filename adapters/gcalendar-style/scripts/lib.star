@@ -136,6 +136,19 @@ def _default_datetime(seq):
     end = _minutes_to_iso(57710400 + seq * 30 + 60)
     return start, end
 
+# === Pagination ===
+
+# _list_page applies Google Calendar pagination (maxResults + pageToken) to a
+# full list and returns (page, next_cursor). Delegates to the builtin
+# paginate(items, limit, cursor): limit None/<=0 disables paging (returns all
+# items, next_cursor None); cursor is the opaque token from a prior call.
+def _list_page(req, items):
+    limit = _to_int(req["query"].get("maxResults", ""))
+    cursor = req["query"].get("pageToken", "")
+    if cursor == None:
+        cursor = ""
+    return paginate(items, limit, cursor)
+
 # === Seeding ===
 
 # _seed ensures the default calendar exists.

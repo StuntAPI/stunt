@@ -319,3 +319,70 @@ func TestSlackStyleAdapter(t *testing.T) {
 		t.Fatalf("no-auth error = %v, want 'not_authed'", noAuth["error"])
 	}
 }
+
+// TestSlackStylePagination verifies cursor pagination on a non-Stripe envelope:
+// conversations.list honors limit + cursor, and the next cursor round-trips
+// through response_metadata.next_cursor (Slack's shape).
+func TestSlackStylePagination(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "slack-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"slack": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["slack"]
+
+	// Create two channels so the collection holds more than one item.
+	for _, name := range []string{"pgchan-a", "pgchan-b"} {
+		if _, status := slackPostJSON(t, base+"/api/conversations.create", slackDevToken, map[string]any{"name": name}); status != 200 {
+			t.Fatalf("conversations.create %s -> %d", name, status)
+		}
+	}
+
+	// limit=1 -> exactly one channel, plus an opaque next_cursor.
+	body, status := slackGet(t, base+"/api/conversations.list?limit=1", slackDevToken)
+	if status != 200 {
+		t.Fatalf("conversations.list?limit=1 -> %d, body %s", status, body)
+	}
+	var pg map[string]any
+	if err := json.Unmarshal([]byte(body), &pg); err != nil {
+		t.Fatalf("unmarshal: %v (body %s)", err, body)
+	}
+	if data, _ := pg["channels"].([]any); len(data) != 1 {
+		t.Fatalf("limit=1 page len = %d, want 1", len(data))
+	}
+	rm, ok := pg["response_metadata"].(map[string]any)
+	if !ok || rm["next_cursor"] == nil || rm["next_cursor"].(string) == "" {
+		t.Fatalf("response_metadata.next_cursor = %v, want non-empty (more pages remain)", pg["response_metadata"])
+	}
+	cursor := rm["next_cursor"].(string)
+
+	// Following the cursor yields another single-item page.
+	body, status = slackGet(t, base+"/api/conversations.list?limit=1&cursor="+cursor, slackDevToken)
+	if status != 200 {
+		t.Fatalf("conversations.list?cursor -> %d, body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &pg); err != nil {
+		t.Fatalf("unmarshal: %v (body %s)", err, body)
+	}
+	if data, _ := pg["channels"].([]any); len(data) != 1 {
+		t.Fatalf("cursor page len = %d, want 1", len(data))
+	}
+}

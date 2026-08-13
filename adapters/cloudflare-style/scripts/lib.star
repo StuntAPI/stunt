@@ -51,18 +51,44 @@ def _cf_ok(result):
     })
 
 # _cf_ok_with_info returns a success response with result_info (pagination).
-def _cf_ok_with_info(result_list, count):
+# next_cursor is the opaque Cloudflare cursor for the next page, or None when
+# there are no more pages. When present it is emitted as result_info.cursors.after
+# (the Cloudflare v4 cursor-based pagination envelope).
+def _cf_ok_with_info(result_list, count, next_cursor):
+    result_info = {
+        "page": 1,
+        "per_page": 20,
+        "total_count": count,
+    }
+    if next_cursor != None and next_cursor != "":
+        result_info["cursors"] = {"after": next_cursor}
     return respond(200, {
         "success": True,
         "errors": [],
         "messages": [],
         "result": result_list,
-        "result_info": {
-            "page": 1,
-            "per_page": 20,
-            "total_count": count,
-        },
+        "result_info": result_info,
     })
+
+# _get_query safely returns a query parameter value.
+def _get_query(req, key, default_val):
+    q = req.get("query")
+    if q == None:
+        return default_val
+    val = q.get(key, default_val)
+    if val == None:
+        return default_val
+    return val
+
+# _list_page slices a list of docs by the Cloudflare pagination query params
+# (per_page = page size, cursor = opaque cursor token) via the paginate()
+# builtin and returns (page, next_cursor). A missing/empty per_page disables
+# paging (returns all docs, next_cursor None). next_cursor is None when no
+# items remain.
+def _list_page(req, docs):
+    limit = _to_int(_get_query(req, "per_page", ""))
+    cursor = _get_query(req, "cursor", "")
+    return paginate(docs, limit, cursor)
 
 # _require_auth returns None if authorized, or a Cloudflare-style 401 error.
 def _require_auth(req):

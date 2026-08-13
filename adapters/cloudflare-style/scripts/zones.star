@@ -28,7 +28,8 @@ def on_list_zones(req):
     for z in zones:
         result.append(_zone_result(z))
 
-    return _cf_ok_with_info(result, len(result))
+    page, next_cursor = _list_page(req, result)
+    return _cf_ok_with_info(page, len(result), next_cursor)
 
 # on_create_zone creates a new zone.
 def on_create_zone(req):
@@ -149,7 +150,8 @@ def on_list_dns_records(req):
             "modified_on": _iso8601(),
         },
     ]
-    return _cf_ok_with_info(records, len(records))
+    page, next_cursor = _list_page(req, records)
+    return _cf_ok_with_info(page, len(records), next_cursor)
 
 # on_list_firewall_rules returns synthetic firewall rules.
 def on_list_firewall_rules(req):
@@ -172,7 +174,8 @@ def on_list_firewall_rules(req):
             "modified_on": _iso8601(),
         },
     ]
-    return _cf_ok_with_info(rules, len(rules))
+    page, next_cursor = _list_page(req, rules)
+    return _cf_ok_with_info(page, len(rules), next_cursor)
 
 # on_list_page_rules returns synthetic page rules.
 def on_list_page_rules(req):
@@ -193,7 +196,8 @@ def on_list_page_rules(req):
             "modified_on": _iso8601(),
         },
     ]
-    return _cf_ok_with_info(rules, len(rules))
+    page, next_cursor = _list_page(req, rules)
+    return _cf_ok_with_info(page, len(rules), next_cursor)
 
 # on_purge_cache purges the cache for a zone.
 def on_purge_cache(req):

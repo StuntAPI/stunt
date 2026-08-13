@@ -7,7 +7,11 @@ def on_list_segments(req):
     if err != None:
         return err
 
-    return respond(200, {
+    page, next_cursor = _list_page(req, _SEGMENTS)
+    body = {
         "message": "success",
-        "segments": _SEGMENTS,
-    })
+        "segments": page,
+    }
+    if next_cursor != None:
+        body["next_cursor"] = next_cursor
+    return respond(200, body)

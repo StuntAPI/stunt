@@ -35,7 +35,8 @@ def on_list_issues(req):
             continue
         result.append(_issue_view(i))
 
-    return respond(200, result)
+    page, next_link = _list_page(req, result)
+    return respond(200, page, _gh_link_headers(next_link))
 
 # on_create_issue creates a new issue.
 def on_create_issue(req):

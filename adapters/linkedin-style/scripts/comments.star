@@ -33,9 +33,15 @@ def on_list_comments(req):
             "lastModified": {"createdOn": doc.get("ts_ms", 0)},
         })
 
+    page, next_cursor = _list_page(req, elements)
+    start = _to_int(req["query"].get("start", ""))
+    links = []
+    if next_cursor != None:
+        links.append({"rel": "next", "href": "/rest/comments?start=" + next_cursor})
+
     return respond(200, {
-        "elements": elements,
-        "paging": {"count": len(elements), "start": 0},
+        "elements": page,
+        "paging": {"count": len(page), "start": start, "links": links},
     })
 
 # on_post_comment creates a comment on a post.

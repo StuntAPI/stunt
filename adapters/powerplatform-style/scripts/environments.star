@@ -7,4 +7,9 @@ def on_list_environments(req):
     if err != None:
         return err
 
-    return respond(200, {"value": _ENVS})
+    page, next_link = _list_page(req, _ENVS, "/v2/environments")
+
+    resp = {"value": page}
+    if next_link != None:
+        resp["@odata.nextLink"] = next_link
+    return respond(200, resp)

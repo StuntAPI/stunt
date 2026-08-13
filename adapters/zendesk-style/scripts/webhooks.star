@@ -30,7 +30,18 @@ def on_list_webhooks(req):
             "method": d.get("method", "POST"),
         })
 
-    return respond(200, {"webhooks": webhooks})
+    page_size = _to_int(_get_query(req, "per_page", "100"))
+    paged, next_cursor = _list_page(req, webhooks)
+
+    resp = {
+        "webhooks": paged,
+        "meta": {"has_more": next_cursor != None},
+    }
+    if next_cursor != None:
+        resp["links"] = {"next": _next_link("/api/v2/webhooks", next_cursor, page_size)}
+    else:
+        resp["links"] = {"next": None}
+    return respond(200, resp)
 
 def on_create_webhook(req):
     ok, err = _require_auth(req)

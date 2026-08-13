@@ -216,6 +216,58 @@ def _round4(val):
 def _fmt(val):
     return str(val)
 
+# --- Query + pagination helpers ---
+
+# _get_query safely returns a query parameter value.
+def _get_query(req, key, default_val):
+    query = req.get("query")
+    if query == None:
+        query = {}
+    v = query.get(key, default_val)
+    if v == None:
+        return default_val
+    return v
+
+# _to_int parses a decimal string to int. Returns 0 for None/empty/non-numeric.
+def _to_int(s):
+    if s == None:
+        return 0
+    s = str(s).strip()
+    if s == "":
+        return 0
+    neg = False
+    if s.startswith("-"):
+        neg = True
+        s = s[1:]
+    n = 0
+    for ch in s:
+        if ch < "0" or ch > "9":
+            return 0
+        n = n * 10 + (ord(ch) - ord("0"))
+    if neg:
+        return -n
+    return n
+
+# _list_page reads Avalara OData $top (page size) / $skip (offset cursor)
+# query params, slices the already-filtered docs via the paginate() builtin,
+# and returns (page, next_link) where next_link is an @odata.nextLink URL
+# string the client can follow to round-trip $top/$skip, or None when there
+# is no further page. Paging is DISABLED (whole list returned, next_link
+# None) when $top is missing or <= 0 — preserving prior unpaginated behavior.
+# base_path is the route used to build the next-link URL.
+def _list_page(req, docs, base_path):
+    top = _to_int(_get_query(req, "$top", ""))
+    skip = _get_query(req, "$skip", "")
+    if skip == None:
+        skip = ""
+
+    page, next_cursor = paginate(docs, top, skip)
+
+    next_link = None
+    if next_cursor != None:
+        next_link = base_path + "?$top=" + str(top) + "&$skip=" + next_cursor
+    return page, next_link
+
 # _address_state extracts the state/region from an addresses structure.
 def _address_state(addresses):
     if addresses == None:

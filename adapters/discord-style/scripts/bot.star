@@ -72,4 +72,12 @@ def on_guild_channels(req):
             "nsfw": ch.get("nsfw", False),
         })
 
-    return respond(200, result)
+    # Apply cursor pagination (limit/after) after filtering. A missing/zero
+    # limit disables paging (returns the whole list), matching the bare-array
+    # behavior Discord exposes for this endpoint.
+    page, next_cursor = _list_page(req, result)
+    headers = None
+    link = _next_link(req, next_cursor)
+    if link != None:
+        headers = {"Link": link}
+    return respond(200, page, headers)

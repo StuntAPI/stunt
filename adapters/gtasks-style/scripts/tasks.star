@@ -22,7 +22,14 @@ def on_list_tasks(req):
         if task.get("tasklistId") == list_id:
             items.append(_task_resource(task))
 
-    return respond(200, {"items": items})
+    # Apply Google Tasks pagination (maxResults + pageToken) after filtering.
+    page, next_cursor = _list_page(req, items)
+
+    result = {"items": page}
+    if next_cursor != None:
+        result["nextPageToken"] = next_cursor
+
+    return respond(200, result)
 
 def on_create_task(req):
     err = _require_bearer(req)

@@ -28,4 +28,5 @@ def on_list_accounts(req):
             "Class": doc.get("Class", ""),
         })
 
-    return _envelope("Accounts", accounts)
+    accounts, next_page = _list_page(req, accounts)
+    return _envelope("Accounts", accounts, next_page)

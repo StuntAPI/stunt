@@ -51,11 +51,15 @@ def on_list_leads(req):
         for d in docs:
             result.append(_lead_shape(d))
 
+    # Apply Marketo paging (batchSize + nextPageToken) after filtering.
+    page, next_cursor, more = _list_page(req, result)
+
     return respond(200, {
         "requestId": _request_id(),
         "success": True,
-        "result": result,
-        "moreResult": False,
+        "result": page,
+        "nextPageToken": next_cursor,
+        "moreResult": more,
     })
 
 def on_create_lead(req):

@@ -72,7 +72,12 @@ def on_list_usage(req):
             "Status": d.get("Status", "Imported"),
         })
 
-    return respond(200, {
+    usage, next_cursor = _list_page(req, usage)
+
+    resp = {
         "success": True,
         "usage": usage,
-    })
+    }
+    if next_cursor != None:
+        resp["nextPage"] = next_cursor
+    return respond(200, resp)

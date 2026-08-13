@@ -43,9 +43,11 @@ def _ok(context, value):
         "value": value,
     })
 
-# _odata_link builds an @odata.nextLink URL for OData pagination.
-def _odata_link(base_url, skip):
-    return base_url + "?$skip=" + str(skip)
+# _odata_link builds an @odata.nextLink URL for OData pagination. It carries
+# both $top (so the next page keeps the same page size) and $skip (the opaque
+# cursor token returned by the engine paginate() builtin).
+def _odata_link(base_url, top, skip_token):
+    return base_url + "?$top=" + str(top) + "&$skip=" + skip_token
 
 # _to_int parses a decimal string to int. Returns 0 for None, empty string,
 # or any non-numeric input (never crashes on None).
@@ -163,46 +165,44 @@ def _find_substr(s, needle):
             return i
     return -1
 
+# _list_page applies engine pagination to a (pre-filtered) list of entities
+# using the OData $top (page size) and $skip (cursor) query parameters. It
+# delegates the slicing to the pure paginate() builtin. Returns (page,
+# next_cursor) where next_cursor is the opaque token to emit in
+# @odata.nextLink, or "" when there are no more pages.
+def _list_page(entities, query):
+    top = _to_int(query.get("$top", ""))
+    skip = query.get("$skip", "")
+    page, next_cursor = paginate(entities, top, skip)
+    return page, next_cursor
+
 # _apply_odata applies $select, $filter, $top, and $skip query parameters
 # to a list of entities and returns an OData response envelope dict.
-# base_url is used for the @odata.nextLink.
+# base_url is used for the @odata.nextLink. $filter runs BEFORE paging;
+# paging is handled by the engine paginate() builtin via _list_page.
 def _apply_odata(entities, query, base_url):
-    # $filter
+    # $filter (apply before paging).
     filter_expr = query.get("$filter", "")
     entities = _filter_list(entities, filter_expr)
 
-    # $select
+    # $select projection fields.
     select_fields = _split_commas(query.get("$select", ""))
 
-    # $skip
-    skip = _to_int(query.get("$skip", "0"))
-
-    # $top
-    top = _to_int(query.get("$top", "0"))
-
-    # Apply skip then top.
-    if skip > 0 and skip < len(entities):
-        entities = entities[skip:]
-    elif skip >= len(entities):
-        entities = []
-
-    has_next = False
-    if top > 0:
-        if len(entities) > top:
-            has_next = True
-            entities = entities[:top]
+    # Pagination: $top = page size, $skip = opaque cursor token.
+    top = _to_int(query.get("$top", ""))
+    page, next_cursor = _list_page(entities, query)
 
     # Project selected fields.
     value = []
-    for e in entities:
+    for e in page:
         value.append(_select_fields(e, select_fields))
 
     envelope = {
         "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#collection",
         "value": value,
     }
-    if has_next:
-        envelope["@odata.nextLink"] = _odata_link(base_url, skip + top)
+    if next_cursor != None and next_cursor != "":
+        envelope["@odata.nextLink"] = _odata_link(base_url, top, next_cursor)
     return respond(200, envelope)
 
 # --- OneDrive driveItem helpers (shared by drive.star and drive_upload.star) ---

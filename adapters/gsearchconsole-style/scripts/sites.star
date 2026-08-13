@@ -19,7 +19,12 @@ def on_list_sites(req):
             "permissionLevel": s.get("permissionLevel", "siteFullUser"),
         })
 
-    return respond(200, {"siteEntry": items})
+    # Apply Search Console pagination (maxResults + pageToken) after listing.
+    page, next_token = _list_page(req, items)
+    result = {"siteEntry": page}
+    if next_token != None:
+        result["nextPageToken"] = next_token
+    return respond(200, result)
 
 def on_list_sitemaps(req):
     err = _require_bearer(req)
@@ -28,21 +33,26 @@ def on_list_sitemaps(req):
 
     site_url = req["params"]["siteUrl"]
 
-    return respond(200, {
-        "sitemap": [
-            {
-                "path": site_url + "sitemap.xml",
-                "lastSubmitted": "2024-01-01T00:00:00.000Z",
-                "lastDownloaded": "2024-01-01T00:00:00.000Z",
-                "isPending": False,
-                "isSitemapsIndex": False,
-                "type": "sitemap",
-                "errors": "0",
-                "warnings": "0",
-                "contents": [{"type": "web", "submitted": "42", "indexed": "38"}],
-            },
-        ],
-    })
+    sitemaps = [
+        {
+            "path": site_url + "sitemap.xml",
+            "lastSubmitted": "2024-01-01T00:00:00.000Z",
+            "lastDownloaded": "2024-01-01T00:00:00.000Z",
+            "isPending": False,
+            "isSitemapsIndex": False,
+            "type": "sitemap",
+            "errors": "0",
+            "warnings": "0",
+            "contents": [{"type": "web", "submitted": "42", "indexed": "38"}],
+        },
+    ]
+
+    # Apply Search Console pagination (maxResults + pageToken).
+    page, next_token = _list_page(req, sitemaps)
+    result = {"sitemap": page}
+    if next_token != None:
+        result["nextPageToken"] = next_token
+    return respond(200, result)
 
 def on_inspect(req):
     err = _require_bearer(req)

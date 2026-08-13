@@ -65,10 +65,11 @@ def on_list_runs(req):
             continue
         result.append(_run_view(r))
 
+    page, next_link = _list_page(req, result)
     return respond(200, {
         "total_count": len(result),
-        "workflow_runs": result,
-    })
+        "workflow_runs": page,
+    }, _gh_link_headers(next_link))
 
 # --- helpers ---
 

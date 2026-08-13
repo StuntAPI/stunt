@@ -36,7 +36,11 @@ def on_list_listings(req):
     for listing in lc.list():
         result.append(_strip_id(listing))
 
-    return respond(200, {"orders": result})
+    page, next_cursor = _list_page(req, result)
+    body = {"orders": page}
+    if next_cursor != None:
+        body["next"] = next_cursor
+    return respond(200, body)
 
 def on_list_offers(req):
     auth_err = _require_xapikey(req)
@@ -53,7 +57,11 @@ def on_list_offers(req):
     for offer in oc.list():
         result.append(_strip_id(offer))
 
-    return respond(200, {"orders": result})
+    page, next_cursor = _list_page(req, result)
+    body = {"orders": page}
+    if next_cursor != None:
+        body["next"] = next_cursor
+    return respond(200, body)
 
 def on_create_offer(req):
     auth_err = _require_xapikey(req)

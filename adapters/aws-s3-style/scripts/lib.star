@@ -281,3 +281,57 @@ def _to_int_str(val):
     if dot > 0:
         return s[:dot]
     return s
+
+# ====================================================================
+# List pagination (ListObjectsV2)
+# ====================================================================
+# S3 ListObjectsV2 pagination:
+#   page-size param : max-keys        (S3 default 1000)
+#   cursor param    : continuation-token (opaque, round-tripped by the client)
+#   next cursor     : <NextContinuationToken> element in the XML body,
+#                     alongside <IsTruncated>.
+# The engine paginate() builtin uses an opaque integer-offset token; we
+# expose it verbatim as the continuation-token.
+
+_S3_DEFAULT_MAX_KEYS = 1000
+
+# _to_int parses a decimal string to int. Returns 0 for None, empty string,
+# or any non-numeric input (never crashes on None).
+def _to_int(s):
+    if s == None or s == "":
+        return 0
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch >= "0" and ch <= "9":
+            n = n * 10 + (ord(ch) - ord("0"))
+        else:
+            return 0
+    return n
+
+# _list_page applies S3 ListObjectsV2 pagination (max-keys +
+# continuation-token) to a list of docs via the paginate builtin. Returns
+# (page, next_cursor) where next_cursor is "" when there is no further
+# page. When max-keys is absent the S3 default (1000) is used; a max-keys
+# of 0 or negative disables paging per the builtin contract.
+def _list_page(req, docs):
+    q = req.get("query")
+    if q == None:
+        q = {}
+    limit = _S3_DEFAULT_MAX_KEYS
+    raw = q.get("max-keys", "")
+    if raw != None and raw != "":
+        n = _to_int(raw)
+        if n > 0:
+            limit = n
+        else:
+            # 0 / non-positive → disable paging (returns all, next None).
+            limit = 0
+    cursor = q.get("continuation-token", "")
+    if cursor == None:
+        cursor = ""
+    page, nxt = paginate(docs, limit, cursor)
+    next_cursor = ""
+    if nxt != None:
+        next_cursor = nxt
+    return page, next_cursor

@@ -32,9 +32,11 @@ def on_list_documents(req):
         if d.get("collection", "") == collection and d.get("project", "") == project:
             result.append(_document_entity(d, project, collection))
 
-    return respond(200, {
-        "documents": result,
-    })
+    page, next_cursor = _list_page(req, result)
+    body = {"documents": page}
+    if next_cursor != None:
+        body["nextPageToken"] = next_cursor
+    return respond(200, body)
 
 # on_create_document creates a new document with an auto-generated id.
 # POST /v1/projects/{project}/databases/(default)/documents/{collection}

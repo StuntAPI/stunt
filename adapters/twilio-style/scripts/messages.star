@@ -88,14 +88,26 @@ def on_list_messages(req):
             continue
         result.append(m)
 
+    # Apply paging after filtering. Twilio lists are driven by PageSize
+    # (page size) + PageToken (opaque cursor from a prior next_page_uri).
+    page, next_cursor = _list_page(req, result)
+
+    page_size = _to_int(req["query"].get("PageSize", ""))
+    if page_size <= 0:
+        page_size = 50
+
+    next_page_uri = None
+    if next_cursor != None:
+        next_page_uri = "/2010-06-01/Accounts/" + account_sid + "/Messages.json?Page=0&PageSize=" + str(page_size) + "&PageToken=" + next_cursor
+
     return respond(200, {
-        "first_page_uri": "/2010-06-01/Accounts/" + account_sid + "/Messages.json?Page=0&PageSize=50",
-        "next_page_uri": None,
+        "first_page_uri": "/2010-06-01/Accounts/" + account_sid + "/Messages.json?Page=0&PageSize=" + str(page_size),
+        "next_page_uri": next_page_uri,
         "page": 0,
-        "page_size": 50,
+        "page_size": page_size,
         "previous_page_uri": None,
         "uri": "/2010-06-01/Accounts/" + account_sid + "/Messages.json",
-        "messages": result,
+        "messages": page,
     })
 
 # on_get_message retrieves a single message by SID.

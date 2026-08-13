@@ -45,6 +45,30 @@ def _to_int(s):
             return 0
     return n
 
+# _get_query reads a single value from the request query string.
+# Returns "" if the query dict or key is absent (never crashes on None).
+def _get_query(req, key):
+    q = req.get("query")
+    if q == None:
+        return ""
+    v = q.get(key, "")
+    if v == None:
+        return ""
+    return v
+
+# _list_page slices a list of docs by the Printful pagination query params
+# (limit = page size, offset = opaque cursor token) via the paginate() builtin
+# and returns (page, next_cursor). A missing/empty limit disables paging
+# (paginate returns all items, next_cursor None). next_cursor is the opaque
+# offset token for the next page, or None when no items remain.
+def _list_page(req, docs):
+    q = req.get("query")
+    if q == None:
+        q = {}
+    limit = _to_int(q.get("limit", ""))
+    cursor = q.get("offset", "")
+    return paginate(docs, limit, cursor)
+
 # _next_product_id returns the next sequential product id.
 def _next_product_id():
     return store_kv_incr("printful", "product_seq")

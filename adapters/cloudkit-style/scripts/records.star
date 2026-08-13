@@ -76,7 +76,11 @@ def on_query(req):
             continue
         result.append(_record_response(record))
 
-    return respond(200, {"records": result})
+    page, next_cursor = _list_page(req, result)
+    resp = {"records": page}
+    if next_cursor != None:
+        resp["continuationMarker"] = next_cursor
+    return respond(200, resp)
 
 # on_modify performs create/update/delete operations.
 def on_modify(req):

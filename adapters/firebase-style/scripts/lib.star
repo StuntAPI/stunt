@@ -86,6 +86,26 @@ def _to_int(s):
     return n
 
 # ====================================================================
+# List pagination
+# ====================================================================
+
+# _list_page applies Firebase/Firestore-style paging to a full list of
+# resources. It reads the provider's pageSize (page size) and pageToken
+# (cursor) query params and delegates to the pure paginate() builtin.
+#
+# Returns (page, next_cursor) where next_cursor is an opaque string token for
+# the next page, or None when no items remain. When pageSize is absent or <= 0
+# paging is disabled and the whole list is returned with next_cursor None,
+# preserving the unpaginated behavior.
+def _list_page(req, docs):
+    q = req["query"]
+    limit = _to_int(q.get("pageSize", ""))
+    cursor = q.get("pageToken", "")
+    if cursor == None:
+        cursor = ""
+    return paginate(docs, limit, cursor)
+
+# ====================================================================
 # Firestore typed-value helpers
 # ====================================================================
 # Firestore represents every field value as a typed wrapper:

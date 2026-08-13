@@ -80,6 +80,9 @@ def _list_blobs(req):
             continue
         matching.append(b)
 
+    # Apply paging (maxresults + marker) after prefix filtering.
+    matching, next_marker = _list_page(req, matching)
+
     xml = '<?xml version="1.0" encoding="utf-8"?>\n'
     xml = xml + '<EnumerationResults ServiceEndpoint="http://stunt.local/" ContainerName="' + _xml_escape(container) + '">\n'
     xml = xml + "  <Blobs>\n"
@@ -102,7 +105,10 @@ def _list_blobs(req):
         xml = xml + "      </Properties>\n"
         xml = xml + "    </Blob>\n"
     xml = xml + "  </Blobs>\n"
-    xml = xml + "  <NextMarker />\n"
+    if next_marker == "":
+        xml = xml + "  <NextMarker />\n"
+    else:
+        xml = xml + "  <NextMarker>" + _xml_escape(next_marker) + "</NextMarker>\n"
     xml = xml + "</EnumerationResults>"
     return respond(200, xml, {"Content-Type": "application/xml", "x-ms-request-id": _req_id()})
 

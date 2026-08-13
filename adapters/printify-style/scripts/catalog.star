@@ -65,7 +65,8 @@ def on_list_blueprints(req):
     err = _require_auth(req)
     if err != None:
         return err
-    return respond(200, {"data": _BLUEPRINTS})
+    page, next_page = _list_page(req, _BLUEPRINTS)
+    return respond(200, {"data": page, "next_page": next_page})
 
 # on_list_variants returns the variants for a given blueprint_id.
 def on_list_variants(req):
@@ -77,4 +78,5 @@ def on_list_variants(req):
     variants = _VARIANTS.get(bp_id)
     if variants == None:
         return respond(404, {"status": 404, "message": "blueprint not found"})
-    return respond(200, {"data": variants})
+    page, next_page = _list_page(req, variants)
+    return respond(200, {"data": page, "next_page": next_page})

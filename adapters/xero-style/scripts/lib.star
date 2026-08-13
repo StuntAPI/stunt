@@ -106,12 +106,67 @@ def _xero_id():
     return _guid(n + 5000)
 
 # _envelope returns Xero's { Id, Status, <Entities>: [...] } envelope.
-def _envelope(entities_key, entities_list):
-    return respond(200, {
+# next_page is an optional Xero page-number cursor; when not None it is surfaced
+# as a top-level "nextPage" field so callers can round-trip the next page.
+def _envelope(entities_key, entities_list, next_page=None):
+    body = {
         "Id": _xero_id(),
         "Status": "OK",
         entities_key: entities_list,
-    })
+    }
+    if next_page != None:
+        body["nextPage"] = next_page
+    return respond(200, body)
+
+# _to_int parses a string/int into an int, returning 0 on any failure (mirrors
+# the adapter's defensive parsing conventions).
+def _to_int(v):
+    if type(v) == type(0):
+        return v
+    if v == None:
+        return 0
+    s = str(v)
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch >= "0" and ch <= "9":
+            n = n * 10 + (ord(ch) - ord("0"))
+        else:
+            return 0
+    return n
+
+# _get_query reads a single query-param value from req, returning "" for a
+# missing param or a None value (mirrors the adapter's existing conventions).
+def _get_query(req, key):
+    q = req.get("query")
+    if q == None:
+        return ""
+    v = q.get(key, "")
+    if v == None:
+        return ""
+    return v
+
+# _list_page applies Xero-style pagination to a list of docs via the pure
+# paginate() builtin. Xero paginates with a 1-based `page` query param together
+# with `pageSize`. When `pageSize` is missing or <= 0 paging is DISABLED (the
+# whole list is returned with a None next_page, preserving the prior
+# unpaginated behavior). The returned next_page is the next 1-based page number
+# (the value the client echoes back as the `page` query param), or None when no
+# further pages remain. The builtin's opaque offset cursor is derived from the
+# requested page number and never escapes the adapter.
+def _list_page(req, docs):
+    page_size = _to_int(_get_query(req, "pageSize"))
+    if page_size <= 0:
+        return docs, None
+    page = _to_int(_get_query(req, "page"))
+    if page <= 0:
+        page = 1
+    offset = (page - 1) * page_size
+    page_docs, next_offset = paginate(docs, page_size, str(offset))
+    next_page = None
+    if next_offset != None:
+        next_page = str(page + 1)
+    return page_docs, next_page
 
 # _ensure_accounts seeds default chart of accounts.
 def _ensure_accounts():

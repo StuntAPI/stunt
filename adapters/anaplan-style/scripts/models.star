@@ -25,15 +25,20 @@ def on_list_models(req):
     if models == None:
         models = []
 
+    page, next_cursor = _list_page(req, models)
+    paging = {
+        "currentPageSize": len(page),
+        "offset": _to_int(req.get("query", {}).get("offset", "")),
+        "totalSize": len(models),
+    }
+    if next_cursor != None:
+        paging["nextCursor"] = next_cursor
+
     return respond(200, {
         "meta": {
-            "paging": {
-                "currentPageSize": len(models),
-                "offset": 0,
-                "totalSize": len(models),
-            },
+            "paging": paging,
         },
-        "items": models,
+        "items": page,
     })
 
 def on_get_model(req):
@@ -69,13 +74,18 @@ def on_list_modules(req):
         {"id": "mod003", "name": "Headcount", "activeState": True, "dataSource": False},
     ]
 
+    page, next_cursor = _list_page(req, modules)
+    paging = {
+        "currentPageSize": len(page),
+        "offset": _to_int(req.get("query", {}).get("offset", "")),
+        "totalSize": len(modules),
+    }
+    if next_cursor != None:
+        paging["nextCursor"] = next_cursor
+
     return respond(200, {
         "meta": {
-            "paging": {
-                "currentPageSize": len(modules),
-                "offset": 0,
-                "totalSize": len(modules),
-            },
+            "paging": paging,
         },
-        "items": modules,
+        "items": page,
     })

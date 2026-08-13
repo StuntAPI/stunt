@@ -24,7 +24,8 @@ def on_list_invoices(req):
     for doc in docs:
         invoices.append(_invoice_public(doc))
 
-    return _envelope("Invoices", invoices)
+    invoices, next_page = _list_page(req, invoices)
+    return _envelope("Invoices", invoices, next_page)
 
 # on_put_invoices creates invoices.
 def on_put_invoices(req):

@@ -120,3 +120,18 @@ def _to_int(s):
         else:
             return n
     return n
+
+# _list_page applies Slack-style cursor pagination to a list of docs.
+# Slack uses "limit" (page size) and "cursor" (an opaque offset token
+# returned by a prior call). Returns (page, next_cursor). When limit is
+# None or <= 0, paging is disabled: the full list is returned with a None
+# next_cursor, preserving the pre-pagination behavior.
+def _list_page(req, docs):
+    q = req.get("query")
+    if q == None:
+        q = {}
+    limit = _to_int(q.get("limit", ""))
+    cursor = q.get("cursor", "")
+    if cursor == None:
+        cursor = ""
+    return paginate(docs, limit, cursor)

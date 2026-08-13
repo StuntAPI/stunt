@@ -39,14 +39,18 @@ def on_list_users(req):
 
     uc = store_collection("users")
     docs = uc.list()
+    page, next_link = _list_page(req, docs, "/v1.0/users")
     value = []
-    for d in docs:
+    for d in page:
         value.append(_user_entity(d))
 
-    return respond(200, {
+    resp = {
         "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users",
         "value": value,
-    })
+    }
+    if next_link != None:
+        resp["@odata.nextLink"] = next_link
+    return respond(200, resp)
 
 # on_create_user creates a new user in the directory.
 # POST /v1.0/users (Bearer, admin consent required)
@@ -133,8 +137,9 @@ def on_list_applications(req):
 
     ac = store_collection("applications")
     docs = ac.list()
+    page, next_link = _list_page(req, docs, "/v1.0/applications")
     value = []
-    for d in docs:
+    for d in page:
         value.append({
             "id": d["id"],
             "appId": d["appId"],
@@ -142,10 +147,13 @@ def on_list_applications(req):
             "createdDateTime": d["createdDateTime"],
         })
 
-    return respond(200, {
+    resp = {
         "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#applications",
         "value": value,
-    })
+    }
+    if next_link != None:
+        resp["@odata.nextLink"] = next_link
+    return respond(200, resp)
 
 # on_list_service_principals returns all service principals.
 # GET /v1.0/servicePrincipals (Bearer)
@@ -163,8 +171,9 @@ def on_list_service_principals(req):
 
     spc = store_collection("service_principals")
     docs = spc.list()
+    page, next_link = _list_page(req, docs, "/v1.0/servicePrincipals")
     value = []
-    for d in docs:
+    for d in page:
         value.append({
             "id": d["id"],
             "appId": d["appId"],
@@ -173,10 +182,13 @@ def on_list_service_principals(req):
             "appRoles": d.get("appRoles", []),
         })
 
-    return respond(200, {
+    resp = {
         "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#servicePrincipals",
         "value": value,
-    })
+    }
+    if next_link != None:
+        resp["@odata.nextLink"] = next_link
+    return respond(200, resp)
 
 # --- helpers ---
 
