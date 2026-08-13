@@ -177,3 +177,13 @@ def on_token(req):
     uc.insert(u)
 
     return respond(200, _issue_tokens(user, scope))
+
+# on_jwks serves the JWKS (public signing keys) so a client can verify the RS256
+# tokens minted by _mint_jwt. Matches the Microsoft identity platform's
+# /common/discovery/v2.0/keys shape.
+def on_jwks(req):
+    key = crypto.rsa_public_jwk(_JWT_PUBLIC_KEY)
+    key["kid"] = _JWT_KID
+    key["alg"] = "RS256"
+    key["use"] = "sig"
+    return respond(200, {"keys": [key]})
