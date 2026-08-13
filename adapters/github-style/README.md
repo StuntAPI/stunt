@@ -61,11 +61,14 @@ this exercises your signature-verification path, not GitHub's event-schema parse
 SHA-256 only (`X-Hub-Signature-256`); the legacy SHA-1 header is not emitted.
 
 ```
-X-Hub-Signature-256: sha256=<hex(HMAC-SHA256(webhook_secret, raw_body))>
-X-Hub-Signature:     sha1=<hex(HMAC-SHA1(webhook_secret, raw_body))>   (legacy)
-X-GitHub-Event:      <event_type>  (push, pull_request, issues, etc.)
-X-GitHub-Delivery:   <uuid>
+X-Hub-Signature-256: sha256=<hex(HMAC-SHA256(webhook_secret, raw_body))>   ← emitted by stunt
+X-Hub-Signature:     sha1=<hex(HMAC-SHA1(webhook_secret, raw_body))>       (legacy; real GitHub only)
+X-GitHub-Event:      <event_type>  (push, pull_request, issues, etc.)      ← emitted by stunt
+X-GitHub-Delivery:   <uuid>                                              (real GitHub only)
 ```
+
+Stunt emits only `X-Hub-Signature-256` and `X-GitHub-Event`; the legacy SHA-1
+header and `X-GitHub-Delivery` (delivery UUID) are not emitted.
 
 Verification in Go:
 
