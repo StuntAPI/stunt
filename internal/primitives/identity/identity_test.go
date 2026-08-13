@@ -212,4 +212,15 @@ func TestIssuerWithInjectableClock(t *testing.T) {
 	if _, err := iss.Validate(token2); err != nil {
 		t.Fatalf("Validate fresh token after advance: %v", err)
 	}
+
+	// Determinism: two independent issuers whose virtual clocks agree produce
+	// byte-identical tokens for the same inputs — the property record/replay
+	// relies on. A time.Now() implementation would (almost) never match here.
+	a := NewIssuerWithClock([]byte("det"), clock.NewVirtualClock(start))
+	b := NewIssuerWithClock([]byte("det"), clock.NewVirtualClock(start))
+	ta, _ := a.Mint("sub", []string{"read", "write"}, 2*time.Hour)
+	tb, _ := b.Mint("sub", []string{"read", "write"}, 2*time.Hour)
+	if ta != tb {
+		t.Fatalf("tokens differ across virtual-clock instances — not deterministic:\n a=%s\n b=%s", ta, tb)
+	}
 }
