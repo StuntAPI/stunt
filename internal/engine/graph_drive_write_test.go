@@ -646,17 +646,29 @@ func sessionIDFromURL(t *testing.T, url string) string {
 	return url[idx+1:]
 }
 
+// firstChunkPUT sends a valid first chunk (bytes 0-99) to uploadURL and fails
+// the test unless it is accepted (202), creating the partial blob via the
+// adapter's own append path — the contract the GC tests must exercise.
+func firstChunkPUT(t *testing.T, uploadURL string, total int) {
+	t.Helper()
+	status, body := graphDo(t, "PUT", uploadURL, "", allByteValues(total)[0:100], map[string]string{
+		"Content-Range": fmt.Sprintf("bytes 0-99/%d", total),
+		"Content-Type":  "application/octet-stream",
+	})
+	if status != 202 {
+		t.Fatalf("first chunk -> %d, want 202; body %s", status, body)
+	}
+}
+
 // TestGraphDriveUploadSessionExpiresOnAccess proves a session past its 48h TTL
-// is reaped on first use: the chunk returns 404 (same as a missing session) and
-// both the session row and its partial blob are gone. Uses an injected virtual
-// clock so the TTL can elapse instantly.
+// is reaped on next use: the chunk returns 404 and BOTH the session row and the
+// partial blob — created by the adapter's own append path — are gone. Uses an
+// injected virtual clock so the TTL elapses instantly.
 func TestGraphDriveUploadSessionExpiresOnAccess(t *testing.T) {
 	vc := clock.NewVirtualClock(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 	base, e := bootGraphServiceWithClock(t, 0, vc)
 
-	original := allByteValues(500)
-	total := len(original)
-
+	const total = 500
 	sessBody, _ := json.Marshal(map[string]any{
 		"item": map[string]any{"@microsoft.graph.conflictBehavior": "rename", "name": "later.bin"},
 	})
@@ -668,23 +680,23 @@ func TestGraphDriveUploadSessionExpiresOnAccess(t *testing.T) {
 	uploadURL, _ := graphJSON(t, body)["uploadUrl"].(string)
 	sid := sessionIDFromURL(t, uploadURL)
 
-	// Seed a partial blob so its reclamation is observable.
+	firstChunkPUT(t, uploadURL, total) // append-creates up-<sid> via the adapter path
 	st := e.states["graph"]
-	if _, err := st.blobStore.PutWith("drive", "up-"+sid, "application/octet-stream", strings.NewReader("partial")); err != nil {
-		t.Fatalf("seed partial blob: %v", err)
+	if _, err := st.blobStore.Get("drive", "up-"+sid); err != nil {
+		t.Fatalf("partial blob not created by first chunk: %v", err)
 	}
 
 	vc.Advance(49 * time.Hour) // past the 48h TTL
 
 	// A chunk to the now-expired session → 404 (same as a missing session).
-	status, _ = graphDo(t, "PUT", uploadURL, "", original[0:100], map[string]string{
-		"Content-Range": fmt.Sprintf("bytes 0-99/%d", total),
+	status, _ = graphDo(t, "PUT", uploadURL, "", allByteValues(total)[100:200], map[string]string{
+		"Content-Range": fmt.Sprintf("bytes 100-199/%d", total),
 	})
 	if status != 404 {
 		t.Fatalf("chunk to expired session -> %d, want 404", status)
 	}
 
-	// The expire-on-access path reaped the session row AND the partial blob.
+	// Expire-on-access reaped the session row AND the append-created partial blob.
 	col, _ := st.store.Collection("sessions")
 	if _, err := col.Get(sid); err == nil {
 		t.Fatal("session row still present after expiry")
@@ -694,13 +706,14 @@ func TestGraphDriveUploadSessionExpiresOnAccess(t *testing.T) {
 	}
 }
 
-// TestGraphDriveUploadSessionSweepOnCreate proves that creating a new session
-// sweeps abandoned ones past TTL (row + partial blob), while an in-window
-// session survives and the session_seq KV counter persists (not reset).
+// TestGraphDriveUploadSessionSweepOnCreate proves creating a new session sweeps
+// abandoned ones past TTL (row + the append-created partial blob), an in-window
+// session survives, and the session_seq KV counter persists (not reset).
 func TestGraphDriveUploadSessionSweepOnCreate(t *testing.T) {
 	vc := clock.NewVirtualClock(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 	base, e := bootGraphServiceWithClock(t, 0, vc)
 
+	const total = 500
 	create := func(name string) string {
 		sessBody, _ := json.Marshal(map[string]any{
 			"item": map[string]any{"@microsoft.graph.conflictBehavior": "rename", "name": name},
@@ -715,14 +728,12 @@ func TestGraphDriveUploadSessionSweepOnCreate(t *testing.T) {
 	}
 
 	sidA := create("a.bin")
-	st := e.states["graph"]
-	if _, err := st.blobStore.PutWith("drive", "up-"+sidA, "application/octet-stream", strings.NewReader("partialA")); err != nil {
-		t.Fatalf("seed partial blob A: %v", err)
-	}
+	firstChunkPUT(t, base+"/v1.0/_upload/"+sidA, total) // append-creates up-<sidA>
 
 	vc.Advance(49 * time.Hour) // A is now abandoned past TTL
 	sidB := create("b.bin")    // triggers _sweep_expired_sessions
 
+	st := e.states["graph"]
 	col, _ := st.store.Collection("sessions")
 	if _, err := col.Get(sidA); err == nil {
 		t.Fatal("abandoned session A row still present after sweep-on-create")
@@ -736,5 +747,52 @@ func TestGraphDriveUploadSessionSweepOnCreate(t *testing.T) {
 	// session_seq must persist across the sweep (GC never touches KV counters).
 	if sidB != "sess-000002" {
 		t.Fatalf("session B id = %q, want sess-000002 (session_seq must persist)", sidB)
+	}
+}
+
+// TestGraphDriveUploadSessionInWindowSurvives pins the TTL value: a session
+// advanced LESS than 48h must NOT be reaped (by expire-on-access or by a sweep).
+// Without this, a regression that drops the TTL term (reaping every session on
+// the next access/sweep) would pass the two tests above.
+func TestGraphDriveUploadSessionInWindowSurvives(t *testing.T) {
+	vc := clock.NewVirtualClock(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+	base, e := bootGraphServiceWithClock(t, 0, vc)
+
+	const total = 500
+	sessBody, _ := json.Marshal(map[string]any{
+		"item": map[string]any{"@microsoft.graph.conflictBehavior": "rename", "name": "live.bin"},
+	})
+	status, body := graphDo(t, "POST", base+"/v1.0/me/drive/root:/live.bin:/createUploadSession",
+		graphToken, sessBody, map[string]string{"Content-Type": "application/json"})
+	if status != 200 {
+		t.Fatalf("createUploadSession -> %d: %s", status, body)
+	}
+	uploadURL, _ := graphJSON(t, body)["uploadUrl"].(string)
+	sid := sessionIDFromURL(t, uploadURL)
+	firstChunkPUT(t, uploadURL, total)
+
+	vc.Advance(47 * time.Hour) // still within the 48h TTL
+
+	// A sweep triggered by a fresh createUploadSession must leave the in-window
+	// session (and its partial blob) intact.
+	if status, body := graphDo(t, "POST", base+"/v1.0/me/drive/root:/other.bin:/createUploadSession",
+		graphToken, []byte("{}"), map[string]string{"Content-Type": "application/json"}); status != 200 {
+		t.Fatalf("sweep-triggering create -> %d: %s", status, body)
+	}
+	st := e.states["graph"]
+	col, _ := st.store.Collection("sessions")
+	if _, err := col.Get(sid); err != nil {
+		t.Fatal("in-window session row was reaped by the sweep")
+	}
+	if _, err := st.blobStore.Get("drive", "up-"+sid); err != nil {
+		t.Fatal("in-window partial blob was reaped by the sweep")
+	}
+
+	// And expire-on-access must still accept a chunk (202), not 404 it.
+	status, _ = graphDo(t, "PUT", uploadURL, "", allByteValues(total)[100:200], map[string]string{
+		"Content-Range": fmt.Sprintf("bytes 100-199/%d", total),
+	})
+	if status != 202 {
+		t.Fatalf("chunk to in-window session -> %d, want 202", status)
 	}
 }

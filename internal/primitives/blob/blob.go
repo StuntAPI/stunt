@@ -166,8 +166,9 @@ func (s *Store) PutWith(ns, name, contentType string, r io.Reader) (string, erro
 // Concurrency contract: a single Append is crash-safe (meta is temp-then-renamed
 // so a reader never sees a half-written meta). Append is NOT linearizable across
 // concurrent appends to the same id — the caller must serialize them (the graph
-// upload endpoint does so via concurrency_key). Append does not roll back a
-// partial content write on an io.Reader error.
+// upload endpoint does so via concurrency_key). If Append fails after writing any
+// bytes, the content is truncated back to its pre-append size, so a caller retry
+// re-appends exactly once rather than duplicating the chunk.
 func (s *Store) Append(ns, id, contentType string, r io.Reader) (int64, error) {
 	if err := validateName("namespace", ns); err != nil {
 		return 0, err
@@ -185,12 +186,24 @@ func (s *Store) Append(ns, id, contentType string, r io.Reader) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("blob: append open %s/%s: %w", ns, id, err)
 	}
-	n, err := io.Copy(f, r)
-	if err := f.Close(); err != nil {
-		return 0, fmt.Errorf("blob: append close %s/%s: %w", ns, id, err)
+	// Size before any bytes are written. Used to roll a partial/failed append
+	// back so a caller retry re-appends exactly once (Put replaces the whole
+	// blob and was naturally idempotent; Append must work to stay so).
+	preInfo, _ := f.Stat()
+	preSize := int64(0)
+	if preInfo != nil {
+		preSize = preInfo.Size()
 	}
-	if err != nil {
-		return 0, fmt.Errorf("blob: append write %s/%s: %w", ns, id, err)
+	n, copyErr := io.Copy(f, r)
+	closeErr := f.Close()
+	if copyErr != nil || closeErr != nil {
+		if n > 0 {
+			_ = os.Truncate(contentPath, preSize)
+		}
+		if copyErr != nil {
+			return 0, fmt.Errorf("blob: append write %s/%s: %w", ns, id, copyErr)
+		}
+		return 0, fmt.Errorf("blob: append close %s/%s: %w", ns, id, closeErr)
 	}
 
 	info, err := os.Stat(contentPath)
@@ -211,12 +224,18 @@ func (s *Store) Append(ns, id, contentType string, r io.Reader) (int64, error) {
 	if prev, err := s.readMeta(ns, id); err == nil {
 		name, ct = prev.Name, prev.ContentType
 	}
-	return total, s.writeMeta(ns, id, metadata{
+	if err := s.writeMeta(ns, id, metadata{
 		Name:        name,
 		Size:        total,
 		ContentType: ct,
 		Modified:    time.Now().UTC(),
-	})
+	}); err != nil {
+		// Meta write failed after the content grew: roll the content back so a
+		// retry leaves the blob as it was (old meta, old size).
+		_ = os.Truncate(contentPath, preSize)
+		return 0, err
+	}
+	return total, nil
 }
 
 // readMeta loads and decodes a blob's metadata. Returns ErrNotFound when the

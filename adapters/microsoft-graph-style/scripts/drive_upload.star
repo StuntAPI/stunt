@@ -197,7 +197,10 @@ def on_upload_chunk(req):
     # Expire-on-access: a session past TTL is already gone. Same 404 as a
     # missing/completed session (real Graph returns 404 here; clients cannot
     # distinguish 'expired' from 'never existed'). concurrency_key: session
-    # serializes this handler, so the reap is race-free.
+    # serializes chunk-vs-chunk on the same session; it does NOT serialize
+    # against _sweep_expired_sessions (run by createUploadSession), whose
+    # concurrent reap of the same row/blob is benign because deletes are
+    # idempotent.
     if clock.now_unix() > sess.get("created_unix", 0) + _UPLOAD_SESSION_TTL_SECONDS:
         b = store_blob("drive")
         b.delete("up-" + session_id)
@@ -238,7 +241,12 @@ def on_upload_chunk(req):
         # or it reintroduces the abandonment leak.
         full = b.get("up-" + session_id)
         if full == None:
-            full = ""
+            # The partial vanished between the append and this read — only a
+            # concurrent _sweep_expired_sessions reap can do that. Treat it as a
+            # gone session (404) so the client retries with a fresh one, instead
+            # of silently assembling an empty driveItem.
+            sc.delete(session_id)
+            return _err("itemNotFound", 404, "The upload session was not found or is already completed.")
         fc = store_collection("files")
         name = sess["name"]
         parent_id = sess["parentId"]
@@ -322,6 +330,10 @@ def _expiry_rfc3339(created_unix):
 # _sweep_expired_sessions reaps abandoned sessions past TTL: each row plus its
 # partial blob. KV counters and the files collection are never touched. Legacy
 # rows without created_unix default to 0 and are reaped on the first sweep.
+# NOTE: this runs in createUploadSession (no concurrency_key), so it is not
+# serialized against an in-flight chunk on another session. The deletes are
+# idempotent, and on Windows a blob held open by an in-flight chunk may survive
+# this sweep and be reaped on a later one — bounded, non-corrupting.
 def _sweep_expired_sessions():
     sc = store_collection("sessions")
     b = store_blob("drive")
