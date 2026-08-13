@@ -95,6 +95,16 @@ func (e *Emitter) Register(ns, url string) {
 	e.targets[ns] = url
 }
 
+// Target returns the currently-registered webhook URL for the given namespace,
+// or "" if none is registered. Handlers use it to learn where events_emit will
+// deliver (needed by providers whose signature MACs the destination URL, e.g.
+// Twilio and Square).
+func (e *Emitter) Target(ns string) string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.targets[ns]
+}
+
 // Close releases resources associated with the Emitter, including closing
 // idle HTTP connections from the underlying client's pool. After Close, the
 // Emitter should not be used.

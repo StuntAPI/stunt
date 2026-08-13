@@ -214,3 +214,21 @@ def _order_public(doc):
         "total_money": doc.get("total_money", {}),
         "created_at": doc.get("created_at", "2024-01-01T00:00:00Z"),
     }
+
+# Mock Webhook Signature Key for Square webhook signing. Configure your Square
+# webhook receiver with this exact string as the signature key to verify
+# stunt's deliveries. Public + low-entropy: local stunt only.
+_WEBHOOK_SIGNATURE_KEY = "sq0sip_stunt_mock_signature_key_2026"
+
+# _signed_emit MACs the exact on-wire body and delivers with
+# X-Square-HmacSha256-Signature (Square's scheme):
+# base64(HMAC-SHA256(signature_key, notification_url + body)). Square MACs the
+# notification URL + raw body, so the receiver validates against the same URL
+# stunt delivered to.
+def _signed_emit(event_type, payload):
+    body = events_body(event_type, payload)
+    url = events_target()
+    if url == None:
+        url = ""
+    sig = crypto.hmac_sha256(_WEBHOOK_SIGNATURE_KEY, url + body, encoding="base64")
+    events_emit(event_type, payload, {"X-Square-HmacSha256-Signature": sig})

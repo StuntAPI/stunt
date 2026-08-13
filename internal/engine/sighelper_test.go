@@ -2,6 +2,7 @@ package engine
 
 import (
 	"crypto/hmac"
+	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
@@ -117,5 +118,46 @@ func verifyShopifySig(t *testing.T, raw []byte, hdr http.Header, secret string) 
 	want := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	if got := hdr.Get("X-Shopify-Hmac-SHA256"); got != want {
 		t.Fatalf("X-Shopify-Hmac-SHA256 = %q, want %q", got, want)
+	}
+}
+
+// verifyWhatsAppSig re-derives "sha256="+hex(HMAC-SHA256(secret, rawBody)) and
+// compares it to the X-Hub-Signature-256 header (Meta's scheme, used by the
+// WhatsApp Cloud API).
+func verifyWhatsAppSig(t *testing.T, raw []byte, hdr http.Header, secret string) {
+	t.Helper()
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write(raw)
+	want := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+	if got := hdr.Get("X-Hub-Signature-256"); got != want {
+		t.Fatalf("X-Hub-Signature-256 = %q, want %q", got, want)
+	}
+}
+
+// verifyTwilioSig re-derives base64(HMAC-SHA1(authToken, url+rawBody)) and
+// compares it to the X-Twilio-Signature header. Twilio MACs the request URL
+// concatenated with the raw body; url is the delivery URL stunt POSTed to.
+func verifyTwilioSig(t *testing.T, raw []byte, hdr http.Header, authToken, url string) {
+	t.Helper()
+	mac := hmac.New(sha1.New, []byte(authToken))
+	mac.Write([]byte(url))
+	mac.Write(raw)
+	want := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	if got := hdr.Get("X-Twilio-Signature"); got != want {
+		t.Fatalf("X-Twilio-Signature = %q, want %q (url=%s)", got, want, url)
+	}
+}
+
+// verifySquareSig re-derives base64(HMAC-SHA256(key, url+rawBody)) and compares
+// it to the X-Square-HmacSha256-Signature header. Square MACs the notification
+// URL concatenated with the raw body.
+func verifySquareSig(t *testing.T, raw []byte, hdr http.Header, key, url string) {
+	t.Helper()
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write([]byte(url))
+	mac.Write(raw)
+	want := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	if got := hdr.Get("X-Square-HmacSha256-Signature"); got != want {
+		t.Fatalf("X-Square-HmacSha256-Signature = %q, want %q (url=%s)", got, want, url)
 	}
 }

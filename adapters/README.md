@@ -169,6 +169,7 @@ handler. Webhooks are delivered as HTTP POST with a JSON body `{type, payload}`.
 | Builtin | Signature | Returns | Notes |
 |---------|-----------|---------|-------|
 | `events_register(url)` | `(url: str)` | `None` | Registers a webhook URL for the current service |
+| `events_target()` | `()` | `str` or `None` | The currently-registered webhook URL for this service (or `None`). Use it when a provider's signature MACs the destination URL (Twilio, Square) |
 | `events_emit(event_type, payload?, headers?)` | `(event_type: str, payload: dict = {}, headers: dict = {})` | `None` | Emits an event to registered webhook(s). `headers` are set on the POST on top of `Content-Type: application/json` (a caller `Content-Type` overrides it); `Host`/`Content-Length` and any CR/LF are rejected |
 | `events_body(event_type, payload?)` | `(event_type: str, payload: dict = {})` | `str` | The exact JSON body `events_emit(event_type, payload)` will POST. Use it to compute a signature over the real wire bytes (see Signing webhooks below) |
 
@@ -241,11 +242,13 @@ events_emit("push", payload, {"X-Hub-Signature-256": "sha256=" + sig, "X-GitHub-
 | stripe-style | yes | `Stripe-Signature` (`t=,v1=`) | `whsec_stunt_mock_0123456789abcdef0123456789abcdef` | hex |
 | github-style | yes | `X-Hub-Signature-256` | `stunt_mock_github_webhook_secret_2026` | hex |
 | shopify-style | yes | `X-Shopify-Hmac-SHA256` | `shpss_stunt_mock_api_client_secret` | base64 |
+| whatsapp-style | yes | `X-Hub-Signature-256` (Meta) | `whatsapp_stunt_mock_app_secret_2026` | hex |
+| square-style | yes | `X-Square-HmacSha256-Signature` (URL+body) | `sq0sip_stunt_mock_signature_key_2026` | base64 |
+| twilio-style | yes | `X-Twilio-Signature` (SHA-1, URL+body) | `twilio_auth_token` | base64 |
 | adyen-style | deferred | — | — | — |
 | braintree-style | deferred | — | — | — |
-| twilio-style | deferred | — | — | — |
 
-Deferred providers need schemes the current primitives don't cover yet: Adyen signs an in-body `hmacSignature` over a derived field-concatenation; Braintree needs SHA-1 + raw-byte HMAC keys + form-encoded delivery; Twilio signs HMAC-SHA-1 over the sink URL + body hash.
+Deferred providers need schemes the current primitives don't cover yet: Adyen signs an in-body `hmacSignature` over a derived field-concatenation; Braintree needs raw-byte HMAC keys + form-encoded delivery. (Twilio was deferred for HMAC-SHA-1 over the sink URL + body — now shipped, via `crypto.hmac_sha1` + the new `events_target()` builtin for the delivery URL.) Square likewise MACs the notification URL + body.
 
 To receive events, set `config.webhook_url` in your `stunt.yaml`:
 
