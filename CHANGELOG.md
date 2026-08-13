@@ -6,6 +6,36 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-08-13
+
+### Starlark handler API
+
+- **`blob.append` + `blob.Store.Append`.** The blob store gains an append path
+  (`O_APPEND`, returns the new total size, preserves `content_type` from
+  creation) so resumable uploads append each chunk in place — O(chunk)
+  regardless of how large the partial has grown — instead of reading,
+  concatenating, and re-writing the whole blob per chunk (the O(k·N²)
+  read-concat-rewrite). A failed append rolls back to its pre-append size, so a
+  caller retry re-appends exactly once. Append is not linearizable across
+  concurrent appends to the same id; the caller must serialize (the Graph
+  upload endpoint already does, via `concurrency_key`).
+- **`clock.unix_to_rfc3339(unix_seconds)`.** Renders a Unix timestamp as
+  RFC3339. Accepts int or float — timestamps stored in a collection round-trip
+  through JSON as floats, so a strict int unpack rejected them.
+- **`engine.WithClock` option.** `New` accepts an optional clock so time-based
+  adapter behavior is testable against a virtual clock (production defaults to
+  real time).
+
+### Adapters
+
+- **microsoft-graph-style: real resumable-upload lifecycle.** Upload sessions
+  now expire at a real ~48h TTL (was a `2030-…` placeholder) and abandoned
+  sessions plus their partial blobs are reclaimed — sweep-on-create and
+  expire-on-access, both pure Starlark on the injectable clock. The chunk
+  handler uses `blob.append`; the final range reads the assembled bytes once.
+  HTTP contract of `/v1.0/_upload/{session}` (202/201/404/416/409) is
+  unchanged. Closes #17.
+
 ## [0.5.1] — 2026-08-12
 
 ### Engine

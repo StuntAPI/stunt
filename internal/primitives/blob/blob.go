@@ -155,6 +155,130 @@ func (s *Store) PutWith(ns, name, contentType string, r io.Reader) (string, erro
 	return id, nil
 }
 
+// Append writes r to the end of the blob ns/id, creating it if absent, and
+// returns the new total size of the blob after the append. contentType is
+// applied only at creation and preserved across subsequent appends.
+//
+// Append is the O(chunk) append path for resumable uploads: O_APPEND makes the
+// kernel seek to end per write, so cost is independent of how large the blob has
+// grown — unlike a read-modify-write Put of the accumulated content.
+//
+// Concurrency contract: a single Append is crash-safe (meta is temp-then-renamed
+// so a reader never sees a half-written meta). Append is NOT linearizable across
+// concurrent appends to the same id — the caller must serialize them (the graph
+// upload endpoint does so via concurrency_key). If Append fails after writing any
+// bytes, the content is truncated back to its pre-append size, so a caller retry
+// re-appends exactly once rather than duplicating the chunk.
+func (s *Store) Append(ns, id, contentType string, r io.Reader) (int64, error) {
+	if err := validateName("namespace", ns); err != nil {
+		return 0, err
+	}
+	if err := validateName("id", id); err != nil {
+		return 0, err
+	}
+	nsDir := filepath.Join(s.root, ns)
+	if err := os.MkdirAll(nsDir, 0o755); err != nil {
+		return 0, fmt.Errorf("blob: mkdir ns %s: %w", ns, err)
+	}
+	contentPath := s.contentPath(ns, id)
+
+	f, err := os.OpenFile(contentPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return 0, fmt.Errorf("blob: append open %s/%s: %w", ns, id, err)
+	}
+	// Size before any bytes are written. Used to roll a partial/failed append
+	// back so a caller retry re-appends exactly once (Put replaces the whole
+	// blob and was naturally idempotent; Append must work to stay so).
+	preInfo, _ := f.Stat()
+	preSize := int64(0)
+	if preInfo != nil {
+		preSize = preInfo.Size()
+	}
+	n, copyErr := io.Copy(f, r)
+	closeErr := f.Close()
+	if copyErr != nil || closeErr != nil {
+		if n > 0 {
+			_ = os.Truncate(contentPath, preSize)
+		}
+		if copyErr != nil {
+			return 0, fmt.Errorf("blob: append write %s/%s: %w", ns, id, copyErr)
+		}
+		return 0, fmt.Errorf("blob: append close %s/%s: %w", ns, id, closeErr)
+	}
+
+	info, err := os.Stat(contentPath)
+	if err != nil {
+		return 0, fmt.Errorf("blob: append stat %s/%s: %w", ns, id, err)
+	}
+	total := info.Size() // authoritative post-append total
+
+	// An empty append to an already-existing blob must not perturb its meta.
+	if n == 0 {
+		if _, e := s.readMeta(ns, id); e == nil {
+			return total, nil
+		}
+	}
+
+	// contentType is fixed at creation and preserved across appends.
+	name, ct := id, contentType
+	if prev, err := s.readMeta(ns, id); err == nil {
+		name, ct = prev.Name, prev.ContentType
+	}
+	if err := s.writeMeta(ns, id, metadata{
+		Name:        name,
+		Size:        total,
+		ContentType: ct,
+		Modified:    time.Now().UTC(),
+	}); err != nil {
+		// Meta write failed after the content grew: roll the content back so a
+		// retry leaves the blob as it was (old meta, old size).
+		_ = os.Truncate(contentPath, preSize)
+		return 0, err
+	}
+	return total, nil
+}
+
+// readMeta loads and decodes a blob's metadata. Returns ErrNotFound when the
+// metadata file does not exist (blob was never created).
+func (s *Store) readMeta(ns, id string) (metadata, error) {
+	data, err := os.ReadFile(s.metaPath(ns, id))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return metadata{}, ErrNotFound
+		}
+		return metadata{}, err
+	}
+	var m metadata
+	if err := json.Unmarshal(data, &m); err != nil {
+		return metadata{}, err
+	}
+	return m, nil
+}
+
+// writeMeta atomically writes a blob's metadata via temp-then-rename, so a
+// reader never observes a partially written metadata file.
+func (s *Store) writeMeta(ns, id string, m metadata) error {
+	data, err := json.Marshal(m)
+	if err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Join(s.root, ns), ".tmp-meta-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	return os.Rename(tmpPath, s.metaPath(ns, id))
+}
+
 // Get opens the blob content for reading. The caller must close the
 // returned ReadCloser. Returns ErrNotFound if the blob does not exist.
 func (s *Store) Get(ns, id string) (io.ReadCloser, error) {

@@ -366,12 +366,37 @@ func buildClockBuiltins(c *clock.Clock) sk.StringDict {
 				"now_rfc3339": sk.NewBuiltin("clock.now_rfc3339", func(_ *sk.Thread, _ *sk.Builtin, _ sk.Tuple, _ []sk.Tuple) (sk.Value, error) {
 					return sk.String(c.Now().UTC().Format(time.RFC3339)), nil
 				}),
+				"unix_to_rfc3339": sk.NewBuiltin("clock.unix_to_rfc3339", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+					var v sk.Value
+					if err := sk.UnpackArgs("clock.unix_to_rfc3339", args, kwargs, "unix_seconds", &v); err != nil {
+						return nil, err
+					}
+					// A timestamp stored in a collection round-trips through JSON
+					// as a float, so accept both int and float here.
+					secs, ok := unixSeconds(v)
+					if !ok {
+						return nil, fmt.Errorf("clock.unix_to_rfc3339: unix_seconds must be int or float, got %s", v.Type())
+					}
+					return sk.String(time.Unix(secs, 0).UTC().Format(time.RFC3339)), nil
+				}),
 			},
 		},
 	}
 }
 
 // --- conversion helpers ---
+
+// unixSeconds converts a Starlark int or float to a Unix seconds int64.
+func unixSeconds(v sk.Value) (int64, bool) {
+	switch x := v.(type) {
+	case sk.Int:
+		secs, ok := x.Int64()
+		return secs, ok
+	case sk.Float:
+		return int64(x), true
+	}
+	return 0, false
+}
 
 // starlarkListToStrings converts a Starlark list (or None) of strings into
 // a Go []string.
@@ -533,7 +558,7 @@ func (b *blobValue) CompareSameType(_ syntax.Token, _ sk.Value, _ int) (bool, er
 
 // AttrNames returns the method names exposed to Starlark's dir().
 func (b *blobValue) AttrNames() []string {
-	return []string{"put", "get", "stat", "delete", "list"}
+	return []string{"put", "append", "get", "stat", "delete", "list"}
 }
 
 // Attr returns the named method as a Starlark callable, or nil if not found.
@@ -541,6 +566,8 @@ func (b *blobValue) Attr(name string) (sk.Value, error) {
 	switch name {
 	case "put":
 		return sk.NewBuiltin("blob.put", b.put), nil
+	case "append":
+		return sk.NewBuiltin("blob.append", b.append), nil
 	case "get":
 		return sk.NewBuiltin("blob.get", b.get), nil
 	case "stat":
@@ -567,6 +594,22 @@ func (b *blobValue) put(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.
 		return nil, err
 	}
 	return sk.String(id), nil
+}
+
+// append(id, content, content_type="") appends content to a blob, creating it
+// if absent, and returns the new total size. The O(chunk) path for resumable
+// uploads — avoids re-reading and re-writing the accumulated content per chunk.
+func (b *blobValue) append(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	var id, content string
+	var contentType string
+	if err := sk.UnpackArgs("append", args, kwargs, "id", &id, "content", &content, "content_type?", &contentType); err != nil {
+		return nil, err
+	}
+	total, err := b.store.Append(b.ns, id, contentType, strings.NewReader(content))
+	if err != nil {
+		return nil, err
+	}
+	return sk.MakeInt64(total), nil
 }
 
 // get(id) reads and returns the blob content as a string, or None if missing.

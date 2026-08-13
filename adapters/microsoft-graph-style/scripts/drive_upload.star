@@ -24,7 +24,10 @@
 #   - final range (end == total-1) → assemble, create driveItem, 201.
 #   - the session is deleted on completion; later chunks → 404.
 
-_EXPIRATION = "2030-01-01T00:00:00Z"
+# Real Graph upload sessions expire ~48h after creation. Abandoned sessions
+# (no final chunk) and their partial blobs are reclaimed past this TTL — see
+# _sweep_expired_sessions (on create) and the expire-on-access check (on chunk).
+_UPLOAD_SESSION_TTL_SECONDS = 48 * 60 * 60
 
 # --- simple upload ---
 
@@ -162,6 +165,9 @@ def _create_session(req, parent_id, name):
         item_props = {}
     conflict = item_props.get("@microsoft.graph.conflictBehavior", "rename")
 
+    _sweep_expired_sessions()
+
+    created_unix = clock.now_unix()
     session_id = "sess-" + _pad6(store_kv_incr("drive", "session_seq"))
     sc = store_collection("sessions")
     sc.insert({
@@ -171,11 +177,12 @@ def _create_session(req, parent_id, name):
         "conflict": conflict,
         "next": 0,
         "total": -1,
+        "created_unix": created_unix,
     })
 
     return respond(200, {
         "uploadUrl": "http://" + req["host"] + "/v1.0/_upload/" + session_id,
-        "expirationDateTime": _EXPIRATION,
+        "expirationDateTime": _expiry_rfc3339(created_unix),
     })
 
 # on_upload_chunk handles PUT /v1.0/_upload/{session_id}. No bearer check:
@@ -185,6 +192,19 @@ def on_upload_chunk(req):
     sc = store_collection("sessions")
     sess = sc.get(session_id)
     if sess == None:
+        return _err("itemNotFound", 404, "The upload session was not found or is already completed.")
+
+    # Expire-on-access: a session past TTL is already gone. Same 404 as a
+    # missing/completed session (real Graph returns 404 here; clients cannot
+    # distinguish 'expired' from 'never existed'). concurrency_key: session
+    # serializes chunk-vs-chunk on the same session; it does NOT serialize
+    # against _sweep_expired_sessions (run by createUploadSession), whose
+    # concurrent reap of the same row/blob is benign because deletes are
+    # idempotent.
+    if clock.now_unix() > sess.get("created_unix", 0) + _UPLOAD_SESSION_TTL_SECONDS:
+        b = store_blob("drive")
+        b.delete("up-" + session_id)
+        sc.delete(session_id)
         return _err("itemNotFound", 404, "The upload session was not found or is already completed.")
 
     parsed = _parse_content_range(req["headers"].get("Content-Range", ""))
@@ -209,18 +229,24 @@ def on_upload_chunk(req):
     if len(content) != end - start + 1:
         return _range_err("Body length does not match the declared Content-Range.")
 
+    # Append each chunk in place: O(chunk) regardless of how big the partial
+    # has grown, instead of read-concat-rewrite (O(n) per chunk → quadratic).
     b = store_blob("drive")
-    partial = ""
-    if start > 0:
-        existing = b.get("up-" + session_id)
-        if existing != None:
-            partial = existing
-    partial = partial + content
-    b.put("up-" + session_id, partial, "application/octet-stream")
+    b.append("up-" + session_id, content)
 
     if end == total - 1:
-        # Final range: assemble the driveItem, honoring the session's
-        # conflict behavior, and invalidate the session.
+        # Final range: ONE read of the assembled bytes (not quadratic), then
+        # assemble the driveItem honoring the session's conflict behavior.
+        # Every terminal branch below MUST drop the partial blob + session row
+        # or it reintroduces the abandonment leak.
+        full = b.get("up-" + session_id)
+        if full == None:
+            # The partial vanished between the append and this read — only a
+            # concurrent _sweep_expired_sessions reap can do that. Treat it as a
+            # gone session (404) so the client retries with a fresh one, instead
+            # of silently assembling an empty driveItem.
+            sc.delete(session_id)
+            return _err("itemNotFound", 404, "The upload session was not found or is already completed.")
         fc = store_collection("files")
         name = sess["name"]
         parent_id = sess["parentId"]
@@ -232,8 +258,8 @@ def on_upload_chunk(req):
                 sc.delete(session_id)
                 return _err("nameAlreadyExists", 409, "An item with the same name already exists under the parent.")
             if conflict == "replace":
-                b.put(existing_item["id"], partial, "application/octet-stream")
-                existing_item["size"] = len(partial)
+                b.put(existing_item["id"], full, "application/octet-stream")
+                existing_item["size"] = len(full)
                 existing_item["file"] = {"mimeType": "application/octet-stream"}
                 fc.update(existing_item["id"], existing_item)
                 b.delete("up-" + session_id)
@@ -242,13 +268,13 @@ def on_upload_chunk(req):
             name = _conflict_rename(fc, parent_id, name)
 
         item_id = _next_item_id()
-        b.put(item_id, partial, "application/octet-stream")
+        b.put(item_id, full, "application/octet-stream")
         doc = {
             "id": item_id,
             "name": name,
             "file": {"mimeType": "application/octet-stream"},
             "folder": None,
-            "size": len(partial),
+            "size": len(full),
             "parentId": parent_id,
             "createdDateTime": "2024-06-15T12:00:00Z",
             "lastModifiedDateTime": "2024-06-15T12:00:00Z",
@@ -263,7 +289,7 @@ def on_upload_chunk(req):
     sess["total"] = total
     sc.update(session_id, sess)
     return respond(202, {
-        "expirationDateTime": _EXPIRATION,
+        "expirationDateTime": _expiry_rfc3339(sess["created_unix"]),
         "nextExpectedRanges": [str(end + 1) + "-"],
     })
 
@@ -295,6 +321,28 @@ def on_get_content(req):
     return respond(200, content, {"Content-Type": content_type})
 
 # --- helpers ---
+
+# _expiry_rfc3339 renders a session row's expiry (created_unix + TTL). Single
+# source of truth shared by the HTTP response and the GC predicate.
+def _expiry_rfc3339(created_unix):
+    return clock.unix_to_rfc3339(created_unix + _UPLOAD_SESSION_TTL_SECONDS)
+
+# _sweep_expired_sessions reaps abandoned sessions past TTL: each row plus its
+# partial blob. KV counters and the files collection are never touched. Legacy
+# rows without created_unix default to 0 and are reaped on the first sweep.
+# NOTE: this runs in createUploadSession (no concurrency_key), so it is not
+# serialized against an in-flight chunk on another session. The deletes are
+# idempotent, and on Windows a blob held open by an in-flight chunk may survive
+# this sweep and be reaped on a later one — bounded, non-corrupting.
+def _sweep_expired_sessions():
+    sc = store_collection("sessions")
+    b = store_blob("drive")
+    now = clock.now_unix()
+    for row in sc.list():
+        if now > row.get("created_unix", 0) + _UPLOAD_SESSION_TTL_SECONDS:
+            sid = row["id"]
+            sc.delete(sid)
+            b.delete("up-" + sid)
 
 # _parse_content_range parses "bytes {start}-{end}/{total}" into a
 # (start, end, total) tuple, or None when malformed.

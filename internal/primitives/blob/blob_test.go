@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 func newTestStore(t *testing.T) *Store {
@@ -454,5 +455,133 @@ func TestNamespacesAndClearAll(t *testing.T) {
 	ns2, _ := s.Namespaces()
 	if len(ns2) != 0 {
 		t.Fatalf("after clearall = %v", ns2)
+	}
+}
+
+// --- Append (resumable-upload path) ---
+
+func TestAppendRoundtrip(t *testing.T) {
+	s := newTestStore(t)
+
+	for _, chunk := range []string{"foo", "bar", "baz"} {
+		if _, err := s.Append("drive", "up.bin", "application/octet-stream", strings.NewReader(chunk)); err != nil {
+			t.Fatalf("Append: %v", err)
+		}
+	}
+	rc, err := s.Get("drive", "up.bin")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	defer rc.Close()
+	got, _ := io.ReadAll(rc)
+	if string(got) != "foobarbaz" {
+		t.Fatalf("content = %q, want foobarbaz", got)
+	}
+	info, _ := s.Stat("drive", "up.bin")
+	if info.Size != 9 {
+		t.Fatalf("Stat Size = %d, want 9", info.Size)
+	}
+}
+
+func TestAppendCreateIfAbsent(t *testing.T) {
+	s := newTestStore(t)
+
+	// No prior Put: the first append must create the blob (the start==0 path).
+	if _, err := s.Append("drive", "fresh.bin", "application/octet-stream", strings.NewReader("created")); err != nil {
+		t.Fatalf("Append: %v", err)
+	}
+	rc, err := s.Get("drive", "fresh.bin")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	defer rc.Close()
+	got, _ := io.ReadAll(rc)
+	if string(got) != "created" {
+		t.Fatalf("content = %q, want created", got)
+	}
+}
+
+func TestAppendPreservesContentType(t *testing.T) {
+	s := newTestStore(t)
+
+	s.PutWith("drive", "doc.txt", "text/plain", strings.NewReader("hello"))
+	// content_type on later appends is ignored — the creation value is kept.
+	s.Append("drive", "doc.txt", "application/octet-stream", strings.NewReader("world"))
+	info, _ := s.Stat("drive", "doc.txt")
+	if info.ContentType != "text/plain" {
+		t.Fatalf("ContentType = %q, want text/plain (creation value must persist)", info.ContentType)
+	}
+}
+
+func TestAppendReturnsGrowingTotal(t *testing.T) {
+	s := newTestStore(t)
+
+	total, err := s.Append("drive", "grow.bin", "", strings.NewReader("abc"))
+	if err != nil || total != 3 {
+		t.Fatalf("first Append total=%d err=%v, want 3", total, err)
+	}
+	total, err = s.Append("drive", "grow.bin", "", strings.NewReader("defg"))
+	if err != nil || total != 7 {
+		t.Fatalf("second Append total=%d err=%v, want 7", total, err)
+	}
+	total, err = s.Append("drive", "grow.bin", "", strings.NewReader("hi"))
+	if err != nil || total != 9 {
+		t.Fatalf("third Append total=%d err=%v, want 9", total, err)
+	}
+}
+
+// TestAppendIsLinearPerChunk pins the O(chunk) guarantee machine-independently.
+// A correct O_APPEND impl costs roughly the same per chunk, so the second half
+// of N appends takes about as long as the first. A read-modify-write regression
+// reads the growing blob before each write, so its second half dominates (~3×
+// the first); the ratio catches that on any hardware where an absolute time
+// budget would be unreliable.
+func TestAppendIsLinearPerChunk(t *testing.T) {
+	s := newTestStore(t)
+
+	const chunks = 200
+	const half = chunks / 2
+	const size = 64 << 10 // 64 KiB
+	payload := bytes.Repeat([]byte("z"), size)
+
+	var firstHalf, secondHalf time.Duration
+	for i := 0; i < chunks; i++ {
+		start := time.Now()
+		if _, err := s.Append("drive", "big.bin", "application/octet-stream", bytes.NewReader(payload)); err != nil {
+			t.Fatalf("Append %d: %v", i, err)
+		}
+		d := time.Since(start)
+		if i < half {
+			firstHalf += d
+		} else {
+			secondHalf += d
+		}
+	}
+
+	if firstHalf == 0 {
+		t.Fatal("firstHalf timing was zero; cannot ratio")
+	}
+	if ratio := float64(secondHalf) / float64(firstHalf); ratio > 2 {
+		t.Errorf("append cost is not O(1) per chunk: second half took %.1fx the first half (second=%v first=%v) — likely a read-modify-write quadratic regression", ratio, secondHalf, firstHalf)
+	}
+
+	// Content integrity: the assembled blob must be exactly chunks repetitions
+	// of the payload, byte-for-byte (catches offset/duplication corruption).
+	info, _ := s.Stat("drive", "big.bin")
+	if info.Size != int64(chunks)*int64(size) {
+		t.Fatalf("final Size = %d, want %d", info.Size, int64(chunks)*int64(size))
+	}
+	rc, err := s.Get("drive", "big.bin")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	defer rc.Close()
+	got, err := io.ReadAll(rc)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	want := bytes.Repeat(payload, chunks)
+	if !bytes.Equal(got, want) {
+		t.Fatalf("assembled content corrupted: got %d bytes, want %d", len(got), len(want))
 	}
 }
