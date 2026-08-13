@@ -61,11 +61,12 @@ def on_list_payouts(req):
     c = store_collection("payouts")
     docs = c.list()
 
-    # Optional destination filter.
+    # Optional destination filter (applied before paging).
     query = req.get("query")
     if query != None:
         dest_id = query.get("destination", "")
         if dest_id != "":
             docs = [d for d in docs if d.get("destination") == dest_id]
 
-    return respond(200, {"object": "list", "data": docs, "has_more": False, "url": "/v1/payouts"})
+    page, has_more = _list_page(req, docs)
+    return respond(200, {"object": "list", "data": page, "has_more": has_more, "url": "/v1/payouts"})

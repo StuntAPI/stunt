@@ -48,7 +48,8 @@ def on_list_customers(req):
 
     c = store_collection("customers")
     docs = c.list()
-    return respond(200, {"object": "list", "data": docs, "has_more": False, "url": "/v1/customers"})
+    page, has_more = _list_page(req, docs)
+    return respond(200, {"object": "list", "data": page, "has_more": has_more, "url": "/v1/customers"})
 
 # POST /v1/customers/{id} — update a customer (merge fields from body).
 def on_update_customer(req):

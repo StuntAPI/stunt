@@ -172,6 +172,45 @@ handler. Webhooks are delivered as HTTP POST with a JSON body `{type, payload}`.
 | `events_emit(event_type, payload?, headers?)` | `(event_type: str, payload: dict = {}, headers: dict = {})` | `None` | Emits an event to registered webhook(s). `headers` are set on the POST on top of `Content-Type: application/json` (a caller `Content-Type` overrides it); `Host`/`Content-Length` and any CR/LF are rejected |
 | `events_body(event_type, payload?)` | `(event_type: str, payload: dict = {})` | `str` | The exact JSON body `events_emit(event_type, payload)` will POST. Use it to compute a signature over the real wire bytes (see Signing webhooks below) |
 
+### Pagination builtin (`paginate`)
+
+`paginate` slices a list into pages so list handlers can honor `limit`/cursor query params. It is a
+pure builtin — no backing store — so it works in every handler. Returns a 2-tuple `(page, next_cursor)`.
+
+```python
+page, next_cursor = paginate(docs, limit, cursor)
+```
+
+| Argument | Type | Default | Notes |
+|----------|------|---------|-------|
+| `items` | iterable | required | The full result list (typically `store_collection(...).list()`), filtered first |
+| `limit` | int | `None` | Page size. `None` or `<= 0` **disables paging** (returns the whole list, `next_cursor = None`) — so unmodified handlers keep their prior behavior |
+| `cursor` | str | `None` | Opaque offset token returned by a prior call; `None`/`""` for the first page |
+
+`next_cursor` is the opaque token for the next page, or `None` when no items remain.
+
+The builtin does the universal slicing; **the adapter owns the provider envelope and cursor mapping**.
+Stripe, for example, has no cursor field — clients set `starting_after` to the last returned id — so a
+thin wrapper translates the id to an offset and reports `has_more`:
+
+```python
+def _list_page(req, docs):
+    limit = _to_int(req.get("query", {}).get("limit", "")) or 10
+    if limit > 100:
+        limit = 100
+    offset = ""
+    sa = req.get("query", {}).get("starting_after", "")
+    for i in range(len(docs)):
+        if docs[i].get("id") == sa:
+            offset = str(i + 1)
+            break
+    page, nxt = paginate(docs, limit, offset)
+    return page, nxt != None  # has_more
+```
+
+For opaque-cursor providers (HubSpot `after`, OData `@odata.nextLink`), pass `next_cursor` straight
+through as the next page token.
+
 ### Signing webhooks (`crypto`, `clock`)
 
 A receiver that verifies a webhook signature (Stripe `Stripe-Signature`, GitHub `X-Hub-Signature-256`, Shopify, Slack, Twilio, Adyen) can now be exercised against stunt. Three primitives — all string-in/string-out (Starlark has no bytes):
