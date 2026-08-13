@@ -6,6 +6,27 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-08-13
+
+### Adapters
+
+- **More signed webhook deliveries.** Extended the v0.8.0 signing sweep to
+  three providers whose real webhooks HMAC every delivery, each verified
+  against the real formula in a new engine test:
+  - **whatsapp-style (Meta)** — `X-Hub-Signature-256: sha256=<hex>`; secret
+    `whatsapp_stunt_mock_app_secret_2026`.
+  - **square-style** — `X-Square-HmacSha256-Signature: base64(...)` over the
+    notification URL + body; key `sq0sip_stunt_mock_signature_key_2026`.
+  - **twilio-style** — `X-Twilio-Signature: base64(HMAC-SHA1(AUTH_TOKEN,
+    url+body))`; closes the v0.8.0 "twilio deferred" item.
+
+### Starlark handler API
+
+- **`events_target()` builtin** — returns the service's currently-registered
+  webhook URL (or `None`). Needed by providers (Twilio, Square) whose
+  signature MACs the destination URL; backed by a new `Emitter.Target`
+  accessor.
+
 ## [0.10.0] — 2026-08-13
 
 ### Adapters
