@@ -6,6 +6,20 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.21.0] — 2026-08-14
+
+### Adapters
+
+- **CRUD teardown (DELETE) across REST adapters.** ~18 adapters that implemented
+  Create+Read but not Delete now support `DELETE` for their store-backed
+  resources (reusing each adapter's auth + not-found helpers, real-provider
+  status codes), so create→delete lifecycle test flows can clean up:
+  aws-s3 (buckets), cloudflare (zones/workers/r2/d1), firebase (Firestore
+  documents), gmail (messages/drafts/labels), google-admin (groups), jira
+  (issues), microsoft-graph (messages/events/driveItems/teams channels),
+  photos (albums), qbo (customers/invoices), shopify, square, xero, youtube,
+  zendesk, netsuite, apps-script. (gcalendar already had full CRUD.)
+
 ## [0.20.0] — 2026-08-14
 
 ### Engine
