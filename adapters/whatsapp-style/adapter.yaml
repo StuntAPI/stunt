@@ -31,6 +31,11 @@ endpoints:
     method: POST
     handler: scripts/media.star#on_upload_media
 
+  # --- Media content download (the URL in the media metadata points here) ---
+  - route: /v21.0/{media_id}/content
+    method: GET
+    handler: scripts/media.star#on_download_media
+
   # --- Message templates (list + create) ---
   - route: /v21.0/{waba_id}/message_templates
     method: GET

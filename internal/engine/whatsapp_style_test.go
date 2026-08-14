@@ -3,8 +3,11 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -363,4 +366,118 @@ func waNoAuthPost(t *testing.T, rawurl string, body map[string]any) (string, int
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(resp.Body)
 	return string(b), resp.StatusCode
+}
+
+// TestWhatsAppStyleMultipartMedia covers the real Cloud API upload shape:
+// multipart/form-data with a file part. The bytes must round-trip byte-exact
+// through the metadata URL, and file_size/sha256 must reflect the actual
+// upload rather than placeholders.
+func TestWhatsAppStyleMultipartMedia(t *testing.T) {
+	adapterDir := filepath.Join("..", "..", "adapters", "whatsapp-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"whatsapp": {Adapter: absAdapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["whatsapp"]
+	const phoneID = "100000000000001"
+	const token = "EAAG_test_token_mock"
+
+	fileBytes := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe, 0x42}
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	if err := mw.WriteField("messaging_product", "whatsapp"); err != nil {
+		t.Fatal(err)
+	}
+	if err := mw.WriteField("type", "image/png"); err != nil {
+		t.Fatal(err)
+	}
+	fw, err := mw.CreateFormFile("file", "promo.png")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fw.Write(fileBytes); err != nil {
+		t.Fatal(err)
+	}
+	if err := mw.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	req, err := http.NewRequest("POST", base+"/v21.0/"+phoneID+"/media", &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	upBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		t.Fatalf("POST media (multipart) -> status %d; body %s", resp.StatusCode, upBody)
+	}
+	var up map[string]any
+	if err := json.Unmarshal(upBody, &up); err != nil {
+		t.Fatal(err)
+	}
+	mediaID, _ := up["id"].(string)
+	if mediaID == "" {
+		t.Fatalf("media id = %v", up["id"])
+	}
+
+	// Metadata reflects the real bytes.
+	metaBody, status := waGet(t, base+"/v21.0/"+mediaID, token)
+	if status != 200 {
+		t.Fatalf("GET media -> status %d; body %s", status, metaBody)
+	}
+	var meta map[string]any
+	if err := json.Unmarshal([]byte(metaBody), &meta); err != nil {
+		t.Fatal(err)
+	}
+	if got := int(meta["file_size"].(float64)); got != len(fileBytes) {
+		t.Errorf("file_size = %d, want %d", got, len(fileBytes))
+	}
+	sum := sha256.Sum256(fileBytes)
+	if got, _ := meta["sha256"].(string); got != hex.EncodeToString(sum[:]) {
+		t.Errorf("sha256 = %v, want real sha256 of the uploaded bytes", meta["sha256"])
+	}
+	contentURL, _ := meta["url"].(string)
+	if contentURL == "" {
+		t.Fatal("metadata url is empty")
+	}
+
+	// Download via the metadata URL round-trips byte-exact.
+	dl, dstatus := waGet(t, contentURL, token)
+	if dstatus != 200 {
+		t.Fatalf("GET content -> status %d; body %s", dstatus, dl)
+	}
+	if dl != string(fileBytes) {
+		t.Errorf("downloaded bytes differ: %q", dl)
+	}
 }

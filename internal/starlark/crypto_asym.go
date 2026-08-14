@@ -193,6 +193,30 @@ func rsaPublicJWK(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple)
 	return d, nil
 }
 
+// ecPublicJWK returns the JWK parameters of an EC P-256 public key as a dict
+// {kty, crv, x, y} (coords base64url, no padding) for serving a JWKS endpoint
+// the way ES256 issuers (Sign in with Apple, APNs, Apple Search Ads) do.
+func ecPublicJWK(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	var pubPEM string
+	if err := sk.UnpackArgs(b.Name(), args, kwargs, "public_key", &pubPEM); err != nil {
+		return nil, err
+	}
+	k, err := parsePublicKeyPEM(pubPEM)
+	if err != nil {
+		return nil, err
+	}
+	pub, ok := k.(*ecdsa.PublicKey)
+	if !ok || pub.Curve.Params().BitSize != 256 {
+		return nil, fmt.Errorf("crypto.ec_public_jwk: key is not an EC P-256 public key")
+	}
+	d := sk.NewDict(4)
+	d.SetKey(sk.String("kty"), sk.String("EC"))
+	d.SetKey(sk.String("crv"), sk.String("P-256"))
+	d.SetKey(sk.String("x"), sk.String(base64.RawURLEncoding.EncodeToString(leftPad(pub.X.Bytes(), 32))))
+	d.SetKey(sk.String("y"), sk.String(base64.RawURLEncoding.EncodeToString(leftPad(pub.Y.Bytes(), 32))))
+	return d, nil
+}
+
 // ed25519Sign signs data with an Ed25519 private key (signs the message
 // directly — Ed25519 does not pre-hash), returning the 64-byte signature
 // encoded per `encoding` (hex default / base64 / base64url).

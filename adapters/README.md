@@ -212,13 +212,34 @@ def _list_page(req, docs):
 For opaque-cursor providers (HubSpot `after`, OData `@odata.nextLink`), pass `next_cursor` straight
 through as the next page token.
 
+### Multipart builtin (`parse_multipart`)
+
+`parse_multipart` decodes a `multipart/form-data` request so document/file-upload endpoints accept
+the same shape the real provider does instead of a JSON shim. Pure builtin — works in every handler.
+
+```python
+ct = req["headers"].get("content-type", "")
+if ct.startswith("multipart/"):
+    parts, err = parse_multipart(ct, req["raw_body"])
+    if err != None:
+        return respond(400, {"error": err})
+    for p in parts:
+        if p["filename"] != None:   # the file part
+            store_blob("docs").put(name, p["data"], p.get("content_type") or "application/octet-stream")
+```
+
+Each part is a dict `{name, filename, content_type, data}`; `filename`/`content_type` are `None`
+when the part omits them, and `data` carries the raw bytes (Starlark strings are byte strings, so
+binary parts round-trip through `store_blob` exactly). Returns a 2-tuple `(parts, err)` — `err` is
+`None` on success so the handler can answer 400 instead of surfacing a 500.
+
 ### Signing webhooks (`crypto`, `clock`)
 
 A receiver that verifies a webhook signature (Stripe `Stripe-Signature`, GitHub `X-Hub-Signature-256`, Shopify, Slack, Twilio, Adyen) can now be exercised against stunt. Three primitives — all string-in/string-out (Starlark has no bytes):
 
 | Module | Functions | Notes |
 |--------|-----------|-------|
-| `crypto` | `hmac_sha256(key, data, encoding="hex")`, `hmac_sha1(...)`, `sha256(data, encoding="hex")`, `base64_encode(data)`, `base64_decode(s)`, `base64url_encode(data)`, `ecdsa_sign_p256(private_key_pem, data, encoding="hex")`, `ecdsa_verify_p256(public_key_pem, data, signature, encoding="hex")`, `rsa_sign(private_key_pem, data, encoding="hex")`, `rsa_verify(public_key_pem, data, signature, encoding="hex")`, `rsa_public_jwk(public_key_pem)→{kty,n,e}`, `ed25519_sign(private_key_pem, data, encoding="hex")`, `ed25519_verify(public_key_pem, data, signature, encoding="hex")` | `encoding` is `"hex"` (default), `"base64"`, or `"base64url"`. MAC, hash, and asymmetric signature (ECDSA P-256 raw r‖s; RSA-SHA256 PKCS#1 v1.5; Ed25519 over the raw message). Keys arrive as PEM strings the adapter supplies (ship a fixed keypair for determinism). `rsa_public_jwk` returns the RSA public key's JWK params (base64url) for serving JWKS. No encryption/KDF/key-gen |
+| `crypto` | `hmac_sha256(key, data, encoding="hex")`, `hmac_sha1(...)`, `sha256(data, encoding="hex")`, `base64_encode(data)`, `base64_decode(s)`, `base64url_encode(data)`, `base64url_decode(s)`, `ecdsa_sign_p256(private_key_pem, data, encoding="hex")`, `ecdsa_verify_p256(public_key_pem, data, signature, encoding="hex")`, `rsa_sign(private_key_pem, data, encoding="hex")`, `rsa_verify(public_key_pem, data, signature, encoding="hex")`, `rsa_public_jwk(public_key_pem)→{kty,n,e}`, `ec_public_jwk(public_key_pem)→{kty,crv,x,y}`, `ed25519_sign(private_key_pem, data, encoding="hex")`, `ed25519_verify(public_key_pem, data, signature, encoding="hex")` | `encoding` is `"hex"` (default), `"base64"`, or `"base64url"`. MAC, hash, and asymmetric signature (ECDSA P-256 raw r‖s; RSA-SHA256 PKCS#1 v1.5; Ed25519 over the raw message). Keys arrive as PEM strings the adapter supplies (ship a fixed keypair for determinism). `rsa_public_jwk`/`ec_public_jwk` return the public key's JWK params (base64url) for serving JWKS — RS256 issuers (Entra ID, Cognito) and ES256 issuers (Sign in with Apple, APNs) respectively. `base64url_decode` accepts padded input (JWT segments are unpadded). No encryption/KDF/key-gen |
 | `clock` | `now_unix()`, `now_rfc3339()` | Wall clock from the engine's injectable `clock.Clock` — real today; the virtual mode is the seam for future record/replay |
 
 **Rule:** MAC the `events_body(...)` bytes verbatim — never a re-marshalled copy — so the signer and verifier agree on the exact bytes.

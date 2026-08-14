@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"strings"
 
 	sk "go.starlark.net/starlark"
 	"go.starlark.net/starlarkstruct"
@@ -35,11 +36,13 @@ var cryptoModule = &starlarkstruct.Module{
 		"base64_encode":     sk.NewBuiltin("crypto.base64_encode", base64Encode),
 		"base64_decode":     sk.NewBuiltin("crypto.base64_decode", base64Decode),
 		"base64url_encode":  sk.NewBuiltin("crypto.base64url_encode", base64urlEncode),
+		"base64url_decode":  sk.NewBuiltin("crypto.base64url_decode", base64urlDecode),
 		"ecdsa_sign_p256":   sk.NewBuiltin("crypto.ecdsa_sign_p256", ecdsaSignP256),
 		"ecdsa_verify_p256": sk.NewBuiltin("crypto.ecdsa_verify_p256", ecdsaVerifyP256),
 		"rsa_sign":          sk.NewBuiltin("crypto.rsa_sign", rsaSign),
 		"rsa_verify":        sk.NewBuiltin("crypto.rsa_verify", rsaVerify),
 		"rsa_public_jwk":    sk.NewBuiltin("crypto.rsa_public_jwk", rsaPublicJWK),
+		"ec_public_jwk":     sk.NewBuiltin("crypto.ec_public_jwk", ecPublicJWK),
 		"ed25519_sign":      sk.NewBuiltin("crypto.ed25519_sign", ed25519Sign),
 		"ed25519_verify":    sk.NewBuiltin("crypto.ed25519_verify", ed25519Verify),
 	},
@@ -141,4 +144,18 @@ func base64urlEncode(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tup
 		return nil, err
 	}
 	return sk.String(base64.RawURLEncoding.EncodeToString([]byte(data))), nil
+}
+
+// base64urlDecode accepts unpadded base64url (JWT segments are unpadded;
+// padded input is tolerated).
+func base64urlDecode(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	var s string
+	if err := sk.UnpackArgs(b.Name(), args, kwargs, "data", &s); err != nil {
+		return nil, err
+	}
+	out, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(s, "="))
+	if err != nil {
+		return nil, fmt.Errorf("crypto.base64url_decode: %w", err)
+	}
+	return sk.String(string(out)), nil
 }

@@ -236,3 +236,63 @@ func TestRSAPublicJWK(t *testing.T) {
 		t.Errorf("e = %d, want 65537", eInt)
 	}
 }
+
+// TestECPublicJWK verifies ec_public_jwk returns {kty,crv,x,y} with 32-byte
+// zero-padded base64url coords that reconstruct the original public key point.
+func TestECPublicJWK(t *testing.T) {
+	_, pubPEM := testECDSAKeyPair(t)
+	res := callAsym(t, "ec_public_jwk", sk.Tuple{sk.String(pubPEM)})
+	d, ok := res.(*sk.Dict)
+	if !ok {
+		t.Fatalf("got %T, want dict", res)
+	}
+	for k, want := range map[string]string{"kty": "EC", "crv": "P-256"} {
+		v, _, _ := d.Get(sk.String(k))
+		if string(v.(sk.String)) != want {
+			t.Errorf("%s = %v, want %s", k, v, want)
+		}
+	}
+	xVal, _, _ := d.Get(sk.String("x"))
+	yVal, _, _ := d.Get(sk.String("y"))
+	x, err := base64.RawURLEncoding.DecodeString(string(xVal.(sk.String)))
+	if err != nil {
+		t.Fatalf("decode x: %v", err)
+	}
+	y, err := base64.RawURLEncoding.DecodeString(string(yVal.(sk.String)))
+	if err != nil {
+		t.Fatalf("decode y: %v", err)
+	}
+	if len(x) != 32 || len(y) != 32 {
+		t.Fatalf("coords are %d/%d bytes, want 32/32 (fixed-width)", len(x), len(y))
+	}
+	pubAny, err := parsePublicKeyPEM(pubPEM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub := pubAny.(*ecdsa.PublicKey)
+	if new(big.Int).SetBytes(x).Cmp(pub.X) != 0 || new(big.Int).SetBytes(y).Cmp(pub.Y) != 0 {
+		t.Error("coords do not reconstruct the public key point")
+	}
+
+	// RSA key must be rejected.
+	_, rsaPub := testRSAKeyPair(t)
+	if err := callAsymErr("ec_public_jwk", sk.Tuple{sk.String(rsaPub)}); err == nil {
+		t.Error("ec_public_jwk with RSA key: want error, got nil")
+	}
+}
+
+// TestBase64URLDecodeRoundTrip covers the JWT-claims decode path, including
+// padded input tolerance.
+func TestBase64URLDecodeRoundTrip(t *testing.T) {
+	claims := `{"sub":"user-1","exp":1234567890}`
+	enc := string(callAsym(t, "base64url_encode", sk.Tuple{sk.String(claims)}).(sk.String))
+	for _, in := range []string{enc, enc + "=="} {
+		dec := string(callAsym(t, "base64url_decode", sk.Tuple{sk.String(in)}).(sk.String))
+		if dec != claims {
+			t.Errorf("decode(%q) = %q, want %q", in, dec, claims)
+		}
+	}
+	if err := callAsymErr("base64url_decode", sk.Tuple{sk.String("!!!not-base64!!!")}); err == nil {
+		t.Error("garbage input: want error, got nil")
+	}
+}
