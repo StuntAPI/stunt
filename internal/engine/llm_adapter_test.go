@@ -66,6 +66,15 @@ func TestLLMStyleAdapter(t *testing.T) {
 		t.Fatalf("POST /v1/chat/completions (no auth) -> status %d, want 401", status)
 	}
 
+	// ===== 401: bogus Bearer key on chat completions =====
+	_, status = llmPostBearer(t, base+"/v1/chat/completions", "sk-bogus-key", map[string]any{
+		"model":    "gpt-4o",
+		"messages": []map[string]any{{"role": "user", "content": "hello"}},
+	})
+	if status != 401 {
+		t.Fatalf("POST /v1/chat/completions (bogus key) -> status %d, want 401", status)
+	}
+
 	// ===== OpenAI chat completions -> deterministic response =====
 	body, status := llmPostBearer(t, base+"/v1/chat/completions", apiKey, map[string]any{
 		"model":    "gpt-4o",
@@ -178,6 +187,18 @@ func TestLLMStyleAdapter(t *testing.T) {
 	})
 	if status != 401 {
 		t.Fatalf("POST /v1/messages (no x-api-key) -> status %d, want 401", status)
+	}
+
+	// ===== 401: bogus x-api-key on Anthropic messages =====
+	_, status = llmPostHeaders(t, base+"/v1/messages", map[string]any{
+		"x-api-key": "sk-bogus-key",
+	}, map[string]any{
+		"model":      "claude-3-5-sonnet-20241022",
+		"max_tokens": 100,
+		"messages":   []map[string]any{{"role": "user", "content": "hi"}},
+	})
+	if status != 401 {
+		t.Fatalf("POST /v1/messages (bogus x-api-key) -> status %d, want 401", status)
 	}
 
 	// ===== Anthropic messages -> deterministic response =====

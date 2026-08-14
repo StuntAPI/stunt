@@ -1,7 +1,7 @@
-# Profile handler — GET /v1.0/me (Bearer presence required).
+# Profile handler — GET /v1.0/me (valid Bearer required).
 #
-# Returns the static mock profile. The token is NOT validated — only its
-# presence is checked (token-PRESENCE policy).
+# Returns the static mock profile. The token must be known and unexpired
+# (minted by the OAuth flow); otherwise 401 code 190.
 
 # Shared helper (_bearer_present) is preloaded from scripts/lib.star.
 

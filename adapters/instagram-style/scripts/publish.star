@@ -8,8 +8,8 @@
 #     -> 200 { data: [...] }  (?fields= projects each media object; see
 #        _apply_media_fields)
 #
-# Token-PRESENCE policy: any Bearer header is accepted; the value is NOT
-# validated.
+# Token-VALIDATION policy: the Bearer must be a known, unexpired token
+# minted by the OAuth flow (unknown/expired -> 401 code 190).
 
 # Shared helper (_bearer_present) is preloaded from scripts/lib.star.
 

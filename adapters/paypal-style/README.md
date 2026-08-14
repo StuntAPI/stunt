@@ -33,6 +33,11 @@ authorize).
 
 OAuth2 bearer tokens. Obtain via `POST /v1/oauth2/token` with `grant_type=client_credentials`
 and Basic auth (`client_id:secret`). API calls require `Authorization: Bearer <token>`.
+Tokens are validated: the token must have been minted by the token endpoint
+(stored in the `access_tokens` collection with a 9-hour expiry matching the
+advertised `expires_in`). An unknown or expired token returns `401` with
+PayPal's error envelope `{"name": "AUTHENTICATION_FAILURE", "message": ...,
+"debug_id": ...}`.
 
 ## Webhooks
 

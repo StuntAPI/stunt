@@ -44,8 +44,25 @@
 # rejection, your client code can check the mock message timestamps.
 # ============================================================================
 
-# _require_auth checks for an Authorization: Bearer <token> header.
-# Returns None if authorized, or a 401 error-response dict if not.
+# Well-known static test access token, seeded once into the KV store on
+# first request (see _seed_tokens) so existing clients/tests that use it
+# keep working while any other token is rejected with 401.
+_TEST_TOKEN = "EAAG_test_token_mock"
+
+# _seed_tokens inserts the well-known test token into the KV store exactly
+# once per instance (guarded by the "auth_seeded" flag), stored under
+# "tok:<token>" with a far-future expiry computed at runtime (never a
+# hardcoded epoch).
+def _seed_tokens():
+    if store_kv_get("whatsapp", "auth_seeded") == "yes":
+        return
+    store_kv_set("whatsapp", "auth_seeded", "yes")
+    exp = str(clock.now_unix() + 3600 * 24 * 365 * 10)
+    store_kv_set("whatsapp", "tok:" + _TEST_TOKEN, exp)
+
+# _require_auth validates the Authorization: Bearer <token> header against
+# the KV store. Returns None if the token is known and unexpired, or a 401
+# error-response dict if missing, malformed, unknown, or expired.
 def _require_auth(req):
     headers = req.get("headers")
     if headers == None:
@@ -54,6 +71,10 @@ def _require_auth(req):
     if auth == None or auth == "":
         return _wa_unauthorized()
     if not auth.startswith("Bearer "):
+        return _wa_unauthorized()
+    _seed_tokens()
+    exp = store_kv_get("whatsapp", "tok:" + auth[7:])
+    if exp == None or clock.now_unix() > _to_int(exp):
         return _wa_unauthorized()
     return None
 

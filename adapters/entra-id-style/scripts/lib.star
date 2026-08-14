@@ -14,7 +14,9 @@ def _bearer(req):
     return ""
 
 # _user_for_token looks up the user/principal document bound to a Bearer
-# token. Returns None if the token is absent or not found in the store.
+# token. Returns None if the token is absent, not found in the store, or
+# expired (expires_at, a unix timestamp set at mint time — the access-token
+# TTL reported by the real identity platform is ~3600s).
 def _user_for_token(req):
     token = _bearer(req)
     if token == "":
@@ -22,6 +24,9 @@ def _user_for_token(req):
     c = store_collection("tokens")
     doc = c.get(token)
     if doc == None:
+        return None
+    exp = doc.get("expires_at", 0)
+    if exp != None and exp != 0 and clock.now_unix() > exp:
         return None
     return doc
 

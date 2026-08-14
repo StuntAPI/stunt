@@ -55,6 +55,16 @@ The directory self-seeds on first use: three users (`admin@`, `alice@`, `bob@moc
 - All responses include `kind` fields (e.g., `admin#directory#user`).
 - Models the Workspace domain + super-admin authentication gate.
 
+## Auth
+
+All endpoints require `Authorization: Bearer <token>`. Tokens are **validated
+against the `tokens` collection**: unknown tokens — and tokens whose stored
+`expires_at` has passed — get the Google 401 envelope
+(`{"error":{"code":401,"message":"Login Required.","errors":[{"message":"Login Required.","domain":"global","reason":"required"}]}}`).
+A static convenience token,
+`ya29.mock-admin-token`, is seeded on first use with a far-future expiry for
+quick local testing.
+
 ## Usage
 
 ```bash

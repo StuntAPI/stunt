@@ -2,6 +2,10 @@
 
 # POST /2/users/get_current_account — return synthetic account info.
 def on_get_current_account(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
     return respond(200, {
         "account_id": "dbid:synthetic-local-test-account",
         "name": {

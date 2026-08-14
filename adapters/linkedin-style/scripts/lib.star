@@ -14,7 +14,8 @@ def _bearer(req):
     return ""
 
 # _member_for_token looks up the member document bound to a Bearer token.
-# Returns None if the token is absent or not found in the store.
+# Returns None if the token is absent, unknown, or expired (past the
+# expires_at unix timestamp recorded when the token was minted).
 def _member_for_token(req):
     token = _bearer(req)
     if token == "":
@@ -22,6 +23,9 @@ def _member_for_token(req):
     c = store_collection("tokens")
     doc = c.get(token)
     if doc == None:
+        return None
+    exp = doc.get("expires_at", 0)
+    if exp != 0 and clock.now_unix() > exp:
         return None
     return doc
 

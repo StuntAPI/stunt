@@ -31,7 +31,7 @@ session.
 |--------|-------|---------|-------------|
 | GET | `/oauth/authorize` | `oauth.star#on_authorize` | 302 redirect with code + state |
 | POST | `/oauth/access_token` | `oauth.star#on_access_token` | Token exchange (auth code, single-use) or refresh grant |
-| GET | `/v1.0/me` | `profile.star#on_profile` | Profile (Bearer presence) |
+| GET | `/v1.0/me` | `profile.star#on_profile` | Profile (Bearer validation) |
 | GET | `/v1.0/{id}/insights` | `insights.star#on_insights` | Per-media metrics (4 metrics) |
 | POST | `/v1.0/{id}/threads_publish` | `publish.star#on_publish` | Publish container → media (step 2) |
 | POST | `/v1.0/{id}/threads` | `publish.star#on_create` | Create media container (step 1) |
@@ -54,12 +54,12 @@ KV is used for monotonic sequence counters (`user_seq`, `container_seq`,
 
 ## Token policy
 
-The API routes (`/v1.0/*`) check **only** that an `Authorization: Bearer
-<anything>` header is **present** (401 if absent) and do **not** validate the
-token value. Threads' publish flow has no author-URN-matching semantics to
-exercise, so token validation adds no test value. The OAuth routes DO mint
-real tokens (stored in the `tokens` collection) for the round-trip test, but
-the API routes ignore them.
+The API routes (`/v1.0/*`) require a **valid** `Authorization: Bearer <token>`
+header: the token must have been minted by `POST /oauth/access_token` (stored
+in the `tokens` collection) and not be past its 60-day `expires_at`. A
+missing, unknown, or expired token returns
+`401 {"error": {"message": "Missing or invalid access token", "code": 190}}`
+— the Graph API error envelope.
 
 ## Refresh grant
 

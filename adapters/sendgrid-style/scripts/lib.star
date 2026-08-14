@@ -18,22 +18,44 @@ def _bearer(req):
         return auth[7:]
     return ""
 
-# _require_auth validates that a non-empty bearer key is present.
-# SendGrid API keys have the format "SG.<...>".
+# Well-known static test API keys. These are seeded once into the KV store
+# (see _seed_api_keys) so existing clients/tests that use them keep working
+# while any other key is rejected with 401.
+_TEST_API_KEYS = ["SG.testkey.testsecret"]
+
+# _seed_api_keys inserts each well-known test API key into the KV store
+# exactly once per instance (guarded by the "auth_seeded" flag). Keys are
+# stored under "tok:<key>" with a far-future expiry computed at runtime
+# (never a hardcoded epoch).
+def _seed_api_keys():
+    if store_kv_get("sendgrid", "auth_seeded") == "yes":
+        return
+    store_kv_set("sendgrid", "auth_seeded", "yes")
+    exp = str(clock.now_unix() + 3600 * 24 * 365 * 10)
+    for key in _TEST_API_KEYS:
+        store_kv_set("sendgrid", "tok:" + key, exp)
+
+# _require_auth validates the Bearer token against the KV store.
+# SendGrid API keys have the format "SG.<...>". A token is accepted only
+# when it is stored (seeded test key) and not expired; real SendGrid API
+# keys do not expire, so seeded entries carry a far-future expiry.
 # Returns None if authorized, or an error-response dict if not.
 def _require_auth(req):
+    _seed_api_keys()
     token = _bearer(req)
-    if token == "":
-        return respond(401, {
-            "errors": [
-                {
-                    "message": "The provided authorization grant is invalid, expired, or revoked.",
-                    "field": None,
-                    "help": None,
-                }
-            ],
-        })
-    return None
+    if token != "":
+        exp = store_kv_get("sendgrid", "tok:" + token)
+        if exp != None and clock.now_unix() <= _to_int(exp):
+            return None
+    return respond(401, {
+        "errors": [
+            {
+                "message": "The provided authorization grant is invalid, expired, or revoked.",
+                "field": None,
+                "help": None,
+            }
+        ],
+    })
 
 # _next_msg_id returns a monotonically-increasing SendGrid-style message ID
 # using the KV store as a sequence counter.

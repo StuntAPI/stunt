@@ -318,6 +318,20 @@ func TestSlackStyleAdapter(t *testing.T) {
 	if noAuth["error"] != "not_authed" {
 		t.Fatalf("no-auth error = %v, want 'not_authed'", noAuth["error"])
 	}
+
+	// ===== 401 with an unknown (bogus) token =====
+
+	body, status = slackPostJSON(t, base+"/api/auth.test", "xoxb-unknown-bogus-token", map[string]any{})
+	if status != 401 {
+		t.Fatalf("auth.test with bogus token -> status %d, want 401; body %s", status, body)
+	}
+	var badAuth map[string]any
+	if err := json.Unmarshal([]byte(body), &badAuth); err != nil {
+		t.Fatalf("unmarshal bogus-token response: %v (body %s)", err, body)
+	}
+	if badAuth["ok"] != false || badAuth["error"] != "invalid_auth" {
+		t.Fatalf("bogus token response = %v, want {ok:false, error:invalid_auth}", badAuth)
+	}
 }
 
 // TestSlackStylePagination verifies cursor pagination on a non-Stripe envelope:

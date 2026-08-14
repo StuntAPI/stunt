@@ -5,6 +5,32 @@
 # they were builtins.
 
 # HubSpot CRM auth: Bearer token OR hapikey query param.
+#
+# Tokens are VALIDATED against the KV store (namespace "hubspot", key
+# "tok:<credential>"). The value is the expiry as a unix-seconds string, or
+# "never" for non-expiring credentials (the seeded static test keys).
+
+# _seed_auth inserts the static mock credentials once so existing callers
+# keep working while unknown tokens get a 401. Guarded by a KV flag.
+def _seed_auth():
+    if store_kv_get("hubspot", "auth_seeded") == "yes":
+        return
+    store_kv_set("hubspot", "auth_seeded", "yes")
+    store_kv_set("hubspot", "tok:pat-mock-token", "never")
+    store_kv_set("hubspot", "tok:mock-hapikey", "never")
+
+# _credential_ok reports whether the credential is known and unexpired.
+def _credential_ok(cred):
+    if cred == "" or cred == None:
+        return False
+    val = store_kv_get("hubspot", "tok:" + cred)
+    if val == None:
+        return False
+    if val == "never":
+        return True
+    if clock.now_unix() > _to_int(val):
+        return False
+    return True
 
 # _bearer extracts the Bearer token from the Authorization header.
 def _bearer(req):
@@ -15,17 +41,18 @@ def _bearer(req):
         return auth[7:]
     return ""
 
-# _require_auth checks for Bearer token OR hapikey query param. Returns
-# (ok, error_resp). If neither is present, returns (False, 401 response).
+# _require_auth checks for Bearer token OR hapikey query param and validates
+# the credential against the store. Returns (ok, error_resp). If the
+# credential is absent, unknown, or expired, returns (False, 401 response).
 def _require_auth(req):
-    token = _bearer(req)
-    if token != "":
+    _seed_auth()
+    if _credential_ok(_bearer(req)):
         return True, None
     # Check hapikey query param.
     q = req.get("query")
     if q != None:
         hapikey = q.get("hapikey", "")
-        if hapikey != "" and hapikey != None:
+        if _credential_ok(hapikey):
             return True, None
     return False, _auth_error()
 

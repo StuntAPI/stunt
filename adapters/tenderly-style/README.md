@@ -20,6 +20,13 @@ and bundle simulation.
 
 Bearer token (`Authorization: Bearer <key>`).
 
+Tokens are validated: the key must be registered in the KV store
+(`token_<key>` → unix-seconds expiry). An unknown or expired token returns
+`401` with Tenderly's error envelope `{"slug": "unauthorized", "message":
+"Missing or invalid API key"}`. The static test token `test-token-tenderly`
+is seeded automatically on first use with a far-future expiry; send any
+other bearer to exercise the 401 path.
+
 ## API version
 
 `v1`

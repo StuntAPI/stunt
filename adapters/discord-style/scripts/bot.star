@@ -4,9 +4,9 @@
 # GET /guilds/{guild_id}        -> { id, name, icon, owner_id, ... }
 # GET /guilds/{guild_id}/channels -> [ { id, name, type, guild_id, ... } ]
 #
-# Bot endpoints accept any bearer/bot token (the real Discord API validates
-# the token, but for local testing any non-empty Authorization header is
-# accepted). A missing Authorization header returns 401.
+# Bot endpoints require a VALID bearer/bot token, like the real Discord API:
+# _require_bot checks the token against the access_tokens store (unknown or
+# expired -> 401). A missing Authorization header returns 401.
 
 # Shared helpers (_token, _require_bot, _seed) are preloaded from
 # scripts/lib.star.

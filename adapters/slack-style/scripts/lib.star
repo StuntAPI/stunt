@@ -5,9 +5,10 @@
 # they were builtins — without Starlark's load() (which stunt does not
 # support). See internal/starlark/vm.go LoadWithLib.
 
-# Synthetic Slack-style token prefix for the local dev bypass. Any token
-# starting with "xoxb-" is accepted for local testing.
-DEV_PREFIX = "xoxb-"
+# Well-known static test token, seeded once into the KV store on first
+# request (see _seed_tokens) so existing clients/tests that use it keep
+# working while any other token must validate via the identity issuer.
+_TEST_TOKEN = "xoxb-test-token"
 
 # Default team/user info for the mock workspace.
 TEAM_ID = "T00000001"
@@ -31,18 +32,33 @@ def _bearer(req):
         return auth[7:]
     return None
 
+# _seed_tokens inserts the well-known static test token into the KV store
+# exactly once per instance (guarded by the "auth_seeded" flag), stored
+# under "tok:<token>" with a far-future expiry computed at runtime (Slack
+# bot tokens do not expire until revoked, so no hardcoded epoch is used).
+def _seed_tokens():
+    if store_kv_get("slack", "auth_seeded") == "yes":
+        return
+    store_kv_set("slack", "auth_seeded", "yes")
+    exp = str(clock.now_unix() + 3600 * 24 * 365 * 10)
+    store_kv_set("slack", "tok:" + _TEST_TOKEN, exp)
+
 # _require_auth validates the Bearer token.
 #
 # Returns None if authorized, or an error-response dict to return from the
 # handler if not.
 #
-# Dev bypass: tokens starting with "xoxb-" are accepted without validation,
-# for frictionless local testing.
+# A token is accepted when it is present in the KV store (the seeded static
+# test token) and not expired, or when it validates against the identity
+# issuer (real validation). Anything else — including random "xoxb-..."
+# tokens — gets 401 invalid_auth.
 def _require_auth(req):
     token = _bearer(req)
     if token == None:
         return respond(401, {"ok": False, "error": "not_authed"})
-    if token[:5] == DEV_PREFIX:
+    _seed_tokens()
+    exp = store_kv_get("slack", "tok:" + token)
+    if exp != None and clock.now_unix() <= _to_int(exp):
         return None
     # Real validation via the identity issuer.
     claims = identity_validate(token)

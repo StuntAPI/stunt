@@ -17,7 +17,33 @@
 # 2. Bearer Token (OAuth 2.0):
 #    Authorization: Bearer <access_token>
 #
-# This mock validates the PRESENCE of an Authorization header.
+# This mock VALIDATES the Authorization header against the KV store
+# (namespace "servicenow", key "auth:<full header value>"). The value is the
+# expiry as a unix-seconds string, or "never" for non-expiring credentials
+# (the seeded static test credentials).
+
+# _seed_auth inserts the static mock credentials once so existing callers
+# keep working while unknown credentials get a 401. Guarded by a KV flag.
+def _seed_auth():
+    if store_kv_get("servicenow", "auth_seeded") == "yes":
+        return
+    store_kv_set("servicenow", "auth_seeded", "yes")
+    store_kv_set("servicenow", "auth:Basic YWRtaW46cGFzcw==", "never")
+    store_kv_set("servicenow", "auth:Bearer mock-snow-token", "never")
+
+# _credential_ok reports whether the Authorization header value is a known,
+# unexpired credential.
+def _credential_ok(auth):
+    if auth == "" or auth == None:
+        return False
+    val = store_kv_get("servicenow", "auth:" + auth)
+    if val == None:
+        return False
+    if val == "never":
+        return True
+    if clock.now_unix() > _parse_int(val, 0):
+        return False
+    return True
 
 # _auth_header returns the raw Authorization header, or "" if absent.
 def _auth_header(req):
@@ -29,15 +55,17 @@ def _auth_header(req):
         return ""
     return auth
 
-# _require_auth checks for a valid-STRUCTURE auth header. Returns
-# (True, None) if OK, or (False, error_resp) if not.
+# _require_auth checks for a Basic/Bearer auth header and validates the
+# credential against the store. Returns (True, None) if OK, or (False,
+# error_resp) if missing, unknown, or expired.
 def _require_auth(req):
     auth = _auth_header(req)
     if auth == "":
         return False, _auth_error()
-    if _contains(auth, "Basic "):
-        return True, None
-    if _contains(auth, "Bearer "):
+    if not _contains(auth, "Basic ") and not _contains(auth, "Bearer "):
+        return False, _auth_error()
+    _seed_auth()
+    if _credential_ok(auth):
         return True, None
     return False, _auth_error()
 

@@ -50,6 +50,14 @@ OAuth2 uses body-param client credentials (form-encoded). The
 bodies with `grant_type`, `client_id`, `client_secret`, `redirect_uri`, and
 `code`/`refresh_token`.
 
+Access tokens are **validated against the store**: `GET /oauth2/v3/userinfo`
+looks the Bearer token up in the `tokens` collection and rejects unknown or
+expired tokens with Google's 401 envelope
+(`{"error":{"code":401,"message":"Invalid credentials","status":"UNAUTHENTICATED"}}`).
+Minted tokens carry an `expires_at` unix timestamp (matching Google's ~3600s
+access-token lifetime); once `clock.now_unix()` passes it, the token 401s and a
+new one must be obtained via the refresh-token grant.
+
 ## Usage
 
 Point a `stunt.yaml` service at this directory:

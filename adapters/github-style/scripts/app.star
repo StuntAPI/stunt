@@ -9,8 +9,8 @@
 # JWT is RS256-signed with the app private key) and returns a ghs_ prefixed
 # installation access token.
 
-# Shared helpers (_require_app_jwt, _gh_unauthorized, _now, _seed, _next_id)
-# are preloaded from scripts/lib.star.
+# Shared helpers (_require_app_jwt, _gh_unauthorized, _now, _seed, _next_id,
+# _register_credential, _INSTALL_TOKEN_TTL) are preloaded from scripts/lib.star.
 
 # --- adapter-specific helpers ---
 
@@ -90,17 +90,23 @@ def on_create_installation_token(req):
 
     token = _mint_installation_token()
 
-    # Store for potential validation.
+    # Register for validation with GitHub's real 1-hour installation-token
+    # TTL, and store the provider-shaped expiry alongside the token doc.
+    _register_credential(token, "install", _INSTALL_TOKEN_TTL)
+    expires_unix = clock.now_unix() + _INSTALL_TOKEN_TTL
+    expires_at = clock.unix_to_rfc3339(expires_unix)
+
     tc = store_collection("installation_tokens")
     tc.insert({
         "id": token,
         "installation_id": req["params"].get("installation_id", ""),
         "created_at": _now(),
+        "expires_at": expires_at,
     })
 
     return respond(201, {
         "token": token,
-        "expires_at": "2025-01-01T13:00:00Z",
+        "expires_at": expires_at,
         "permissions": {
             "issues": "write",
             "pull_requests": "write",

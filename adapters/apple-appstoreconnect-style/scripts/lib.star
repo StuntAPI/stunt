@@ -118,23 +118,52 @@ def _check_jwt_bearer(req):
         return None
     return token
 
+# _ASC_STATIC_JWTS are well-known structurally-valid ES256 JWTs registered in
+# the KV token registry on first use so static-token clients (engine tests,
+# quick-start examples) keep working while unknown JWTs 401. The payload is
+# {"iss":"test-issuer","iat":...,"exp":...,"aud":"appstoreconnect-v1"}.
+_ASC_STATIC_JWTS = [
+    "eyJhbGciOiJFUzI1NiIsImtpZCI6IlRFU1RLRVkxMjMiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJ0ZXN0LWlzc3VlciIsImlhdCI6MTcwMDAwMDAwMCwiZXhwIjoxNzAwMDAzNjAwLCJhdWQiOiJhcHBzdG9yZWNvbm5lY3QtdjEifQ.c3ludGhldGljLXNpZ25hdHVyZQ",
+]
+
+# _seed_static_jwts registers each static JWT in the KV token registry
+# (insert-once, guarded by a KV flag). Registered tokens carry a far-future
+# expiry (one year, computed at runtime) — the JWT's own exp claim is
+# advisory in this simulator; registry expiry is what the gate enforces.
+def _seed_static_jwts():
+    if store_kv_get("asc", "jwt_seeded") == "yes":
+        return
+    store_kv_set("asc", "jwt_seeded", "yes")
+    exp = str(clock.now_unix() + 365 * 24 * 3600)
+    for t in _ASC_STATIC_JWTS:
+        if store_kv_get("asc", "tok_" + t) == None:
+            store_kv_set("asc", "tok_" + t, exp)
+
 # _require_jwt returns (token, None) if the JWT bearer auth is valid, or
 # (None, error_response) if not. The error_response is a JSON:API-shaped
 # 401 error suitable for App Store Connect API responses.
+#
+# Validation is structural (ES256 + kid, via _check_jwt_bearer) AND
+# registry-based: the exact JWT string must be registered in the KV token
+# registry (seeded static JWTs, or tokens a future minting flow would store)
+# and its registry expiry must not have passed.
 def _require_jwt(req):
     token = _check_jwt_bearer(req)
-    if token == None:
-        return None, respond(401, {
-            "errors": [
-                {
-                    "status": "401",
-                    "code": "NOT_AUTHORIZED",
-                    "title": "Authentication credentials are missing or invalid.",
-                    "detail": "Provide a valid JWT bearer token signed with ES256.",
-                }
-            ],
-        })
-    return token, None
+    if token != None:
+        _seed_static_jwts()
+        exp_s = store_kv_get("asc", "tok_" + token)
+        if exp_s != None and _to_int(exp_s) > clock.now_unix():
+            return token, None
+    return None, respond(401, {
+        "errors": [
+            {
+                "status": "401",
+                "code": "NOT_AUTHORIZED",
+                "title": "Authentication credentials are missing or invalid.",
+                "detail": "Provide a valid JWT bearer token signed with ES256.",
+            }
+        ],
+    })
 
 # _mint_jwt creates a plausible JWT string (header.payload.signature) with an
 # ES256 JOSE header. The signature is NOT a real ECDSA signature — it's a

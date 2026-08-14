@@ -52,6 +52,8 @@ def _issue_tokens(user, scope):
     access = _mint_jwt(user_id, scope, user["displayName"], str(access_seq))
     token_doc["id"] = access
     token_doc["scope"] = scope
+    # Enforce the advertised ~1h access-token TTL (see expires_in below).
+    token_doc["expires_at"] = clock.now_unix() + 3599
 
     tc = store_collection("tokens")
     tc.insert(token_doc)

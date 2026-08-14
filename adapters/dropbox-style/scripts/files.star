@@ -72,6 +72,10 @@ def _try_decode(s):
 #    (Content-Type application/octet-stream) in req["raw_body"].
 # Content is stored via store_blob; metadata goes in the "entries" collection.
 def on_upload(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
     body = req["body"]
     if body == None:
         body = {}
@@ -114,6 +118,10 @@ def on_upload(req):
 # Body: {path} or {id}. Returns the raw file content with Content-Type
 # application/octet-stream. Folders cannot be downloaded (409).
 def on_download(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
     body = req["body"]
     if body == None:
         body = {}
@@ -153,6 +161,10 @@ def on_download(req):
 # cursor field). When limit is absent or <= 0 paging is disabled and the
 # whole (filtered) list is returned with has_more:false.
 def on_list_folder(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
     body = req["body"]
     if body == None:
         body = {}
@@ -182,6 +194,10 @@ def on_list_folder(req):
 #
 # Body: {path}. Returns the entry metadata, or 409 if not found.
 def on_get_metadata(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
     body = req["body"]
     if body == None:
         body = {}
@@ -198,6 +214,10 @@ def on_get_metadata(req):
 # Body: {path}. Creates a folder entry with .tag:"folder" and no blob content.
 # Returns 409 if the path already exists.
 def on_create_folder(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
     body = req["body"]
     if body == None:
         body = {}
@@ -228,6 +248,10 @@ def on_create_folder(req):
 # Body: {path}. Deletes the entry metadata and its blob content (if any).
 # Returns the metadata of the deleted entry.
 def on_delete(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
     body = req["body"]
     if body == None:
         body = {}
@@ -251,6 +275,10 @@ def on_delete(req):
 # Body: {path}. Returns {metadata, link}. The link is synthetic and does
 # not resolve. Folders are disallowed (409).
 def on_get_temporary_link(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
     body = req["body"]
     if body == None:
         body = {}

@@ -31,6 +31,7 @@ A stunt adapter simulating the **Microsoft Entra ID (Azure AD)** API via Microso
 ## Key shapes
 
 - Access tokens are real, verifiable JWTs (`header.payload.signature`): signed with RS256 using a fixed mock RSA keypair (`kid: mock-entra-kid-1`), with claims `sub`, `name`, `scp`, `nonce`, and `iss: https://login.microsoftonline.com/mock-tenant/v2.0`. Verify them against `GET /common/discovery/v2.0/keys`.
+- Bearer tokens are validated against the `tokens` store collection and carry an `expires_at` (unix) of `now + 3599`, matching the advertised `expires_in`. A missing, unknown, or expired token returns `401` with `{error:{code: "InvalidAuthenticationToken", message}}`.
 - User objects use `userPrincipalName` (UPN), not `email`.
 - Listings use `"value": [...]` arrays with `@odata.context`.
 - Admin consent is modeled via `prompt=admin_consent` on the authorize endpoint.

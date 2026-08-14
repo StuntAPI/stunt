@@ -55,9 +55,13 @@ curl -X POST http://localhost:8080/v68/payments/PSPREF/refunds \
 
 ## Authentication
 
-Adyen uses the `X-API-Key` header for Checkout API authentication. This
-adapter checks for presence of the header — the value is not validated
-against real Adyen credentials.
+Adyen uses the `X-API-Key` header for Checkout API authentication. API keys
+are validated: the key must be registered in the KV store (`apikey_<key>` →
+unix-seconds expiry). An unknown or expired key returns `401` with Adyen's
+error envelope `{"status": 401, "errorCode": "401", "message":
+"Unauthorized", "errorType": "security"}`. The static test key
+`AQEyhmfxK....LRGhARAYZ` is seeded automatically on first use with a
+far-future expiry; send any other key to exercise the 401 path.
 
 ## Endpoints
 

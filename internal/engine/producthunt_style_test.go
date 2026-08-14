@@ -113,6 +113,13 @@ func TestProductHuntStyleAdapter(t *testing.T) {
 		t.Fatalf("postCreate without Bearer -> status %d, want 401; body %s", status, body)
 	}
 
+	// ===== postCreate (unknown Bearer) → 401 (validation is real) =====
+
+	body, status = phPostGraphQL(t, base+"/v2/api/graphql.json", "bogus-token", query, vars)
+	if status != 401 {
+		t.Fatalf("postCreate with bogus Bearer -> status %d, want 401; body %s", status, body)
+	}
+
 	// ===== Catch-all 404 =====
 
 	body, status = phGet(t, base+"/nope")

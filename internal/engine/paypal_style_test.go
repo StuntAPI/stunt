@@ -69,6 +69,13 @@ func TestPayPalStyleAdapter(t *testing.T) {
 		t.Fatalf("no-auth get order -> %d, want 401", status)
 	}
 
+	// ===== 401 with a token that was never minted =====
+
+	_, status = ppGet(t, base+"/v2/checkout/orders/ORDERID-1", "A21AAL_never_minted_token")
+	if status != 401 {
+		t.Fatalf("unminted token get order -> %d, want 401", status)
+	}
+
 	// ===== oauth token =====
 
 	body, status := ppPostForm(t, base+"/v1/oauth2/token", url.Values{

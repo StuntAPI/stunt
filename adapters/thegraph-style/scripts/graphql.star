@@ -17,6 +17,10 @@
 def on_query(req):
     _seed()
 
+    err = _auth_check(req)
+    if err != None:
+        return err
+
     body = req.get("body")
     if body == None:
         return respond(400, {"errors": [{"message": "missing body"}]})
@@ -55,6 +59,10 @@ def on_query(req):
 # on_schema returns the GraphQL SDL schema string for introspection.
 def on_schema(req):
     _seed()
+
+    err = _auth_check(req)
+    if err != None:
+        return err
 
     subgraph_id = req["params"]["subgraphId"]
 

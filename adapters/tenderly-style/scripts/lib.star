@@ -12,10 +12,42 @@ def _bearer(req):
         return auth[7:]
     return None
 
-# _require_auth checks for a valid Bearer header.
+# _require_auth checks for a valid Bearer header and validates the token
+# against the KV store (ns "tenderly", key "token_<tok>" → unix-seconds
+# expiry). Unknown or expired tokens are rejected, so the 401 path is
+# exercisable with any bogus bearer.
+
+# _TOKEN_TTL is the far-future lifetime given to seeded static test tokens
+# (computed at runtime — never a hardcoded epoch).
+_TOKEN_TTL = 10 * 365 * 24 * 3600
+
+# _seed_tokens inserts-once the static bearer tokens engine tests use, so
+# presence-only auth could be upgraded to real validation without breaking
+# them. Guarded by a KV flag.
+def _seed_tokens():
+    if store_kv_get("tenderly", "token_seeded") == "yes":
+        return
+    store_kv_set("tenderly", "token_seeded", "yes")
+    expiry = clock.now_unix() + _TOKEN_TTL
+    store_kv_set("tenderly", "token_test-token-tenderly", str(expiry))
+
+# _token_expiry returns the stored expiry (unix seconds int) for a token,
+# or 0 when the token is unknown.
+def _token_expiry(tok):
+    raw = store_kv_get("tenderly", "token_" + tok)
+    if raw == None or raw == "":
+        return 0
+    return _to_int(raw)
+
 def _require_auth(req):
     tok = _bearer(req)
     if tok == None or tok == "":
+        return False
+    _seed_tokens()
+    expiry = _token_expiry(tok)
+    if expiry <= 0:
+        return False
+    if clock.now_unix() > expiry:
         return False
     return True
 

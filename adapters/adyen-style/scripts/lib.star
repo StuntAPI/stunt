@@ -9,7 +9,29 @@
 # We check presence only — the value is not validated against real Adyen
 # credentials.
 
-# _require_apikey validates that X-API-Key is present. Returns None if
+# _seed_apikeys inserts-once the static X-API-Key values engine tests use, so
+# presence-only auth could be upgraded to real validation without breaking
+# them. Guarded by a KV flag; keys get a far-future expiry computed at
+# runtime (never a hardcoded epoch — adapter lint rejects long digit runs).
+_APIKEY_TTL = 10 * 365 * 24 * 3600
+
+def _seed_apikeys():
+    if store_kv_get("adyen", "apikey_seeded") == "yes":
+        return
+    store_kv_set("adyen", "apikey_seeded", "yes")
+    expiry = clock.now_unix() + _APIKEY_TTL
+    store_kv_set("adyen", "apikey_AQEyhmfxK....LRGhARAYZ", str(expiry))
+
+# _apikey_expiry returns the stored expiry (unix seconds int) for an API
+# key, or 0 when the key is unknown.
+def _apikey_expiry(apikey):
+    raw = store_kv_get("adyen", "apikey_" + apikey)
+    if raw == None or raw == "":
+        return 0
+    return _to_int(raw)
+
+# _require_apikey validates that X-API-Key is present, known to the KV
+# store (seeded test keys above), and unexpired. Returns None if
 # authorized, or an error-response dict if not.
 def _require_apikey(req):
     headers = req.get("headers")
@@ -19,6 +41,12 @@ def _require_apikey(req):
     # "X-Api-Key". Try both forms for robustness.
     apikey = headers.get("X-Api-Key", headers.get("X-API-Key", ""))
     if apikey == None or apikey == "":
+        return _adyen_err(401, "401", "Unauthorized", "security")
+    _seed_apikeys()
+    expiry = _apikey_expiry(apikey)
+    if expiry <= 0:
+        return _adyen_err(401, "401", "Unauthorized", "security")
+    if clock.now_unix() > expiry:
         return _adyen_err(401, "401", "Unauthorized", "security")
     return None
 

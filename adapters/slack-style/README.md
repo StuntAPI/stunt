@@ -33,12 +33,15 @@ adapter **validates** the Bearer token:
 
 - Checks for `Authorization: Bearer <token>` header.
 - Returns `401` with `{ok:false, error:"not_authed"}` if the header is missing.
+- Accepts a token only when it is present in the adapter's token store (and
+  not expired) **or** when it validates against the identity issuer.
 
-### Dev bypass (`xoxb-`)
+### Seeded test token
 
-For frictionless local testing, **any token starting with `xoxb-`** is
-accepted **without** identity validation. This lets you use a well-known dev
-token like `xoxb-test-token` in scripts, curl commands, and tests:
+The well-known test token `xoxb-test-token` is seeded automatically into the
+token store on first request (with a far-future expiry — Slack bot tokens do
+not expire until revoked), so existing scripts, curl commands, and tests
+keep working:
 
 ```bash
 curl -H "Authorization: Bearer xoxb-test-token" \
@@ -47,12 +50,19 @@ curl -H "Authorization: Bearer xoxb-test-token" \
   -d '{"channel":"C00000001","text":"Hello from stunt!"}'
 ```
 
-### 401 without auth
+### 401 without auth / with an invalid token
 
 ```bash
 curl -X POST http://localhost:PORT/api/auth.test
 # → 401 {"ok":false,"error":"not_authed"}
+
+curl -X POST http://localhost:PORT/api/auth.test \
+  -H "Authorization: Bearer xoxb-unknown-bogus-token"
+# → 401 {"ok":false,"error":"invalid_auth"}
 ```
+
+Any random `xoxb-...` token that is neither the seeded test token nor a
+valid issuer-minted token is rejected with `invalid_auth`.
 
 ## Webhooks
 

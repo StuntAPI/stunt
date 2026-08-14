@@ -76,6 +76,17 @@ func TestAdyenStyleAdapter(t *testing.T) {
 		t.Fatalf("no-auth payments -> %d, want 401", status)
 	}
 
+	// ===== 401 with an unknown API key =====
+
+	_, status = adPostJSON(t, base+"/v68/payments", "AQEunknown_key_not_seeded", map[string]any{
+		"merchantAccount": "TestMerchant",
+		"amount":          map[string]any{"value": 1000, "currency": "USD"},
+		"reference":       "ref-001",
+	})
+	if status != 401 {
+		t.Fatalf("unknown api key -> %d, want 401", status)
+	}
+
 	// ===== create payment → Authorised =====
 
 	body, status := adPostJSON(t, base+"/v68/payments", apiKey, map[string]any{

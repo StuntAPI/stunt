@@ -62,7 +62,8 @@ resources:
   - name: media
     kind: collection
 
-# Auth scheme metadata (mock: API routes check bearer PRESENCE, not value).
+# Auth scheme metadata (mock: API routes validate the bearer against the
+# tokens collection, including expiry).
 identity:
   token_scheme: bearer
 

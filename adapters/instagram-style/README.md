@@ -62,7 +62,10 @@ requested names (all four metrics are returned when `metric` is absent).
 ## Auth
 
 OAuth2 authorization-code flow mints user-bound tokens. API routes require a
-**Bearer** token to be present (its value is not validated).
+**valid Bearer token**: it must have been minted by `POST /oauth/access_token`
+(stored in the `tokens` collection, 60-day `expires_at`). A missing, unknown,
+or expired token returns `401 {"error": {"message": "Missing or invalid access
+token", "code": 190}}` — the Graph API error envelope.
 
 ## Usage
 

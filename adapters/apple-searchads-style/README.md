@@ -21,9 +21,13 @@ returns nested data structures with campaign-level metrics. The pain: JWT auth f
 
 ## Auth
 
-OAuth2 client-secret JWT → bearer access token. This adapter accepts any
-non-empty `Authorization: Bearer <token>` header (structural validation only;
-the real API uses ES256-signed JWTs exchanged for access tokens).
+OAuth2 client-secret JWT → bearer access token. Bearer tokens are validated
+against the token store: an unknown or expired token gets a `401` with the
+Search Ads error envelope `{"data": {"status": "ERROR", "message": ...}}`.
+Tokens are registered in the KV store with an expiry (`tok_<token>` → unix
+seconds); the static test token `test-bearer-token-searchads` is seeded
+automatically on first use with a far-future expiry. The adapter does not
+verify the ES256 JWT signature.
 
 ## API version
 

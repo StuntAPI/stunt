@@ -243,6 +243,13 @@ func TestServicenowStyleAdapter(t *testing.T) {
 		t.Fatalf("error.message = %v, want string", errObj["message"])
 	}
 
+	// ===== bogus bearer token → 401 =====
+
+	_, status = snowAuthGet(t, base+"/api/now/table/incident", "Bearer bogus-snow-token")
+	if status != 401 {
+		t.Fatalf("list incidents with bogus bearer -> %d, want 401", status)
+	}
+
 	// ===== DELETE an incident =====
 
 	body, status = snowAuthDelete(t, base+"/api/now/table/incident/sysid_inc_002", basicAuth)

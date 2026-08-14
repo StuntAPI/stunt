@@ -10,6 +10,57 @@ SUBGRAPH_UNISWAP_V3 = "5zvR82QoaXYxfyKOCH8Qfl6pUCWd7YFXq56Y3ZSDXx2W"
 # ENS style subgraph.
 SUBGRAPH_ENS = "5XqPmWe6gZyrTtFjASCbxgykJ7KbAA8puFezV8vsJoEB"
 
+# --- optional API-key validation --------------------------------------------
+#
+# The Graph's hosted-service subgraph endpoints (the /subgraphs/id/{id}
+# shape this adapter models) are public — no auth required. The Graph
+# gateway, by contrast, authenticates requests with an API key sent as
+# "Authorization: Bearer <key>". This adapter mirrors both: a request
+# WITHOUT an Authorization header stays anonymous/public; a request WITH
+# one must present a known, unexpired key or gets a 401 GraphQL errors
+# envelope. Known keys live in the "graph" KV namespace under "tok:<key>"
+# with the expiry as unix seconds (far-future, computed at runtime — never
+# a hardcoded epoch).
+
+# Well-known static test API key, seeded once on first request (see
+# _seed_api_keys) so clients that present a key have a working credential
+# while any other key is rejected with 401.
+_TEST_API_KEY = "mock-graph-api-key"
+
+# _seed_api_keys inserts the well-known test API key into the KV store
+# exactly once per instance (guarded by the "auth_seeded" flag).
+def _seed_api_keys():
+    if store_kv_get("graph", "auth_seeded") == "yes":
+        return
+    store_kv_set("graph", "auth_seeded", "yes")
+    store_kv_set("graph", "tok:" + _TEST_API_KEY, str(clock.now_unix() + 3600 * 24 * 365 * 10))
+
+# _graph_unauthorized returns a Graph-gateway-style 401 GraphQL error.
+def _graph_unauthorized():
+    return respond(401, {
+        "errors": [{"message": "valid API key expected"}],
+    })
+
+# _auth_check returns None when the request may proceed anonymously or with
+# a known key, or a 401 response when an unknown/expired key is presented.
+def _auth_check(req):
+    headers = req.get("headers")
+    if headers == None:
+        return None
+    auth = headers.get("Authorization", "")
+    if auth == None or auth == "":
+        return None
+    token = ""
+    if auth.startswith("Bearer "):
+        token = auth[7:]
+    if token == "":
+        return _graph_unauthorized()
+    _seed_api_keys()
+    exp = store_kv_get("graph", "tok:" + token)
+    if exp != None and clock.now_unix() <= _to_int(exp):
+        return None
+    return _graph_unauthorized()
+
 # --- string helpers ---
 
 # _contains checks if a string contains a substring.

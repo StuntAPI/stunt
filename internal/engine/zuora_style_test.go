@@ -235,6 +235,20 @@ func TestZuoraStyleAdapter(t *testing.T) {
 		t.Fatalf("WHERE records = %v, want exactly 1", queryResp["records"])
 	}
 
+	// ===== bogus bearer token → 401 =====
+
+	_, status = zuoraAuthGet(t, base+"/v1/accounts", "Bearer zuora-bogus-token")
+	if status != 401 {
+		t.Fatalf("bogus-token accounts -> %d, want 401", status)
+	}
+
+	// ===== bogus legacy secret → 401 =====
+
+	_, status = zuoraLegacyGet(t, base+"/v1/accounts", "zuora-access-key", "zuora-wrong-secret")
+	if status != 401 {
+		t.Fatalf("bogus-legacy-secret accounts -> %d, want 401", status)
+	}
+
 	// ===== apiAccessKeyId legacy auth (via headers) =====
 
 	body, status = zuoraLegacyGet(t, base+"/v1/accounts", "zuora-access-key", "zuora-secret-key")

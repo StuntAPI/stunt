@@ -35,6 +35,14 @@ curl -X PUT http://localhost:8080/api.xro/2.0/Contacts \
 - **xero-tenant-id**: Required on all `/api.xro/*` endpoints (multi-tenant pain).
   `/connections` does NOT require it (it IS the tenant list).
 
+Tokens are validated: the bearer must be registered in the KV store
+(`token_<token>` → unix-seconds expiry). An unknown or expired token returns
+`401` with Xero's error envelope `{"ErrorNumber": "TokenExpired", "Type":
+"Unauthorized", "Message": "The access token has expired or is invalid"}` —
+the same envelope as a missing token. The static test token `xero-token` is
+seeded automatically on first use with a far-future expiry; send any other
+bearer to exercise the 401 path.
+
 Requests without Bearer return `401`. Requests without `xero-tenant-id` return `400`.
 
 ## Webhooks

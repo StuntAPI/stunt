@@ -19,7 +19,13 @@ lets you test projects, git repos, work items, and iterations locally.
 
 - **Basic:** `Authorization: Basic <base64(PAT:)>` — PAT as username, empty password.
 - **Bearer:** `Authorization: Bearer <PAT>`.
-- Either scheme is accepted (structural validation only).
+- The presented PAT is validated against the `pats` store collection
+  (PATs are minted in the portal UI, so there is no token endpoint here).
+  A static mock PAT `testPAT` is seeded on first use in both wire forms
+  (`testPAT` for Bearer, `dGVzdFBBVDo=` — its `base64(PAT:)` — for Basic)
+  with far-future expiry.
+- A missing, unknown, or expired PAT returns `401` with the Azure DevOps
+  envelope (`{typeName: "Microsoft.TeamFoundation.Framework.Server.UnauthorizedRequestException", ...}`).
 
 ## Endpoints
 

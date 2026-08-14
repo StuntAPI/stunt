@@ -92,5 +92,6 @@ def _mint_token(user):
         "id": token,
         "ig_user_id": user["ig_user_id"],
         "username": user["username"],
+        "expires_at": clock.now_unix() + 60 * 24 * 3600,
     })
     return token

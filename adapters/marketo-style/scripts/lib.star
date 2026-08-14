@@ -29,12 +29,21 @@ def _access_token(req):
             return at
     return ""
 
-# _require_auth checks for a valid access token. Returns (True, None) on
-# success, or (False, error_response) on failure.
+# _require_auth checks for a valid access token. The token is validated
+# against the "tokens" collection (populated by /identity/oauth/token) and
+# rejected when missing, unknown, or expired. Returns (True, None) on
+# success, or (False, 401 error_response) on failure.
 def _require_auth(req):
     tok = _access_token(req)
     if tok == "":
-        return False, _marketo_err(601, "Access token not provided")
+        return False, _marketo_auth_err("Access token not provided")
+    tc = store_collection("tokens")
+    doc = tc.get(tok)
+    if doc == None:
+        return False, _marketo_auth_err("Access token invalid")
+    exp = doc.get("expires_at", 0)
+    if exp != None and clock.now_unix() > exp:
+        return False, _marketo_auth_err("Access token expired")
     return True, None
 
 # _marketo_err returns a Marketo-style error response.
@@ -48,10 +57,15 @@ def _marketo_err(code, message):
 
 # _marketo_unauth returns a 401 error for missing tokens.
 def _marketo_unauth():
+    return _marketo_auth_err("Access token not provided")
+
+# _marketo_auth_err returns the Marketo 601 401 error envelope with the
+# given message (missing / invalid / expired access token).
+def _marketo_auth_err(message):
     return respond(401, {
         "success": False,
         "requestId": _request_id(),
-        "errors": [{"code": "601", "message": "Access token not provided"}],
+        "errors": [{"code": "601", "message": message}],
     })
 
 # _request_id returns a synthetic Marketo requestId.

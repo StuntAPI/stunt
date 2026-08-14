@@ -25,20 +25,49 @@ def _user_for_token(req):
         return None
     return doc
 
+# _GA4_STATIC_TOKENS are well-known bearer tokens seeded into the tokens
+# collection on first use so static-token clients (engine tests, quick-start
+# examples) keep working while unknown tokens 401.
+_GA4_STATIC_TOKENS = ["ya29.mock-token"]
+
+# _seed_static_tokens inserts each static token into the tokens collection
+# (insert-once: get-then-insert). Seeded tokens carry a far-future
+# expires_at (one year, computed at runtime) so they never lapse mid-session.
+def _seed_static_tokens():
+    c = store_collection("tokens")
+    exp = clock.now_unix() + 365 * 24 * 3600
+    for t in _GA4_STATIC_TOKENS:
+        if c.get(t) == None:
+            c.insert({
+                "id": t,
+                "expires_at": exp,
+                "scopes": ["https://www.googleapis.com/auth/analytics.readonly"],
+            })
+
 # _require_bearer returns the user doc for the Bearer token, or a 401
-# response if missing/invalid. For GA4, we accept any non-empty bearer
-# token (Google uses service-account or OAuth2 tokens that we can't
-# meaningfully validate in a mock).
+# response if missing/invalid. The token is validated against the tokens
+# collection (like the google-style OAuth2 simulator): tokens that were
+# never minted/seeded, or whose expires_at has passed, get the 401
+# UNAUTHENTICATED envelope below.
 def _require_bearer(req):
+    err401 = respond(401, {
+        "error": {
+            "code": 401,
+            "message": "API key not valid. Please pass a valid API key.",
+            "status": "UNAUTHENTICATED",
+        },
+    })
     token = _bearer(req)
     if token == "":
-        return None, respond(401, {
-            "error": {
-                "code": 401,
-                "message": "API key not valid. Please pass a valid API key.",
-                "status": "UNAUTHENTICATED",
-            },
-        })
+        return None, err401
+    _seed_static_tokens()
+    c = store_collection("tokens")
+    doc = c.get(token)
+    if doc == None:
+        return None, err401
+    exp = doc.get("expires_at", 0)
+    if exp != None and exp > 0 and clock.now_unix() > exp:
+        return None, err401
     return {"token": token}, None
 
 # _contains reports whether substr appears within s.

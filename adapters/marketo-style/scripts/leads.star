@@ -24,7 +24,7 @@ def _lead_shape(doc):
 def on_list_leads(req):
     ok, err = _require_auth(req)
     if not ok:
-        return _marketo_unauth()
+        return err
     if _check_quota():
         return _quota_err()
 
@@ -90,7 +90,7 @@ def _apply_lead_filters(req, leads):
 def on_create_lead(req):
     ok, err = _require_auth(req)
     if not ok:
-        return _marketo_unauth()
+        return err
     if _check_quota():
         return _quota_err()
 
@@ -123,7 +123,7 @@ def on_create_lead(req):
 def on_sync_leads(req):
     ok, err = _require_auth(req)
     if not ok:
-        return _marketo_unauth()
+        return err
     if _check_quota():
         return _quota_err()
 
@@ -153,7 +153,7 @@ def on_get_lead_json(req):
 def _get_lead(req):
     ok, err = _require_auth(req)
     if not ok:
-        return _marketo_unauth()
+        return err
     if _check_quota():
         return _quota_err()
 

@@ -13,18 +13,47 @@ def _bearer(req):
         return auth[7:]
     return ""
 
-# _require_bearer returns None if a Bearer token is present (authorized),
-# or a 401 response if the header is missing. Microsoft Graph checks token
-# PRESENCE (any non-empty Bearer token is accepted by this mock).
+# _auth_fault returns the Graph 401 error envelope for a missing, unknown,
+# or expired Bearer token.
+def _auth_fault():
+    return respond(401, {
+        "error": {
+            "code": "InvalidAuthenticationToken",
+            "message": "Access token is missing or invalid.",
+        },
+    })
+
+# _seed_known_tokens inserts (once, guarded by a KV flag) the static mock
+# tokens that engine tests present, into the "tokens" collection. This
+# adapter models only the Graph data plane (the token is minted by the
+# identity platform, i.e. entra-id-style), so the known-token bootstrap is
+# the stand-in for "a token the tenant previously issued". Far-future
+# expiry so static-token tests keep passing; unknown tokens still 401.
+def _seed_known_tokens():
+    if store_kv_get("graph", "tokens_seeded") == "yes":
+        return
+    store_kv_set("graph", "tokens_seeded", "yes")
+    tc = store_collection("tokens")
+    tc.insert({
+        "id": "mock-bearer-token",
+        "expires_at": clock.now_unix() + 3600*24*365,
+    })
+
+# _require_bearer returns None if the request carries a Bearer token that is
+# known to the store and not expired, or a 401 response otherwise (missing
+# header, unknown token, or expired token) with the Graph error envelope.
 def _require_bearer(req):
     tok = _bearer(req)
     if tok == "":
-        return respond(401, {
-            "error": {
-                "code": "InvalidAuthenticationToken",
-                "message": "Access token is missing or invalid.",
-            },
-        })
+        return _auth_fault()
+    _seed_known_tokens()
+    tc = store_collection("tokens")
+    doc = tc.get(tok)
+    if doc == None:
+        return _auth_fault()
+    exp = doc.get("expires_at", 0)
+    if exp != None and exp != 0 and clock.now_unix() > exp:
+        return _auth_fault()
     return None
 
 # _err returns a Microsoft Graph error envelope.

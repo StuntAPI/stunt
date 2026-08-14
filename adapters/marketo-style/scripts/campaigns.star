@@ -21,7 +21,7 @@ def _campaign_shape(doc):
 def on_list(req):
     ok, err = _require_auth(req)
     if not ok:
-        return _marketo_unauth()
+        return err
     if _check_quota():
         return _quota_err()
 
@@ -46,7 +46,7 @@ def on_list(req):
 def on_trigger(req):
     ok, err = _require_auth(req)
     if not ok:
-        return _marketo_unauth()
+        return err
     if _check_quota():
         return _quota_err()
 

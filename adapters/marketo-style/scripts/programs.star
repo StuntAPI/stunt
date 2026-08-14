@@ -10,7 +10,7 @@
 def on_list_programs(req):
     ok, err = _require_auth(req)
     if not ok:
-        return _marketo_unauth()
+        return err
     if _check_quota():
         return _quota_err()
 
@@ -44,7 +44,7 @@ def on_list_programs(req):
 def on_list_folders(req):
     ok, err = _require_auth(req)
     if not ok:
-        return _marketo_unauth()
+        return err
     if _check_quota():
         return _quota_err()
 

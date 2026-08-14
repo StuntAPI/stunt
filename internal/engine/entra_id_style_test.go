@@ -159,6 +159,13 @@ func TestEntraIDStyleAdapter(t *testing.T) {
 		t.Fatalf("/me without token -> status %d, want 401; body %s", status, body)
 	}
 
+	// ===== /v1.0/me with an unknown (never-minted) token → 401 =====
+
+	body, status = entraGetAuth(t, base+"/v1.0/me", "entra-bogus-token")
+	if status != 401 {
+		t.Fatalf("/me with unknown token -> status %d, want 401; body %s", status, body)
+	}
+
 	// ===== refresh_token grant → new access token, same user =====
 
 	body, status = entraPostForm(t, base+"/common/oauth2/v2.0/token", url.Values{

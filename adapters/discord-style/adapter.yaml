@@ -78,8 +78,8 @@ resources:
   - name: messages
     kind: collection
 
-# Auth scheme metadata (mock: bot endpoints accept any bearer; OAuth2
-# endpoints validate against the access_tokens collection).
+# Auth scheme metadata (mock: all endpoints validate the credential against
+# the access_tokens collection, including expiry).
 identity:
   token_scheme: bearer
 

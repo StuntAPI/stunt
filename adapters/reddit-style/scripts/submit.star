@@ -18,12 +18,29 @@ def _bearer(req):
         return auth[7:]
     return ""
 
+# _valid_token reports whether the Bearer token was minted by the adapter's
+# token endpoint (present in the "tokens" collection) and is not expired.
+# Reddit's real API validates access tokens server-side; unknown/expired
+# tokens get the USER_REQUIRED "please login" response.
+def _valid_token(req):
+    tok = _bearer(req)
+    if tok == "":
+        return False
+    tc = store_collection("tokens")
+    doc = tc.get(tok)
+    if doc == None:
+        return False
+    exp = doc.get("expires_at", 0)
+    if exp != 0 and clock.now_unix() > exp:
+        return False
+    return True
+
 # on_submit creates a new post for the authenticated user.
 def on_submit(req):
     if not _has_ua(req):
         return _ua_rejected(req)
 
-    if _bearer(req) == "":
+    if not _valid_token(req):
         return respond(401, {"json": {"errors": [["USER_REQUIRED", "please login", None]], "data": {}}})
 
     body = req["body"]

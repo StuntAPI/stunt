@@ -209,6 +209,13 @@ func TestGoogleAdminStyleAdapter(t *testing.T) {
 	if status != 401 {
 		t.Fatalf("list users without token -> status %d, want 401; body %s", status, body)
 	}
+
+	// ===== 401 with an unknown (never minted/seeded) bearer =====
+
+	body, status = gadminGetAuth(t, base+"/admin/directory/v1/users", "ya29.not-a-real-admin-token")
+	if status != 401 {
+		t.Fatalf("list users with bogus token -> status %d, want 401; body %s", status, body)
+	}
 }
 
 // === Helpers ===

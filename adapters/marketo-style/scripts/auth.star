@@ -32,13 +32,14 @@ def on_token(req):
     seq = store_kv_incr("marketo", "token_seq")
     access = "synthetic_token_" + str(seq)
 
-    # Store it so we could validate later (though this mock accepts any
-    # non-empty token).
+    # Store it with its expiry so _require_auth can validate later requests
+    # (Marketo tokens live for 3600 seconds).
     tc = store_collection("tokens")
     tc.insert({
         "id": access,
         "client_id": client_id,
         "scope": "",
+        "expires_at": clock.now_unix() + 3600,
     })
 
     return respond(200, {

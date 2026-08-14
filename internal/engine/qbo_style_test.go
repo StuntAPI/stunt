@@ -295,6 +295,14 @@ func TestQBOStyleAdapter(t *testing.T) {
 	if err0["code"] != "32001" {
 		t.Fatalf("Error code = %v, want 32001", err0["code"])
 	}
+
+	// ===== 401 with an unknown (never-minted) bearer → same Fault envelope =====
+
+	body, status = qboAuthGet(t, base+"/v3/company/"+realmID+"/query?query="+
+		url.QueryEscape("select * from Customer"), "Q0_bogus_never_minted")
+	if status != 401 {
+		t.Fatalf("bogus-token query -> %d, want 401; body %s", status, body)
+	}
 }
 
 // === QBO test helpers ===

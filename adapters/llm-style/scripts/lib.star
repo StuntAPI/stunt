@@ -18,20 +18,51 @@ def _bearer(req):
         return auth[7:]
     return ""
 
-# _require_bearer validates that a non-empty bearer key is present.
+# Well-known static test API key, seeded once into the KV store on first
+# request (see _seed_api_keys) so existing clients/tests that use it keep
+# working while any other key is rejected with 401.
+_TEST_API_KEY = "sk-test-key"
+
+# _seed_api_keys inserts the well-known test API key into the KV store
+# exactly once per instance (guarded by the "auth_seeded" flag), stored
+# under "tok:<key>" with a far-future expiry computed at runtime (OpenAI /
+# Anthropic API keys do not expire, so no hardcoded epoch is used).
+def _seed_api_keys():
+    if store_kv_get("llm", "auth_seeded") == "yes":
+        return
+    store_kv_set("llm", "auth_seeded", "yes")
+    exp = str(clock.now_unix() + 3600 * 24 * 365 * 10)
+    store_kv_set("llm", "tok:" + _TEST_API_KEY, exp)
+
+# _key_is_valid reports whether the given key is present in the KV store
+# and not expired. Seeding happens on the first auth check.
+def _key_is_valid(key):
+    _seed_api_keys()
+    if key == None or key == "":
+        return False
+    exp = store_kv_get("llm", "tok:" + key)
+    if exp == None:
+        return False
+    return clock.now_unix() <= _to_int(exp)
+
+# _require_bearer validates the Bearer API key against the KV store.
 # Returns None if authorized, or an error-response dict if not.
 def _require_bearer(req):
     token = _bearer(req)
+    if _key_is_valid(token):
+        return None
+    msg = "Invalid API key provided."
     if token == "":
-        return respond(401, {
-            "error": {
-                "message": "Missing Authorization header. Provide 'Authorization: Bearer <key>'.",
-                "type": "authentication_error",
-            },
-        })
-    return None
+        msg = "Missing Authorization header. Provide 'Authorization: Bearer <key>'."
+    return respond(401, {
+        "error": {
+            "message": msg,
+            "type": "authentication_error",
+        },
+    })
 
-# _require_api_key validates the x-api-key header (used by Anthropic).
+# _require_api_key validates the x-api-key header (used by Anthropic)
+# against the KV store.
 # Returns None if authorized, or an error-response dict if not.
 # Note: Go's net/http canonicalizes header names, so "x-api-key" becomes
 # "X-Api-Key". We check both forms.
@@ -42,15 +73,20 @@ def _require_api_key(req):
     key = headers.get("X-Api-Key", "")
     if key == None or key == "":
         key = headers.get("x-api-key", "")
-    if key == None or key == "":
-        return respond(401, {
-            "type": "error",
-            "error": {
-                "type": "authentication_error",
-                "message": "x-api-key header is required.",
-            },
-        })
-    return None
+    if key == None:
+        key = ""
+    if _key_is_valid(key):
+        return None
+    msg = "Invalid API key provided."
+    if key == "":
+        msg = "x-api-key header is required."
+    return respond(401, {
+        "type": "error",
+        "error": {
+            "type": "authentication_error",
+            "message": msg,
+        },
+    })
 
 # _last_user_message extracts the content of the last user message from the
 # messages array. Returns "" if there are no user messages.

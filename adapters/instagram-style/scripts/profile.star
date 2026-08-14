@@ -1,9 +1,9 @@
-# Profile handler — GET /v21.0/me (Bearer presence required).
+# Profile handler — GET /v21.0/me (valid Bearer required).
 #
 # Returns the IG profile bound to the bearer token (matching the OAuth flow),
 # with standard Graph API fields: id, username, followers_count, media_count.
-# The token value is validated against the tokens collection — if the token
-# is known, we return that user's profile; if not, a default mock profile.
+# The token value is validated against the tokens collection (must be known
+# and unexpired); otherwise 401 with the Graph error envelope (code 190).
 #
 # Shared helper (_bearer_present) is preloaded from scripts/lib.star.
 

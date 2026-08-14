@@ -19,9 +19,14 @@ def on_token(req):
     n = store_kv_incr("psd2", "token_seq")
     access_token = "psd2-token-" + str(9000000000 + n)
 
-    # Store the token.
+    # Store the token with its expiry (computed at runtime — never a
+    # hardcoded epoch). _require_tpp rejects tokens past expires_at.
     tc = store_collection("access_tokens")
-    tc.insert({"id": access_token})
+    tc.insert({
+        "id": access_token,
+        "expires_at": clock.now_unix() + 3600,
+        "scope": "PIS AIS",
+    })
 
     return respond(200, {
         "access_token": access_token,

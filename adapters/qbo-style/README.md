@@ -43,6 +43,11 @@ the `realmId` in the URL path. Access tokens are short-lived (1hr). Each refresh
 issues a new access_token AND a new refresh_token (the old refresh_token is
 invalidated — the infamous QBO refresh churn).
 
+Tokens are validated against the `access_tokens` store collection. Minted
+tokens carry an `expires_at` (unix) set to `now + 3600`, matching the
+advertised `expires_in`; an expired or unknown token returns `401` with the
+Fault envelope below (`code:"32001"`).
+
 ## Endpoints
 
 | Method | Route | Handler | Description |

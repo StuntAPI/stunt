@@ -5,8 +5,8 @@
 # POST /v1.0/{user_id}/threads_publish?creation_id=<container_id>  (Bearer; no body)
 #     -> 201 { id: "m_<seq>" }   (published media)
 #
-# Token-PRESENCE policy: any Bearer header is accepted; the value is NOT
-# validated (Threads has no author-URN-matching semantics to exercise).
+# Token-VALIDATION policy: the Bearer must be a known, unexpired token
+# minted by the OAuth flow (unknown/expired -> 401 code 190).
 
 # Shared helper (_bearer_present) is preloaded from scripts/lib.star.
 

@@ -24,6 +24,72 @@ def _to_int(s):
             return 0
     return n
 
+# === Auth ===
+#
+# Dropbox uses OAuth2 short-lived bearer tokens. This adapter historically
+# enforced nothing. It now VALIDATES a bearer token when one is presented:
+# the token must be registered in the KV store (ns "dropbox", key
+# "token_<tok>" → unix-seconds expiry) and unexpired; otherwise the request
+# fails with Dropbox's 401 invalid_access_token envelope. Requests with NO
+# Authorization header are still accepted, preserving the mock's original
+# no-auth convenience for the shared engine test helpers.
+
+# _TOKEN_TTL is the far-future lifetime given to seeded static tokens
+# (computed at runtime — never a hardcoded epoch).
+_TOKEN_TTL = 10 * 365 * 24 * 3600
+
+# _bearer extracts the Bearer token from the Authorization header,
+# or "" when absent.
+def _bearer(req):
+    headers = req.get("headers")
+    if headers == None:
+        return ""
+    auth = headers.get("Authorization", "")
+    if auth == None:
+        auth = ""
+    if auth.startswith("Bearer "):
+        return auth[7:]
+    return ""
+
+# _seed_tokens inserts-once the static bearer tokens documented in the
+# README, so the valid-token path is exercisable without an OAuth flow
+# (this adapter has no token-minting endpoint). Guarded by a KV flag.
+def _seed_tokens():
+    if store_kv_get("dropbox", "token_seeded") == "yes":
+        return
+    store_kv_set("dropbox", "token_seeded", "yes")
+    expiry = clock.now_unix() + _TOKEN_TTL
+    store_kv_set("dropbox", "token_sl.test_token_mock", str(expiry))
+
+# _token_expiry returns the stored expiry (unix seconds int) for a token,
+# or 0 when the token is unknown.
+def _token_expiry(token):
+    raw = store_kv_get("dropbox", "token_" + token)
+    if raw == None or raw == "":
+        return 0
+    return _to_int(raw)
+
+# _require_auth validates the Bearer token when one is presented. Returns
+# None if authorized (or no Authorization header was sent), or an
+# error-response dict if the token is unknown or expired.
+def _require_auth(req):
+    token = _bearer(req)
+    if token == "":
+        return None
+    _seed_tokens()
+    expiry = _token_expiry(token)
+    if expiry <= 0:
+        return respond(401, {
+            "error_summary": "invalid_access_token/..",
+            "error": {".tag": "invalid_access_token"},
+        })
+    if clock.now_unix() > expiry:
+        return respond(401, {
+            "error_summary": "expired_access_token/..",
+            "error": {".tag": "expired_access_token"},
+        })
+    return None
+
 # === List pagination ===
 
 # _list_page applies Dropbox-style paging to a full list of resources.

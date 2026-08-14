@@ -64,6 +64,15 @@ func TestBrazeStyleAdapter(t *testing.T) {
 		t.Fatalf("track without auth -> status %d, want 401", status)
 	}
 
+	// ===== 401 with an unknown (bogus) API key =====
+
+	_, status = brazePost(t, base+"/users/track", "bogus-app-group-key", map[string]any{
+		"attributes": []map[string]any{{"external_id": "user1"}},
+	})
+	if status != 401 {
+		t.Fatalf("track with bogus key -> status %d, want 401", status)
+	}
+
 	// ===== users/track → attributes processed =====
 
 	body, status := brazePost(t, base+"/users/track", token, map[string]any{

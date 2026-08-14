@@ -56,7 +56,11 @@ KV is used for monotonic sequence counters (`access_seq`, `refresh_seq`,
 
 The token endpoint uses **HTTP Basic** client credentials (username=client_id,
 password=client_secret), matching Reddit's real requirement. The submit
-endpoint requires a **Bearer** token.
+endpoint requires a **valid Bearer token**: it must have been minted by
+`POST /api/v1/access_token` (stored in the `tokens` collection with a 1-hour
+`expires_at`, matching `expires_in`). A missing, unknown, or expired token
+returns `401 {"json": {"errors": [["USER_REQUIRED", "please login", null]],
+"data": {}}}` — Reddit's login-required envelope.
 
 ## User-Agent
 

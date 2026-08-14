@@ -39,7 +39,11 @@ Authorization: Basic <base64(username:password)>
 Authorization: Bearer <access_token>
 ```
 
-Requests without authentication return **401**.
+Requests without authentication return **401**. Credentials are validated against the
+adapter's credential store: the seeded mock credentials `Basic admin:pass`
+(`YWRtaW46cGFzcw==`) and `Bearer mock-snow-token` are accepted without expiry. Any
+other, unknown, or expired credential returns the same 401 envelope
+(`"User Not Authenticated"`).
 
 ## Encoded query syntax
 

@@ -35,6 +35,7 @@ def _issue_tokens(user):
     for k in user:
         doc[k] = user[k]
     doc["id"] = access
+    doc["expires_at"] = clock.now_unix() + _TOKEN_TTL
     tc.insert(doc)
 
     rc = store_collection("refresh_tokens")
@@ -129,6 +130,7 @@ def on_token(req):
         for k in user:
             doc[k] = user[k]
         doc["id"] = access
+        doc["expires_at"] = clock.now_unix() + _TOKEN_TTL
         tc.insert(doc)
 
         _seed()

@@ -109,11 +109,15 @@ KV is used for monotonic sequence counters (`user_seq`, `code_seq`,
 
 ## Auth
 
-- **Bot REST endpoints** accept any `Authorization: Bot <token>` or
-  `Authorization: Bearer <token>` header (the token value is not validated —
-  only presence is checked). A missing header returns `401`.
+- **Bot REST endpoints** require a VALID `Authorization: Bot <token>` (or
+  `Bearer`) credential: the token must exist in the `access_tokens`
+  collection and not be past its `expires_at`. A missing, unknown, or
+  expired token returns `401 {"code": 0, "message": "401: Unauthorized"}`.
+  The well-known static mock bot token `mock-bot-token` is seeded into the
+  store on first use (1-year expiry) so existing local clients keep working.
 - **OAuth2 endpoints** (`/oauth2/@me`) validate the Bearer token against the
-  `access_tokens` collection.
+  `access_tokens` collection and enforce the same expiry; tokens minted by
+  `POST /oauth2/token` carry a 7-day `expires_at` (matching `expires_in`).
 
 ## Usage
 

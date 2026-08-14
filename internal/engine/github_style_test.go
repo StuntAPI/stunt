@@ -72,6 +72,13 @@ func TestGitHubStyleAdapter(t *testing.T) {
 		t.Fatalf("GET issues without auth -> status %d, want 401", status)
 	}
 
+	// ===== 401 with an unknown token (validation is real, not presence-only) =====
+
+	_, status = ghGetBearer(t, base+"/repos/octocat/hello-world/issues", "ghp_bogus_token")
+	if status != 401 {
+		t.Fatalf("GET issues with bogus PAT -> status %d, want 401", status)
+	}
+
 	// ===== App installation access token exchange =====
 	// POST /app/installations/{id}/access_tokens with Bearer <app-jwt>
 
@@ -465,7 +472,7 @@ func ghToInt(v any) int {
 // issue is created → _emit_if_subscribed → _signed_emit.
 func TestGitHubStyleSignatureVerifies(t *testing.T) {
 	const secret = "stunt_mock_github_webhook_secret_2026"
-	const anyToken = "token ghp_signature_test"
+	const anyToken = "ghp_signature_test"
 	sink := newCaptureSink()
 	defer sink.close()
 

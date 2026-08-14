@@ -17,15 +17,38 @@ def _check_auth(req):
         return xauth2
     return None
 
-# _require_auth returns (token, None) if auth is present, or
-# (None, error_response) if missing.
+# Well-known static test API key, seeded once into the KV store on first
+# request (see _seed_api_keys) so existing clients/tests that use it keep
+# working while any other key is rejected with 401.
+_TEST_API_KEY = "test-app-group-api-key"
+
+# _seed_api_keys inserts the well-known test API key into the KV store
+# exactly once per instance (guarded by the "auth_seeded" flag), stored
+# under "tok:<key>" with a far-future expiry computed at runtime (Braze
+# app-group API keys do not expire, so no hardcoded epoch is used).
+def _seed_api_keys():
+    if store_kv_get("braze", "auth_seeded") == "yes":
+        return
+    store_kv_set("braze", "auth_seeded", "yes")
+    exp = str(clock.now_unix() + 3600 * 24 * 365 * 10)
+    store_kv_set("braze", "tok:" + _TEST_API_KEY, exp)
+
+# _require_auth returns (token, None) if the presented credential is a
+# known, unexpired API key, or (None, error_response) if missing/unknown/
+# expired.
 def _require_auth(req):
     token = _check_auth(req)
     if token == None:
         return None, respond(401, {
             "message": "Unauthorized. A valid API key is required.",
         })
-    return token, None
+    _seed_api_keys()
+    exp = store_kv_get("braze", "tok:" + token)
+    if exp != None and clock.now_unix() <= _to_int(exp):
+        return token, None
+    return None, respond(401, {
+        "message": "Unauthorized. A valid API key is required.",
+    })
 
 # _seed populates default segments and campaigns.
 _SEGMENTS = [

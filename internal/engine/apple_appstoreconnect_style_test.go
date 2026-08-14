@@ -33,6 +33,17 @@ func mintBadAlgJWT(t *testing.T) string {
 	return header + "." + payload + ".c3ludGhldGljLXNpZ25hdHVyZQ"
 }
 
+// mintUnregisteredJWT creates a structurally valid ES256 JWT that is NOT
+// registered in the adapter's token registry (should be rejected with 401).
+func mintUnregisteredJWT(t *testing.T) string {
+	t.Helper()
+	// {"alg":"ES256","kid":"TESTKEY123","typ":"JWT"}
+	header := "eyJhbGciOiJFUzI1NiIsImtpZCI6IlRFU1RLRVkxMjMiLCJ0eXAiOiJKV1QifQ"
+	// {"iss":"other-issuer"}
+	payload := "eyJpc3MiOiJvdGhlci1pc3N1ZXIifQ"
+	return header + "." + payload + ".c3ludGhldGljLXNpZ25hdHVyZQ"
+}
+
 func TestAppStoreConnectStyleAdapter(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "apple-appstoreconnect-style")
 	absAdapterDir, err := filepath.Abs(adapterDir)
@@ -94,6 +105,12 @@ func TestAppStoreConnectStyleAdapter(t *testing.T) {
 	body, status = ascGet(t, base+"/v1/apps", mintBadAlgJWT(t))
 	if status != 401 {
 		t.Fatalf("GET /v1/apps with HS256 JWT -> status %d, want 401; body %s", status, body)
+	}
+
+	// ===== Structurally valid but unregistered JWT → 401 =====
+	body, status = ascGet(t, base+"/v1/apps", mintUnregisteredJWT(t))
+	if status != 401 {
+		t.Fatalf("GET /v1/apps with unregistered JWT -> status %d, want 401; body %s", status, body)
 	}
 
 	// ===== GET /v1/apps with JWT → seeded app in list =====

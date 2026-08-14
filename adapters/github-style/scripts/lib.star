@@ -86,31 +86,85 @@ def _gh_event_payload(repo_key, action, subject, obj):
         "sender": {"login": "stunt-dev", "id": 1000002, "type": "Bot"},
     }
 
-# _require_auth checks for an Authorization header. Accepts:
+# --- credential store ------------------------------------------------------
+#
+# Minted and well-known credentials live in the "github" KV namespace:
+#   tok:<token>  -> expiry unix seconds (string)
+#   kind:<token> -> "jwt" | "install" | "pat"
+# on_create_installation_token (app.star) registers every ghs_ token it
+# mints with GitHub's real 1-hour TTL; static test credentials are seeded
+# below with a far-future expiry.
+
+# Well-known static test credentials, seeded once on first request (see
+# _seed_credentials) so existing clients/tests that use them keep working
+# while any other credential is rejected with 401.
+_TEST_APP_JWT = "mock-app-jwt-token"
+_TEST_PAT = "ghp_pat_token_mock"
+_TEST_PAT_SIGTEST = "ghp_signature_test"
+
+# GitHub installation tokens expire after 1 hour (real TTL). Static test
+# credentials get a far-future expiry computed at runtime.
+_INSTALL_TOKEN_TTL = 3600
+_FAR_FUTURE_SECS = 3600 * 24 * 365 * 10
+
+# _seed_credentials inserts the well-known static test credentials into the
+# KV store exactly once per instance (guarded by the "auth_seeded" flag).
+def _seed_credentials():
+    if store_kv_get("github", "auth_seeded") == "yes":
+        return
+    store_kv_set("github", "auth_seeded", "yes")
+    far = str(clock.now_unix() + _FAR_FUTURE_SECS)
+    store_kv_set("github", "tok:" + _TEST_APP_JWT, far)
+    store_kv_set("github", "kind:" + _TEST_APP_JWT, "jwt")
+    store_kv_set("github", "tok:" + _TEST_PAT, far)
+    store_kv_set("github", "kind:" + _TEST_PAT, "pat")
+    store_kv_set("github", "tok:" + _TEST_PAT_SIGTEST, far)
+    store_kv_set("github", "kind:" + _TEST_PAT_SIGTEST, "pat")
+
+# _register_credential records a freshly minted credential with the given
+# kind and TTL in seconds.
+def _register_credential(token, kind, ttl):
+    store_kv_set("github", "tok:" + token, str(clock.now_unix() + ttl))
+    store_kv_set("github", "kind:" + token, kind)
+
+# _credential_valid reports whether token is a known, unexpired credential.
+# kind narrows the check to one credential type (kind=None accepts any).
+def _credential_valid(token, kind):
+    _seed_credentials()
+    exp = store_kv_get("github", "tok:" + token)
+    if exp == None:
+        return False
+    if clock.now_unix() > _to_int(exp):
+        return False
+    if kind != None and store_kv_get("github", "kind:" + token) != kind:
+        return False
+    return True
+
+# _require_auth validates the Authorization header. Accepts:
 #   "Bearer <jwt_or_ghs_token>" — GitHub App JWT or installation token
 #   "token <ghp_token>"         — Personal Access Token (PAT)
-# Returns None if authorized, or a 401 error-response dict if not.
+# The credential must be known (minted via the installation token exchange
+# or one of the seeded static test credentials) and unexpired. Returns None
+# if authorized, or a 401 error-response dict if not.
 def _require_auth(req):
-    headers = req.get("headers")
-    if headers == None:
+    token = _token(req)
+    if token == "":
         return _gh_unauthorized()
-    auth = headers.get("Authorization", "")
-    if auth == None or auth == "":
-        return _gh_unauthorized()
-    if not auth.startswith("Bearer ") and not auth.startswith("token "):
+    if not _credential_valid(token, None):
         return _gh_unauthorized()
     return None
 
-# _require_app_jwt checks specifically for a Bearer token (app JWT).
-# The /app and /app/installations endpoints require an app JWT, not a PAT.
+# _require_app_jwt checks specifically for a Bearer app JWT.
+# The /app and /app/installations endpoints require an app JWT, not a PAT
+# or an installation token.
 def _require_app_jwt(req):
     headers = req.get("headers")
     if headers == None:
         return _gh_unauthorized()
     auth = headers.get("Authorization", "")
-    if auth == None or auth == "":
+    if auth == None or not auth.startswith("Bearer "):
         return _gh_unauthorized()
-    if not auth.startswith("Bearer "):
+    if not _credential_valid(auth[7:], "jwt"):
         return _gh_unauthorized()
     return None
 

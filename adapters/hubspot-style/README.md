@@ -32,7 +32,10 @@ All objects are **stateful** — seed data is pre-loaded so lists return data im
 ## Auth
 
 HubSpot CRM accepts `Authorization: Bearer <access_token>` (private app tokens) or the
-legacy `?hapikey=<key>` query param. This mock accepts either.
+legacy `?hapikey=<key>` query param. This mock validates the credential against its
+token store: the seeded mock credential `pat-mock-token` (Bearer) and `mock-hapikey`
+(query param) are accepted without expiry. Any other, unknown, or expired credential
+returns the 401 envelope above (`category:"AUTHENTICATION"`).
 
 ## Endpoints
 

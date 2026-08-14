@@ -76,6 +76,17 @@ func TestWhatsAppStyleAdapter(t *testing.T) {
 		t.Fatalf("POST messages without token -> status %d, want 401", status)
 	}
 
+	// ===== 401 with an unknown (bogus) bearer token =====
+
+	_, status = waPost(t, base+"/v21.0/"+phoneID+"/messages", "EAAG_bogus_unknown_token", map[string]any{
+		"messaging_product": "whatsapp",
+		"to":                "15550001111",
+		"type":              "text",
+	})
+	if status != 401 {
+		t.Fatalf("POST messages with bogus token -> status %d, want 401", status)
+	}
+
 	// ===== Send text message → messages[].id =====
 
 	body, status := waPost(t, base+"/v21.0/"+phoneID+"/messages", token, map[string]any{

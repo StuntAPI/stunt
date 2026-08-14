@@ -98,12 +98,26 @@ def _authorisation_id():
     return "auth-" + str(8000000000 + n)
 
 # _require_tpp validates the bearer token (TPP-level auth).
-# Checks that a bearer token is present.
+# The token must be one minted by /v1/oauth/token (stored in the
+# access_tokens collection with an expires_at unix timestamp) and unexpired.
+# Unknown or expired tokens get the NextGenPSD2 401 tppMessages envelope.
 # Returns None if authorized, or an error-response dict if not.
 def _require_tpp(req):
     token = _bearer(req)
     if token == "":
-        return _psd2_err(401, "ERROR", "CONSENT_INVALID", "Missing or invalid access token")
+        return _psd2_err(401, "ERROR", "TOKEN_INVALID", "Missing or invalid access token")
+
+    tc = store_collection("access_tokens")
+    doc = tc.get(token)
+    if doc == None:
+        return _psd2_err(401, "ERROR", "TOKEN_INVALID", "Missing or invalid access token")
+
+    expires_at = doc.get("expires_at", 0)
+    if type(expires_at) != "int":
+        expires_at = _to_int(str(expires_at))
+    if expires_at > 0 and clock.now_unix() > expires_at:
+        return _psd2_err(401, "ERROR", "TOKEN_EXPIRED", "The access token has expired")
+
     return None
 
 # _require_consent validates the bearer token AND checks that at least one

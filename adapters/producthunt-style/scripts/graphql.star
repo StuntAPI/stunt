@@ -7,12 +7,11 @@
 # in the query string and returns the JSON shape a production client parses.
 # the specific mutations/queries the adapter sends.
 
-# Shared helper (_bearer) is preloaded from scripts/lib.star.
+# Shared helpers (_bearer_valid) are preloaded from scripts/lib.star.
 
 # on_graphql dispatches based on the operation name in the GraphQL query.
 def on_graphql(req):
-    token = _bearer(req)
-    if token == "":
+    if not _bearer_valid(req):
         return respond(401, {
             "errors": [{"message": "You need to sign in or sign up before continuing."}],
         })

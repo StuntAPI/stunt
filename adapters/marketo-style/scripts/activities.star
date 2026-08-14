@@ -13,7 +13,7 @@
 def on_paging_token(req):
     ok, err = _require_auth(req)
     if not ok:
-        return _marketo_unauth()
+        return err
     if _check_quota():
         return _quota_err()
 
@@ -34,7 +34,7 @@ def on_paging_token(req):
 def on_list_activities(req):
     ok, err = _require_auth(req)
     if not ok:
-        return _marketo_unauth()
+        return err
     if _check_quota():
         return _quota_err()
 
