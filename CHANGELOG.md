@@ -6,6 +6,8 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.27.0] — 2026-08-14
+
 ### Added
 
 - **`query_select(items, filter?, order_by?, order_dir?, limit?, offset?, fields?)` builtin** —
