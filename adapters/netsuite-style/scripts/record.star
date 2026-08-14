@@ -35,6 +35,17 @@ def on_create(req):
 
     body = _get_body(req)
 
+    # Idempotent upsert by externalId: if a record with this externalId already
+    # exists, return its Location instead of creating a duplicate (NetSuite
+    # dedupes writes by externalId).
+    ext = body.get("externalId", "")
+    if ext != None and ext != "":
+        for d in col.list():
+            if d.get("externalId") == ext:
+                return respond(204, body=None, headers={
+                    "Location": "/services/rest/record/v1/" + record_type + "/" + d.get("id"),
+                })
+
     # Generate a new internal ID.
     record_id = _next_id(record_type)
     doc = {}

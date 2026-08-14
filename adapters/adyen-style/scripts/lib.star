@@ -144,3 +144,37 @@ def _list_page(req, docs):
         cursor = ""
     page, next_cursor = paginate(docs, page_size, cursor)
     return page, next_cursor
+
+# --- Idempotency (Adyen Idempotency-Key header) ---
+# A /payments POST carrying Idempotency-Key replays the original response.
+# Scoped by method+path+collection+key; cache stores "<status>:<pspRef>".
+def _idempotency_key(req):
+    h = req.get("headers")
+    if h == None:
+        return ""
+    k = h.get("Idempotency-Key", "")
+    if k == None:
+        return ""
+    return k
+
+def _idempotency_scope(req, ns):
+    return req["method"] + "|" + req["path"] + "|" + ns + "|" + _idempotency_key(req)
+
+def _idempotent_lookup(req, ns):
+    if _idempotency_key(req) == "":
+        return None
+    raw = store_kv_get("adyen", "idem_" + _idempotency_scope(req, ns))
+    if raw == None or raw == "":
+        return None
+    sep = raw.find(":")
+    if sep < 0:
+        return None
+    doc = store_collection(ns).get(raw[sep + 1:])
+    if doc == None:
+        return None
+    return {"status": int(raw[:sep]), "doc": doc}
+
+def _idempotent_remember(req, ns, status, rid):
+    if _idempotency_key(req) == "":
+        return
+    store_kv_set("adyen", "idem_" + _idempotency_scope(req, ns), str(status) + ":" + rid)

@@ -12,6 +12,10 @@ def on_create_transaction(req):
     if err != None:
         return err
 
+    cached = _idempotent_lookup(req, "transactions")
+    if cached != None:
+        return respond(cached["status"], {"transaction": _txn_public(cached["doc"])})
+
     body = req.get("body")
     if body == None:
         body = {}
@@ -34,6 +38,7 @@ def on_create_transaction(req):
     c = store_collection("transactions")
     c.insert(doc)
 
+    _idempotent_remember(req, "transactions", 200, txn_id)
     return respond(200, {"transaction": _txn_public(doc)})
 
 # on_get_transaction retrieves a REST transaction by ID.
