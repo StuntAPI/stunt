@@ -93,7 +93,7 @@ compute it on its own authorize redirect.
 | GET | `/admin/api/2024-10/products/{id}.json` | `products.star#on_get_product` | Get product |
 | PUT | `/admin/api/2024-10/products/{id}.json` | `products.star#on_update_product` | Update product |
 | DELETE | `/admin/api/2024-10/products/{id}.json` | `products.star#on_delete_product` | Delete product (200 {}) |
-| GET | `/admin/api/2024-10/orders.json` | `orders.star#on_list_orders` | List orders |
+| GET | `/admin/api/2024-10/orders.json` | `orders.star#on_list_orders` | List orders (filters: `status` open/closed/cancelled/any — default open, `financial_status`, `fulfillment_status`, `since_id`, `ids`, `created_at_min`/`max`, `fields` projection) |
 | GET | `/admin/api/2024-10/orders/{id}.json` | `orders.star#on_get_order` | Get order |
 | POST | `/admin/api/2024-10/orders/{id}/fulfillments.json` | `orders.star#on_create_fulfillment` | Create fulfillment (201) |
 | POST | `/admin/api/2024-10/orders/{id}/transactions.json` | `orders.star#on_create_transaction` | Create transaction (201) |

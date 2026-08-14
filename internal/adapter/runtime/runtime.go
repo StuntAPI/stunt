@@ -108,6 +108,9 @@ func BuildAllBuiltins(opts BuiltinOptions) sk.StringDict {
 	for k, v := range buildMultipartBuiltins() {
 		dict[k] = v
 	}
+	for k, v := range buildQueryBuiltins() {
+		dict[k] = v
+	}
 	return dict
 }
 

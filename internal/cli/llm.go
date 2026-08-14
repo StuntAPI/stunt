@@ -101,6 +101,9 @@ Builtins:
   b = store_blob("up"); b.put(name,bytes,ctype); b.get(name); b.stat(name); b.list(); b.append(...); b.delete(name)
   page, next = paginate(items, limit, cursor)  # cursor-based list paging; limit None/<=0 = all; next is None when done
   parts, err = parse_multipart(content_type, raw_body)  # multipart/form-data; each part {name, filename, content_type, data}
+  # filter/sort/slice/project a list in one call; filter = [[field, op, value], ...] (AND), ops:
+  #   = != > >= < <= contains startswith endswith in like(% _); dotted field paths OK ("a.b")
+  res = query_select(docs, filter, order_by="amount", order_dir="desc", limit=20, offset=0, fields=["id","amount"])
   tok = identity_mint(subject, scopes=[...]); sub = identity_validate(token); identity_has_scope(token,scope)
   events_register(url); events_emit(event_type, payload?, headers?)   # headers: optional dict set on the webhook POST
   events_target()                            # the service's registered webhook URL (for URL-in-MAC schemes: Twilio, Square)

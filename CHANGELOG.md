@@ -6,6 +6,21 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **`query_select(items, filter?, order_by?, order_dir?, limit?, offset?, fields?)` builtin** —
+  the semantic core behind every provider's list-filter params: filter
+  (list of `[field, op, value]` triples, AND'ed; ops `= != > >= < <= contains
+  startswith endswith in like`, dotted field paths) → stable sort →
+  offset/limit slice → field projection, in one call. Numbers compare
+  numerically, ISO-8601 strings chronologically. Each adapter translates its
+  provider's query syntax (`$filter`, SOQL `WHERE`, `q=`, `sysparm_query`, …)
+  into triples — closing the sweep's largest gap class (filter params silently
+  ignored, ~40 adapters). First wired in `shopify-style` (orders:
+  status/financial_status/fulfillment_status/since_id/ids/created_at_min/max,
+  `fields` projection) and `twilio-style` (messages: `To`/`From`/`DateSent`
+  windows excluding queued messages).
+
 ## [0.26.0] — 2026-08-14
 
 ### Added

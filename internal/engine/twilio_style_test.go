@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -332,5 +333,86 @@ func TestTwilioStyleAdapter(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != 401 {
 		t.Fatalf("GET messages with wrong auth -> status %d, want 401", resp.StatusCode)
+	}
+}
+
+// TestTwilioStyleMessageFilters pins the real MessageList filters: To, From,
+// and the DateSent window params excluding unsent (queued) messages.
+func TestTwilioStyleMessageFilters(t *testing.T) {
+	adapterDir := filepath.Join("..", "..", "adapters", "twilio-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"twilio": {Adapter: absAdapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["twilio"]
+	const accountSID = twilioAccountSID
+	msgPath := base + "/2010-06-01/Accounts/" + accountSID + "/Messages.json"
+
+	for _, to := range []string{"+15551110001", "+15551110001", "+15551110002"} {
+		body, status := twilioPostJSON(t, msgPath, map[string]any{
+			"To":   to,
+			"From": "+15557654321",
+			"Body": "filter me",
+		})
+		if status != 201 {
+			t.Fatalf("POST message -> %d; %s", status, body)
+		}
+	}
+
+	list := func(q string) []any {
+		t.Helper()
+		body, status := twilioGet(t, msgPath+q)
+		if status != 200 {
+			t.Fatalf("list %q -> %d; %s", q, status, body)
+		}
+		var out map[string]any
+		if err := json.Unmarshal([]byte(body), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out["messages"].([]any)
+	}
+
+	if got := len(list("")); got != 3 {
+		t.Fatalf("unfiltered -> %d messages, want 3", got)
+	}
+	if got := len(list("?To=" + url.QueryEscape("+15551110001"))); got != 2 {
+		t.Fatalf("To filter -> %d messages, want 2", got)
+	}
+	if got := len(list("?To=" + url.QueryEscape("+15551110002"))); got != 1 {
+		t.Fatalf("To filter -> %d messages, want 1", got)
+	}
+	if got := len(list("?From=" + url.QueryEscape("+15559999999"))); got != 0 {
+		t.Fatalf("From miss -> %d messages, want 0", got)
+	}
+	// Queued messages have date_sent=null: a DateSent filter must exclude them.
+	if got := len(list("?DateSent=2024-08-15")); got != 0 {
+		t.Fatalf("DateSent on queued-only -> %d messages, want 0", got)
+	}
+	if got := len(list("?DateSent>=2020-01-01")); got != 0 {
+		t.Fatalf("DateSent> on queued-only -> %d messages, want 0", got)
 	}
 }

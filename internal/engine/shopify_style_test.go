@@ -638,3 +638,86 @@ func TestShopifyStyleSignatureVerifies(t *testing.T) {
 	raw, hdr := sink.awaitDelivery(t, time.Second)
 	verifyShopifySig(t, raw, hdr, secret)
 }
+
+// TestShopifyStyleOrderFilters pins the real order-list query params against
+// the seeded order: financial_status, since_id, ids, fields projection, and
+// the derived status=any/open default.
+func TestShopifyStyleOrderFilters(t *testing.T) {
+	adapterDir := filepath.Join("..", "..", "adapters", "shopify-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"shopify": {Adapter: absAdapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["shopify"]
+	const token = "shpat_test_token"
+
+	listOrders := func(q string) []map[string]any {
+		t.Helper()
+		body, status := shopifyGet(t, base+"/admin/api/2024-10/orders.json"+q, token)
+		if status != 200 {
+			t.Fatalf("list %q -> %d; %s", q, status, body)
+		}
+		var out struct {
+			Orders []map[string]any `json:"orders"`
+		}
+		if err := json.Unmarshal([]byte(body), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out.Orders
+	}
+
+	// Default status (open) returns the seeded order (nothing closed/cancelled).
+	orders := listOrders("")
+	if len(orders) != 1 {
+		t.Fatalf("default -> %d orders, want 1", len(orders))
+	}
+	id := strconv.FormatInt(int64(orders[0]["id"].(float64)), 10)
+
+	if got := len(listOrders("?status=any")); got != 1 {
+		t.Fatalf("status=any -> %d orders, want 1", got)
+	}
+	if got := len(listOrders("?status=any&financial_status=paid")); got != 1 {
+		t.Fatalf("financial_status=paid -> %d orders, want 1", got)
+	}
+	if got := len(listOrders("?status=any&financial_status=pending")); got != 0 {
+		t.Fatalf("financial_status=pending -> %d orders, want 0", got)
+	}
+	if got := len(listOrders("?status=any&since_id=" + id)); got != 0 {
+		t.Fatalf("since_id -> %d orders, want 0", got)
+	}
+	if got := len(listOrders("?status=any&ids=" + id)); got != 1 {
+		t.Fatalf("ids -> %d orders, want 1", got)
+	}
+
+	// fields= projects.
+	orders = listOrders("?status=any&fields=id,financial_status")
+	if len(orders) != 1 {
+		t.Fatalf("fields -> %d orders, want 1", len(orders))
+	}
+	if len(orders[0]) != 2 {
+		t.Fatalf("fields projection left %d keys, want 2: %v", len(orders[0]), orders[0])
+	}
+}

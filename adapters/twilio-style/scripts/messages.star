@@ -88,6 +88,31 @@ def on_list_messages(req):
             continue
         result.append(m)
 
+    # Real MessageList filters (To/From/DateSent), applied after account
+    # scoping and before paging. DateSent comparisons exclude unsent messages
+    # (date_sent is null while queued), like the real API.
+    f = []
+    to = req["query"].get("To", "")
+    if to != "":
+        f.append(["to", "=", to])
+    frm = req["query"].get("From", "")
+    if frm != "":
+        f.append(["from", "=", frm])
+    ds = req["query"].get("DateSent", "")
+    if ds != "":
+        f.append(["date_sent", "!=", None])
+        f.append(["date_sent", "startswith", ds])
+    ds_after = req["query"].get("DateSent>", "")
+    if ds_after != "":
+        f.append(["date_sent", "!=", None])
+        f.append(["date_sent", ">", ds_after])
+    ds_before = req["query"].get("DateSent<", "")
+    if ds_before != "":
+        f.append(["date_sent", "!=", None])
+        f.append(["date_sent", "<", ds_before])
+    if len(f) > 0:
+        result = query_select(result, f)
+
     # Apply paging after filtering. Twilio lists are driven by PageSize
     # (page size) + PageToken (opaque cursor from a prior next_page_uri).
     page, next_cursor = _list_page(req, result)

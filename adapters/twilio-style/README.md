@@ -16,7 +16,10 @@ account:
 
 - **Send SMS/MMS:** `POST /2010-06-01/Accounts/{Sid}/Messages.json` (`{To, From, Body}`).
 - **List messages:** `GET /2010-06-01/Accounts/{Sid}/Messages.json` (cursor-paginated
-  via `PageSize` + `PageToken`, with a Twilio-style `next_page_uri`).
+  via `PageSize` + `PageToken`, with a Twilio-style `next_page_uri`; filters
+  `To`, `From`, `DateSent` (also `DateSent>`/`DateSent<` windows — queued
+  messages with a null `date_sent` are excluded by date filters, like the
+  real API)).
 - **Retrieve message:** `GET .../Messages/{Sid}.json`.
 - **Create call:** `POST /2010-06-01/Accounts/{Sid}/Calls.json` (`{To, From, Url}`).
 - **Verify:** `POST /v2/Services/{ServiceSid}/Verification` → `{status:"pending"}`.
