@@ -10,6 +10,10 @@ def on_create_charge(req):
     if err != None:
         return err
 
+    cached = _idempotent_lookup(req, "charges")
+    if cached != None:
+        return respond(cached["status"], cached["doc"])
+
     body = req["body"]
     if body == None:
         body = {}
@@ -39,6 +43,7 @@ def on_create_charge(req):
     # Emit webhook event (fire-and-forget: errors do not break charge creation).
     _signed_emit("charge.created", doc)
 
+    _idempotent_remember(req, "charges", 201, charge_id)
     return respond(201, doc)
 
 # GET /v1/charges/{id} — retrieve a single charge.

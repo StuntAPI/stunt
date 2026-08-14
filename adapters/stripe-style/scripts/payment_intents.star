@@ -32,6 +32,10 @@ def on_create_payment_intent(req):
     if err != None:
         return err
 
+    cached = _idempotent_lookup(req, "payment_intents")
+    if cached != None:
+        return respond(cached["status"], _pi_public(cached["doc"]))
+
     body = req["body"]
     if body == None:
         body = {}
@@ -72,6 +76,7 @@ def on_create_payment_intent(req):
         _signed_emit("payment_intent.succeeded", _pi_public(doc))
     elif status == "requires_capture":
         _signed_emit("payment_intent.requires_capture", _pi_public(doc))
+    _idempotent_remember(req, "payment_intents", 201, pi_id)
     return respond(201, _pi_public(doc))
 
 # GET /v1/payment_intents/{id} — retrieve a PaymentIntent.
@@ -110,6 +115,10 @@ def on_confirm_payment_intent(req):
     if err != None:
         return err
 
+    cached = _idempotent_lookup(req, "payment_intents")
+    if cached != None:
+        return respond(cached["status"], _pi_public(cached["doc"]))
+
     id = req["params"]["id"]
     c = store_collection("payment_intents")
     doc = c.get(id)
@@ -137,6 +146,7 @@ def on_confirm_payment_intent(req):
         _signed_emit("payment_intent.succeeded", _pi_public(doc))
     else:
         _signed_emit("payment_intent.requires_capture", _pi_public(doc))
+    _idempotent_remember(req, "payment_intents", 200, id)
     return respond(200, _pi_public(doc))
 
 # POST /v1/payment_intents/{id}/capture — capture a manually-captured intent.
@@ -144,6 +154,10 @@ def on_capture_payment_intent(req):
     err = _require_auth(req)
     if err != None:
         return err
+
+    cached = _idempotent_lookup(req, "payment_intents")
+    if cached != None:
+        return respond(cached["status"], _pi_public(cached["doc"]))
 
     id = req["params"]["id"]
     c = store_collection("payment_intents")
@@ -160,4 +174,5 @@ def on_capture_payment_intent(req):
     c.update(id, doc)
 
     _signed_emit("payment_intent.succeeded", _pi_public(doc))
+    _idempotent_remember(req, "payment_intents", 200, id)
     return respond(200, _pi_public(doc))

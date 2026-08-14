@@ -134,3 +134,46 @@ def _list_page(req, docs, resource):
                 return None, False, err
     page, nxt = paginate(docs, limit, offset)
     return page, nxt != None, None
+
+# --- Idempotency (Stripe Idempotency-Key header) ---
+# A write carrying Idempotency-Key replays the original response verbatim.
+# Scoped by method+path+collection+key so the same key on different endpoints
+# never collides. The cache stores "<status>:<resource_id>"; the handler
+# re-renders the resource from its stored doc on replay.
+
+# _idempotency_key reads the Idempotency-Key header ("" if absent).
+def _idempotency_key(req):
+    h = req.get("headers")
+    if h == None:
+        return ""
+    k = h.get("Idempotency-Key", "")
+    if k == None:
+        return ""
+    return k
+
+def _idempotency_scope(req, ns):
+    return req["method"] + "|" + req["path"] + "|" + ns + "|" + _idempotency_key(req)
+
+# _idempotent_lookup returns {"status": int, "doc": dict} for a prior write with
+# this key, or None. The doc is the stored resource (re-fetched, so for mutating
+# endpoints it reflects the final state).
+def _idempotent_lookup(req, ns):
+    if _idempotency_key(req) == "":
+        return None
+    raw = store_kv_get("stripe", "idem_" + _idempotency_scope(req, ns))
+    if raw == None or raw == "":
+        return None
+    sep = raw.find(":")
+    if sep < 0:
+        return None
+    doc = store_collection(ns).get(raw[sep + 1:])
+    if doc == None:
+        return None
+    return {"status": int(raw[:sep]), "doc": doc}
+
+# _idempotent_remember caches "<status>:<resource_id>" for this key. Call only
+# on the success path (Stripe does not cache non-2xx).
+def _idempotent_remember(req, ns, status, rid):
+    if _idempotency_key(req) == "":
+        return
+    store_kv_set("stripe", "idem_" + _idempotency_scope(req, ns), str(status) + ":" + rid)

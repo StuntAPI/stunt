@@ -22,6 +22,10 @@ def on_create_refund(req):
     if err != None:
         return err
 
+    cached = _idempotent_lookup(req, "refunds")
+    if cached != None:
+        return respond(cached["status"], _refund_public(cached["doc"]))
+
     body = req["body"]
     if body == None:
         body = {}
@@ -68,6 +72,7 @@ def on_create_refund(req):
 
     _signed_emit("refund.created", _refund_public(doc))
     _signed_emit("charge.refunded", _refund_public(doc))
+    _idempotent_remember(req, "refunds", 201, doc["id"])
     return respond(201, _refund_public(doc))
 
 # GET /v1/refunds/{id} — retrieve a refund.
