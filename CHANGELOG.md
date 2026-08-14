@@ -6,6 +6,17 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.25.0] — 2026-08-14
+
+### Documentation
+
+- **`stunt llm` builtin summary refreshed** — now lists `paginate`,
+  `events_target`, the asymmetric crypto set (`ecdsa_sign_p256`,
+  `rsa_sign`, `ed25519_sign`, `rsa_public_jwk`, `base64url_encode`), `raw_body`,
+  and OData embedded-param routing (previously HMAC-only). Agent harnesses
+  capturing `stunt llm` get the current handler API.
+- README winget install path bumped to the current release.
+
 ## [0.24.0] — 2026-08-14
 
 ### Adapters
