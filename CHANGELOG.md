@@ -6,6 +6,16 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.23.0] — 2026-08-14
+
+### Starlark handler API
+
+- **`crypto.ed25519_sign` / `crypto.ed25519_verify`** — Ed25519 signature over
+  the raw message (the last asymmetric scheme the crypto module lacked),
+  unblocking Discord's signed interactions and the deferred
+  discord/plaid/sendgrid signing work. PEM keys in, encoded signature out
+  (hex/base64/base64url); verify returns `False` on a bad signature.
+
 ## [0.22.0] — 2026-08-14
 
 ### Adapters
