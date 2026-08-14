@@ -6,6 +6,17 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.22.0] — 2026-08-14
+
+### Adapters
+
+- **salesforce-style: general SOQL query engine.** Beyond `WHERE Id = '...'`, the
+  query endpoint now evaluates a general WHERE clause — comparators
+  (`=, !=, <, <=, >, >=`), `IN ('a','b')`, `LIKE 'pattern'` (`%` wildcards),
+  and `AND`/`OR` with correct precedence — plus `ORDER BY field [ASC|DESC]` and
+  `LIMIT`/`OFFSET` paging. Non-trivial read paths are now testable.
+  (SObject Collections bulk DML + JWT bearer grant remain.)
+
 ## [0.21.0] — 2026-08-14
 
 ### Adapters
