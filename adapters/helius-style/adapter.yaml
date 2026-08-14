@@ -61,6 +61,8 @@ endpoints:
 resources:
   - name: webhooks
     kind: collection
+  - name: transactions
+    kind: collection
 
 # Auth scheme metadata (api-key query param).
 identity:

@@ -18,7 +18,7 @@ validated and stored, and receipts are available for sent userOps.
 - Get the supported EntryPoint address (v0.7).
 - Estimate gas for a userOp (deterministic plausible values).
 - Send a userOp (with full field validation) and get a hash back.
-- Retrieve the receipt for a sent userOp.
+- Retrieve the receipt for a sent userOp (once it is included on chain).
 - Retrieve the full userOp by hash.
 - Use the mock paymaster to sign sponsorship data.
 
@@ -29,8 +29,8 @@ validated and stored, and receipts are available for sent userOps.
 | `eth_supportedEntryPoints` | `["0x0000000071727De22E5E9d8BAf0edAc6f37da032"]` | v0.7 EntryPoint |
 | `eth_estimateUserOperationGas` | `{preVerificationGas, verificationGasLimit, callGasLimit}` | Deterministic |
 | `eth_sendUserOperation` | userOp hash | Validates fields, stores userOp + receipt |
-| `eth_getUserOperationReceipt` | receipt obj | `{userOpHash, sender, nonce, success, actualGasCost, actualGasUsed, logs, receipt}` |
-| `eth_getUserOperationByHash` | userOp obj | Returns stored userOp |
+| `eth_getUserOperationReceipt` | receipt obj \| null | Null until the op is included on chain |
+| `eth_getUserOperationByHash` | userOp obj \| null | Null while in the mempool; null block fields while bundled |
 
 ### UserOp fields (required)
 
@@ -50,6 +50,32 @@ All of these fields must be present in a `sendUserOperation` or
 | `maxPriorityFeePerGas` | hex |
 | `paymasterAndData` | hex |
 | `signature` | hex |
+
+### UserOperation lifecycle
+
+A sent userOperation no longer completes instantly — it goes through the real
+bundler inclusion lifecycle, derived from the engine clock on read
+(derive-on-read) and persisted back so repeated polls agree:
+
+```
+mempool (0-1s) -> bundled (1-3s) -> included (>=3s, success true|false)
+```
+
+- **mempool** — both `eth_getUserOperationByHash` and
+  `eth_getUserOperationReceipt` return `null`, exactly like a real bundler
+  before the op is picked up.
+- **bundled** — `getUserOperationByHash` returns the op with `blockNumber`,
+  `blockHash` and `transactionHash` set to `null` (in a bundle, not yet
+  mined); the receipt is still `null`.
+- **included** — both return the full on-chain shapes; the receipt carries
+  `success: true` plus logs and the bundle-tx receipt.
+
+**Failure injection (simulator extension):** pass
+`{"simulate_fail": true}` as a third `params` element to
+`eth_sendUserOperation` (e.g. `params: [userOp, entryPoint,
+{"simulate_fail": true}]`) to make the op execute-and-revert on inclusion —
+the receipt then has `success: false` and a `reason`, like a real userOp that
+fails during execution.
 
 ### Paymaster
 

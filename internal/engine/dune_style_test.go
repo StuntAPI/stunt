@@ -16,8 +16,10 @@ import (
 // TestDuneStyleAdapter exercises the Dune-style adapter end-to-end:
 //
 //   - execute query → PENDING
-//   - poll status → COMPLETED
-//   - get results → rows with metadata
+//   - poll status immediately → pre-terminal (PENDING/EXECUTING)
+//   - simulate_fail execution → FAILED terminal, no results
+//   - poll status after the 3s window → COMPLETED
+//   - get results → rows with metadata (404 before completion)
 //   - inline result → COMPLETED + rows
 //   - auth validate → valid
 //   - 401 without auth
@@ -83,18 +85,66 @@ func TestDuneStyleAdapter(t *testing.T) {
 		t.Fatalf("no auth -> status %d, want 401", status)
 	}
 
+	// ===== Poll status immediately → still pre-terminal =====
+
+	body, status = duneGet(t, base+"/api/v1/execution/"+execID+"/status", token)
+	if status != 200 {
+		t.Fatalf("get status (early) -> status %d, want 200; body %s", status, body)
+	}
+	var statusResp map[string]any
+	if err := json.Unmarshal([]byte(body), &statusResp); err != nil {
+		t.Fatalf("unmarshal status: %v (body %s)", err, body)
+	}
+	earlyState, _ := statusResp["state"].(string)
+	if earlyState == "QUERY_STATE_COMPLETED" || earlyState == "QUERY_STATE_FAILED" {
+		t.Fatalf("early status state = %v, want pre-terminal (PENDING/EXECUTING)", earlyState)
+	}
+
+	// ===== Execute with simulate_fail → FAILED terminal =====
+
+	bodyF, _ := dunePost(t, base+"/api/v1/query/12345/execute", token, map[string]any{
+		"simulate_fail": true,
+	})
+	var execRespF map[string]any
+	if err := json.Unmarshal([]byte(bodyF), &execRespF); err != nil {
+		t.Fatalf("unmarshal fail exec: %v (body %s)", err, bodyF)
+	}
+	failID, _ := execRespF["execution_id"].(string)
+	if failID == "" {
+		t.Fatalf("fail execution_id = %v, want non-empty string", execRespF["execution_id"])
+	}
+
+	// Sleep past the simulated execution window (1s running / 3s done).
+	time.Sleep(3200 * time.Millisecond)
+
 	// ===== Poll status → COMPLETED =====
 
 	body, status = duneGet(t, base+"/api/v1/execution/"+execID+"/status", token)
 	if status != 200 {
 		t.Fatalf("get status -> status %d, want 200; body %s", status, body)
 	}
-	var statusResp map[string]any
 	if err := json.Unmarshal([]byte(body), &statusResp); err != nil {
 		t.Fatalf("unmarshal status: %v (body %s)", err, body)
 	}
 	if statusResp["state"] != "QUERY_STATE_COMPLETED" {
 		t.Fatalf("status state = %v, want QUERY_STATE_COMPLETED", statusResp["state"])
+	}
+
+	// ===== Fail-injected execution → FAILED / no results =====
+
+	body, status = duneGet(t, base+"/api/v1/execution/"+failID+"/status", token)
+	if status != 200 {
+		t.Fatalf("fail status -> status %d, want 200; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &statusResp); err != nil {
+		t.Fatalf("unmarshal fail status: %v (body %s)", err, body)
+	}
+	if statusResp["state"] != "QUERY_STATE_FAILED" {
+		t.Fatalf("fail status state = %v, want QUERY_STATE_FAILED", statusResp["state"])
+	}
+	_, status = duneGet(t, base+"/api/v1/execution/"+failID+"/results", token)
+	if status != 404 {
+		t.Fatalf("fail results -> status %d, want 404", status)
 	}
 
 	// ===== Get results → rows =====
@@ -128,11 +178,18 @@ func TestDuneStyleAdapter(t *testing.T) {
 
 	// ===== Deterministic: same query gives same rows =====
 
-	// Execute again for same query_id.
+	// Execute again for same query_id. Results 404 until the window elapses.
 	body2, _ := dunePost(t, base+"/api/v1/query/12345/execute", token, map[string]any{})
 	var execResp2 map[string]any
 	_ = json.Unmarshal([]byte(body2), &execResp2)
 	execID2, _ := execResp2["execution_id"].(string)
+
+	_, status = duneGet(t, base+"/api/v1/execution/"+execID2+"/results", token)
+	if status != 404 {
+		t.Fatalf("early results -> status %d, want 404 (execution still running)", status)
+	}
+
+	time.Sleep(3200 * time.Millisecond)
 
 	body3, _ := duneGet(t, base+"/api/v1/execution/"+execID2+"/results", token)
 	var resultsResp2 map[string]any

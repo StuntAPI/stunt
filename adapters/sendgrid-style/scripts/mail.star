@@ -7,9 +7,17 @@
 #
 # Mail records are STATEFUL: a message sent via POST appears in the GET
 # messages endpoint, enabling round-trip testing locally.
+#
+# ASYNC DELIVERY LIFECYCLE (derive-on-read): a send is accepted with status
+# "processed" (and a signed "processed" event per recipient, like the real
+# Event Webhook); every GET /v3/messages then derives each message's status
+# from the clock — "delivered" at +3s (or "dropped" with failure injection)
+# — persisting the transition and emitting the terminal event exactly once.
+# See scripts/lib.star.
 
-# Shared helpers (_bearer, _require_auth, _next_msg_id, _extract_emails)
-# are preloaded from scripts/lib.star.
+# Shared helpers (_bearer, _require_auth, _next_msg_id, _extract_emails,
+# _num, _lifecycle_stamp, _lifecycle_stage, _emit_event) are preloaded from
+# scripts/lib.star.
 
 # on_send_mail creates a mail record and returns 202 Accepted (empty body).
 def on_send_mail(req):
@@ -53,6 +61,13 @@ def on_send_mail(req):
 
     msg_id = _next_msg_id()
 
+    # Failure injection: simulator-only body flag selecting the "dropped"
+    # terminal (see README). Real SendGrid emits processed then dropped.
+    fail_mode = ""
+    sf = body.get("simulate_fail", False)
+    if sf != None and sf:
+        fail_mode = "dropped"
+
     doc = {
         "id": msg_id,
         "from": from_obj,
@@ -64,21 +79,23 @@ def on_send_mail(req):
         "custom_args": body.get("custom_args", {}),
         "headers": body.get("headers", {}),
         "created_at": _now_iso(),
-        "status": "delivered",
+        "status": "processed",
     }
+    doc["_fail_mode"] = fail_mode
+    _lifecycle_stamp(doc)
 
     c = store_collection("mail")
     c.insert(doc)
 
-    # Emit ECDSA-signed Event Webhook events (fire-and-forget): one
-    # "processed" + "delivered" event object per recipient, matching the real
-    # per-recipient event stream. See scripts/lib.star for the signature
-    # scheme; deliveries only fire when an Event Webhook is enabled via
-    # POST /v3/user/webhooks/event/settings.
+    # Emit the ECDSA-signed "processed" Event Webhook event immediately
+    # (fire-and-forget), one per recipient, matching the real per-recipient
+    # event stream. See scripts/lib.star for the signature scheme;
+    # deliveries only fire when an Event Webhook is enabled via
+    # POST /v3/user/webhooks/event/settings. The terminal "delivered" /
+    # "dropped" event fires later, when a read first derives it.
     for r in recipients:
         email = r.get("email", "")
         _emit_event("processed", msg_id, email)
-        _emit_event("delivered", msg_id, email)
 
     # Real SendGrid returns 202 Accepted with empty body.
     return respond(202, "", {
@@ -94,13 +111,19 @@ def on_send_mail(req):
 # SendGrid-style offset pagination: limit (page size, default 50) and offset
 # (the opaque cursor token returned by a prior call). Paging is applied after
 # the full result list is assembled.
+#
+# Each message's async delivery status is derived from the clock first
+# (persisted + terminal event emitted on transition), so lists agree with the
+# Event Webhook stream.
 def on_list_messages(req):
     err = _require_auth(req)
     if err != None:
         return err
 
     c = store_collection("mail")
-    all_mail = c.list()
+    all_mail = []
+    for m in c.list():
+        all_mail.append(_advance_mail(m))
     all_mail = _apply_message_filters(req, all_mail)
 
     result = []
@@ -122,6 +145,32 @@ def on_list_messages(req):
     return respond(200, body)
 
 # --- helpers ---
+
+# _advance_mail derives a message's stage from the clock, persists the
+# transition, and emits the terminal Event Webhook event ("delivered" or
+# "dropped", one per recipient) exactly once, the first time a read observes
+# it. Stage 1 keeps status "processed" — SendGrid's event vocabulary has no
+# separate in-transit state between processed and delivered. Returns the doc.
+def _advance_mail(m):
+    stage = _num(m.get("_stage", 0))
+    target = _lifecycle_stage(m)
+    if target <= stage:
+        return m
+    c = store_collection("mail")
+    while stage < target:
+        stage = stage + 1
+        if stage == 1:
+            m["status"] = "processed"
+        elif m.get("_fail_mode", "") == "dropped":
+            m["status"] = "dropped"
+        else:
+            m["status"] = "delivered"
+        m["_stage"] = stage
+        c.update(m["id"], m)
+        if stage == 2:
+            for r in m.get("to", []):
+                _emit_event(m["status"], m["id"], r.get("email", ""))
+    return m
 
 # _apply_message_filters implements a subset of the real Email Activity
 # query language for GET /v3/messages?query=...: `field="value"` and

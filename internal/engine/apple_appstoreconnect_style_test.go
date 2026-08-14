@@ -300,3 +300,112 @@ func ascPostJSON(t *testing.T, rawurl, jwt string, body map[string]any) (string,
 	b, _ := io.ReadAll(resp.Body)
 	return string(b), resp.StatusCode
 }
+
+// TestAppStoreConnectStyleBuildLifecycle proves the derive-on-read build
+// processing state machine: a fresh app's build is PROCESSING immediately
+// and settles VALID after the 3s window (INVALID with the simulator-only
+// simulate_fail attribute). Also exercises GET /v1/builds/{id}.
+func TestAppStoreConnectStyleBuildLifecycle(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "apple-appstoreconnect-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"appstoreconnect": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["appstoreconnect"]
+	jwt := mintES256JWT(t)
+
+	// Seed the default app (its build lifecycle clock starts now).
+	body, status := ascGet(t, base+"/v1/apps", jwt)
+	if status != 200 {
+		t.Fatalf("GET apps -> %d", status)
+	}
+	var appsResp map[string]any
+	json.Unmarshal([]byte(body), &appsResp)
+	appsData := appsResp["data"].([]any)
+	if len(appsData) == 0 {
+		t.Fatal("apps list is empty; expected seeded app")
+	}
+	seededAppID := appsData[0].(map[string]any)["id"].(string)
+
+	// Create an app whose build will end INVALID.
+	body, status = ascPostJSON(t, base+"/v1/apps", jwt, map[string]any{
+		"data": map[string]any{
+			"attributes": map[string]any{
+				"name":          "Fail App",
+				"bundleId":      "com.example.failapp",
+				"simulate_fail": true,
+			},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST fail app -> %d; body %s", status, body)
+	}
+	var createResp map[string]any
+	json.Unmarshal([]byte(body), &createResp)
+	failAppID := createResp["data"].(map[string]any)["id"].(string)
+
+	ascBuildState := func(appID string) (string, string) {
+		t.Helper()
+		body, status := ascGet(t, base+"/v1/apps/"+appID+"/builds", jwt)
+		if status != 200 {
+			t.Fatalf("GET builds for %s -> %d; body %s", appID, status, body)
+		}
+		var listResp map[string]any
+		json.Unmarshal([]byte(body), &listResp)
+		data := listResp["data"].([]any)
+		if len(data) != 1 {
+			t.Fatalf("builds for %s = %d items, want 1", appID, len(data))
+		}
+		b := data[0].(map[string]any)
+		return b["attributes"].(map[string]any)["processingState"].(string), b["id"].(string)
+	}
+
+	// Immediately: both builds are PROCESSING.
+	if st, _ := ascBuildState(seededAppID); st != "PROCESSING" {
+		t.Fatalf("seeded build immediate state = %q, want PROCESSING", st)
+	}
+	failState, failBuildID := ascBuildState(failAppID)
+	if failState != "PROCESSING" {
+		t.Fatalf("fail build immediate state = %q, want PROCESSING", failState)
+	}
+
+	// After the 3s window: VALID and INVALID.
+	time.Sleep(3500 * time.Millisecond)
+
+	if st, _ := ascBuildState(seededAppID); st != "VALID" {
+		t.Fatalf("seeded build after window = %q, want VALID", st)
+	}
+	if st, _ := ascBuildState(failAppID); st != "INVALID" {
+		t.Fatalf("fail build after window = %q, want INVALID", st)
+	}
+
+	// Single-build endpoint agrees.
+	body, status = ascGet(t, base+"/v1/builds/"+failBuildID, jwt)
+	if status != 200 {
+		t.Fatalf("GET single build -> %d; body %s", status, body)
+	}
+	var single map[string]any
+	json.Unmarshal([]byte(body), &single)
+	if single["data"].(map[string]any)["attributes"].(map[string]any)["processingState"] != "INVALID" {
+		t.Fatalf("single build state = %v, want INVALID", single["data"])
+	}
+}

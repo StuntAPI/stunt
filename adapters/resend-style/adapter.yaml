@@ -30,6 +30,7 @@ endpoints:
   - route: /emails/{id}
     method: GET
     handler: scripts/emails.star#on_get_email
+    concurrency_key: id
 
   # --- Webhooks ---
   - route: /webhooks

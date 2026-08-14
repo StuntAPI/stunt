@@ -25,9 +25,11 @@ endpoints:
   - route: /netverify/v2/scans/{scan_reference}
     method: GET
     handler: scripts/scans.star#on_get_scan
+    concurrency_key: scan_reference
   - route: /netverify/v2/scans/{scan_reference}/data
     method: GET
     handler: scripts/scans.star#on_get_scan_data
+    concurrency_key: scan_reference
 
   # --- Webhook receiver ---
   - route: /netverify/v2/webhooks

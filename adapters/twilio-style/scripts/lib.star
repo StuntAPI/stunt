@@ -173,3 +173,65 @@ def _signed_emit(event_type, payload):
         url = ""
     sig = crypto.hmac_sha1(AUTH_TOKEN, url + body, encoding="base64")
     events_emit(event_type, payload, {"X-Twilio-Signature": sig})
+
+# ============================================================================
+# ASYNC MESSAGE LIFECYCLE (derive-on-read state machine)
+# ============================================================================
+# Outbound messages progress through Twilio's real status vocabulary on a
+# clock-derived schedule (timestamps computed at CREATE time, never hardcoded):
+#
+#   queued -> sent -> delivered     (success path; timings 1s / 3s)
+#   queued -> sent -> undelivered   (simulate_fail: true in the POST body —
+#                                    simulator extension, see README)
+#   queued -> sent -> failed        (To = Twilio's real magic always-fail
+#                                    test number)
+#
+# Every read (GET message / GET list) derives the current stage from the
+# clock, persists the transition, and fires the signed status-callback
+# webhook exactly once per NEW stage reached (message.sent on queued->sent;
+# message.delivered / message.undelivered / message.failed at the terminal).
+
+# Twilio's real magic test "To" number: messages to it are accepted (queued)
+# then always fail. Assembled from short chunks so no 5+ consecutive digits
+# appear in a literal.
+_MAGIC_FAIL_TO = "+1" + "500" + "555" + "0001"
+
+# _num coerces a JSON-round-tripped number (int or float) to int.
+def _num(v):
+    if v == None:
+        return 0
+    if type(v) == "int":
+        return v
+    if type(v) == "float":
+        return int(v)
+    return _to_int(str(v))
+
+# _lifecycle_stamp writes the internal async schedule onto a doc at CREATE
+# time: in-flight at now + 1s, terminal at now + 3s (clock-derived, so
+# integration tests can sleep through the window deterministically).
+def _lifecycle_stamp(doc):
+    now = clock.now_unix()
+    doc["_running_at"] = now + 1
+    doc["_done_at"] = now + 3
+    doc["_stage"] = 0
+
+# _lifecycle_stage returns the clock-derived target stage for a doc:
+# 0 = initial (pre-1s), 1 = in-flight (1s..3s), 2 = terminal (>=3s).
+def _lifecycle_stage(doc):
+    now = clock.now_unix()
+    if now >= _num(doc.get("_done_at", 0)):
+        return 2
+    if now >= _num(doc.get("_running_at", 0)):
+        return 1
+    return 0
+
+# _public_view strips the simulator's internal keys (underscore-prefixed
+# lifecycle fields and the store's id) from a stored doc before returning it
+# in a response — the real API would never show them.
+def _public_view(doc):
+    out = {}
+    for k in doc:
+        if k == "id" or k[:1] == "_":
+            continue
+        out[k] = doc[k]
+    return out

@@ -69,6 +69,31 @@ curl http://localhost:PORT/2010-06-01/Accounts/AC.../Messages.json
 # → 401 {"code":20003,"message":"Missing or invalid Basic Auth credentials",...}
 ```
 
+## Message lifecycle (async status machine)
+
+Real Twilio messages take time: `POST .../Messages.json` returns `status:
+"queued"`, then the message moves to `sent` and finally `delivered`. This
+adapter reproduces that with a **derive-on-read** state machine:
+
+```
+queued -> sent -> delivered          (timings: sent at +1s, delivered at +3s)
+```
+
+Every read (`GET .../Messages/{Sid}.json` and `GET .../Messages.json`)
+derives the current status from the clock, **persists** the transition, and
+fires the signed status-callback webhook **exactly once per new stage**
+(`message.sent` on queued→sent; `message.delivered` at the terminal), so
+polls, lists, and webhooks always agree. Integration tests can simply sleep
+past the 3s window and poll again.
+
+**Failure injection:**
+
+- `To = +15005550001` — Twilio's *real* magic test number that always fails:
+  terminal state `failed` (error code 21211, "Invalid 'To' Phone Number").
+- `"simulate_fail": true` in the POST body — **simulator extension**: the
+  terminal state becomes `undelivered` (error code 30007) and the success
+  side effects are skipped; the `message.undelivered` callback still fires.
+
 ## Verify flow
 
 The verification code is **deterministic** for local testing: the last 6 digits
@@ -87,9 +112,11 @@ verification on record returns `404` (Twilio error `20404`).
 
 ## Webhooks
 
-When a message is sent, the adapter emits a `message.sent` webhook event
-(fire-and-forget) to the registered webhook sink. See the stunt docs for
-webhook configuration (`events_target`).
+As a message advances through its [lifecycle](#message-lifecycle-async-status-machine),
+the adapter emits a `message.sent` / `message.delivered` / `message.undelivered`
+/ `message.failed` webhook event (fire-and-forget, once per transition) to the
+registered webhook sink. See the stunt docs for webhook configuration
+(`events_target`).
 
 ### Signed deliveries — `X-Twilio-Signature`
 

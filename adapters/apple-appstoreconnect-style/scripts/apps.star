@@ -15,18 +15,20 @@
 # _to_int, _b64url_decode, _jose_header, _reverse) are preloaded from
 # scripts/lib.star.
 
-# _seed populates a default app on first access.
+# _seed populates a default app (and its build) on first access.
 def _seed():
     if store_kv_get("asc", "seeded") == "yes":
         return
     store_kv_set("asc", "seeded", "yes")
     c = store_collection("apps")
-    c.insert(_app_doc(
+    doc = _app_doc(
         "com.example.mockapp",
         "Mock App",
         "MOCK_SKU_001",
         "en-US",
-    ))
+    )
+    c.insert(doc)
+    _create_build(doc["id"], False)
 
 # _app_doc builds a stored app document.
 def _app_doc(bundle_id, name, sku, locale):
@@ -62,6 +64,70 @@ def _app_entity(doc):
 def _find_app(app_id):
     c = store_collection("apps")
     return c.get(app_id)
+
+# --- build lifecycle (derive-on-read) ---
+
+# _create_build stores a freshly uploaded build for an app with the
+# derive-on-read timestamps: _running_at (create + 1s) and _done_at
+# (create + 3s) computed from clock.now_unix(). fail is the simulator-only
+# simulate_fail flag from the app-creation attributes.
+def _create_build(app_id, fail):
+    now = clock.now_unix()
+    bc = store_collection("builds")
+    bc.insert({
+        "id": "bld_" + app_id + "_1",
+        "app": app_id,
+        "version": "1",
+        "processingState": "PROCESSING",
+        "uploadedDate": clock.now_rfc3339(),
+        "_running_at": now + 1,
+        "_done_at": now + 3,
+        "_fail": fail,
+    })
+
+# _derive_build_state maps the clock onto Apple's real processingState
+# vocabulary: PROCESSING while Apple processes the upload, then VALID (or
+# INVALID for the simulate_fail path).
+def _derive_build_state(b):
+    if b.get("_done_at", None) == None:
+        return b.get("processingState", "VALID")
+    now = clock.now_unix()
+    if now < b["_done_at"]:
+        return "PROCESSING"
+    if b.get("_fail", False):
+        return "INVALID"
+    return "VALID"
+
+# _advance_build derives the current processingState and persists the
+# transition back to the builds collection so polls, lists, and the
+# processingState filter agree. App Store Connect has no build webhooks, so
+# no events are emitted.
+def _advance_build(b, bc):
+    state = _derive_build_state(b)
+    if b.get("processingState", "") == state:
+        return state
+    b["processingState"] = state
+    bc.update(b.get("id", ""), b)
+    return state
+
+# _build_entity builds a JSON:API resource object from a stored build doc
+# (the internal underscore-prefixed lifecycle fields never appear).
+def _build_entity(doc):
+    return {
+        "id": doc["id"],
+        "type": "builds",
+        "attributes": {
+            "version": doc.get("version", "1"),
+            "uploadedDate": doc.get("uploadedDate", ""),
+            "processingState": doc.get("processingState", "PROCESSING"),
+            "usesNonExemptEncryption": False,
+        },
+        "relationships": {
+            "app": {
+                "data": {"type": "apps", "id": doc.get("app", "")},
+            },
+        },
+    }
 
 # --- handlers ---
 
@@ -130,9 +196,17 @@ def on_create_app(req):
                      "An attribute is missing or invalid",
                      "The required attributes 'name' and 'bundleId' must be provided.")
 
+    fail = attrs.get("simulate_fail", False)
+    if fail == None:
+        fail = False
+
     doc = _app_doc(bundle_id, name, sku, locale)
     c = store_collection("apps")
     c.insert(doc)
+
+    # A freshly uploaded build starts PROCESSING (derive-on-read lifecycle,
+    # see on_list_builds).
+    _create_build(doc["id"], fail)
 
     return respond(201, {
         "data": _app_entity(doc),
@@ -181,6 +255,11 @@ def on_list_app_versions(req):
     })
 
 # on_list_builds handles GET /v1/apps/{id}/builds.
+# Build processing is a derive-on-read state machine using Apple's real
+# processingState vocabulary: PROCESSING -> VALID (or INVALID with the
+# simulator-only simulate_fail flag set at app creation; Apple's real sandbox
+# has no failure trigger). Reads derive the state from the clock and persist
+# the transition back so polls and lists agree.
 def on_list_builds(req):
     _, err = _require_jwt(req)
     if err != None:
@@ -191,23 +270,13 @@ def on_list_builds(req):
     if doc == None:
         return _not_found_err("App", app_id)
 
-    data = [
-        {
-            "id": "bld_" + app_id + "_1",
-            "type": "builds",
-            "attributes": {
-                "version": "1",
-                "uploadedDate": "2024-01-15T10:00:00Z",
-                "processingState": "VALID",
-                "usesNonExemptEncryption": False,
-            },
-            "relationships": {
-                "app": {
-                    "data": {"type": "apps", "id": app_id},
-                },
-            },
-        }
-    ]
+    bc = store_collection("builds")
+    data = []
+    for b in bc.list():
+        if b.get("app", "") != app_id:
+            continue
+        _advance_build(b, bc)
+        data.append(_build_entity(b))
 
     # Real list params (filter[processingState], filter[version], sort).
     data = _apply_build_query(req, data)
@@ -217,6 +286,26 @@ def on_list_builds(req):
         "included": None,
         "links": {
             "self": "/v1/apps/" + app_id + "/builds",
+        },
+    })
+
+# on_get_build handles GET /v1/builds/{id} (Read Build Information).
+def on_get_build(req):
+    _, err = _require_jwt(req)
+    if err != None:
+        return err
+
+    build_id = req["params"]["id"]
+    bc = store_collection("builds")
+    doc = bc.get(build_id)
+    if doc == None:
+        return _not_found_err("Build", build_id)
+
+    _advance_build(doc, bc)
+    return respond(200, {
+        "data": _build_entity(doc),
+        "links": {
+            "self": "/v1/builds/" + build_id,
         },
     })
 

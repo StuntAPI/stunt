@@ -34,8 +34,55 @@ def _gen_id(prefix, seq):
         s = "0" + s
     return prefix + "-" + s
 
-# _advance_check_status advances a check through in_progress→complete.
-def _advance_check_status(current):
-    if current == "in_progress":
+# _derive_check_status maps wall-clock time onto the check lifecycle.
+#
+# A check doc stores two internal timestamps set at CREATE time from
+# clock.now_unix():
+#   _running_at = now + 1   (processing starts; Onfido's real check for an
+#                            applicant with documents on file is in_progress
+#                            from the start, so this window is still reported
+#                            as in_progress)
+#   _done_at    = now + 3   (terminal)
+#
+# Real Onfido check statuses: awaiting_applicant → in_progress → complete
+# (+ withdrawn). With documents already uploaded the visible machine is:
+#   in_progress (0-3s) → complete (>=3s, result clear|consider)
+def _derive_check_status(doc):
+    if clock.now_unix() >= doc.get("_done_at", 0):
         return "complete"
-    return "complete"
+    return "in_progress"
+
+# _derive_check_result returns the check result once complete, else None.
+# A check created with simulate_fail: true completes with result
+# "consider" (Onfido's flagged outcome — its real sandbox drives this via
+# special sandbox documents; the body flag is a simulator extension).
+def _derive_check_result(doc):
+    if _derive_check_status(doc) != "complete":
+        return None
+    if doc.get("_fail", False):
+        return "consider"
+    return "clear"
+
+# ============================================================================
+# WEBHOOK SIGNATURE SCHEME (Onfido X-SHA2-Signature)
+# ============================================================================
+# Onfido signs webhook payloads with HMAC-SHA256 over the raw body, delivered
+# in the X-SHA2-Signature header (hex digest). Verification in Go:
+#
+#   mac := hmac.New(sha256.New, []byte(secret))
+#   mac.Write(rawBody)
+#   expected := hex.EncodeToString(mac.Sum(nil))
+#   if expected != r.Header.Get("X-SHA2-Signature") { return 401 }
+#
+# The secret below is the simulator's fixed synthetic signing secret.
+# Public + low-entropy: local stunt only.
+# ============================================================================
+
+_WEBHOOK_SECRET = "stunt_onfido_mock_signing_key"
+
+# _signed_emit MACs the exact on-wire body and delivers it with the
+# X-SHA2-Signature header, matching what Onfido sends on check completion.
+def _signed_emit(event_name, payload):
+    body = events_body(event_name, payload)
+    sig = crypto.hmac_sha256(_WEBHOOK_SECRET, body)
+    events_emit(event_name, payload, {"X-SHA2-Signature": sig})

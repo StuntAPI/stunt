@@ -13,7 +13,7 @@ The timing of the webhook vs. polling creates integration complexity.
 | Endpoint | Method | Description |
 |---|---|---|
 | `/api/inquiry/v1/inquiries` | POST | Create an inquiry (JSON:API) |
-| `/api/inquiry/v1/inquiries/{id}` | GET | Get inquiry — status progresses created→pending→completed |
+| `/api/inquiry/v1/inquiries/{id}` | GET | Get inquiry — status progresses created→pending→completed (derive-on-read) |
 | `/api/inquiry/v1/inquiries/{id}/resume` | POST | Resume an inquiry |
 | `/api/inquiry/v1/inquiries/{id}/verifications` | GET | List verifications |
 | `/api/inquiry/v1/webhooks` | POST | Webhook receiver (Persona-Signature HMAC) |
@@ -28,13 +28,25 @@ Bearer token (`Authorization: Bearer <key>`).
 
 ## Status lifecycle
 
-Each GET on an inquiry advances the status:
+The inquiry is a real async state machine: status is derived from the clock
+on each GET and persisted.
 
 ```
-created → pending → completed
+created (0-1s after create) → pending (1-3s) → completed (+3s) | declined (simulate_fail)
 ```
 
-Once `completed`, verifications (government-id, selfie) are auto-seeded.
+When the transition to `completed` first fires, verifications (government-id,
+selfie) are auto-seeded and an `inquiry.completed` webhook is emitted, signed
+with `Persona-Signature: t=<ts>,v1=<hmac>` (HMAC-SHA256 over `<ts>.<raw
+body>`). Resuming an inquiry restarts the clock at `pending`.
+
+### Failure injection (simulator extension)
+
+Pass `"simulate_fail": true` in the `POST /api/inquiry/v1/inquiries` body:
+the inquiry transitions to `declined` (Persona's declined review outcome,
+notified in the real API via the `inquiry.declined` webhook) at +3s instead
+of `completed`, emits `inquiry.declined`, and seeds no verifications. This is
+a stunt-only flag.
 
 ## Webhook
 

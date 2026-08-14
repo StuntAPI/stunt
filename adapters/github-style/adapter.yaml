@@ -67,6 +67,10 @@ endpoints:
   - route: /repos/{owner}/{repo}/actions/runs
     method: GET
     handler: scripts/actions.star#on_list_runs
+  - route: /repos/{owner}/{repo}/actions/runs/{run_id}
+    method: GET
+    handler: scripts/actions.star#on_get_run
+    concurrency_key: run_id
 
   # --- Webhooks (register) ---
   - route: /repos/{owner}/{repo}/hooks

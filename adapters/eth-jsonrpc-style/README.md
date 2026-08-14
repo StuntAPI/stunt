@@ -15,7 +15,8 @@ A deterministic, stateful mock of an Ethereum JSON-RPC provider's HTTP surface.
 It does **not** execute real EVM bytecode — it simulates the JSON-RPC responses
 deterministically so that:
 
-- A transaction sent via `eth_sendRawTransaction` shows up in a receipt.
+- A transaction sent via `eth_sendRawTransaction` shows up in a receipt —
+  once it is mined (it starts in the mempool, see the lifecycle below).
 - The block number advances predictably (each transaction mines one block).
 - Logs are retrievable via `eth_getLogs` and `eth_getTransactionReceipt`.
 - The same input always produces the same output (no faucet hell, no rate limits).
@@ -36,8 +37,8 @@ supported — batch responses are returned as arrays.
 | `eth_getBalance` | hex wei | Seeded accounts |
 | `eth_getTransactionCount` | hex nonce | Advances after send |
 | `eth_sendRawTransaction` | tx hash | Mints hash, bumps block, records tx + logs |
-| `eth_getTransactionReceipt` | receipt obj | Status `"0x1"`, logs, block info |
-| `eth_getTransactionByHash` | tx obj | Stateful |
+| `eth_getTransactionReceipt` | receipt obj \| null | `null` until the tx is mined (>=3s); status `"0x1"`, logs, block info |
+| `eth_getTransactionByHash` | tx obj | Null block fields while in the mempool; full shape once mined |
 | `eth_call` | hex | Deterministic by calldata (selector echo) |
 | `eth_getLogs` | `[log]` | Filtered by block range, address, topics |
 | `eth_getBlockByNumber` | block obj | With transactions (full or hashes) |
@@ -65,6 +66,32 @@ is seeded with a genesis block (block 0) and synthetic accounts with balances.
 Transaction hashes are deterministic: the same raw transaction hex always
 produces the same hash (via a pseudo-keccak function — not real keccak256, but
 deterministic and collision-resistant enough for local testing).
+
+## Transaction lifecycle
+
+Sent transactions no longer mine instantly. Each stored tx/receipt/log
+carries a clock-derived mining milestone and the current state is computed
+when polled (derive-on-read), with each transition persisted back so repeated
+polls agree:
+
+```
+mempool (0-3s) -> mined (>=3s, receipt status "0x1" | "0x0")
+```
+
+Real-node semantics throughout:
+
+- **mempool** — `eth_getTransactionReceipt` returns `null` (no receipt
+  before inclusion), `eth_getTransactionByHash` returns the tx with
+  `blockNumber`/`blockHash`/`transactionIndex` set to `null`, and
+  `eth_getLogs` excludes the tx's logs. The block number still advances at
+  send time (each tx mines one block).
+- **mined** — full shapes everywhere: receipt with status `"0x1"`, logs
+  visible to `eth_getLogs`.
+
+**Failure injection (simulator extension):** pass `{"simulate_fail": true}`
+as the second `params` element to `eth_sendRawTransaction
+(rawTx, {"simulate_fail": true})` to mine the transaction reverted — the
+receipt then has status `"0x0"`, like a real reverted transaction.
 
 ## Usage
 

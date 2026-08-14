@@ -190,3 +190,50 @@ def _emit_event(event_name, msg_id, email):
         "X-Twilio-Email-Event-Webhook-Signature": sig,
         "X-Twilio-Email-Event-Webhook-Timestamp": str(ts),
     })
+
+# ============================================================================
+# ASYNC DELIVERY LIFECYCLE (derive-on-read state machine)
+# ============================================================================
+# Real SendGrid accepts a send (202), emits "processed", and only later
+# reports "delivered" (or "dropped"). This adapter reproduces that with a
+# derive-on-read state machine using SendGrid's real event vocabulary:
+#
+#   processed -> delivered   (timings: terminal at +3s; processed is emitted
+#                             immediately at send, like the real Event
+#                             Webhook, and there is no separate in-transit
+#                             event in SendGrid's vocabulary)
+#   processed -> dropped     (simulate_fail: true in the send body —
+#                             simulator extension, see README)
+#
+# Every read (GET /v3/messages) derives each message's stage from the clock,
+# persists the transition, and emits the terminal event exactly once per
+# recipient, so lists and webhooks always agree.
+
+# _num coerces a JSON-round-tripped number (int or float) to int.
+def _num(v):
+    if v == None:
+        return 0
+    if type(v) == "int":
+        return v
+    if type(v) == "float":
+        return int(v)
+    return _to_int(_to_int_str(v))
+
+# _lifecycle_stamp writes the internal async schedule onto a doc at CREATE
+# time: in-flight at now + 1s, terminal at now + 3s (clock-derived, so
+# integration tests can sleep through the window deterministically).
+def _lifecycle_stamp(doc):
+    now = clock.now_unix()
+    doc["_running_at"] = now + 1
+    doc["_done_at"] = now + 3
+    doc["_stage"] = 0
+
+# _lifecycle_stage returns the clock-derived target stage for a doc:
+# 0 = initial (pre-1s), 1 = in-flight (1s..3s), 2 = terminal (>=3s).
+def _lifecycle_stage(doc):
+    now = clock.now_unix()
+    if now >= _num(doc.get("_done_at", 0)):
+        return 2
+    if now >= _num(doc.get("_running_at", 0)):
+        return 1
+    return 0

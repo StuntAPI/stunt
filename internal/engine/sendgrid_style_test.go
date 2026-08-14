@@ -18,6 +18,8 @@ import (
 //
 //   - POST /v3/mail/send with Bearer → 202 Accepted (empty body)
 //   - GET /v3/messages shows the sent mail (STATEFUL)
+//   - Async lifecycle → processed derives to delivered after 3s;
+//     simulate_fail send derives to dropped
 //   - 401 without Bearer
 func TestSendGridStyleAdapter(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "sendgrid-style")
@@ -178,6 +180,49 @@ func TestSendGridStyleAdapter(t *testing.T) {
 	})
 	if resp.StatusCode != 401 {
 		t.Fatalf("send without auth -> status %d, want 401", resp.StatusCode)
+	}
+
+	// ===== Async delivery lifecycle: derive-on-read statuses =====
+	// processed -> delivered at +3s; a simulate_fail send (simulator
+	// extension) terminates in dropped.
+
+	sgPostJSON(t, base+"/v3/mail/send", bearer, map[string]any{
+		"personalizations": []map[string]any{
+			{
+				"to":      []map[string]any{{"email": "dropped@example.com"}},
+				"subject": "doomed",
+			},
+		},
+		"from":          map[string]any{"email": "sender@example.com"},
+		"simulate_fail": true,
+	})
+
+	time.Sleep(3500 * time.Millisecond)
+
+	body, status = sgGet(t, base+"/v3/messages?limit=10", bearer)
+	if status != 200 {
+		t.Fatalf("list messages (lifecycle) -> status %d, want 200; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &listResp); err != nil {
+		t.Fatalf("unmarshal messages (lifecycle): %v (body %s)", err, body)
+	}
+	messages = listResp["messages"].([]any)
+	sawDelivered := false
+	sawDropped := false
+	for _, msg := range messages {
+		mm := msg.(map[string]any)
+		if mm["subject"] == "Hello from stunt" && mm["status"] == "delivered" {
+			sawDelivered = true
+		}
+		if mm["subject"] == "doomed" && mm["status"] == "dropped" {
+			sawDropped = true
+		}
+	}
+	if !sawDelivered {
+		t.Fatalf("no message with subject 'Hello from stunt' in status delivered; messages: %+v", messages)
+	}
+	if !sawDropped {
+		t.Fatalf("no failure-injected message in status dropped; messages: %+v", messages)
 	}
 }
 

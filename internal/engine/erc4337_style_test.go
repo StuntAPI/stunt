@@ -165,6 +165,50 @@ func TestErc4337StyleAdapter(t *testing.T) {
 		t.Fatalf("error code = %v, want -32602", errObj["code"])
 	}
 
+	// ===== Lifecycle: receipt is null until the op is included (>=3s) =====
+
+	body, status = ercRPC(t, base, map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "eth_getUserOperationReceipt",
+		"params":  []any{userOpHash},
+		"id":      5,
+	})
+	if status != 200 {
+		t.Fatalf("early receipt -> status %d, want 200; body %s", status, body)
+	}
+	var earlyResp map[string]any
+	json.Unmarshal([]byte(body), &earlyResp)
+	if earlyResp["result"] != nil {
+		t.Fatalf("early receipt = %v, want null (op not yet included)", earlyResp["result"])
+	}
+
+	// Negative path: a userOp sent with {"simulate_fail": true} (third
+	// params element) executes-and-reverts on inclusion.
+	failOp := map[string]any{}
+	for k, v := range userOp {
+		failOp[k] = v
+	}
+	failOp["callData"] = "0xdeadbeef-fail"
+	failOp["nonce"] = "0x1"
+	body, status = ercRPC(t, base, map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "eth_sendUserOperation",
+		"params":  []any{failOp, entryPoint, map[string]any{"simulate_fail": true}},
+		"id":      8,
+	})
+	if status != 200 {
+		t.Fatalf("sendUserOperation (fail) -> status %d, want 200; body %s", status, body)
+	}
+	var failSendResp map[string]any
+	json.Unmarshal([]byte(body), &failSendResp)
+	failHash, ok := failSendResp["result"].(string)
+	if !ok || len(failHash) != 66 || failHash[:2] != "0x" {
+		t.Fatalf("fail userOpHash = %v, want 0x + 64 hex chars", failSendResp["result"])
+	}
+
+	// Sleep past the 3s inclusion mark.
+	time.Sleep(3500 * time.Millisecond)
+
 	// ===== eth_getUserOperationReceipt(hash) → receipt =====
 
 	body, status = ercRPC(t, base, map[string]any{
@@ -202,6 +246,30 @@ func TestErc4337StyleAdapter(t *testing.T) {
 	txHash, ok := innerReceipt["transactionHash"].(string)
 	if !ok || txHash[:2] != "0x" {
 		t.Fatalf("receipt.receipt.transactionHash = %v, want 0x hex", innerReceipt["transactionHash"])
+	}
+
+	// ===== simulate_fail op → receipt with success:false =====
+
+	body, status = ercRPC(t, base, map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "eth_getUserOperationReceipt",
+		"params":  []any{failHash},
+		"id":      9,
+	})
+	if status != 200 {
+		t.Fatalf("fail receipt -> status %d, want 200; body %s", status, body)
+	}
+	var failReceiptResp map[string]any
+	json.Unmarshal([]byte(body), &failReceiptResp)
+	failReceipt, ok := failReceiptResp["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("fail receipt = %v, want object", failReceiptResp["result"])
+	}
+	if failReceipt["success"] != false {
+		t.Fatalf("simulate_fail receipt success = %v, want false", failReceipt["success"])
+	}
+	if failReceipt["reason"] == nil || failReceipt["reason"] == "" {
+		t.Fatalf("simulate_fail receipt reason = %v, want non-empty", failReceipt["reason"])
 	}
 
 	// ===== eth_getUserOperationByHash(hash) → stored userOp =====

@@ -39,10 +39,32 @@ test the workspace → model → import → task-status flow locally.
 - Workspace list: `{meta:{paging}, items:[{id, name, active, size}]}`.
 - Model: `{id, name, active, modelType}`.
 - Import response: `{task:{taskId, taskState:"CREATED", creationTime}}`.
-- Task status: `{taskId, taskState:"COMPLETE", result:{successful, totalCount, successCount, failureCount}}`.
+- Task status: `{taskId, taskState, creationTime[, completionTime, result:{successful, totalCount, successCount, failureCount}]}` (result appears once COMPLETE).
 
 ## Data model
 
 Workspaces are **stateful**. Tasks are stored and retrievable. The async flow
-simulates a task transitioning from CREATED → COMPLETE (returned as COMPLETE
-on status check).
+is a derive-on-read state machine:
+
+```
+CREATED (POST response) → NOT_STARTED → IN_PROGRESS → COMPLETE
+```
+
+Timings: IN_PROGRESS at +1s, COMPLETE at +3s after task creation (computed
+from the injectable clock). Status polls derive the current taskState from
+the clock and persist the transition back to the tasks collection, so
+repeated polls and list views agree.
+
+### Failure injection (simulator extension)
+
+The real Anaplan API has no sandbox failure trigger, so this adapter accepts
+a simulator-only flag in the POST `.../tasks` body:
+
+```json
+{"simulate_fail": true}
+```
+
+The task still reaches `COMPLETE` (as in the real API, failure is reported in
+the result block): `result.successful` is `false` with a nonzero
+`failureCount`. Anaplan has no task webhooks, so no events are emitted on
+transitions.

@@ -93,12 +93,25 @@ func TestTwilioStyleSignatureVerifies(t *testing.T) {
 	base := addrs["twilio"]
 
 	msgPath := base + "/2010-06-01/Accounts/" + twilioAccountSID + "/Messages.json"
-	if _, status := twilioPostJSON(t, msgPath, map[string]any{
+	body, status := twilioPostJSON(t, msgPath, map[string]any{
 		"To":   "+15551234567",
 		"From": "+15557654321",
 		"Body": "sign me",
-	}); status != 201 {
+	})
+	if status != 201 {
 		t.Fatalf("POST Messages.json -> %d, want 201", status)
+	}
+	var sent map[string]any
+	if err := json.Unmarshal([]byte(body), &sent); err != nil {
+		t.Fatalf("unmarshal sent message: %v (body %s)", err, body)
+	}
+	sid, _ := sent["sid"].(string)
+
+	// The message.sent status callback now fires when a read first derives
+	// the sent stage (derive-on-read lifecycle, +1s after the POST).
+	time.Sleep(1200 * time.Millisecond)
+	if _, status := twilioGet(t, base+"/2010-06-01/Accounts/"+twilioAccountSID+"/Messages/"+sid+".json"); status != 200 {
+		t.Fatalf("GET Messages/%s.json -> %d, want 200", sid, status)
 	}
 
 	raw, hdr := sink.awaitDelivery(t, time.Second)

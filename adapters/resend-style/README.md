@@ -20,12 +20,34 @@ account or hitting the network.
   assertions that an email was sent).
 - **List:** `GET /emails` returns all sent emails.
 - **Webhooks:** register an endpoint with `POST /webhooks`
-  (`{endpoint, events}`); every send then emits **Svix-signed**
-  `email.sent` and `email.delivered` events to it — see
-  [Webhooks](#webhooks) below.
+  (`{endpoint, events}`); sends then emit **Svix-signed** `email.sent` /
+  `email.delivered` (or `email.bounced`) events to it as their
+  [delivery lifecycle](#delivery-lifecycle-async-status-machine) progresses —
+  see [Webhooks](#webhooks) below.
 
 State persists in a SQLite-backed collection, so emails sent in one request are
 retrievable in subsequent requests within the same `stunt up` session.
+
+## Delivery lifecycle (async status machine)
+
+Real Resend accepts a send, emits `email.sent` when the message is handed to
+the provider, and later `email.delivered` (or `email.bounced`). This adapter
+reproduces that with a **derive-on-read** state machine:
+
+```
+queued -> sent -> delivered    (timings: sent at +1s, delivered at +3s)
+```
+
+`POST /emails` stores the email with `status: "queued"`. Every read
+(`GET /emails/{id}` and `GET /emails`) then derives the status from the
+clock, **persists** the transition, and emits the Svix-signed webhook
+exactly once per new stage — `email.sent` on queued→sent, `email.delivered`
+at the terminal — so polls, lists, and webhooks always agree. Integration
+tests can simply sleep past the 3s window and re-read the email.
+
+**Failure injection:** `"simulate_fail": true` in the send body — **simulator
+extension**: the terminal state becomes `bounced` and the emitted event is
+`email.bounced` instead of `email.delivered`.
 
 ## Endpoints
 
@@ -88,9 +110,12 @@ svix-timestamp:  1739000000
 svix-signature:  v1,<base64(HMAC-SHA256(secret, svix-id + "." + svix-timestamp + "." + raw_body))>
 ```
 
-- **Events emitted:** `email.sent`, `email.delivered` (per registered
-  webhook that subscribes to the type; an empty `events` list subscribes to
-  everything).
+- **Events emitted:** `email.sent`, `email.delivered`, and `email.bounced`
+  (per registered webhook that subscribes to the type; an empty `events`
+  list subscribes to everything). Emission is tied to the
+  [delivery lifecycle](#delivery-lifecycle-async-status-machine): `email.sent`
+  fires when a read first derives the sent stage, the terminal event when a
+  read first derives delivered/bounced — exactly once each.
 - **Payload shape:** Resend's envelope `{type, created_at, data: {id, object,
   to, from, subject, created_at}}` wrapped in stunt's standard
   `{"type": ..., "payload": {...}}` delivery envelope.

@@ -37,6 +37,33 @@ def _hex(n):
         v = v // 16
     return s
 
+# _derive_exec_state derives the CURRENT execution state from the injectable
+# clock (derive-on-read) instead of flipping it on first poll. Dune's real
+# state machine is QUERY_STATE_PENDING -> QUERY_STATE_EXECUTING ->
+# QUERY_STATE_COMPLETED (terminal failure vocabulary: QUERY_STATE_FAILED).
+# Timings: PENDING until _running_at (create + 1s), EXECUTING until _done_at
+# (create + 3s), terminal after that.
+def _derive_exec_state(doc):
+    now = clock.now_unix()
+    if now < doc.get("_running_at", 0):
+        return "QUERY_STATE_PENDING"
+    if now < doc.get("_done_at", 0):
+        return "QUERY_STATE_EXECUTING"
+    if doc.get("_fail", False):
+        return "QUERY_STATE_FAILED"
+    return "QUERY_STATE_COMPLETED"
+
+# _advance_execution derives the current state and persists the transition
+# back to the collection so status polls, results and any list view agree.
+# Returns the derived state.
+def _advance_execution(exec_id, doc):
+    state = _derive_exec_state(doc)
+    if doc.get("state") != state:
+        doc["state"] = state
+        ec = store_collection("executions")
+        ec.update(exec_id, doc)
+    return state
+
 # _seed_rows generates deterministic synthetic result rows for a query.
 # The rows are based on the query_id so different queries get different data.
 def _seed_rows(query_id):

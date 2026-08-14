@@ -23,7 +23,10 @@ import (
 //   - POST /emails -> 200 {id}; missing auth -> 401
 //   - GET /emails/{id} -> the stored email (all fields round-trip)
 //   - GET /emails -> {data: [...]} with the sent email present
-//   - webhook delivery: email.sent + email.delivered are emitted
+//   - Async lifecycle: queued derives to delivered after 3s; a
+//     simulate_fail send derives to bounced
+//   - webhook delivery: email.sent + email.delivered (+ email.bounced for
+//     the failure-injected send) are emitted
 func TestResendStyleAdapter(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "resend-style")
 	absAdapterDir, err := filepath.Abs(adapterDir)
@@ -80,7 +83,7 @@ func TestResendStyleAdapter(t *testing.T) {
 
 	wbBody, status := resendPostJSON(t, base+"/webhooks", apiKey, map[string]any{
 		"endpoint": sink.URL,
-		"events":   []string{"email.sent", "email.delivered"},
+		"events":   []string{"email.sent", "email.delivered", "email.bounced"},
 	})
 	if status != 200 && status != 201 {
 		t.Fatalf("POST /webhooks -> %d; %s", status, wbBody)
@@ -169,6 +172,58 @@ func TestResendStyleAdapter(t *testing.T) {
 	if first["id"] != emailID {
 		t.Fatalf("list[0].id = %v, want %v", first["id"], emailID)
 	}
+	// The email is queued right after the send (derive-on-read lifecycle);
+	// tolerate sent in case the 1s window elapses under load.
+	if st := first["status"]; st != "queued" && st != "sent" {
+		t.Fatalf("list[0].status = %v, want queued or sent", st)
+	}
+
+	// ===== Async lifecycle: queued -> sent -> delivered (1s/3s) =====
+	// Also send a failure-injected email (simulator extension).
+
+	body, status = resendPostJSON(t, base+"/emails", apiKey, map[string]any{
+		"from":          "Acme <onboarding@acme.test>",
+		"to":            []string{"bounced@resend.dev"},
+		"subject":       "doomed",
+		"simulate_fail": true,
+	})
+	if status != 200 {
+		t.Fatalf("POST /emails (simulate_fail) -> status %d, want 200; body %s", status, body)
+	}
+	var failResp map[string]any
+	if err := json.Unmarshal([]byte(body), &failResp); err != nil {
+		t.Fatalf("unmarshal fail send: %v (body %s)", err, body)
+	}
+	failID, ok := failResp["id"].(string)
+	if !ok || !strings.HasPrefix(failID, "re_") {
+		t.Fatalf("fail id = %v, want re_* prefix", failResp["id"])
+	}
+
+	time.Sleep(3500 * time.Millisecond)
+
+	// Polling past the window derives the terminal statuses.
+	body, status = resendGet(t, base+"/emails/"+emailID, apiKey)
+	if status != 200 {
+		t.Fatalf("GET /emails/{id} (lifecycle) -> status %d, want 200; body %s", status, body)
+	}
+	var derived map[string]any
+	if err := json.Unmarshal([]byte(body), &derived); err != nil {
+		t.Fatalf("unmarshal derived email: %v (body %s)", err, body)
+	}
+	if derived["status"] != "delivered" {
+		t.Fatalf("derived status = %v, want delivered", derived["status"])
+	}
+
+	body, status = resendGet(t, base+"/emails/"+failID, apiKey)
+	if status != 200 {
+		t.Fatalf("GET /emails/{fail} (lifecycle) -> status %d, want 200; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &derived); err != nil {
+		t.Fatalf("unmarshal derived fail email: %v (body %s)", err, body)
+	}
+	if derived["status"] != "bounced" {
+		t.Fatalf("derived fail status = %v, want bounced", derived["status"])
+	}
 
 	// ===== Webhook events were delivered =====
 	// Wait briefly for async delivery (fire-and-forget with retries).
@@ -196,6 +251,9 @@ func TestResendStyleAdapter(t *testing.T) {
 	}
 	if !eventTypes["email.delivered"] {
 		t.Errorf("expected email.delivered webhook event; got events: %+v", receivedEvents)
+	}
+	if !eventTypes["email.bounced"] {
+		t.Errorf("expected email.bounced webhook event (simulate_fail); got events: %+v", receivedEvents)
 	}
 }
 

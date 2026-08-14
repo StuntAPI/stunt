@@ -23,7 +23,10 @@ A faithful behavioral mock of Meta's WhatsApp Business Cloud API surface:
   `{messaging_product:"whatsapp", to, type, ...}` →
   `{messaging_product, contacts:[{input, wa_id}], messages:[{id:"wamid...."}]}`.
   Supports `type:"text"` and `type:"template"`.
-- **Message status:** `GET /v21.0/{message_id}` → `{message_status, ...}`.
+- **Message status:** `GET /v21.0/{message_id}` → `{message_status, ...}`
+  (derive-on-read lifecycle: `sent` right after the send, `delivered`
+  derived at **+3s** — see
+  [Message status lifecycle](#message-status-lifecycle-async-state-machine)).
 - **Phone number:** `GET /v21.0/{phone_number_id}` → registration status.
   `POST /v21.0/{phone_number_id}/register` → `{success: true}`.
 - **Media:** `POST /v21.0/{phone_number_id}/media` (upload, real Cloud API shape:
@@ -40,10 +43,36 @@ A faithful behavioral mock of Meta's WhatsApp Business Cloud API surface:
 - **Template approval lifecycle:** PENDING → APPROVED or PENDING → REJECTED.
   New templates start PENDING (matching the real 24h+ review process).
 - **Webhook events:** every successful message send emits a signed `messages`
-  webhook event (Meta `X-Hub-Signature-256`) to your configured sink — see
+  webhook event (Meta `X-Hub-Signature-256`), and each message-status
+  terminal transition emits a signed `message_status` event (see
+  [Message status lifecycle](#message-status-lifecycle-async-state-machine))
+  to your configured sink — see
   [Webhook signature scheme](#webhook-signature-scheme) below.
 
 Messages and templates are **stateful** — created data persists across requests.
+
+## Message status lifecycle (async state machine)
+
+Real WhatsApp outbound messages report `sent` immediately, then later
+`delivered` (or `failed`) via status webhooks. This adapter reproduces that
+with a **derive-on-read** state machine:
+
+```
+sent -> delivered    (delivered derived at +3s after the send; Meta's
+                      vocabulary has no separate in-transit status)
+```
+
+`POST .../messages` stores the message with `status: "sent"`. Every
+`GET /v21.0/{message_id}` derives the current status from the clock,
+**persists** the transition, and emits the signed `message_status` webhook
+event — carrying Meta's real status payload shape
+(`{messaging_product, statuses: [{id, status, timestamp, recipient_id}]}`) —
+**exactly once** per new terminal status, so lookups and webhooks always
+agree. Integration tests can simply sleep past the 3s window and poll again.
+
+**Failure injection:** `"simulate_fail": true` in the send body —
+**simulator extension**: the terminal status becomes `failed` and the
+emitted status webhook reports `failed` instead of `delivered`.
 
 ## Webhook signature scheme
 

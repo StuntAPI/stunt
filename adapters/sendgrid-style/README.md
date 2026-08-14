@@ -26,6 +26,28 @@ integration testing without a real SendGrid account:
 Mail records are **stateful**: a message sent via `POST /v3/mail/send` appears in
 the `GET /v3/messages` response, enabling round-trip testing locally.
 
+## Delivery lifecycle (async status machine)
+
+Real SendGrid accepts a send (202), emits a `processed` event, and only later
+reports `delivered` (or `dropped`). This adapter reproduces that with a
+**derive-on-read** state machine using SendGrid's real event vocabulary:
+
+```
+processed -> delivered    (terminal derived at +3s after the send)
+```
+
+`POST /v3/mail/send` stores the message with `status: "processed"` and emits
+the signed `processed` event per recipient immediately (like the real Event
+Webhook). Every `GET /v3/messages` then derives each message's status from
+the clock, **persists** the transition, and emits the terminal
+`delivered`/`dropped` event exactly once per recipient — so lists and
+webhooks always agree. Integration tests can simply sleep past the 3s window
+and list again.
+
+**Failure injection:** `"simulate_fail": true` in the send body — **simulator
+extension**: the terminal state becomes `dropped` (a real SendGrid event) and
+the `delivered` side effect is replaced by a `dropped` event.
+
 ### Request shape
 
 ```json
@@ -117,8 +139,10 @@ curl -X POST "http://localhost:PORT/v3/user/webhooks/event/test" \
   -H "Authorization: Bearer SG.testkey.testsecret"
 ```
 
-Once enabled, every `POST /v3/mail/send` emits a **signed** `processed` and
-`delivered` event object per recipient (fire-and-forget).
+Once enabled, every `POST /v3/mail/send` emits a **signed** `processed` event
+object per recipient (fire-and-forget); the terminal `delivered` (or
+`dropped` — see [Delivery lifecycle](#delivery-lifecycle-async-status-machine))
+event fires later, the first time a read derives that status.
 
 ### Events
 

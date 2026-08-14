@@ -129,6 +129,36 @@ func TestOnfidoStyleAdapter(t *testing.T) {
 		t.Fatalf("check status = %v, want in_progress", checkCreate["status"])
 	}
 
+	// ===== GET check immediately → still in_progress (completes at +3s) =====
+
+	body, status = onfidoGet(t, base+"/v3.6/checks/"+checkID, token)
+	if status != 200 {
+		t.Fatalf("get check (immediate) -> status %d, want 200; body %s", status, body)
+	}
+	var checkEarly map[string]any
+	if err := json.Unmarshal([]byte(body), &checkEarly); err != nil {
+		t.Fatalf("unmarshal check early: %v (body %s)", err, body)
+	}
+	if checkEarly["status"] != "in_progress" {
+		t.Fatalf("immediate check status = %v, want in_progress", checkEarly["status"])
+	}
+
+	// ===== Create a failing check (simulator extension: simulate_fail) =====
+
+	body, status = onfidoPost(t, base+"/v3.6/checks", token, map[string]any{
+		"applicant_id":  applicantID,
+		"report_names":  []string{"document"},
+		"simulate_fail": true,
+	})
+	if status != 201 {
+		t.Fatalf("create failing check -> status %d, want 201; body %s", status, body)
+	}
+	failCheckID := onfidoExtractID(t, body, "id")
+
+	// ===== Sleep past the 3s completion window =====
+
+	time.Sleep(3500 * time.Millisecond)
+
 	// ===== GET check → complete with result "clear" =====
 
 	body, status = onfidoGet(t, base+"/v3.6/checks/"+checkID, token)
@@ -151,6 +181,23 @@ func TestOnfidoStyleAdapter(t *testing.T) {
 	}
 	if _, ok := breakdown["document"]; !ok {
 		t.Fatalf("breakdown missing 'document': %v", breakdown)
+	}
+
+	// ===== GET failing check → complete with result "consider" =====
+
+	body, status = onfidoGet(t, base+"/v3.6/checks/"+failCheckID, token)
+	if status != 200 {
+		t.Fatalf("get failing check -> status %d, want 200; body %s", status, body)
+	}
+	var checkFail map[string]any
+	if err := json.Unmarshal([]byte(body), &checkFail); err != nil {
+		t.Fatalf("unmarshal failing check: %v (body %s)", err, body)
+	}
+	if checkFail["status"] != "complete" {
+		t.Fatalf("failing check status = %v, want complete", checkFail["status"])
+	}
+	if checkFail["result"] != "consider" {
+		t.Fatalf("failing check result = %v, want consider", checkFail["result"])
 	}
 
 	// ===== Webhook receiver =====

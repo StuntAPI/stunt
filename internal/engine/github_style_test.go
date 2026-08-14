@@ -525,3 +525,105 @@ func TestGitHubStyleSignatureVerifies(t *testing.T) {
 	raw, hdr := sink.awaitDelivery(t, time.Second)
 	verifyGitHubSig(t, raw, hdr, secret, "issues")
 }
+
+// TestGitHubStyleActionsRunLifecycle proves the derive-on-read run state
+// machine: a dispatched run is queued/in_progress immediately, reaches
+// completed/success after the 3s window, and completed/failure with the
+// simulator-only simulate_fail flag. Also exercises the single-run endpoint.
+func TestGitHubStyleActionsRunLifecycle(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "github-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"github": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["github"]
+
+	const token = "ghp_pat_token_mock"
+	runsURL := base + "/repos/octocat/hello-world/actions/runs"
+
+	// Dispatch a normal run and a simulate_fail run.
+	if _, status := ghPostBearer(t, base+"/repos/octocat/hello-world/dispatches", token, map[string]any{
+		"event_type": "lifecycle-ok",
+	}); status != 204 {
+		t.Fatalf("dispatch ok -> %d, want 204", status)
+	}
+	if _, status := ghPostBearer(t, base+"/repos/octocat/hello-world/dispatches", token, map[string]any{
+		"event_type":    "lifecycle-fail",
+		"simulate_fail": true,
+	}); status != 204 {
+		t.Fatalf("dispatch fail -> %d, want 204", status)
+	}
+
+	ghFindRun := func(name string) map[string]any {
+		t.Helper()
+		body, status := ghGetBearer(t, runsURL, token)
+		if status != 200 {
+			t.Fatalf("GET runs -> %d; body %s", status, body)
+		}
+		var runsObj map[string]any
+		if err := json.Unmarshal([]byte(body), &runsObj); err != nil {
+			t.Fatal(err)
+		}
+		for _, r := range runsObj["workflow_runs"].([]any) {
+			rm := r.(map[string]any)
+			if rm["name"] == name {
+				return rm
+			}
+		}
+		t.Fatalf("run %q not found", name)
+		return nil
+	}
+
+	// Immediately: both runs are still pre-terminal (queued or in_progress).
+	for _, name := range []string{"lifecycle-ok", "lifecycle-fail"} {
+		run := ghFindRun(name)
+		st := run["status"].(string)
+		if st != "queued" && st != "in_progress" {
+			t.Fatalf("run %q immediate status = %q, want queued|in_progress", name, st)
+		}
+	}
+
+	// After the 3s window: success and failure conclusions.
+	time.Sleep(3500 * time.Millisecond)
+
+	okRun := ghFindRun("lifecycle-ok")
+	if okRun["status"] != "completed" || okRun["conclusion"] != "success" {
+		t.Fatalf("ok run = %v/%v, want completed/success", okRun["status"], okRun["conclusion"])
+	}
+	failRun := ghFindRun("lifecycle-fail")
+	if failRun["status"] != "completed" || failRun["conclusion"] != "failure" {
+		t.Fatalf("fail run = %v/%v, want completed/failure", failRun["status"], failRun["conclusion"])
+	}
+
+	// Single-run endpoint agrees with the list.
+	body, status := ghGetBearer(t, runsURL+"/"+strconv.Itoa(ghToInt(okRun["id"])), token)
+	if status != 200 {
+		t.Fatalf("GET single run -> %d; body %s", status, body)
+	}
+	var single map[string]any
+	if err := json.Unmarshal([]byte(body), &single); err != nil {
+		t.Fatal(err)
+	}
+	if single["status"] != "completed" || single["conclusion"] != "success" {
+		t.Fatalf("single run = %v/%v, want completed/success", single["status"], single["conclusion"])
+	}
+}

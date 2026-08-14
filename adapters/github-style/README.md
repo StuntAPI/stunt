@@ -25,6 +25,8 @@ A faithful behavioral mock of GitHub's App API surface:
   sequence.
 - **Actions:** `POST /repos/{owner}/{repo}/dispatches` → 204 (workflow dispatch).
   `GET /repos/{owner}/{repo}/actions/runs` → `{workflow_runs:[...]}`.
+  `GET /repos/{owner}/{repo}/actions/runs/{run_id}` → single run. Dispatched runs
+  progress through GitHub's real states on a derive-on-read clock (see below).
 - **Webhooks:** `POST /repos/{owner}/{repo}/hooks` (register). Events emitted via
   `events_emit` using GitHub event types (`push`, `pull_request`, `issues`), signed
   with the per-hook `config.secret` — see below.
@@ -116,9 +118,38 @@ trigger retries with exponential backoff.
 | `issues` | issue created / updated / closed / reopened | `{action, issue, repository, sender}` (`action` is `opened`, `edited`, `closed`, or `reopened`) |
 | `pull_request` | PR created | `{action:"opened", pull_request, repository, sender}` |
 | `workflow_dispatch` | `POST /repos/{owner}/{repo}/dispatches` | `{repo}` |
+| `workflow_run` | run created / status transition | `{action, workflow_run, repository, sender}` (`action` is `requested`, `in_progress`, or `completed`) |
 
 Deliveries go only to hooks whose `events` list includes the event type
 (GitHub does not deliver unsubscribed events).
+
+## Async run lifecycle
+
+Workflow runs created by `POST /repos/{owner}/{repo}/dispatches` are a
+derive-on-read state machine using GitHub's real run vocabulary:
+
+```
+queued --(+1s)--> in_progress --(+3s)--> completed (conclusion: success | failure)
+```
+
+Timings are relative to the dispatch (computed from the injectable clock).
+Every run read (single run or list) derives the current status from the clock
+and persists the transition back to the runs collection, so repeated polls and
+lists agree. Each first-time transition emits the `workflow_run` webhook
+(`action=in_progress`, `action=completed`) exactly once, to hooks subscribed to
+`workflow_run`.
+
+### Failure injection (simulator extension)
+
+The real API has no sandbox failure trigger, so the dispatch body accepts a
+simulator-only flag:
+
+```json
+{"event_type": "ci", "simulate_fail": true}
+```
+
+The run still reaches `completed`, but with `conclusion: "failure"` (GitHub's
+real vocabulary) and the usual `workflow_run` `completed` delivery.
 
 ## Endpoints
 
@@ -138,6 +169,7 @@ Deliveries go only to hooks whose `events` list includes the event type
 | GET | `/repos/{owner}/{repo}/pulls/{number}/reviews` | `pulls.star#on_list_reviews` | List PR reviews |
 | POST | `/repos/{owner}/{repo}/dispatches` | `actions.star#on_dispatch` | Workflow dispatch (204) |
 | GET | `/repos/{owner}/{repo}/actions/runs` | `actions.star#on_list_runs` | List workflow runs (honors `branch`, `event`, `status`) |
+| GET | `/repos/{owner}/{repo}/actions/runs/{run_id}` | `actions.star#on_get_run` | Get a workflow run |
 | POST | `/repos/{owner}/{repo}/hooks` | `hooks.star#on_create_hook` | Register webhook (201) |
 | POST | `/graphql` | `graphql.star#on_graphql` | GraphQL (pattern-matched) |
 

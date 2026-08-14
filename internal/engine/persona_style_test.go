@@ -98,26 +98,68 @@ func TestPersonaStyleAdapter(t *testing.T) {
 		t.Fatalf("no auth -> status %d, want 401", status)
 	}
 
-	// ===== Status flow: created → pending → completed =====
+	// ===== Status flow: created → pending → completed (derive-on-read) =====
 
+	// Immediate GET → still "created" (pending starts at +1s, completes at +3s).
 	body, status = personaGet(t, base+"/api/inquiry/v1/inquiries/"+inquiryID, apiKey)
 	if status != 200 {
 		t.Fatalf("get inquiry (1) -> status %d, want 200; body %s", status, body)
 	}
-	checkInquiryStatus(t, body, "pending")
+	checkInquiryStatusIn(t, body, "created", "pending")
 
+	// Create a failing inquiry (simulator extension: simulate_fail).
+	body, status = personaPost(t, base+"/api/inquiry/v1/inquiries", apiKey, map[string]any{
+		"template_id":   "itmpl_abc123",
+		"reference_id":  "user-43",
+		"simulate_fail": true,
+	})
+	if status != 201 {
+		t.Fatalf("create failing inquiry -> status %d, want 201; body %s", status, body)
+	}
+	var failCreate map[string]any
+	if err := json.Unmarshal([]byte(body), &failCreate); err != nil {
+		t.Fatalf("unmarshal fail create: %v (body %s)", err, body)
+	}
+	failID, ok := failCreate["data"].(map[string]any)["id"].(string)
+	if !ok || failID == "" {
+		t.Fatalf("failing inquiry id = %v, want non-empty", failCreate["data"])
+	}
+
+	// Sleep past the 3s completion window.
+	time.Sleep(3500 * time.Millisecond)
+
+	// Now completed; stays completed.
 	body, status = personaGet(t, base+"/api/inquiry/v1/inquiries/"+inquiryID, apiKey)
 	if status != 200 {
 		t.Fatalf("get inquiry (2) -> status %d, want 200; body %s", status, body)
 	}
 	checkInquiryStatus(t, body, "completed")
 
-	// Stays completed.
 	body, status = personaGet(t, base+"/api/inquiry/v1/inquiries/"+inquiryID, apiKey)
 	if status != 200 {
 		t.Fatalf("get inquiry (3) -> status %d, want 200; body %s", status, body)
 	}
 	checkInquiryStatus(t, body, "completed")
+
+	// Failing inquiry → declined.
+	body, status = personaGet(t, base+"/api/inquiry/v1/inquiries/"+failID, apiKey)
+	if status != 200 {
+		t.Fatalf("get failing inquiry -> status %d, want 200; body %s", status, body)
+	}
+	checkInquiryStatus(t, body, "declined")
+
+	// Declined inquiries seed no verifications.
+	body, status = personaGet(t, base+"/api/inquiry/v1/inquiries/"+failID+"/verifications", apiKey)
+	if status != 200 {
+		t.Fatalf("get failing verifications -> status %d, want 200; body %s", status, body)
+	}
+	var failVerResp map[string]any
+	if err := json.Unmarshal([]byte(body), &failVerResp); err != nil {
+		t.Fatalf("unmarshal failing verifications: %v (body %s)", err, body)
+	}
+	if failData, ok := failVerResp["data"].([]any); !ok || len(failData) != 0 {
+		t.Fatalf("declined inquiry verifications = %v, want empty", failVerResp["data"])
+	}
 
 	// ===== Get verifications after completion =====
 
@@ -180,6 +222,21 @@ func TestPersonaStyleAdapter(t *testing.T) {
 	if status != 404 {
 		t.Fatalf("unknown inquiry -> status %d, want 404", status)
 	}
+}
+
+func checkInquiryStatusIn(t *testing.T, body string, wants ...string) {
+	t.Helper()
+	var resp map[string]any
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		t.Fatalf("unmarshal inquiry: %v (body %s)", err, body)
+	}
+	attrs := resp["data"].(map[string]any)["attributes"].(map[string]any)
+	for _, w := range wants {
+		if attrs["status"] == w {
+			return
+		}
+	}
+	t.Fatalf("inquiry status = %v, want one of %v", attrs["status"], wants)
 }
 
 func checkInquiryStatus(t *testing.T, body, want string) {

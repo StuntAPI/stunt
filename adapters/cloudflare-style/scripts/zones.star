@@ -23,9 +23,11 @@ def on_list_zones(req):
     zc = store_collection("zones")
     zones = zc.list()
 
-    # Extract clean zone objects (strip internal id field)
+    # Derive the current status from the clock and persist transitions so
+    # list, get, and the status filter all agree.
     result = []
     for z in zones:
+        _advance_zone(z, zc)
         result.append(_zone_result(z))
 
     result = _apply_zone_filters(req, result)
@@ -55,10 +57,14 @@ def on_create_zone(req):
             return _cf_err(400, 1061, "Zone already exists.")
 
     zone_id = _gen_id("zone")
+    fail = body.get("simulate_fail", False)
+    if fail == None:
+        fail = False
+    now = clock.now_unix()
     doc = {
         "zone_id": zone_id,
         "name": name,
-        "status": "active",
+        "status": "pending",
         "account": {
             "id": _default_account_id(),
             "name": "stunt-account",
@@ -70,6 +76,9 @@ def on_create_zone(req):
         "type": "full",
         "created_on": _iso8601(),
         "modified_on": _iso8601(),
+        "_running_at": now + 1,
+        "_done_at": now + 3,
+        "_fail": fail,
     }
     zc.insert(doc)
 
@@ -92,6 +101,7 @@ def on_get_zone(req):
     if zone == None:
         return _cf_err(404, 1003, "Zone not found.")
 
+    _advance_zone(zone, zc)
     return _cf_ok(_zone_result(zone))
 
 # on_delete_zone deletes a zone by ID.
@@ -316,6 +326,33 @@ def _apply_page_rule_filters(req, rules):
 # _default_account_id returns a fixed synthetic account ID.
 def _default_account_id():
     return "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+# _derive_zone_status maps the clock onto Cloudflare's real zone status
+# vocabulary (pending -> initializing -> active; "moved" when the zone has
+# moved away). Zones stored before the lifecycle fields existed (the seeded
+# zone) keep their stored status.
+def _derive_zone_status(z):
+    if z.get("_done_at", None) == None:
+        return z.get("status", "active")
+    now = clock.now_unix()
+    if now < z.get("_running_at", 0):
+        return "pending"
+    if now < z["_done_at"]:
+        return "initializing"
+    if z.get("_fail", False):
+        return "moved"
+    return "active"
+
+# _advance_zone derives the current status and persists the transition back
+# to the zones collection so the list, get, and status-filter views agree.
+def _advance_zone(z, zc):
+    status = _derive_zone_status(z)
+    if z.get("status", "") == status:
+        return status
+    z["status"] = status
+    z["modified_on"] = _iso8601()
+    zc.update(z.get("id", ""), z)
+    return status
 
 # _zone_result returns a clean zone object for the API response.
 def _zone_result(z):

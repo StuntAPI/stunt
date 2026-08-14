@@ -50,20 +50,63 @@ def _jsonapi_err(status, code, title):
         ]
     }
 
-# _advance_status advances an inquiry status through the KYC lifecycle:
-# created → pending → completed. Each GET bumps the status. Once completed,
-# it stays completed.
-def _advance_status(current):
-    if current == "created":
-        return "pending"
-    if current == "pending":
+# _derive_inquiry_status maps wall-clock time onto the inquiry lifecycle.
+#
+# An inquiry doc stores two internal timestamps set at CREATE time from
+# clock.now_unix():
+#   _running_at = now + 1   (verification starts → "pending")
+#   _done_at    = now + 3   (terminal)
+#
+# Real Persona inquiry statuses: created → pending → completed (plus
+# expired), with declined as the review outcome notified via the
+# inquiry.declined webhook:
+#   created (0-1s) → pending (1-3s) → completed (+3s) | declined (simulate_fail)
+def _derive_inquiry_status(doc):
+    now = clock.now_unix()
+    if now >= doc.get("_done_at", 0):
+        if doc.get("_fail", False):
+            return "declined"
         return "completed"
-    return "completed"
+    if now >= doc.get("_running_at", 0):
+        return "pending"
+    return "created"
+
+# ============================================================================
+# WEBHOOK SIGNATURE SCHEME (Persona Persona-Signature)
+# ============================================================================
+# Persona signs webhook payloads with HMAC-SHA256 over "<t>.<raw body>",
+# delivered as "Persona-Signature: t=<unix>,v1=<hex hmac>". Verification in
+# Go:
+#
+#   mac := hmac.New(sha256.New, []byte(secret))
+#   mac.Write([]byte(strconv.FormatInt(t, 10) + "." + string(rawBody)))
+#   expected := "v1," + hex.EncodeToString(mac.Sum(nil))
+#   if expected != r.Header.Get("Persona-Signature") { return 401 }
+#
+# The secret below is the simulator's fixed synthetic signing secret.
+# Public + low-entropy: local stunt only.
+# ============================================================================
+
+_WEBHOOK_SECRET = "stunt_persona_mock_signing_key"
+
+# _signed_emit MACs the exact on-wire body and delivers it with the
+# Persona-Signature header, matching what Persona posts on inquiry
+# status transitions.
+def _signed_emit(event_name, payload):
+    ts = clock.now_unix()
+    body = events_body(event_name, payload)
+    sig = crypto.hmac_sha256(_WEBHOOK_SECRET, str(ts) + "." + body)
+    events_emit(event_name, payload, {"Persona-Signature": "t=" + str(ts) + ",v1=" + sig})
 
 # _seed_verifications creates synthetic verification data for an inquiry
 # when it reaches the completed state.
 def _seed_verifications(inquiry_id, inquiry_ref):
     vc = store_collection("verifications")
+    # Resume resets the inquiry to pending; a re-completion must not
+    # duplicate verifications or re-fire the webhook.
+    for v in vc.list():
+        if v.get("inquiry_id", "") == inquiry_id:
+            return
     seq = store_kv_incr("persona", "ver_seq")
 
     ver_id = _gen_ver_id(seq)
