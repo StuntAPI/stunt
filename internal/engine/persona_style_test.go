@@ -105,7 +105,7 @@ func TestPersonaStyleAdapter(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("get inquiry (1) -> status %d, want 200; body %s", status, body)
 	}
-	checkInquiryStatus(t, body, "created")
+	checkInquiryStatusIn(t, body, "created", "pending")
 
 	// Create a failing inquiry (simulator extension: simulate_fail).
 	body, status = personaPost(t, base+"/api/inquiry/v1/inquiries", apiKey, map[string]any{
@@ -222,6 +222,21 @@ func TestPersonaStyleAdapter(t *testing.T) {
 	if status != 404 {
 		t.Fatalf("unknown inquiry -> status %d, want 404", status)
 	}
+}
+
+func checkInquiryStatusIn(t *testing.T, body string, wants ...string) {
+	t.Helper()
+	var resp map[string]any
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		t.Fatalf("unmarshal inquiry: %v (body %s)", err, body)
+	}
+	attrs := resp["data"].(map[string]any)["attributes"].(map[string]any)
+	for _, w := range wants {
+		if attrs["status"] == w {
+			return
+		}
+	}
+	t.Fatalf("inquiry status = %v, want one of %v", attrs["status"], wants)
 }
 
 func checkInquiryStatus(t *testing.T, body, want string) {

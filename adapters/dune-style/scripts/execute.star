@@ -51,12 +51,16 @@ def on_inline_result(req):
     exec_id = _gen_execution_id()
 
     ec = store_collection("executions")
+    now = clock.now_unix()
     ec.insert({
         "id": exec_id,
         "query_id": query_id,
         "state": "QUERY_STATE_COMPLETED",
         "get_count": 0,
         "created_at": clock.now_rfc3339(),
+        # inline results are already terminal; stamps keep the poll path uniform
+        "_running_at": now,
+        "_done_at": now,
     })
 
     rows = _seed_rows(query_id)

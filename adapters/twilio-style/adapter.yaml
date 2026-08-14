@@ -26,6 +26,7 @@ endpoints:
   - route: /2010-06-01/Accounts/{account_sid}/Messages/{sid}
     method: GET
     handler: scripts/messages.star#on_get_message
+    concurrency_key: sid
 
   # --- Calls ---
   - route: /2010-06-01/Accounts/{account_sid}/Calls.json

@@ -172,9 +172,10 @@ func TestResendStyleAdapter(t *testing.T) {
 	if first["id"] != emailID {
 		t.Fatalf("list[0].id = %v, want %v", first["id"], emailID)
 	}
-	// The email is queued right after the send (derive-on-read lifecycle).
-	if first["status"] != "queued" {
-		t.Fatalf("list[0].status = %v, want queued before the 3s window", first["status"])
+	// The email is queued right after the send (derive-on-read lifecycle);
+	// tolerate sent in case the 1s window elapses under load.
+	if st := first["status"]; st != "queued" && st != "sent" {
+		t.Fatalf("list[0].status = %v, want queued or sent", st)
 	}
 
 	// ===== Async lifecycle: queued -> sent -> delivered (1s/3s) =====

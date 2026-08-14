@@ -45,9 +45,9 @@ def _hex(n):
 # (create + 3s), terminal after that.
 def _derive_exec_state(doc):
     now = clock.now_unix()
-    if now < doc["_running_at"]:
+    if now < doc.get("_running_at", 0):
         return "QUERY_STATE_PENDING"
-    if now < doc["_done_at"]:
+    if now < doc.get("_done_at", 0):
         return "QUERY_STATE_EXECUTING"
     if doc.get("_fail", False):
         return "QUERY_STATE_FAILED"

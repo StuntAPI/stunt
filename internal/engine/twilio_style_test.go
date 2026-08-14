@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -472,5 +474,95 @@ func TestTwilioStyleMessageFilters(t *testing.T) {
 	}
 	if got := len(list("?DateSent>=2020-01-01")); got != 0 {
 		t.Fatalf("DateSent> on queued-only -> %d messages, want 0", got)
+	}
+}
+
+// TestTwilioStyleLifecycleEmitsOnce pins the exactly-once guarantee: a
+// terminal message read repeatedly (and listed again) must emit each
+// lifecycle webhook once — the transition guard persists before emitting.
+func TestTwilioStyleLifecycleEmitsOnce(t *testing.T) {
+	var mu sync.Mutex
+	var statuses []string
+	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		var ev map[string]any
+		if err := json.Unmarshal(b, &ev); err == nil {
+			if ty, ok := ev["type"].(string); ok {
+				mu.Lock()
+				statuses = append(statuses, ty)
+				mu.Unlock()
+			}
+		}
+		w.WriteHeader(200)
+	}))
+	defer sink.Close()
+
+	adapterDir := filepath.Join("..", "..", "adapters", "twilio-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"twilio": {Adapter: absAdapterDir, Config: map[string]any{"webhook_url": sink.URL}},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["twilio"]
+	const accountSID = twilioAccountSID
+	msgPath := base + "/2010-06-01/Accounts/" + accountSID + "/Messages.json"
+
+	body, status := twilioPostJSON(t, msgPath, map[string]any{
+		"To":   "+15551234567",
+		"From": "+15557654321",
+		"Body": "once only",
+	})
+	if status != 201 {
+		t.Fatalf("POST message -> %d; %s", status, body)
+	}
+	var msg map[string]any
+	_ = json.Unmarshal([]byte(body), &msg)
+	sid := msg["sid"].(string)
+	single := base + "/2010-06-01/Accounts/" + accountSID + "/Messages/" + sid + ".json"
+
+	time.Sleep(3500 * time.Millisecond)
+
+	// Repeated reads at terminal: single, list, single.
+	for i := 0; i < 3; i++ {
+		if _, st := twilioGet(t, single); st != 200 {
+			t.Fatalf("read %d -> %d", i, st)
+		}
+		if _, st := twilioGet(t, msgPath); st != 200 {
+			t.Fatalf("list %d -> %d", i, st)
+		}
+	}
+	time.Sleep(300 * time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+	counts := map[string]int{}
+	for _, s := range statuses {
+		counts[s]++
+	}
+	if counts["message.delivered"] != 1 {
+		t.Errorf("delivered emitted %d times, want exactly 1 (statuses: %v)", counts["delivered"], counts)
+	}
+	if counts["message.sent"] != 1 {
+		t.Errorf("sent emitted %d times, want exactly 1 (statuses: %v)", counts["sent"], counts)
 	}
 }

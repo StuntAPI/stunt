@@ -25,12 +25,15 @@ endpoints:
   - route: /api/inquiry/v1/inquiries/{inquiry_id}
     method: GET
     handler: scripts/inquiries.star#on_get_inquiry
+    concurrency_key: inquiry_id
   - route: /api/inquiry/v1/inquiries/{inquiry_id}/resume
     method: POST
     handler: scripts/inquiries.star#on_resume_inquiry
+    concurrency_key: inquiry_id
   - route: /api/inquiry/v1/inquiries/{inquiry_id}/verifications
     method: GET
     handler: scripts/inquiries.star#on_get_verifications
+    concurrency_key: inquiry_id
 
   # --- Webhook receiver (documents the Persona-Signature flow) ---
   - route: /api/inquiry/v1/webhooks

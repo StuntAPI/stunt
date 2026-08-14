@@ -48,6 +48,7 @@ endpoints:
   - route: /v21.0/{resource_id}
     method: GET
     handler: scripts/resource.star#on_get_resource
+    concurrency_key: resource_id
 
   # --- Template update (POST /v21.0/{template_id}) ---
   - route: /v21.0/{template_id}

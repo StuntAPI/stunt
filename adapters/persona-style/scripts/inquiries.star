@@ -74,31 +74,36 @@ def _advance_inquiry(inquiry_id):
     if new_status != doc["status"]:
         doc["status"] = new_status
         ic.update(inquiry_id, doc)
+        already_terminal = doc.get("_ever_terminal", False)
+        doc["_ever_terminal"] = True
+        ic.update(inquiry_id, doc)
         if new_status == "completed":
             _seed_verifications(inquiry_id, doc["reference_id"])
-            _signed_emit("inquiry.completed", {
-                "type": "inquiry.completed",
-                "data": {
-                    "type": "inquiry",
-                    "id": inquiry_id,
-                    "attributes": {
-                        "status": "completed",
-                        "reference_id": doc["reference_id"],
+            if not already_terminal:
+                _signed_emit("inquiry.completed", {
+                    "type": "inquiry.completed",
+                    "data": {
+                        "type": "inquiry",
+                        "id": inquiry_id,
+                        "attributes": {
+                            "status": "completed",
+                            "reference_id": doc["reference_id"],
+                        },
                     },
-                },
-            })
+                })
         elif new_status == "declined":
-            _signed_emit("inquiry.declined", {
-                "type": "inquiry.declined",
-                "data": {
-                    "type": "inquiry",
-                    "id": inquiry_id,
-                    "attributes": {
-                        "status": "declined",
-                        "reference_id": doc["reference_id"],
+            if not already_terminal:
+                _signed_emit("inquiry.declined", {
+                    "type": "inquiry.declined",
+                    "data": {
+                        "type": "inquiry",
+                        "id": inquiry_id,
+                        "attributes": {
+                            "status": "declined",
+                            "reference_id": doc["reference_id"],
+                        },
                     },
-                },
-            })
+                })
     return doc
 
 # on_get_inquiry handles GET /api/inquiry/v1/inquiries/{id}.

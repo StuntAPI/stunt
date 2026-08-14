@@ -43,6 +43,7 @@ endpoints:
   - route: /v3.6/checks/{check_id}
     method: GET
     handler: scripts/checks.star#on_get_check
+    concurrency_key: check_id
 
   # --- Webhook receiver (X-SHA2-Signature) ---
   - route: /v3.6/webhooks

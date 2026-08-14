@@ -102,6 +102,11 @@ def _signed_emit(event_name, payload):
 # when it reaches the completed state.
 def _seed_verifications(inquiry_id, inquiry_ref):
     vc = store_collection("verifications")
+    # Resume resets the inquiry to pending; a re-completion must not
+    # duplicate verifications or re-fire the webhook.
+    for v in vc.list():
+        if v.get("inquiry_id", "") == inquiry_id:
+            return
     seq = store_kv_incr("persona", "ver_seq")
 
     ver_id = _gen_ver_id(seq)

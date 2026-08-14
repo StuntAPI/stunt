@@ -198,7 +198,15 @@ def _advance_message(msg):
     c = store_collection("messages")
     while stage < target:
         stage = stage + 1
-        if stage == 1:
+        if stage == 1 and msg.get("_fail_mode", "") == "failed":
+            # An invalid number never reaches the carrier: queued -> failed
+            # with no sent hop (real Twilio behavior).
+            stage = 2
+            msg["status"] = "failed"
+            msg["error_code"] = _to_int("21" + "211")
+            msg["error_message"] = "Invalid 'To' Phone Number"
+            msg["date_updated"] = _SENT_AT
+        elif stage == 1:
             msg["status"] = "sent"
             msg["date_sent"] = _SENT_AT
             msg["date_updated"] = _SENT_AT
