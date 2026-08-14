@@ -100,6 +100,29 @@ def on_get_script(req):
 
     return _cf_ok(_worker_result(worker))
 
+# on_delete_script deletes a Worker script by name.
+# DELETE /accounts/{account_id}/workers/scripts/{script_name}
+# Real Cloudflare returns 200 with a success envelope (result: null).
+def on_delete_script(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
+    account_id = req["params"]["account_id"]
+    script_name = req["params"]["script_name"]
+
+    wc = store_collection("workers")
+    target = None
+    for w in wc.list():
+        if w.get("name", "") == script_name and w.get("account_id", "") == account_id:
+            target = w
+            break
+    if target == None:
+        return _cf_err(404, 10043, "Worker script not found.")
+
+    wc.delete(target.get("id", ""))
+    return _cf_ok(None)
+
 # ====================================================================
 # Helpers
 # ====================================================================

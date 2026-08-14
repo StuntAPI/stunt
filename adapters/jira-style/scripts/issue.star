@@ -3,6 +3,7 @@
 # POST   /rest/api/3/issue -> {id, key, self}
 # GET    /rest/api/3/issue/{key} -> issue object
 # PUT    /rest/api/3/issue/{key} -> 204 (update)
+# DELETE /rest/api/3/issue/{key} -> 204 (delete)
 # GET    /rest/api/3/issue/{key}/transitions -> {transitions:[...]}
 # POST   /rest/api/3/issue/{key}/transitions -> 204 (do transition)
 # POST   /rest/api/3/issue/{key}/comment -> {id, ...}
@@ -115,6 +116,21 @@ def on_update_issue(req):
 
     c = store_collection("issues")
     c.update(doc.get("id", ""), merged_doc)
+
+    return respond(204)
+
+def on_delete_issue(req):
+    _, err = _require_auth(req)
+    if err != None:
+        return err
+
+    key = req["params"].get("key", "")
+    doc = _find_issue(key)
+    if doc == None:
+        return _not_found()
+
+    c = store_collection("issues")
+    c.delete(doc.get("id", ""))
 
     return respond(204)
 

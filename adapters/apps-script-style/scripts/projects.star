@@ -1,8 +1,9 @@
 # Project handlers — Google Apps Script API.
 #
-# GET  /v1/projects → list projects
-# POST /v1/projects → create a project
-# POST /v1/projects/{scriptId}/deployments → create a deployment
+# GET    /v1/projects → list projects
+# POST   /v1/projects → create a project
+# DELETE /v1/projects/{scriptId} → delete a project
+# POST   /v1/projects/{scriptId}/deployments → create a deployment
 
 def on_list_projects(req):
     err = _require_bearer(req)
@@ -53,6 +54,25 @@ def on_create_project(req):
     pc.insert(project)
 
     return respond(200, _project_resource(project))
+
+# DELETE /v1/projects/{scriptId} → delete a project.
+# The real Apps Script API returns an empty response body on success.
+def on_delete_project(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    _seed()
+
+    script_id = req["params"]["scriptId"]
+    project = _find_project(script_id)
+    if project == None:
+        return _g_err(404, "Project " + script_id + " not found.", "NOT_FOUND")
+
+    pc = store_collection("projects")
+    pc.delete(project.get("id"))
+
+    return respond(200, None)
 
 def on_create_deployment(req):
     err = _require_bearer(req)

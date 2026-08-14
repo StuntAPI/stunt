@@ -89,6 +89,28 @@ def on_create_child_item(req):
         return _err("itemNotFound", 404, "The parent folder could not be found.")
     return _create_folder(req, parent_id)
 
+# on_delete_item deletes a driveItem (file or folder) by id.
+# DELETE /v1.0/me/drive/items/{id} (Bearer) → 204 No Content
+def on_delete_item(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    _seed_files()
+    item_id = req["params"].get("id", "")
+    fc = store_collection("files")
+    doc = fc.get(item_id)
+    if doc == None:
+        return _err("itemNotFound", 404, "The resource could not be found.")
+
+    # Drop stored content for file items.
+    if doc.get("file") != None:
+        b = store_blob("drive")
+        b.delete(item_id)
+
+    fc.delete(item_id)
+    return respond(204)
+
 # --- helpers ---
 
 # _create_folder handles the createFolder body against a parent. Graph's

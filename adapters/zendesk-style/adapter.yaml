@@ -38,6 +38,9 @@ endpoints:
   - route: /api/v2/tickets/{id}
     method: PUT
     handler: scripts/tickets.star#on_update
+  - route: /api/v2/tickets/{id}
+    method: DELETE
+    handler: scripts/tickets.star#on_delete
 
   # --- Users ---
   - route: /api/v2/users
@@ -79,6 +82,9 @@ endpoints:
   - route: /api/v2/webhooks
     method: POST
     handler: scripts/webhooks.star#on_create_webhook
+  - route: /api/v2/webhooks/{id}
+    method: DELETE
+    handler: scripts/webhooks.star#on_delete_webhook
 
   # --- Suspended tickets ---
   - route: /api/v2/suspended_tickets

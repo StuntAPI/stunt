@@ -83,3 +83,21 @@ def on_create_draft(req):
             "labelIds": ["DRAFT"],
         },
     })
+
+# on_delete_draft immediately and permanently deletes the specified draft.
+# DELETE /gmail/v1/users/{userId}/drafts/{id} → 204 No Content.
+def on_delete_draft(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    _seed()
+
+    draft_id = req["params"]["id"]
+    dc = store_collection("drafts")
+    for doc in dc.list():
+        if doc.get("id") == draft_id:
+            dc.delete(doc["id"])
+            return respond(204)
+
+    return _not_found("Draft not found: " + draft_id)

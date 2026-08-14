@@ -64,6 +64,29 @@ def on_create_database(req):
 
     return _cf_ok(_db_result(doc))
 
+# on_delete_database deletes a D1 database by UUID.
+# DELETE /accounts/{account_id}/d1/database/{database_id}
+# Real Cloudflare returns 200 with a success envelope (result: null).
+def on_delete_database(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
+    account_id = req["params"]["account_id"]
+    database_id = req["params"]["database_id"]
+
+    dc = store_collection("databases")
+    target = None
+    for d in dc.list():
+        if d.get("uuid", "") == database_id and d.get("account_id", "") == account_id:
+            target = d
+            break
+    if target == None:
+        return _cf_err(404, 10005, "Database not found.")
+
+    dc.delete(target.get("id", ""))
+    return _cf_ok(None)
+
 # on_query_database executes a SQL query against a D1 database.
 # POST /accounts/{account_id}/d1/database/{database_id}/query
 # Body: {sql: "SELECT * FROM users LIMIT 10"}

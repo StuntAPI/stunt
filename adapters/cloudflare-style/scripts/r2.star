@@ -66,6 +66,29 @@ def on_create_bucket(req):
 
     return _cf_ok(_bucket_result(doc))
 
+# on_delete_bucket deletes an R2 bucket by name.
+# DELETE /accounts/{account_id}/r2/buckets/{bucket_name}
+# Real Cloudflare R2 returns 204 No Content.
+def on_delete_bucket(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
+    account_id = req["params"]["account_id"]
+    bucket_name = req["params"]["bucket_name"]
+
+    bc = store_collection("buckets")
+    target = None
+    for b in bc.list():
+        if b.get("name", "") == bucket_name and b.get("account_id", "") == account_id:
+            target = b
+            break
+    if target == None:
+        return _cf_err(404, 10004, "Bucket not found.")
+
+    bc.delete(target.get("id", ""))
+    return respond(204, None)
+
 # ====================================================================
 # Helpers
 # ====================================================================

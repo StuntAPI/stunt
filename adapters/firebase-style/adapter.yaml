@@ -52,6 +52,9 @@ endpoints:
   - route: /v1/projects/{project}/databases/(default)/documents/{collection}/{id}
     method: PATCH
     handler: scripts/firestore.star#on_upsert_document
+  - route: /v1/projects/{project}/databases/(default)/documents/{collection}/{id}
+    method: DELETE
+    handler: scripts/firestore.star#on_delete_document
 
   # --- FCM (Cloud Messaging) ---
   - route: /v1/projects/{project}/messages:send

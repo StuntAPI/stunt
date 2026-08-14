@@ -1,8 +1,10 @@
-# Playlists handlers — create, list, and add items.
+# Playlists handlers — create, list, add items, and deletes.
 #
-# POST /youtube/v3/playlists (Bearer; JSON) -> { id, snippet, status, contentDetails }
-# GET  /youtube/v3/playlists?mine=true (Bearer) -> { items: [...] }
-# POST /youtube/v3/playlistItems (Bearer; JSON) -> { id }
+# POST   /youtube/v3/playlists (Bearer; JSON) -> { id, snippet, status, contentDetails }
+# GET    /youtube/v3/playlists?mine=true (Bearer) -> { items: [...] }
+# DELETE /youtube/v3/playlists?id=... (Bearer) -> 204
+# POST   /youtube/v3/playlistItems (Bearer; JSON) -> { id }
+# DELETE /youtube/v3/playlistItems?id=... (Bearer) -> 204
 #
 # STATEFUL: created playlists appear in list; playlist items persist.
 
@@ -116,6 +118,36 @@ def on_add_playlist_item(req):
     })
 
     return respond(200, {"id": item_id})
+
+# on_delete_playlist deletes a playlist by id.
+def on_delete_playlist(req):
+    user = _user_for_token(req)
+    if user == None:
+        return respond(401, {"error": {"code": 401, "message": "Invalid credentials", "status": "UNAUTHENTICATED"}})
+
+    playlist_id = req["query"].get("id", "")
+    pc = store_collection("playlists")
+    doc = pc.get(playlist_id)
+    if doc == None:
+        return respond(404, {"error": {"code": 404, "message": "Playlist not found", "status": "NOT_FOUND"}})
+
+    pc.delete(playlist_id)
+    return respond(204, None)
+
+# on_delete_playlist_item deletes a playlist item by id.
+def on_delete_playlist_item(req):
+    user = _user_for_token(req)
+    if user == None:
+        return respond(401, {"error": {"code": 401, "message": "Invalid credentials", "status": "UNAUTHENTICATED"}})
+
+    item_id = req["query"].get("id", "")
+    ic = store_collection("playlist_items")
+    doc = ic.get(item_id)
+    if doc == None:
+        return respond(404, {"error": {"code": 404, "message": "Playlist item not found", "status": "NOT_FOUND"}})
+
+    ic.delete(item_id)
+    return respond(204, None)
 
 # _public_playlist strips internal fields (user) from a stored doc.
 def _public_playlist(doc):

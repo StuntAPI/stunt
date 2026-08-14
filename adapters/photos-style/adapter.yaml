@@ -62,6 +62,9 @@ endpoints:
   - route: /v1/albums/{id}
     method: GET
     handler: scripts/albums.star#on_get_album
+  - route: /v1/albums/{id}
+    method: DELETE
+    handler: scripts/albums.star#on_delete_album
 
 # Backing stores — collections for stateful data.
 resources:

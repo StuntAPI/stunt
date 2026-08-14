@@ -24,6 +24,11 @@ endpoints:
     method: POST
     handler: scripts/projects.star#on_create_project
 
+  # --- Project by id ---
+  - route: /v1/projects/{scriptId}
+    method: DELETE
+    handler: scripts/projects.star#on_delete_project
+
   # --- Content (literal 4th segment) ---
   - route: /v1/projects/{scriptId}/content
     method: GET

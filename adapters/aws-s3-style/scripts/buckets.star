@@ -1,6 +1,7 @@
-# Bucket handler — create bucket.
+# Bucket handlers — create + delete bucket.
 #
-# PUT /{bucket} -> 200, create bucket
+# PUT    /{bucket} -> 200, create bucket
+# DELETE /{bucket} -> 204, delete bucket (must be empty, per S3 semantics)
 #
 # Shared helpers (_require_auth, _xml_*, _no_such_bucket) are preloaded from
 # scripts/lib.star. Note: _no_such_bucket is defined in objects.star which
@@ -54,5 +55,46 @@ def on_create_bucket(req):
 
     return respond(200, "", {
         "Location": "/" + bucket,
+        "x-amz-request-id": _req_id(),
+    })
+
+# on_delete_bucket deletes a bucket. Per S3 semantics the bucket must be
+# empty; otherwise a 409 BucketNotEmpty error is returned. Returns 204 on
+# success (idempotent: deleting a non-existent bucket is a no-op 204 here
+# to keep teardown/cleanup test flows robust).
+def on_delete_bucket(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
+    bucket = req["params"]["bucket"]
+
+    bc = store_collection("buckets")
+    bucket_id = None
+    for b in bc.list():
+        if b.get("name", "") == bucket:
+            bucket_id = b.get("id", "")
+            break
+
+    # Idempotent no-op if the bucket does not exist.
+    if bucket_id == None or bucket_id == "":
+        return respond(204, "", {
+            "x-amz-request-id": _req_id(),
+        })
+
+    # Refuse deletion if the bucket still contains objects (real S3 behavior).
+    oc = store_collection("objects")
+    for o in oc.list():
+        if o.get("bucket", "") == bucket:
+            xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+            xml = xml + "<Error><Code>BucketNotEmpty</Code>"
+            xml = xml + "<Message>The bucket you tried to delete is not empty.</Message>"
+            xml = xml + "<BucketName>" + _xml_escape(bucket) + "</BucketName>"
+            xml = xml + "<RequestId>" + _req_id() + "</RequestId></Error>"
+            return respond(409, xml, {"Content-Type": "application/xml"})
+
+    bc.delete(bucket_id)
+
+    return respond(204, "", {
         "x-amz-request-id": _req_id(),
     })

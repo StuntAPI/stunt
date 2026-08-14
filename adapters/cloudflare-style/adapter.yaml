@@ -27,6 +27,9 @@ endpoints:
   - route: /zones/{zone_id}
     method: GET
     handler: scripts/zones.star#on_get_zone
+  - route: /zones/{zone_id}
+    method: DELETE
+    handler: scripts/zones.star#on_delete_zone
   - route: /zones/{zone_id}/dns_records
     method: GET
     handler: scripts/zones.star#on_list_dns_records
@@ -50,6 +53,9 @@ endpoints:
   - route: /accounts/{account_id}/workers/scripts/{script_name}
     method: GET
     handler: scripts/workers.star#on_get_script
+  - route: /accounts/{account_id}/workers/scripts/{script_name}
+    method: DELETE
+    handler: scripts/workers.star#on_delete_script
 
   # --- R2 ---
   - route: /accounts/{account_id}/r2/buckets
@@ -58,6 +64,9 @@ endpoints:
   - route: /accounts/{account_id}/r2/buckets
     method: POST
     handler: scripts/r2.star#on_create_bucket
+  - route: /accounts/{account_id}/r2/buckets/{bucket_name}
+    method: DELETE
+    handler: scripts/r2.star#on_delete_bucket
 
   # --- D1 ---
   - route: /accounts/{account_id}/d1/database
@@ -66,6 +75,9 @@ endpoints:
   - route: /accounts/{account_id}/d1/database
     method: POST
     handler: scripts/d1.star#on_create_database
+  - route: /accounts/{account_id}/d1/database/{database_id}
+    method: DELETE
+    handler: scripts/d1.star#on_delete_database
   - route: /accounts/{account_id}/d1/database/{database_id}/query
     method: POST
     handler: scripts/d1.star#on_query_database

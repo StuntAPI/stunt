@@ -8,6 +8,8 @@
 #       → get a single document
 # PATCH /v1/projects/{project}/databases/(default)/documents/{collection}/{id}
 #       → upsert document
+# DELETE /v1/projects/{project}/databases/(default)/documents/{collection}/{id}
+#       → delete a single document
 #
 # Every field value is wrapped in a Firestore typed value:
 #   {stringValue: "x"}  {integerValue: "5"}  {booleanValue: true}
@@ -94,6 +96,29 @@ def on_get_document(req):
         return _err(404, 404, "NOT_FOUND", "Document not found: " + collection + "/" + doc_id, "NOT_FOUND")
 
     return respond(200, _document_entity(doc, project, collection))
+
+# on_delete_document deletes a single document by id.
+# DELETE /v1/projects/{project}/databases/(default)/documents/{collection}/{id}
+# The real Firestore API returns 200 with an empty body on success.
+def on_delete_document(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
+    project = req["params"].get("project", "")
+    collection = req["params"].get("collection", "")
+    doc_id = req["params"].get("id", "")
+
+    dc = store_collection("documents")
+    doc = dc.get(doc_id)
+    if doc == None:
+        return _err(404, 404, "NOT_FOUND", "Document not found: " + collection + "/" + doc_id, "NOT_FOUND")
+
+    if doc.get("collection", "") != collection or doc.get("project", "") != project:
+        return _err(404, 404, "NOT_FOUND", "Document not found: " + collection + "/" + doc_id, "NOT_FOUND")
+
+    dc.delete(doc_id)
+    return respond(200, {})
 
 # on_upsert_document creates or updates a document by id (PATCH = upsert).
 # PATCH /v1/projects/{project}/databases/(default)/documents/{collection}/{id}

@@ -125,6 +125,25 @@ def on_get_message(req):
     base["historyId"] = doc.get("historyId", "0")
     return respond(200, base)
 
+# on_delete_message immediately and permanently deletes the specified message.
+# DELETE /gmail/v1/users/{userId}/messages/{messageId} → 204 No Content.
+def on_delete_message(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    _seed()
+
+    msg_id = req["params"]["messageId"]
+    doc = _find_message(msg_id)
+    if doc == None:
+        return _not_found("Message not found: " + msg_id)
+
+    mc = store_collection("messages")
+    mc.delete(doc["id"])
+
+    return respond(204)
+
 # on_send_message accepts a raw base64url rfc822 message, decodes it, stores
 # it, and returns the message stub with SENT label.
 def on_send_message(req):

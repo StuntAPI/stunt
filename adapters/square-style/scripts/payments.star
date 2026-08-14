@@ -76,6 +76,29 @@ def on_get_payment(req):
 
     return respond(200, {"payment": _payment_public(doc)})
 
+# on_delete_payment removes a payment by ID.
+#
+# Square's real Payments API exposes no DELETE (payments are canceled via
+# POST /v2/payments/{id}/complete or refunded). stunt models a delete anyway
+# so create->delete teardown lifecycle tests can clean up.
+def on_delete_payment(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+    err = _require_version(req)
+    if err != None:
+        return err
+
+    payment_id = req["params"]["id"]
+    c = store_collection("payments")
+    doc = c.get(payment_id)
+    if doc == None:
+        return _sq_err(404, "NOT_FOUND", "NOT_FOUND", "Payment not found")
+
+    c.delete(payment_id)
+
+    return respond(200, {"payment": _payment_public(doc)})
+
 # on_complete_payment transitions an APPROVED payment to COMPLETED.
 def on_complete_payment(req):
     err = _require_auth(req)

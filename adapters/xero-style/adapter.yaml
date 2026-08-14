@@ -41,6 +41,9 @@ endpoints:
   - route: /api.xro/2.0/Invoices/{id}
     method: GET
     handler: scripts/invoices.star#on_get_invoice
+  - route: /api.xro/2.0/Invoices/{id}
+    method: DELETE
+    handler: scripts/invoices.star#on_delete_invoice
   - route: /api.xro/2.0/Invoices/{id}/Payments
     method: POST
     handler: scripts/invoices.star#on_post_payment

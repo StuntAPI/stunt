@@ -41,6 +41,9 @@ endpoints:
   - route: /v3/company/{realmId}/customer/{id}
     method: GET
     handler: scripts/customer.star#on_read_customer_by_id
+  - route: /v3/company/{realmId}/customer/{id}
+    method: DELETE
+    handler: scripts/customer.star#on_delete_customer_by_id
 
   # Invoice CRUD.
   - route: /v3/company/{realmId}/invoice
@@ -49,6 +52,9 @@ endpoints:
   - route: /v3/company/{realmId}/invoice/{id}
     method: GET
     handler: scripts/invoice.star#on_read_invoice
+  - route: /v3/company/{realmId}/invoice/{id}
+    method: DELETE
+    handler: scripts/invoice.star#on_delete_invoice
 
 # Backing stores — collections for stateful data.
 resources:

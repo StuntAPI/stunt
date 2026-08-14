@@ -73,6 +73,23 @@ def on_create_webhook(req):
 
     return respond(201, {"webhook": _webhook_view(webhook)})
 
+# on_delete_webhook deletes a webhook subscription. Shopify returns 200 with
+# an empty JSON object body {} (same envelope as product DELETE).
+def on_delete_webhook(req):
+    err = _require_token(req)
+    if err != None:
+        return err
+    _seed()
+
+    wid = _strip_json(req["params"]["webhook_id"])
+    wc = store_collection("webhooks")
+    hook = wc.get(wid)
+    if hook == None:
+        return _not_found("Webhook", wid)
+
+    wc.delete(wid)
+    return respond(200, {})
+
 # _webhook_view returns the public-facing webhook subscription object.
 def _webhook_view(w):
     return {

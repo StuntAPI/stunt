@@ -28,6 +28,11 @@ endpoints:
     method: POST
     handler: scripts/labels.star#on_create_label
 
+  # --- Labels: delete (by id) ---
+  - route: /gmail/v1/users/{userId}/labels/{id}
+    method: DELETE
+    handler: scripts/labels.star#on_delete_label
+
   # --- Messages: send (literal, before {messageId}) ---
   - route: /gmail/v1/users/{userId}/messages/send
     method: POST
@@ -66,6 +71,11 @@ endpoints:
     method: GET
     handler: scripts/messages.star#on_get_message
 
+  # --- Single message: delete ---
+  - route: /gmail/v1/users/{userId}/messages/{messageId}
+    method: DELETE
+    handler: scripts/messages.star#on_delete_message
+
   # --- Drafts ---
   - route: /gmail/v1/users/{userId}/drafts
     method: GET
@@ -73,6 +83,11 @@ endpoints:
   - route: /gmail/v1/users/{userId}/drafts
     method: POST
     handler: scripts/drafts.star#on_create_draft
+
+  # --- Drafts: delete (by id) ---
+  - route: /gmail/v1/users/{userId}/drafts/{id}
+    method: DELETE
+    handler: scripts/drafts.star#on_delete_draft
 
   # --- Threads ---
   - route: /gmail/v1/users/{userId}/threads/{threadId}
