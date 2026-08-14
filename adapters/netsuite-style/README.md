@@ -122,9 +122,26 @@ NetSuite uses a distinctive error envelope with `o:` prefixed keys:
 }
 ```
 
-Pagination via `?offset=0&limit=50` (defaults: `offset=0`, `limit=50`). When
-another page exists the response sets `hasMore: true` and appends a
-`{"rel": "next", "href": ...}` link with the next `offset`/`limit`.
+Pagination via `?offset=0&limit=1000` (defaults: `offset=0`, `limit=1000`,
+matching the real collection paging default). When another page exists the
+response sets `hasMore: true` and appends a `{"rel": "next", "href": ...}`
+link with the next `offset`/`limit`.
+
+Record list endpoints also honor the documented `q` Record Collection
+Filtering param (`q=email START_WITH barbara`, `q=creditlimit
+GREATER_OR_EQUAL 1000`) with operators IS / IS_NOT, CONTAIN / CONTAIN_NOT,
+START_WITH / START_WITH_NOT, END_WITH / END_WITH_NOT, GREATER /
+GREATER_OR_EQUAL / LESS / LESS_OR_EQUAL, ANY_OF `[a,b]`, BETWEEN `[lo,hi]`,
+AFTER / BEFORE / ON / ON_OR_AFTER / ON_OR_BEFORE (dates), and EMPTY /
+NOT_EMPTY. Conditions join with `AND`, and `OR` is supported between AND
+groups (top level); matching is case-sensitive. The symbolic operators
+`= != > < >= <=` and word aliases `EQ NE GT LT GE LE LIKE IS IN BETWEEN`
+are also accepted. An unparseable `q` returns `400` with
+`o:errorCode: INVALID_SEARCH_PARAMETER` instead of silently unfiltered
+results. `orderBy` (`orderBy=tranId DESC`) is applied before paging.
+SuiteQL honors its SQL `LIMIT`/`OFFSET` clauses (falling back to the
+`limit`/`offset` query params) and appends a `next` link when more rows
+remain.
 
 ## Write response shape
 

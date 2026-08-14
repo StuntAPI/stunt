@@ -31,5 +31,6 @@ def on_list_items(req):
         },
     ]
 
+    docs = _apply_list_filters(req, docs)
     docs, next_page = _list_page(req, docs)
     return _envelope("Items", docs, next_page)

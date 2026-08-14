@@ -38,12 +38,17 @@ request is visible when publishing in the next, within the same `stunt up` sessi
 | GET | `/oauth/authorize` | `oauth.star#on_authorize` | OAuth2 authorize → 302 redirect with single-use code |
 | POST | `/oauth/access_token` | `oauth.star#on_access_token` | Exchange code for access token |
 | GET | `/v21.0/me` | `profile.star#on_profile` | Authenticated user profile (Bearer) |
-| GET | `/v21.0/{media_id}/insights` | `insights.star#on_insights` | Per-media insights metrics |
+| GET | `/v21.0/{media_id}/insights` | `insights.star#on_insights` | Per-media insights metrics (honors `metric=`) |
 | POST | `/v21.0/{ig_user_id}/media_publish` | `publish.star#on_publish` | Publish a media container (Bearer) |
 | POST | `/v21.0/{ig_user_id}/media` | `publish.star#on_create` | Create a media container (Bearer) |
-| GET | `/v21.0/{ig_user_id}/media` | `publish.star#on_list_media` | List a user's media (Bearer) |
+| GET | `/v21.0/{ig_user_id}/media` | `publish.star#on_list_media` | List a user's media (Bearer; honors `fields=`, `limit`/`after`) |
 
 Any unmatched route returns `404`.
+
+The Graph API edge params are honored on list responses: `?fields=` on
+`GET /v21.0/{ig_user_id}/media` projects each media object onto the requested
+fields, and `?metric=` on insights filters the returned metrics to the
+requested names (all four metrics are returned when `metric` is absent).
 
 ## Backing stores
 

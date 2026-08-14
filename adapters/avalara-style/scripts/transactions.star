@@ -106,6 +106,9 @@ def on_list_transactions(req):
             "status": doc.get("status", "Saved"),
         })
 
+    # Apply OData $filter/$orderBy before paging.
+    value = _apply_odata_filters(req, value)
+
     # Apply OData $top/$skip paging after filtering.
     page, next_link = _list_page(req, value, "/v2/transactions")
 

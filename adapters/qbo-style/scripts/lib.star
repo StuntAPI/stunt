@@ -120,3 +120,46 @@ def _lower(s):
             code = code + 32
         out += chr(code)
     return out
+
+# _index returns the index of the first occurrence of needle in haystack,
+# or -1 if absent.
+def _index(haystack, needle):
+    if len(needle) == 0:
+        return 0
+    for i in range(len(haystack) - len(needle) + 1):
+        match = True
+        for j in range(len(needle)):
+            if haystack[i + j] != needle[j]:
+                match = False
+                break
+        if match:
+            return i
+    return -1
+
+# _contains reports whether haystack contains needle.
+def _contains(haystack, needle):
+    return _index(haystack, needle) >= 0
+
+# _trim strips leading/trailing spaces (and a trailing ';').
+def _trim(s):
+    start = 0
+    end = len(s)
+    while start < end and (s[start] == " " or s[start] == "\t" or s[start] == "\n"):
+        start = start + 1
+    while end > start and (s[end - 1] == " " or s[end - 1] == "\t" or s[end - 1] == "\n" or s[end - 1] == ";"):
+        end = end - 1
+    return s[start:end]
+
+# _split splits s on a single-character delimiter.
+def _split(s, delim):
+    result = []
+    current = ""
+    for i in range(len(s)):
+        ch = s[i]
+        if ch == delim:
+            result.append(current)
+            current = ""
+        else:
+            current = current + ch
+    result.append(current)
+    return result

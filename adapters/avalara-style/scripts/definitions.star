@@ -40,6 +40,9 @@ def on_list_nexuses(req):
         },
     ]
 
+    # Apply OData $filter/$orderBy before paging.
+    value = _apply_odata_filters(req, value)
+
     # Apply OData $top/$skip paging.
     page, next_link = _list_page(req, value, "/v2/definitions/nexuses")
 
@@ -63,6 +66,9 @@ def on_list_taxcodes(req):
         {"taxCode": "NT", "description": "Non-Taxable"},
         {"taxCode": "D0000000", "description": "Digital Goods"},
     ]
+
+    # Apply OData $filter/$orderBy before paging.
+    value = _apply_odata_filters(req, value)
 
     # Apply OData $top/$skip paging.
     page, next_link = _list_page(req, value, "/v2/definitions/taxcodes")

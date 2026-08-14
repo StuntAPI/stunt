@@ -26,7 +26,7 @@ locally.
 |--------|-------|-------------|
 | GET | `/tasks/v1/lists` | List task lists. |
 | POST | `/tasks/v1/lists` | Create a task list. |
-| GET | `/tasks/v1/lists/{tasklistId}/tasks` | List tasks in a list. |
+| GET | `/tasks/v1/lists/{tasklistId}/tasks` | List tasks in a list (params: `q`, `showCompleted`, `dueMin`, `dueMax`, `completedMin`, `completedMax`, `updatedMin`, `maxResults`, `pageToken`). |
 | POST | `/tasks/v1/lists/{tasklistId}/tasks` | Create a task. |
 | GET | `/tasks/v1/lists/{tasklistId}/tasks/{taskId}` | Get a task. |
 | PUT | `/tasks/v1/lists/{tasklistId}/tasks/{taskId}` | Update a task. |
@@ -38,6 +38,11 @@ locally.
 - Task list: `{id, title, updated, selfLink}`.
 - Task: `{id, title, notes, status, due, completed, parent, position, updated}`.
 - List response: `{items:[...]}`.
+- **List filtering**: `q` matches title/notes (case-insensitive),
+  `showCompleted=false` returns only `needsAction` tasks (default includes
+  completed), `dueMin`/`dueMax` compare the RFC3339 `due` stamp,
+  `completedMin`/`completedMax` exclude uncompleted tasks, and `updatedMin`
+  compares the `updated` stamp. Filtering runs before pagination.
 - Move body: `{parent, previous}` — re-parents/reorders.
 
 ## Data model

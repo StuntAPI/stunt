@@ -28,10 +28,10 @@ All requests go to `GET /api?apikey=...&module=...&action=...`.
 |--------|--------|--------|-------|
 | `account` | `balance` | wei string | Balance for a single address |
 | `account` | `balancemulti` | `[{account, balance}]` | Multiple addresses (comma-separated) |
-| `account` | `txlist` | `[{hash, from, to, value, ...}]` | Transaction history |
+| `account` | `txlist` | `[{hash, from, to, value, ...}]` | Transaction history — honors `startblock`, `endblock`, `filter_by`, `sort`, `page`/`offset` |
 | `contract` | `getabi` | ABI JSON string | Verified contract ABI |
 | `contract` | `getsourcecode` | `[{ContractName, CompilerVersion, ABI, SourceCode}]` | Source + ABI |
-| `token` | `tokenholderlist` | `[{TokenHolderAddress, TokenHolderQuantity}]` | Token holders |
+| `token` | `tokenholderlist` | `[{TokenHolderAddress, TokenHolderQuantity}]` | Token holders — honors `page`/`offset` paging |
 | `stats` | `ethsupply` | wei string | Total ETH supply |
 | `stats` | `ethprice` | `{ethusd, ethbtc, ...}` | ETH price |
 | `transaction` | `getstatus` | `"1"` | Tx status |

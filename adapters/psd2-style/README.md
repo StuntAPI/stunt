@@ -47,8 +47,8 @@ curl http://localhost:8080/v1/accounts \
 curl http://localhost:8080/v1/accounts/acc-001/balances \
   -H "Authorization: Bearer $TOKEN"
 
-# 7. Get transactions
-curl http://localhost:8080/v1/accounts/acc-001/transactions \
+# 7. Get transactions (bookingStatus and dateFrom are required)
+curl "http://localhost:8080/v1/accounts/acc-001/transactions?bookingStatus=booked&dateFrom=2024-01-01" \
   -H "Authorization: Bearer $TOKEN"
 ```
 
@@ -101,9 +101,9 @@ Missing the bearer token returns `401` with a `tppMessages` error.
 | POST | `/v1/consents/{consentId}/authorisations` | Start SCA authorisation |
 | GET | `/v1/consents/{consentId}/authorisations/{authorisationId}` | Get SCA status |
 | PUT | `/v1/consents/{consentId}/authorisations/{authorisationId}` | Update SCA (finalise) |
-| GET | `/v1/accounts` | List accounts |
+| GET | `/v1/accounts` | List accounts (honors `withBalance`, `page`/`size` paging) |
 | GET | `/v1/accounts/{resourceId}/balances` | Get account balances |
-| GET | `/v1/accounts/{resourceId}/transactions` | Get account transactions |
+| GET | `/v1/accounts/{resourceId}/transactions` | Get account transactions (`bookingStatus` and `dateFrom` required — missing either returns `400` with `PARAMETER_MISSING-BOOKINGSTATUS` / `PARAMETER_MISSING-DATEFROM`; `dateTo` optional) |
 
 ## Seeded data
 

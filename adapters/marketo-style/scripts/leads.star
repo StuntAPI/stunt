@@ -31,25 +31,13 @@ def on_list_leads(req):
     col = store_collection("leads")
     docs = col.list()
 
-    filter_type = _get_query(req, "filterType", "")
-    filter_values = _get_query(req, "filterValues", "")
-    fields = _get_query(req, "fields", "")
-
     result = []
-    if filter_type != "" and filter_values != "":
-        # Marketo filter: match any of the comma-separated filterValues
-        # against the filterType field.
-        values = _split(filter_values, ",")
-        for d in docs:
-            field_val = d.get(filter_type, "")
-            for v in values:
-                v = _trim(v)
-                if field_val == v:
-                    result.append(_lead_shape(d))
-                    break
-    else:
-        for d in docs:
-            result.append(_lead_shape(d))
+    for d in docs:
+        result.append(_lead_shape(d))
+
+    # Real Get Leads params (filterType/filterValues, fields) applied before
+    # paging, like the real API.
+    result = _apply_lead_filters(req, result)
 
     # Apply Marketo paging (batchSize + nextPageToken) after filtering.
     page, next_cursor, more = _list_page(req, result)
@@ -61,6 +49,43 @@ def on_list_leads(req):
         "nextPageToken": next_cursor,
         "moreResult": more,
     })
+
+# _apply_lead_filters maps the real Get Multiple Leads query params to
+# query_select: filterType + filterValues (match ANY of the comma-separated
+# values against the named field) and the fields projection (comma-separated
+# list of lead fields to return; id is always included).
+def _apply_lead_filters(req, leads):
+    f = []
+    filter_type = _get_query(req, "filterType", "")
+    filter_values = _get_query(req, "filterValues", "")
+    if filter_type != "" and filter_values != "":
+        values = []
+        for v in _split(filter_values, ","):
+            v = _trim(v)
+            if v != "":
+                values.append(v)
+        if len(values) > 0:
+            f.append([filter_type, "in", values])
+
+    flt = None
+    if len(f) > 0:
+        flt = f
+
+    fields_param = _get_query(req, "fields", "")
+    fields = None
+    if fields_param != "":
+        wanted = []
+        for part in _split(fields_param, ","):
+            part = _trim(part)
+            if part != "" and part != "id":
+                wanted.append(part)
+        if len(wanted) > 0 or _contains(fields_param, "id"):
+            # Marketo always returns id plus the requested fields.
+            fields = ["id"]
+            for w in wanted:
+                fields.append(w)
+
+    return query_select(leads, flt, None, "", None, None, fields)
 
 def on_create_lead(req):
     ok, err = _require_auth(req)

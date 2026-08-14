@@ -65,12 +65,31 @@ def on_list_charges(req):
     if err != None:
         return err
 
+    bad = _created_check(req)
+    if bad != None:
+        return bad
+
     c = store_collection("charges")
     docs = c.list()
+    docs = _apply_charge_filters(req, docs)
+    docs = _newest_first(docs)
     page, has_more, err = _list_page(req, docs, "charge")
     if err != None:
         return err
     return respond(200, {"object": "list", "data": page, "has_more": has_more, "url": "/v1/charges"})
+
+# _apply_charge_filters maps the real Stripe charge-list query params
+# (customer, created exact/range) to query_select clauses, applied before
+# paging like the real API.
+def _apply_charge_filters(req, docs):
+    f = []
+    cust = _get_query(req, "customer")
+    if cust != "":
+        f.append(["customer", "=", cust])
+    _created_filters(req, f)
+    if len(f) == 0:
+        return docs
+    return query_select(docs, f)
 
 # POST /v1/charges/{id}/capture — capture a pending charge (set status succeeded).
 def on_capture_charge(req):

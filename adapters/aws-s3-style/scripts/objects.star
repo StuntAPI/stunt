@@ -245,8 +245,65 @@ def on_list_or_location(req):
     # ListObjectsV2 (default)
     return _list_objects_v2(bucket, req)
 
-# _list_objects_v2 returns a ListObjectsV2 XML response. Paging (max-keys +
-# continuation-token) is applied AFTER the bucket/prefix filtering.
+# _find_from returns the index of the first occurrence of needle in s at or
+# after position start, or -1 if not found.
+def _find_from(s, start, needle):
+    if len(needle) == 0:
+        return -1
+    if start < 0:
+        start = 0
+    for i in range(start, len(s) - len(needle) + 1):
+        match = True
+        for j in range(len(needle)):
+            if s[i+j] != needle[j]:
+                match = False
+                break
+        if match:
+            return i
+    return -1
+
+# _hex2 returns v (0-255) as two uppercase hex digits.
+def _hex2(v):
+    digits = "0123456789ABCDEF"
+    return digits[v // 16] + digits[v % 16]
+
+# _url_encode percent-encodes s per RFC 3986 (unreserved chars stay literal,
+# everything else becomes %XX of its UTF-8 bytes). Used for the S3
+# encoding-type=url response encoding.
+def _url_encode(s):
+    unreserved = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~"
+    out = ""
+    for i in range(len(s)):
+        ch = s[i]
+        if _find_substr(unreserved, ch) >= 0:
+            out = out + ch
+        else:
+            v = ord(ch)
+            if v < 0x80:
+                out = out + "%" + _hex2(v)
+            elif v < 0x800:
+                out = out + "%" + _hex2(0xC0 | (v >> 6)) + "%" + _hex2(0x80 | (v & 0x3F))
+            else:
+                out = out + "%" + _hex2(0xE0 | (v >> 12)) + "%" + _hex2(0x80 | ((v >> 6) & 0x3F)) + "%" + _hex2(0x80 | (v & 0x3F))
+    return out
+
+# _invalid_argument returns an S3 InvalidArgument XML error (400).
+def _invalid_argument(arg_name, arg_value, message):
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml = xml + "<Error><Code>InvalidArgument</Code>"
+    xml = xml + "<Message>" + _xml_escape(message) + "</Message>"
+    xml = xml + "<ArgumentName>" + _xml_escape(arg_name) + "</ArgumentName>"
+    xml = xml + "<ArgumentValue>" + _xml_escape(arg_value) + "</ArgumentValue>"
+    xml = xml + "<RequestId>" + _req_id() + "</RequestId></Error>"
+    return respond(400, xml, {"Content-Type": "application/xml"})
+
+# _list_objects_v2 returns a ListObjectsV2 XML response. All list params are
+# applied BEFORE the max-keys/continuation-token paging, like real S3:
+# bucket + prefix scoping, start-after (V2) / marker (V1), delimiter roll-up
+# into <CommonPrefixes>, then paging. Keys and rolled-up prefixes are
+# returned in ascending lexicographic (UTF-8 byte) order. encoding-type=url
+# percent-encodes keys/prefixes/delimiter in the response; fetch-owner=true
+# (V2) adds an <Owner> element to each <Contents>.
 def _list_objects_v2(bucket, req):
     query = req.get("query")
     if query == None:
@@ -263,6 +320,31 @@ def _list_objects_v2(bucket, req):
     if cont_token == None:
         cont_token = ""
 
+    delimiter = query.get("delimiter", "")
+    if delimiter == None:
+        delimiter = ""
+
+    start_after = query.get("start-after", "")
+    if start_after == None:
+        start_after = ""
+
+    # marker (ListObjects V1 pagination-start key, used when list-type != 2).
+    marker = query.get("marker", "")
+    if marker == None:
+        marker = ""
+
+    # encoding-type: only "url" is valid; anything else is a real S3 error.
+    encoding_type = query.get("encoding-type", "")
+    if encoding_type == None:
+        encoding_type = ""
+    if encoding_type != "" and encoding_type != "url":
+        return _invalid_argument("encoding-type", encoding_type, "Invalid Encoding Method specified in Request")
+
+    # fetch-owner (V2): include the <Owner> element in <Contents>.
+    fetch_owner = query.get("fetch-owner", "")
+    if fetch_owner == None:
+        fetch_owner = ""
+
     oc = store_collection("objects")
     all_objects = oc.list()
 
@@ -276,8 +358,40 @@ def _list_objects_v2(bucket, req):
             continue
         matching.append(o)
 
+    # start-after (ListObjectsV2) / marker (V1): list keys lexicographically
+    # after this one.
+    if list_type == "2":
+        if start_after != "":
+            matching = query_select(matching, [["key", ">", start_after]])
+    elif marker != "":
+        matching = query_select(matching, [["key", ">", marker]])
+
+    # Roll keys up into common prefixes when a delimiter is given (S3
+    # delimiter semantics: keys sharing the prefix up to and including the
+    # first delimiter after `prefix` collapse into one CommonPrefixes entry).
+    # Every entry carries a "sort" field so keys and prefixes interleave in
+    # ascending order via query_select's ordering.
+    cp_seen = {}
+    entries = []
+    for o in matching:
+        key = o.get("key", "")
+        cp = ""
+        if delimiter != "":
+            idx = _find_from(key, len(prefix), delimiter)
+            if idx >= 0:
+                cp = key[:idx + len(delimiter)]
+        if cp != "":
+            if cp in cp_seen:
+                continue
+            cp_seen[cp] = True
+            entries.append({"sort": cp, "cp": cp, "obj": None})
+        else:
+            entries.append({"sort": key, "cp": "", "obj": o})
+
+    entries = query_select(entries, None, "sort", "asc")
+
     # Apply S3 ListObjectsV2 pagination (max-keys + continuation-token).
-    page, next_cursor = _list_page(req, matching)
+    page, next_cursor = _list_page(req, entries)
     truncated = next_cursor != ""
 
     # Effective MaxKeys to echo (requested value, or S3 default).
@@ -288,10 +402,22 @@ def _list_objects_v2(bucket, req):
     if max_keys_echo <= 0:
         max_keys_echo = _S3_DEFAULT_MAX_KEYS
 
+    # With encoding-type=url, echoed params and keys/prefixes in the response
+    # are percent-encoded; otherwise they are emitted verbatim.
+    enc = _xml_escape
+    if encoding_type == "url":
+        enc = _url_encode
+
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
     xml = xml + '<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
     xml = xml + "<Name>" + _xml_escape(bucket) + "</Name>"
-    xml = xml + "<Prefix>" + _xml_escape(prefix) + "</Prefix>"
+    xml = xml + "<Prefix>" + enc(prefix) + "</Prefix>"
+    if delimiter != "":
+        xml = xml + "<Delimiter>" + enc(delimiter) + "</Delimiter>"
+    if list_type != "2" and marker != "":
+        xml = xml + "<Marker>" + enc(marker) + "</Marker>"
+    if list_type == "2" and start_after != "":
+        xml = xml + "<StartAfter>" + enc(start_after) + "</StartAfter>"
     if cont_token != "":
         xml = xml + "<ContinuationToken>" + _xml_escape(cont_token) + "</ContinuationToken>"
     if list_type == "2":
@@ -302,17 +428,28 @@ def _list_objects_v2(bucket, req):
         xml = xml + "<NextContinuationToken>" + _xml_escape(next_cursor) + "</NextContinuationToken>"
     else:
         xml = xml + "<IsTruncated>false</IsTruncated>"
+    if encoding_type == "url":
+        xml = xml + "<EncodingType>url</EncodingType>"
 
-    for o in page:
+    for e in page:
+        cp = e.get("cp", "")
+        if cp != "":
+            xml = xml + "<CommonPrefixes><Prefix>" + enc(cp) + "</Prefix></CommonPrefixes>"
+            continue
+        o = e.get("obj")
+        if o == None:
+            continue
         key = o.get("key", "")
         etag = o.get("etag", "")
         size = o.get("size", 0)
         lm = o.get("lastModified", "")
         xml = xml + "<Contents>"
-        xml = xml + "<Key>" + _xml_escape(key) + "</Key>"
+        xml = xml + "<Key>" + enc(key) + "</Key>"
         xml = xml + "<LastModified>" + _xml_escape(lm) + "</LastModified>"
         xml = xml + '<ETag>"' + _xml_escape(etag) + '"</ETag>'
         xml = xml + "<Size>" + _to_int_str(size) + "</Size>"
+        if list_type == "2" and fetch_owner == "true":
+            xml = xml + "<Owner><ID>stunt-owner-id-stunt-owner-id-stunt-owner-id</ID><DisplayName>stunt-owner</DisplayName></Owner>"
         xml = xml + "<StorageClass>STANDARD</StorageClass>"
         xml = xml + "</Contents>"
 

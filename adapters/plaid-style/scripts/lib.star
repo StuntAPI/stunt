@@ -79,6 +79,19 @@ def _item_accounts(item_id):
             result.append(_account_public(a))
     return result
 
+# _filter_account_ids applies the real Plaid `options.account_ids` body
+# param (accounts/get, accounts/balance/get, identity/get): restrict the
+# returned accounts to the given account_id list via query_select. Returns
+# the list unchanged when the option is absent or empty.
+def _filter_account_ids(body, accounts):
+    options = body.get("options")
+    if options == None:
+        return accounts
+    ids = options.get("account_ids")
+    if ids == None or len(ids) == 0:
+        return accounts
+    return query_select(accounts, [["account_id", "in", list(ids)]])
+
 # _account_public strips internal fields and returns the Plaid-shaped account.
 def _account_public(a):
     return {

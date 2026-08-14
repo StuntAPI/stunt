@@ -14,7 +14,8 @@
 # _get_cell, _build_range_str, etc.) are preloaded from scripts/lib.star.
 
 # on_get_values reads cells from the grid and returns them as a 2D array
-# in Google's {range, majorDimension, values} format.
+# in Google's {range, majorDimension, values} format. The majorDimension
+# query param (ROWS|COLUMNS) is honored like the real API.
 def on_get_values(req):
     err = _require_bearer(req)
     if err != None:
@@ -37,15 +38,26 @@ def on_get_values(req):
     if sheet == "":
         sheet = "Sheet1"
 
-    values = _read_grid(ss_id, sheet, parsed["row1"], parsed["col1"], parsed["row2"], parsed["col2"])
+    major = req["query"].get("majorDimension", "")
+    if major == None:
+        major = ""
 
+    values = _read_grid(ss_id, sheet, parsed["row1"], parsed["col1"], parsed["row2"], parsed["col2"])
+    out_dimension = "ROWS"
+    if major == "COLUMNS":
+        out_dimension = "COLUMNS"
+
+    # The range stays in row space (the covered cells) regardless of the
+    # output orientation, like the real API.
     out_range = _build_range_str(sheet, parsed["row1"], parsed["col1"],
                                  parsed["row1"] + len(values) - 1,
                                  parsed["col1"] + _max_row_width(values) - 1)
 
+    values = _apply_major_dimension(values, major)
+
     return respond(200, {
         "range": out_range,
-        "majorDimension": "ROWS",
+        "majorDimension": out_dimension,
         "values": values,
     })
 
@@ -239,6 +251,12 @@ def on_batch_get(req):
     ranges = body.get("ranges", [])
     if ranges == None:
         ranges = []
+    major = body.get("majorDimension", "")
+    if major == None:
+        major = ""
+    out_dimension = "ROWS"
+    if major == "COLUMNS":
+        out_dimension = "COLUMNS"
 
     value_ranges = []
     for r in ranges:
@@ -250,11 +268,15 @@ def on_batch_get(req):
             sheet = "Sheet1"
         values = _read_grid(ss_id, sheet, parsed["row1"], parsed["col1"],
                             parsed["row2"], parsed["col2"])
+        # The range stays in row space (the covered cells) regardless of
+        # the output orientation, like the real API.
+        out_range = _build_range_str(sheet, parsed["row1"], parsed["col1"],
+                                     parsed["row1"] + len(values) - 1,
+                                     parsed["col1"] + _max_row_width(values) - 1)
+        values = _apply_major_dimension(values, major)
         value_ranges.append({
-            "range": _build_range_str(sheet, parsed["row1"], parsed["col1"],
-                                      parsed["row1"] + len(values) - 1,
-                                      parsed["col1"] + _max_row_width(values) - 1),
-            "majorDimension": "ROWS",
+            "range": out_range,
+            "majorDimension": out_dimension,
             "values": values,
         })
 
@@ -338,6 +360,26 @@ def on_batch_update(req):
     })
 
 # === Grid helpers ===
+
+# _apply_major_dimension transposes the 2D values array when majorDimension
+# is COLUMNS (Google's row-major default is ROWS). Ragged rows are padded
+# with "" before transposing so no cell is lost.
+def _apply_major_dimension(values, major):
+    if major != "COLUMNS":
+        return values
+    if len(values) == 0:
+        return values
+    width = _max_row_width(values)
+    out = []
+    for c in range(width):
+        col = []
+        for r in range(len(values)):
+            if c < len(values[r]):
+                col.append(values[r][c])
+            else:
+                col.append("")
+        out.append(col)
+    return out
 
 # _read_grid reads cells from the grid into a 2D values array, trimming
 # trailing empty rows and columns (matching Google's behaviour).

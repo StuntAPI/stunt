@@ -186,3 +186,28 @@ def _record_shape(doc):
         "updatedAt": doc.get("updatedAt", _now()),
         "archived": doc.get("archived", False),
     }
+
+# _project_properties narrows each record's nested properties object to the
+# requested property names (HubSpot's properties projection for list and
+# batch/read calls). Shared by objects.star and batch.star.
+def _project_properties(docs, wanted):
+    if wanted == None or len(wanted) == 0:
+        return docs
+    out = []
+    for d in docs:
+        props = d.get("properties", {})
+        if props == None:
+            props = {}
+        kept = {}
+        for name in wanted:
+            if name in props:
+                kept[name] = props[name]
+        nd = {
+            "id": d.get("id", ""),
+            "properties": kept,
+            "createdAt": d.get("createdAt", _now()),
+            "updatedAt": d.get("updatedAt", _now()),
+            "archived": d.get("archived", False),
+        }
+        out.append(nd)
+    return out

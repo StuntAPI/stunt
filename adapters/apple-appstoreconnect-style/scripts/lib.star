@@ -222,6 +222,64 @@ def _not_found_err(type_name, id):
     return _err(404, "NOT_FOUND", "The specified resource does not exist",
                 "No " + type_name + " found with id '" + id + "'")
 
+# --- query-param helpers (JSON:API list endpoints) ---
+
+# _get_query reads a query param, returning "" when absent (never None).
+def _get_query(req, key):
+    q = req.get("query")
+    if q == None:
+        return ""
+    v = q.get(key, "")
+    if v == None:
+        return ""
+    return v
+
+# _asc_sort parses an App Store Connect `sort` query param ("name" or
+# "-name"; a leading '-' means descending). Returns (field, desc).
+def _asc_sort(req):
+    s = _get_query(req, "sort")
+    if s == "":
+        return "", False
+    desc = False
+    if s[0] == "-":
+        desc = True
+        s = s[1:]
+    elif s[0] == "+":
+        s = s[1:]
+    return s, desc
+
+# _project_jsonapi_fields projects JSON:API entities to the comma-separated
+# attribute names in a `fields[<type>]` param, keeping id/type/links. Returns
+# the input unchanged when the param is absent or empty.
+def _project_jsonapi_fields(items, fields_param):
+    if fields_param == None or fields_param == "":
+        return items
+    wanted = []
+    for part in fields_param.split(","):
+        part = part.strip()
+        if part != "":
+            wanted.append(part)
+    if len(wanted) == 0:
+        return items
+    out = []
+    for it in items:
+        attrs = it.get("attributes", {})
+        if attrs == None:
+            attrs = {}
+        new_attrs = {}
+        for k in wanted:
+            if k in attrs:
+                new_attrs[k] = attrs[k]
+        ent = {
+            "id": it.get("id", ""),
+            "type": it.get("type", ""),
+            "attributes": new_attrs,
+        }
+        if "links" in it:
+            ent["links"] = it["links"]
+        out.append(ent)
+    return out
+
 # --- misc helpers ---
 
 # _to_int parses a decimal string to int. Returns 0 for None, empty string,

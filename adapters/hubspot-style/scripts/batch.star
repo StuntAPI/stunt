@@ -68,6 +68,10 @@ def on_batch_read(req):
             continue
         results.append(_record_shape(doc))
 
+    # Real batch/read honors the body's properties list: only the requested
+    # property names are returned per record.
+    results = _project_properties(results, requested_props)
+
     return respond(200, {"results": results})
 
 def on_batch_update(req):

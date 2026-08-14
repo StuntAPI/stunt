@@ -278,41 +278,43 @@ The connected account's balance is debited by the payout amount.
 | POST | `/v1/tokens` | `tokens.star#on_mint_token` | Mint a test token (no auth required) |
 | POST | `/v1/charges` | `charges.star#on_create_charge` | Create a charge (status → `pending`; idempotent) |
 | GET | `/v1/charges/{id}` | `charges.star#on_retrieve_charge` | Retrieve a charge |
-| GET | `/v1/charges` | `charges.star#on_list_charges` | List charges (paginated) |
+| GET | `/v1/charges` | `charges.star#on_list_charges` | List charges (`?customer=`, `created` exact/range filters, paginated) |
 | POST | `/v1/charges/{id}/capture` | `charges.star#on_capture_charge` | Capture a charge (→ `succeeded`) |
 | POST | `/v1/charges/{id}/refund` | `charges.star#on_refund_charge` | Refund a charge (→ `refunded`) |
 | POST | `/v1/payment_intents` | `payment_intents.star#on_create_payment_intent` | Create a PaymentIntent (optional `confirm`-at-create; idempotent) |
 | POST | `/v1/payment_intents/{id}/confirm` | `payment_intents.star#on_confirm_payment_intent` | Confirm with a `payment_method` (idempotent) |
 | POST | `/v1/payment_intents/{id}/capture` | `payment_intents.star#on_capture_payment_intent` | Capture a `requires_capture` intent (idempotent) |
 | GET | `/v1/payment_intents/{id}` | `payment_intents.star#on_retrieve_payment_intent` | Retrieve a PaymentIntent |
-| GET | `/v1/payment_intents` | `payment_intents.star#on_list_payment_intents` | List PaymentIntents (`?customer=` filter, paginated) |
+| GET | `/v1/payment_intents` | `payment_intents.star#on_list_payment_intents` | List PaymentIntents (`?customer=`, `created` exact/range filters, paginated) |
 | POST | `/v1/payment_methods` | `payment_methods.star#on_create_payment_method` | Create a PaymentMethod (default: synthetic Visa card) |
 | POST | `/v1/payment_methods/{id}/attach` | `payment_methods.star#on_attach_payment_method` | Attach to a customer |
 | POST | `/v1/payment_methods/{id}/detach` | `payment_methods.star#on_detach_payment_method` | Detach from its customer |
 | GET | `/v1/payment_methods/{id}` | `payment_methods.star#on_retrieve_payment_method` | Retrieve a PaymentMethod |
-| GET | `/v1/payment_methods` | `payment_methods.star#on_list_payment_methods` | List PaymentMethods (`?customer=` filter, paginated) |
+| GET | `/v1/payment_methods` | `payment_methods.star#on_list_payment_methods` | List PaymentMethods (`?customer=`, `?type=` filters, paginated) |
 | POST | `/v1/refunds` | `refunds.star#on_create_refund` | Refund a PaymentIntent or charge, full or partial (idempotent) |
 | GET | `/v1/refunds/{id}` | `refunds.star#on_retrieve_refund` | Retrieve a refund |
-| GET | `/v1/refunds` | `refunds.star#on_list_refunds` | List refunds (`?payment_intent=` filter, paginated) |
+| GET | `/v1/refunds` | `refunds.star#on_list_refunds` | List refunds (`?charge=`, `?payment_intent=`, `created` exact/range filters, paginated) |
 | POST | `/v1/customers` | `customers.star#on_create_customer` | Create a customer |
 | GET | `/v1/customers/{id}` | `customers.star#on_retrieve_customer` | Retrieve a customer |
-| GET | `/v1/customers` | `customers.star#on_list_customers` | List customers (paginated) |
+| GET | `/v1/customers` | `customers.star#on_list_customers` | List customers (`?email=`, `created` exact/range filters, paginated) |
 | POST | `/v1/customers/{id}` | `customers.star#on_update_customer` | Update a customer |
 | DELETE | `/v1/customers/{id}` | `customers.star#on_delete_customer` | Delete a customer |
 | GET | `/v1/balance` | `balance.star#on_get_balance` | Return account balance (supports `Stripe-Account` header) |
 | POST | `/v1/accounts` | `accounts.star#on_create_account` | Create a connected account |
 | GET | `/v1/accounts/{id}` | `accounts.star#on_retrieve_account` | Retrieve a connected account |
 | POST | `/v1/accounts/{id}` | `accounts.star#on_update_account` | Update a connected account (e.g. capabilities) |
-| GET | `/v1/accounts` | `accounts.star#on_list_accounts` | List connected accounts (paginated) |
+| GET | `/v1/accounts` | `accounts.star#on_list_accounts` | List connected accounts (`created` exact/range filters, paginated) |
 | POST | `/v1/account_links` | `account_links.star#on_create_account_link` | Create an account link (onboarding URL) |
 | POST | `/v1/transfers` | `transfers.star#on_create_transfer` | Create a transfer to a connected account |
 | GET | `/v1/transfers/{id}` | `transfers.star#on_retrieve_transfer` | Retrieve a transfer |
-| GET | `/v1/transfers` | `transfers.star#on_list_transfers` | List transfers (`?destination=` filter, paginated) |
+| GET | `/v1/transfers` | `transfers.star#on_list_transfers` | List transfers (`?destination=`, `created` exact/range filters, paginated) |
 | POST | `/v1/transfers/{id}/reversals` | `transfers.star#on_reverse_transfer` | Reverse a transfer |
 | POST | `/v1/payouts` | `payouts.star#on_create_payout` | Create a payout |
-| GET | `/v1/payouts` | `payouts.star#on_list_payouts` | List payouts (`?destination=` filter, paginated) |
+| GET | `/v1/payouts` | `payouts.star#on_list_payouts` | List payouts (`?destination=`, `?status=`, `arrival_date`/`created` exact/range filters, paginated) |
 
 Any unmatched route returns `404 {"error":"resource_not_found"}`.
+
+List endpoints Stripe documents as newest-first (`charges`, `customers`, `payment_intents`, `refunds`, `payouts`, `transfers`) return the most recently created objects first, like the real API. A non-numeric `created` / `created[gt|gte|lt|lte]` filter value returns Stripe's `400 parameter_invalid_integer` error.
 
 ## Backing stores
 

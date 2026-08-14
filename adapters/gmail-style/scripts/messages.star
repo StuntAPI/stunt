@@ -23,28 +23,12 @@ def on_list_messages(req):
     _seed()
 
     user_id = req["params"]["userId"]
-    q = req["query"].get("q", "")
-    label_ids = req["query"].get("labelIds", "")
 
     mc = store_collection("messages")
+    docs = _apply_message_filters(req, mc.list())
+
     messages = []
-    for doc in mc.list():
-        # Filter by labelIds if specified.
-        if label_ids != "" and label_ids != None:
-            doc_labels = doc.get("labelIds", [])
-            if label_ids not in doc_labels:
-                continue
-
-        # Simple query filtering: check if q appears in snippet or subject.
-        if q != "" and q != None:
-            snippet = doc.get("snippet", "")
-            subject = ""
-            for h in doc.get("headers", []):
-                if h["name"].lower() == "subject":
-                    subject = h["value"]
-            if q.lower() not in snippet.lower() and q.lower() not in subject.lower():
-                continue
-
+    for doc in docs:
         messages.append({
             "id": doc["id"],
             "threadId": doc["threadId"],
@@ -413,6 +397,48 @@ def on_get_attachment(req):
     })
 
 # === Helpers ===
+
+# _apply_message_filters applies the real messages.list params (labelIds, q,
+# includeSpamTrash) before paging. Gmail excludes messages carrying the TRASH
+# or SPAM label unless includeSpamTrash=true. labelIds filters by label
+# membership; q does a case-insensitive substring match against the snippet
+# and the Subject header. Label membership and the OR-shaped q match are not
+# expressible as query_select triples, so this stays a manual scan.
+def _apply_message_filters(req, docs):
+    q = req["query"].get("q", "")
+    if q == None:
+        q = ""
+    label_ids = req["query"].get("labelIds", "")
+    if label_ids == None:
+        label_ids = ""
+    include_spam_trash = req["query"].get("includeSpamTrash", "")
+    if include_spam_trash == None:
+        include_spam_trash = ""
+
+    result = []
+    for doc in docs:
+        doc_labels = doc.get("labelIds", [])
+
+        # TRASH/SPAM messages are hidden unless includeSpamTrash=true.
+        if include_spam_trash != "true":
+            if "TRASH" in doc_labels or "SPAM" in doc_labels:
+                continue
+
+        if label_ids != "":
+            if label_ids not in doc_labels:
+                continue
+
+        if q != "":
+            snippet = doc.get("snippet", "")
+            subject = ""
+            for h in doc.get("headers", []):
+                if h["name"].lower() == "subject":
+                    subject = h["value"]
+            if q.lower() not in snippet.lower() and q.lower() not in subject.lower():
+                continue
+
+        result.append(doc)
+    return result
 
 # _reconstruct_raw builds a raw base64url rfc822 string from a stored message.
 def _reconstruct_raw(doc):

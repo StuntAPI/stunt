@@ -25,8 +25,49 @@ def on_list_invoices(req):
     for doc in docs:
         invoices.append(_invoice_public(doc))
 
+    invoices = _apply_invoice_filters(req, invoices)
     invoices, next_page = _list_page(req, invoices)
     return _envelope("Invoices", invoices, next_page)
+
+# _apply_invoice_filters maps the real Xero GET /Invoices query params to
+# query_select clauses, applied before paging like the real API:
+#   Statuses=DRAFT,AUTHORISED (comma list)   InvoiceNumber=INV-001,INV-002
+#   ContactID=<guid>                         where=Type=="ACCREC"
+#   order=InvoiceNumber DESC
+def _apply_invoice_filters(req, invoices):
+    f = _coerce_triples(_where_triples(_get_query(req, "where")), invoices)
+
+    statuses = _get_query(req, "Statuses")
+    if statuses != "":
+        vals = []
+        for part in _split(statuses, ","):
+            part = _trim(part)
+            if part != "":
+                vals.append(part)
+        if len(vals) > 0:
+            f.append(["Status", "in", vals])
+
+    numbers = _get_query(req, "InvoiceNumber")
+    if numbers != "":
+        vals = []
+        for part in _split(numbers, ","):
+            part = _trim(part)
+            if part != "":
+                vals.append(part)
+        if len(vals) > 0:
+            f.append(["InvoiceNumber", "in", vals])
+
+    contact_id = _get_query(req, "ContactID")
+    if contact_id != "":
+        f.append(["Contact.ContactID", "=", contact_id])
+
+    order = _order_parts(req)
+    if len(f) == 0 and order[0] == "":
+        return invoices
+    filt = None
+    if len(f) > 0:
+        filt = f
+    return query_select(invoices, filt, order[0], order[1], None, None, None)
 
 # on_put_invoices creates invoices.
 def on_put_invoices(req):

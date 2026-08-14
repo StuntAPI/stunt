@@ -77,6 +77,16 @@ valid for local testing.
 Any unmatched route returns Xero's `404` envelope
 (`{ ErrorNumber: 404, Type: "NotFound", Message: ... }`).
 
+## Filtering and sorting
+
+Before paging, the list endpoints honor Xero's documented filter/sort query
+params: `where` (AND'ed conditions like `Status=="AUTHORISED"` or
+`Name.Contains("acme")`, joined with `&&`/`AND`) and `order` (`InvoiceNumber`
+or `Date DESC`) on all `api.xro` list endpoints; `Invoices` additionally
+supports `Statuses` (comma list), `InvoiceNumber` (comma list) and
+`ContactID`; `Contacts` additionally supports `search` (case-insensitive
+partial match on name or email).
+
 ## Pagination
 
 List endpoints (`GET /connections`, `GET .../Contacts`, `GET .../Invoices`)

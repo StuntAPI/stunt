@@ -16,6 +16,9 @@ integration testing without a real SendGrid account:
 
 - **Send mail:** `POST /v3/mail/send` → **202 Accepted** (empty body, exactly like real SendGrid).
 - **List sent mail:** `GET /v3/messages?limit=N` → `{messages: [...]}` (debug/retrieval endpoint).
+  Honors the Email Activity `query` filter (subset: `field="value"`, `field CONTAINS "value"`,
+  `field!="value"` terms AND'ed together; fields `msg_id`, `from_email`, `to_email`, `subject`,
+  `status`, `template_id`).
 
 Mail records are **stateful**: a message sent via `POST /v3/mail/send` appears in
 the `GET /v3/messages` response, enabling round-trip testing locally.

@@ -61,12 +61,14 @@ Requests without auth return `401`.
 |--------|-------|-------------|
 | POST | `/v2/tax/calculate` | Quick tax estimate (jurisdiction breakdown) |
 | POST | `/v2/transactions/create` | Create a transaction |
-| GET | `/v2/transactions` | List transactions |
+| GET | `/v2/transactions` | List transactions (`$filter`, `$orderBy`, `$top`/`$skip` paging) |
 | GET | `/v2/transactions/{id}` | Get transaction |
 | POST | `/v2/transactions/{id}/void` | Void transaction |
-| GET | `/v2/companies` | List companies |
-| GET | `/v2/definitions/nexuses` | List nexus (tax obligation) |
-| GET | `/v2/definitions/taxcodes` | List tax codes |
+| GET | `/v2/companies` | List companies (`$filter`, `$orderBy`, `$top`/`$skip` paging) |
+| GET | `/v2/definitions/nexuses` | List nexus (`$filter`, `$orderBy`, `$top`/`$skip` paging) |
+| GET | `/v2/definitions/taxcodes` | List tax codes (`$filter`, `$orderBy`, `$top`/`$skip` paging) |
+
+`$filter` literals are typed like OData: unquoted all-digit values compare as integers (e.g. `id eq 1001` against nexus ids) and bare `true`/`false` as booleans (e.g. `hasNexus eq true`); single-quoted values always compare as strings.
 
 ## Tax calculation model
 

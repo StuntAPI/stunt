@@ -29,9 +29,9 @@ CRUD flow without provisioning a CloudKit container.
 |--------|-------|-------------|
 | GET | `/database/1/{container}/{env}/public/records/lookup` | Look up records by name (`{records:[{recordName}]}`). |
 | POST | `/database/1/{container}/{env}/public/records/modify` | Create/update/delete records (`{operations:[...]}`). |
-| GET | `/database/1/{container}/{env}/public/records/query` | Query by recordType + filters. |
+| GET | `/database/1/{container}/{env}/public/records/query` | Query records (`{query:{recordType, filterBy:[{fieldName, comparator, fieldValue}], sortBy:[{fieldName, ascending}], ...}}`; comparators `EQUALS`, `NOT_EQUALS`, `LESS_THAN`, `GREATER_THAN`, `IN`, `BEGINS_WITH`, `CONTAINS`/`LIST_MEMBER`). |
 | GET | `/database/1/{container}/{env}/public/users/current` | Get current user. |
-| GET | `/database/1/{container}/{env}/public/zones/list` | List zones. |
+| GET | `/database/1/{container}/{env}/public/zones/list` | List zones (body param: `zoneNamePrefix`). |
 
 ## Key shapes
 

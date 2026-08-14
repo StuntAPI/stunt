@@ -71,6 +71,17 @@ def _list_page(req, docs):
     cursor = body.get("continuationMarker", "")
     return paginate(docs, limit, cursor)
 
+# _get_body_param reads a JSON body field, returning "" when absent (never
+# None). CloudKit list/query endpoints take their params in the request body.
+def _get_body_param(req, key):
+    body = req.get("body")
+    if body == None:
+        return ""
+    v = body.get(key, "")
+    if v == None:
+        return ""
+    return v
+
 # _seed populates default zones and sample records.
 def _seed():
     if store_kv_get("cloudkit", "seeded") == "yes":

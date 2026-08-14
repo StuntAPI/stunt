@@ -5,6 +5,19 @@
 # Shared helpers (_require_auth, _next_id, _not_found, _get_balance,
 # _set_balance) are in lib.star.
 
+# _apply_transfer_filters maps the real Stripe transfer-list query params
+# (destination, created exact/range) to query_select clauses, applied before
+# paging like the real API.
+def _apply_transfer_filters(req, docs):
+    f = []
+    dest = _get_query(req, "destination")
+    if dest != "":
+        f.append(["destination", "=", dest])
+    _created_filters(req, f)
+    if len(f) == 0:
+        return docs
+    return query_select(docs, f)
+
 # POST /v1/transfers — create a transfer to a connected account.
 def on_create_transfer(req):
     err = _require_auth(req)
@@ -73,15 +86,17 @@ def on_list_transfers(req):
     if err != None:
         return err
 
+    bad = _created_check(req)
+    if bad != None:
+        return bad
+
     c = store_collection("transfers")
     docs = c.list()
 
-    # Optional destination filter (applied before paging).
-    query = req.get("query")
-    if query != None:
-        dest_id = query.get("destination", "")
-        if dest_id != "":
-            docs = [d for d in docs if d.get("destination") == dest_id]
+    # Real transfer-list params (destination, created exact/range), applied
+    # before paging. transfer_group is not stored, so it is not honored.
+    docs = _apply_transfer_filters(req, docs)
+    docs = _newest_first(docs)
 
     page, has_more, err = _list_page(req, docs, "transfer")
     if err != None:

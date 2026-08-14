@@ -14,8 +14,9 @@
 #
 # Shared helpers are preloaded from scripts/lib.star.
 
-# on_list_events returns events for a calendar, with optional timeMin/timeMax
-# filtering and pagination.
+# on_list_events returns events for a calendar, with optional q/iCalUID/
+# timeMin/timeMax/showDeleted filtering, singleEvents expansion, orderBy
+# sorting, and pagination.
 def on_list_events(req):
     err = _require_bearer(req)
     if err != None:
@@ -27,17 +28,27 @@ def on_list_events(req):
     if cal_id == None:
         return _not_found("Calendar not found")
 
-    time_min = req["query"].get("timeMin", "")
-    time_max = req["query"].get("timeMax", "")
     single_events = req["query"].get("singleEvents", "")
+    if single_events == None:
+        single_events = ""
     order_by = req["query"].get("orderBy", "")
+    if order_by == None:
+        order_by = ""
+    show_deleted = req["query"].get("showDeleted", "")
+    if show_deleted == None:
+        show_deleted = ""
+
+    # Like the real API, orderBy=startTime is only valid together with
+    # singleEvents=true.
+    if order_by == "startTime" and single_events != "true":
+        return _bad_request("The orderBy value startTime is only valid when singleEvents is true.")
 
     ec = store_collection("events")
     items = []
     for doc in ec.list():
         if doc.get("calendarId") != cal_id:
             continue
-        if doc.get("deleted", False) == True:
+        if doc.get("deleted", False) == True and show_deleted != "true":
             continue
 
         event = _event_public(doc)
@@ -49,21 +60,8 @@ def on_list_events(req):
         else:
             items.append(event)
 
-    # Apply timeMin/timeMax filtering (string comparison works for ISO8601).
-    if time_min != "" and time_min != None:
-        filtered = []
-        for e in items:
-            start = e.get("start", {}).get("dateTime", "")
-            if start >= time_min:
-                filtered.append(e)
-        items = filtered
-    if time_max != "" and time_max != None:
-        filtered = []
-        for e in items:
-            start = e.get("start", {}).get("dateTime", "")
-            if start <= time_max:
-                filtered.append(e)
-        items = filtered
+    # Apply the real events.list filter/sort params before paging.
+    items = _apply_event_filters(req, items)
 
     # Apply Google Calendar pagination (maxResults + pageToken).
     page, next_cursor = _list_page(req, items)
@@ -264,6 +262,9 @@ def on_list_instances(req):
 
     instances = _expand_recurring(doc)
 
+    # Apply the real instances timeMin/timeMax params before paging.
+    instances = _apply_instance_filters(req, instances)
+
     # Apply Google Calendar pagination (maxResults + pageToken).
     page, next_cursor = _list_page(req, instances)
 
@@ -373,6 +374,79 @@ def on_import(req):
     return respond(200, _event_public(doc))
 
 # === Helpers ===
+
+# _apply_event_filters maps the real events.list query params to query_select
+# clauses, applied before paging like the real API. timeMin/timeMax and
+# iCalUID become triples (ISO8601 strings compare lexicographically);
+# orderBy=startTime sorts by start.dateTime ascending; showDeleted=false
+# (the default) hides cancelled events, including soft-deleted ones. q is a
+# free-text match over summary/description/location — its OR shape is not
+# expressible as AND'ed triples, so it runs as a manual scan after
+# query_select.
+def _apply_event_filters(req, items):
+    f = []
+
+    show_deleted = req["query"].get("showDeleted", "")
+    if show_deleted == None:
+        show_deleted = ""
+    if show_deleted != "true":
+        f.append(["status", "!=", "cancelled"])
+
+    ical_uid = req["query"].get("iCalUID", "")
+    if ical_uid != None and ical_uid != "":
+        f.append(["iCalUID", "=", ical_uid])
+
+    # Overlap-window semantics: timeMin is an exclusive lower bound on an
+    # event's END time; timeMax is an exclusive upper bound on its START
+    # time. Events missing the compared dateTime (missing fields match only
+    # !=) do not match the corresponding bound.
+    time_min = req["query"].get("timeMin", "")
+    if time_min != None and time_min != "":
+        f.append(["end.dateTime", ">", time_min])
+    time_max = req["query"].get("timeMax", "")
+    if time_max != None and time_max != "":
+        f.append(["start.dateTime", "<", time_max])
+
+    order_by = req["query"].get("orderBy", "")
+    if order_by == None:
+        order_by = ""
+    order_field = ""
+    if order_by == "startTime":
+        order_field = "start.dateTime"
+
+    if len(f) > 0 or order_field != "":
+        items = query_select(items, f, order_field, "asc", None, None, None)
+
+    q = req["query"].get("q", "")
+    if q != None and q != "":
+        needle = q.lower()
+        filtered = []
+        for e in items:
+            # (x.get(k) or "") — a key present with a null value returns
+            # None from .get, and None + str would fail the request.
+            hay = (e.get("summary") or "") + "\n" + (e.get("description") or "") + "\n" + (e.get("location") or "")
+            if needle in hay.lower():
+                filtered.append(e)
+        items = filtered
+
+    return items
+
+# _apply_instance_filters applies the real instances timeMin/timeMax params
+# (ISO8601 strings compare lexicographically) before paging.
+def _apply_instance_filters(req, items):
+    # Same overlap-window semantics as events.list: timeMin bounds the
+    # instance END (exclusive), timeMax bounds the instance START
+    # (exclusive).
+    f = []
+    time_min = req["query"].get("timeMin", "")
+    if time_min != None and time_min != "":
+        f.append(["end.dateTime", ">", time_min])
+    time_max = req["query"].get("timeMax", "")
+    if time_max != None and time_max != "":
+        f.append(["start.dateTime", "<", time_max])
+    if len(f) > 0:
+        return query_select(items, f)
+    return items
 
 # _find_event finds an event by calendarId + eventId. Returns the stored doc
 # (with _id) or None.

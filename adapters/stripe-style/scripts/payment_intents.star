@@ -97,17 +97,31 @@ def on_list_payment_intents(req):
     if err != None:
         return err
 
+    bad = _created_check(req)
+    if bad != None:
+        return bad
+
     docs = store_collection("payment_intents").list()
-    q = req.get("query")
-    if q != None:
-        cust = q.get("customer", "")
-        if cust != "":
-            docs = [d for d in docs if d.get("customer") == cust]
+    docs = _apply_payment_intent_filters(req, docs)
+    docs = _newest_first(docs)
 
     page, has_more, e = _list_page(req, docs, "payment_intent")
     if e != None:
         return e
     return respond(200, {"object": "list", "data": [_pi_public(d) for d in page], "has_more": has_more, "url": "/v1/payment_intents"})
+
+# _apply_payment_intent_filters maps the real Stripe PaymentIntent-list query
+# params (customer, created exact/range) to query_select clauses, applied
+# before paging like the real API.
+def _apply_payment_intent_filters(req, docs):
+    f = []
+    cust = _get_query(req, "customer")
+    if cust != "":
+        f.append(["customer", "=", cust])
+    _created_filters(req, f)
+    if len(f) == 0:
+        return docs
+    return query_select(docs, f)
 
 # POST /v1/payment_intents/{id}/confirm — attach a payment_method and advance.
 def on_confirm_payment_intent(req):

@@ -2,6 +2,8 @@
 #
 # GET /v21.0/{media_id}/insights?metric=impressions,reach,likes,comments  (Bearer)
 #   -> 200 { data: [ {name, title, values:[{value}]}, ... ] }
+#   ?metric= filters the returned metrics to the requested names (all four
+#   are returned when metric is absent).
 #
 # Metrics are deterministic per media_id, computed via an FNV-1a 64-bit hash
 # with distinct bit offsets so the values are independent.
@@ -40,4 +42,17 @@ def on_insights(req):
         {"name": "likes", "title": "Likes", "values": [{"value": likes}]},
         {"name": "comments", "title": "Comments", "values": [{"value": comments}]},
     ]
+
+    # The real insights edge requires ?metric=name1,name2 and returns only
+    # the requested metrics; filter the computed set to match.
+    metric = _get_query(req, "metric", "")
+    if metric != "":
+        names = []
+        for part in metric.split(","):
+            part = part.strip()
+            if part != "":
+                names.append(part)
+        if len(names) > 0:
+            data = query_select(data, [["name", "in", names]])
+
     return respond(200, {"data": data})

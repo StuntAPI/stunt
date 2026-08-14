@@ -16,6 +16,22 @@ def _refund_public(doc):
         "created": doc.get("created", 1700000000),
     }
 
+# _apply_refund_filters maps the real Stripe refund-list query params
+# (charge, payment_intent, created exact/range) to query_select clauses,
+# applied before paging like the real API.
+def _apply_refund_filters(req, docs):
+    f = []
+    ch = _get_query(req, "charge")
+    if ch != "":
+        f.append(["charge", "=", ch])
+    pi = _get_query(req, "payment_intent")
+    if pi != "":
+        f.append(["payment_intent", "=", pi])
+    _created_filters(req, f)
+    if len(f) == 0:
+        return docs
+    return query_select(docs, f)
+
 # POST /v1/refunds — refund a payment_intent or charge. amount omitted → full.
 def on_create_refund(req):
     err = _require_auth(req)
@@ -93,12 +109,13 @@ def on_list_refunds(req):
     if err != None:
         return err
 
+    bad = _created_check(req)
+    if bad != None:
+        return bad
+
     docs = store_collection("refunds").list()
-    q = req.get("query")
-    if q != None:
-        pi = q.get("payment_intent", "")
-        if pi != "":
-            docs = [d for d in docs if d.get("payment_intent") == pi]
+    docs = _apply_refund_filters(req, docs)
+    docs = _newest_first(docs)
 
     page, has_more, e = _list_page(req, docs, "refund")
     if e != None:

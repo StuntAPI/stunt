@@ -17,7 +17,12 @@ unblock ITSM integrations during local development:
   .../incident/{sys_id}` — and the same pattern for `task`, `change_request`,
   `cmdb_ci`, `sys_user`, `sys_user_group`, `sc_req_item`.
 - **Encoded query:** `?sysparm_query=active=true^short_description=Email` —
-  pattern-matches the `^`-separated `field=value` syntax.
+  parses the `^`-separated `field=value` syntax, including ordering
+  directives (`^ORDERBYpriority`, `^ORDERBYDESCpriority`). String matching is
+  case-insensitive, like the real Table API; a clause that does not parse is
+  rejected with **400**.
+- **Field projection:** `?sysparm_fields=sys_id,number,state` returns only
+  the listed fields.
 - **Pagination:** `?sysparm_limit=10&sysparm_offset=0`.
 - **Display values:** `?sysparm_display_value=true` returns display values.
 - **Import sets:** `POST /api/now/import/u_my_table`.
@@ -44,16 +49,27 @@ ServiceNow's encoded query language uses `^` as a separator:
 ?sysparm_query=active=true^short_description=Email
 ```
 
-Supported operators (pattern-matching, not a full engine):
+Supported operators (the operator is the first keyword between the field
+name and the value, so values like `IN_PROGRESS` after `state=` parse
+correctly):
 
 | Operator | Example | Meaning |
 |----------|---------|---------|
-| `=` | `state=2` | Exact match |
-| `!=` | `priority!=1` | Not equal |
-| `LIKE` | `short_descriptionLIKEEmail` | Contains substring |
+| `=` | `state=2` | Exact match (case-insensitive for strings) |
+| `!=` | `priority!=1` | Not equal (case-insensitive for strings) |
+| `>` `>=` `<` `<=` | `priority>=2` | Numeric/date range (numeric strings compare numerically) |
+| `LIKE` | `short_descriptionLIKEEmail` | Contains substring (case-insensitive) |
+| `STARTSWITH` | `short_descriptionSTARTSWITHEmail` | Prefix match (case-insensitive) |
+| `ENDSWITH` | `short_descriptionENDSWITHdown` | Suffix match (case-insensitive) |
 | `IN` | `stateIN1,2,3` | In comma-separated set |
+| `ORDERBY` | `^ORDERBYnumber` | Sort ascending by field |
+| `ORDERBYDESC` | `^ORDERBYDESCpriority` | Sort descending by field |
 
 Boolean values (`true`/`false`) are handled specially.
+
+Clauses that do not parse (unknown operator, empty field/value, unsupported
+operators like `NOT LIKE`) are rejected with a **400** Invalid query error,
+like the real Table API.
 
 ## List response shape
 

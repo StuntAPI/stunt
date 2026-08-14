@@ -229,6 +229,7 @@ def _get_query(req, key, default_val):
     return v
 
 # _to_int parses a decimal string to int. Returns 0 for None/empty/non-numeric.
+# NOTE: Starlark strings are not iterable (no `for ch in s`), so this indexes.
 def _to_int(s):
     if s == None:
         return 0
@@ -236,11 +237,12 @@ def _to_int(s):
     if s == "":
         return 0
     neg = False
-    if s.startswith("-"):
+    if s[0] == "-":
         neg = True
         s = s[1:]
     n = 0
-    for ch in s:
+    for i in range(len(s)):
+        ch = s[i]
         if ch < "0" or ch > "9":
             return 0
         n = n * 10 + (ord(ch) - ord("0"))
@@ -267,6 +269,97 @@ def _list_page(req, docs, base_path):
     if next_cursor != None:
         next_link = base_path + "?$top=" + str(top) + "&$skip=" + next_cursor
     return page, next_link
+
+# _apply_odata_filters applies the AvaTax OData-style `$filter` and
+# `$orderBy` query params to a list of response dicts via query_select,
+# BEFORE `$top`/`$skip` paging (like the real API).
+#   $filter: "field op value" clauses joined by " and " (lowercase); ops are
+#   eq ne gt ge lt le (case-insensitive); values may be single-quoted
+#   ('CA') or bare. Unquoted all-digit values compare as ints and bare
+#   true/false as bools (OData literals are typed). Field names match the
+#   returned objects' fields.
+#   $orderBy: "field" or "field desc" (asc is the default).
+# Unsupported syntax is ignored (mock-friendly).
+def _apply_odata_filters(req, items):
+    f = []
+    expr = _get_query(req, "$filter", "")
+    if expr != "":
+        for clause in expr.strip().split(" and "):
+            triple = _parse_odata_clause(clause.strip())
+            if triple != None:
+                f.append(triple)
+
+    order_by = ""
+    order_dir = ""
+    ob = _get_query(req, "$orderBy", "")
+    if ob == "":
+        ob = _get_query(req, "$orderby", "")
+    if ob != "":
+        parts = ob.strip().split(" ")
+        order_by = parts[0]
+        if len(parts) > 1 and parts[1].lower() == "desc":
+            order_dir = "desc"
+
+    if len(f) == 0 and order_by == "":
+        return items
+    return query_select(items, f, order_by, order_dir, None, None, None)
+
+# _parse_odata_clause parses one "field op value" clause into a query_select
+# triple, or None when unparseable.
+def _parse_odata_clause(clause):
+    if clause == "":
+        return None
+    lc = clause.lower()
+    ops = [
+        ["eq", "="],
+        ["ne", "!="],
+        ["gt", ">"],
+        ["ge", ">="],
+        ["lt", "<"],
+        ["le", "<="],
+    ]
+    for pair in ops:
+        needle = " " + pair[0] + " "
+        idx = lc.find(needle)
+        if idx > 0:
+            field = clause[:idx].strip()
+            raw = clause[idx + len(needle):].strip()
+            val = _strip_quotes(raw)
+            if field != "" and val != "":
+                if raw == val:
+                    # Unquoted literal. OData values are typed, and
+                    # query_select's = is strictly typed: a string "1001"
+                    # never matches an int field (nexus ids), and "true"/
+                    # "false" never match a bool (hasNexus). Convert
+                    # all-digit literals to int and bare true/false to bool;
+                    # ordering ops coerce numeric strings anyway, but
+                    # converting keeps them exact.
+                    if _all_digits(val):
+                        return [field, pair[1], _to_int(val)]
+                    lv = val.lower()
+                    if lv == "true":
+                        return [field, pair[1], True]
+                    if lv == "false":
+                        return [field, pair[1], False]
+                return [field, pair[1], val]
+    return None
+
+# _all_digits reports whether s is non-empty and all decimal digits.
+def _all_digits(s):
+    if s == "":
+        return False
+    for i in range(len(s)):
+        ch = s[i]
+        if ch < "0" or ch > "9":
+            return False
+    return True
+
+# _strip_quotes removes one pair of surrounding single or double quotes.
+def _strip_quotes(val):
+    if len(val) >= 2:
+        if (val[0] == "'" and val[len(val) - 1] == "'") or (val[0] == '"' and val[len(val) - 1] == '"'):
+            return val[1:len(val) - 1]
+    return val
 
 # _address_state extracts the state/region from an addresses structure.
 def _address_state(addresses):

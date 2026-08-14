@@ -15,13 +15,15 @@ marketing automation integrations during local development:
 
 - **Auth:** `Authorization: Bearer <access_token>` OR `?access_token=<token>` query param.
   Tokens are minted via OAuth `client_credentials` grant and expire every hour.
-- **Leads (stateful):** `GET /rest/v1/leads` (filter by `filterType`/`filterValues`),
+- **Leads (stateful):** `GET /rest/v1/leads` (filter by `filterType`/`filterValues`,
+  project with `fields=id,firstName,lastName,...`),
   `POST /rest/v1/leads` (create/update), `GET /rest/v1/leads/{id}`,
   `POST /rest/v1/leads.json` (sync leads bulk upsert).
 - **Campaigns (stateful):** `GET /rest/v1/campaigns` → list campaigns,
   `POST /rest/v1/campaigns/{id}/trigger` → trigger a campaign for lead IDs.
 - **Programs:** `GET /rest/v1/programs` → marketing programs.
-- **Folders:** `GET /rest/v1/folders` → folder browsing (the Marketo folder-id pain).
+- **Folders:** `GET /rest/v1/folders` → folder browsing (the Marketo folder-id pain);
+  honors `root`, `maxDepth`, and `minDepth`.
 - **Activities (cursor-paginated):** `GET /rest/v1/activities/pagingtoken` → get a
   paging token; `GET /rest/v1/activities?activityTypeIds=&nextPageToken=` → fetch
   activities with paging tokens.

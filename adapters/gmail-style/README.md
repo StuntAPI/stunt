@@ -21,7 +21,7 @@ encoding) so you can test your integration locally without that delay.
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| GET | `/gmail/v1/users/{userId}/messages` | List messages (params: `q`, `maxResults`, `pageToken`, `labelIds`). |
+| GET | `/gmail/v1/users/{userId}/messages` | List messages (params: `q`, `maxResults`, `pageToken`, `labelIds`, `includeSpamTrash`). |
 | GET | `/gmail/v1/users/{userId}/messages/{messageId}` | Get message (`format=full\|metadata\|raw`). |
 | POST | `/gmail/v1/users/{userId}/messages/send` | Send message (`{raw: "<base64url rfc822>"}`). |
 | POST | `/gmail/v1/users/{userId}/messages` | Insert message. |
@@ -43,7 +43,7 @@ encoding) so you can test your integration locally without that delay.
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| GET | `/gmail/v1/users/{userId}/drafts` | List drafts (params: `maxResults`, `pageToken`). |
+| GET | `/gmail/v1/users/{userId}/drafts` | List drafts (params: `q`, `maxResults`, `pageToken`). |
 | POST | `/gmail/v1/users/{userId}/drafts` | Create draft. |
 | DELETE | `/gmail/v1/users/{userId}/drafts/{id}` | Immediately and permanently delete draft → `204`. |
 | GET | `/gmail/v1/users/{userId}/threads/{threadId}` | Get thread (all messages in thread). |
@@ -73,7 +73,9 @@ encoding) so you can test your integration locally without that delay.
   when more pages remain. The labels list is not paginated.
 - **Query filtering**: `q` does a case-insensitive substring match against
   the snippet and the Subject header; `labelIds` filters by label membership.
-  Filtering is applied before pagination.
+  Messages with the `TRASH` or `SPAM` label are excluded unless
+  `includeSpamTrash=true`, like the real API. Drafts support `q` (Subject
+  header or body). Filtering is applied before pagination.
 - **Labels**: 11 built-in system labels (INBOX, SENT, DRAFT, etc.) seeded on
   first access. User labels can be created (creating an existing name is
   idempotent — it returns the existing label). System labels cannot be

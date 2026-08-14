@@ -89,7 +89,7 @@ synthetic records. Supports `SELECT <fields> FROM <Object> [WHERE Id = 'value']`
 
 | Method | Route | Handler | Description |
 |--------|-------|---------|-------------|
-| GET | `/v1/accounts` | `accounts.star#on_list_accounts` | List accounts |
+| GET | `/v1/accounts` | `accounts.star#on_list_accounts` | List accounts (`filter[]`, `sort[]`, `fields[]` query params, `pageSize`/`cursor` paging) |
 | POST | `/v1/accounts` | `accounts.star#on_create_account` | Create account |
 | GET | `/v1/accounts/{accountKey}` | `accounts.star#on_get_account` | Get account |
 | GET | `/v1/subscriptions/{key}` | `subscriptions.star#on_get_subscription` | Get subscription |
@@ -97,12 +97,18 @@ synthetic records. Supports `SELECT <fields> FROM <Object> [WHERE Id = 'value']`
 | PUT | `/v1/subscriptions/{key}` | `subscriptions.star#on_update_subscription` | Update subscription |
 | POST | `/v1/subscriptions/{key}/cancel` | `subscriptions.star#on_cancel_subscription` | Cancel subscription |
 | POST | `/v1/usage` | `usage.star#on_record_usage` | Record usage |
-| GET | `/v1/usage` | `usage.star#on_list_usage` | List usage |
+| GET | `/v1/usage` | `usage.star#on_list_usage` | List usage (`?AccountId=`, `filter[]`, `sort[]`, `fields[]` query params, `pageSize`/`cursor` paging) |
 | GET | `/v1/invoices/{id}` | `billing.star#on_get_invoice` | Get invoice |
-| GET | `/v1/payments` | `billing.star#on_list_payments` | List payments |
+| GET | `/v1/payments` | `billing.star#on_list_payments` | List payments (`filter[]`, `sort[]`, `fields[]` query params, `pageSize`/`cursor` paging) |
 | POST | `/v1/payment-methods/credit-cards` | `billing.star#on_create_payment_method` | Create payment method |
 | POST | `/v1/transactions/billing/preview` | `billing.star#on_preview_billing` | Preview billing |
 | POST | `/v1/action/query` | `query.star#on_query` | ZOQL query |
+
+Note on list filtering: `filter[]` matching is exact and case-insensitive (as
+Zuora documents), and `field.EQ:null` matches null/missing fields — but the
+underlying engine keeps only one value per query key, so **only a single
+`filter[]` condition is applied per request**; multiple `filter[]` params
+cannot be ANDed.
 
 ## Backing stores
 

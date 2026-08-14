@@ -26,9 +26,11 @@ two-step upload pipeline:
   media item.
 - **Search:** `POST /v1/mediaItems:search` → `{mediaItems:[...],
   nextPageToken?}` — STATEFUL: items created via batchCreate appear in
-  search. Honors `pageSize`/`pageToken` from the JSON body.
+  search. Honors `pageSize` (default 25, max 100)/`pageToken` and
+  `filters.mediaTypeFilter` (PHOTO/VIDEO) + `filters.dateFilter` (dates,
+  ranges) from the JSON body.
 - **List:** `GET /v1/mediaItems` → `{mediaItems:[...], nextPageToken?}`.
-  Honors `pageSize`/`pageToken` query parameters.
+  Honors `pageSize` (default 25, max 100)/`pageToken` query parameters.
 - **Get:** `GET /v1/mediaItems/{id}` → the public media item.
 - **Media download:** `GET /v1/media-dl/{id}` serves the media bytes (the
   `baseUrl` target). Strict Google suffix semantics: `{id}=d` / `{id}=dv`
@@ -37,7 +39,8 @@ two-step upload pipeline:
   suffix fail byte-comparison loudly.
 - **Albums:** list, create, get album details, and delete an album
   (`DELETE /v1/albums/{id}` removes the album but leaves its media items
-  intact, mirroring the real API; returns an empty object).
+  intact, mirroring the real API; returns an empty object). Listing honors
+  `pageSize` (default 20, max 50) / `pageToken`.
 
 `baseUrl` is computed at read time from the request Host header
 (`http://{host}/v1/media-dl/{id}`), so responses always point back at the

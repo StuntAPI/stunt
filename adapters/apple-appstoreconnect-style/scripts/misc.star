@@ -39,6 +39,10 @@ def on_list_users(req):
         },
     ]
 
+    # Real list params (filter[username], filter[roles], sort) filter before
+    # paging.
+    users = _apply_users_query(req, users)
+
     page, next_cursor, limit = _list_page(req, users)
 
     return respond(200, {
@@ -79,3 +83,44 @@ def on_sales_reports(req):
             "self": "/v1/salesReports",
         },
     })
+
+# --- list query helpers ---
+
+# _apply_users_query maps the real List Users query params to query_select
+# clauses over JSON:API user entities. filter[roles] is a comma-separated
+# list matched against the roles array (the builtin cannot express
+# list-membership, so it is checked manually before query_select).
+def _apply_users_query(req, users):
+    roles_param = _get_query(req, "filter[roles]")
+    if roles_param != "":
+        wanted = []
+        for part in roles_param.split(","):
+            part = part.strip()
+            if part != "":
+                wanted.append(part)
+        if len(wanted) > 0:
+            out = []
+            for u in users:
+                got = u.get("attributes", {}).get("roles", [])
+                matched = False
+                for r in wanted:
+                    if r in got:
+                        matched = True
+                        break
+                if matched:
+                    out.append(u)
+            users = out
+
+    f = []
+    v = _get_query(req, "filter[username]")
+    if v != "":
+        f.append(["attributes.username", "=", v])
+
+    sort_field, desc = _asc_sort(req)
+    order_by = None
+    order_dir = ""
+    if sort_field == "username" or sort_field == "lastName" or sort_field == "firstName":
+        order_by = "attributes." + sort_field
+        order_dir = "desc" if desc else "asc"
+
+    return query_select(users, f if len(f) > 0 else None, order_by, order_dir, None, None, None)

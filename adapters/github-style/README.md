@@ -93,15 +93,15 @@ trigger retries with exponential backoff.
 | POST | `/app/installations/{id}/access_tokens` | `app.star#on_create_installation_token` | Exchange JWT → ghs_ token (201) |
 | GET | `/installation` | `app.star#on_get_installation` | Current installation |
 | GET | `/repos/{owner}/{repo}` | `repos.star#on_get_repo` | Repo metadata |
-| GET | `/repos/{owner}/{repo}/issues` | `issues.star#on_list_issues` | List issues |
+| GET | `/repos/{owner}/{repo}/issues` | `issues.star#on_list_issues` | List issues (honors `state`, `labels`, `creator`, `since`, `sort`, `direction`) |
 | POST | `/repos/{owner}/{repo}/issues` | `issues.star#on_create_issue` | Create issue (201) |
 | GET | `/repos/{owner}/{repo}/issues/{number}` | `issues.star#on_get_issue` | Get issue |
 | PATCH | `/repos/{owner}/{repo}/issues/{number}` | `issues.star#on_update_issue` | Update/close issue |
-| GET | `/repos/{owner}/{repo}/pulls` | `pulls.star#on_list_pulls` | List PRs |
+| GET | `/repos/{owner}/{repo}/pulls` | `pulls.star#on_list_pulls` | List PRs (honors `state`, `head`, `base`, `sort`, `direction`) |
 | POST | `/repos/{owner}/{repo}/pulls` | `pulls.star#on_create_pull` | Create PR (201) |
 | GET | `/repos/{owner}/{repo}/pulls/{number}/reviews` | `pulls.star#on_list_reviews` | List PR reviews |
 | POST | `/repos/{owner}/{repo}/dispatches` | `actions.star#on_dispatch` | Workflow dispatch (204) |
-| GET | `/repos/{owner}/{repo}/actions/runs` | `actions.star#on_list_runs` | List workflow runs |
+| GET | `/repos/{owner}/{repo}/actions/runs` | `actions.star#on_list_runs` | List workflow runs (honors `branch`, `event`, `status`) |
 | POST | `/repos/{owner}/{repo}/hooks` | `hooks.star#on_create_hook` | Register webhook (201) |
 | POST | `/graphql` | `graphql.star#on_graphql` | GraphQL (pattern-matched) |
 

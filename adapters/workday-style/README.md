@@ -103,7 +103,7 @@ authentication return **401**.
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| GET | `/wbs/v40.0/staffing/workers` | List workers |
+| GET | `/wbs/v40.0/staffing/workers` | List workers (honors `?search=` — case-insensitive partial match on descriptor/email/worker ID, applied before `limit`/`offset`) |
 | GET | `/wbs/v40.0/staffing/workers/{id}` | Get worker |
 | GET | `/wbs/v40.0/compensation/workers/{id}/compensation` | Worker compensation |
 | GET | `/wbs/v40.0/payroll/pay_components` | Pay components |

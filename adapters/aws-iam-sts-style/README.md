@@ -44,11 +44,17 @@ query parameter. Both GET and POST carry the same parameters.
 
 | Action | Description |
 |--------|-------------|
-| `?Action=ListRoles` | List IAM roles. **Stateful** (seeded + created roles appear). |
+| `?Action=ListRoles` | List IAM roles. **Stateful** (seeded + created roles appear). Honors `PathPrefix`, `MaxItems`, `Marker`. |
 | `?Action=GetRole` | Get a single role by name. |
 | `?Action=CreateRole` | Create a new IAM role. |
-| `?Action=ListUsers` | List IAM users. |
+| `?Action=ListUsers` | List IAM users. Honors `PathPrefix`, `MaxItems`, `Marker`. |
 | `?Action=CreateAccessKey` | Create an AKIA... long-term access key. |
+
+List actions paginate with `MaxItems` (IAM default `100`) + `Marker` (the
+opaque token from a prior truncated response); when truncated, the response
+carries `<IsTruncated>true</IsTruncated>` plus a `<Marker>` element, and
+`PathPrefix` filters entities by path prefix — all applied before rendering,
+like the real query API.
 
 ## Credential provider chain
 

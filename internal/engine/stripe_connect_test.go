@@ -550,3 +550,101 @@ func TestStripeStyleConnectAuth(t *testing.T) {
 		t.Fatalf("POST /v1/accounts (dev token) -> status %d, want 201; body %s", status, body)
 	}
 }
+
+// TestStripeStylePayoutAccountScoping pins Connect payout scoping: payouts
+// created under a Stripe-Account header are only listed for that account, and
+// the internal scoping key never leaks into API responses or webhooks.
+func TestStripeStylePayoutAccountScoping(t *testing.T) {
+	var mu sync.Mutex
+	var bodies []string
+	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		bodies = append(bodies, string(b))
+		mu.Unlock()
+		w.WriteHeader(200)
+	}))
+	defer sink.Close()
+
+	adapterDir := filepath.Join("..", "..", "adapters", "stripe-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"stripe": {Adapter: absAdapterDir, Config: map[string]any{"webhook_url": sink.URL}},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["stripe"]
+
+	body, status := postJSONAuthHeader(t, base+"/v1/payouts", devToken,
+		map[string]any{"amount": 500, "currency": "usd"},
+		map[string]string{"Stripe-Account": "acct-alpha"})
+	if status != 201 {
+		t.Fatalf("create payout -> %d; %s", status, body)
+	}
+	var created map[string]any
+	if err := json.Unmarshal([]byte(body), &created); err != nil {
+		t.Fatal(err)
+	}
+	if _, leaked := created["_account"]; leaked {
+		t.Fatal("_account leaked into the create response")
+	}
+
+	// Same account sees it; a different account does not.
+	listBody, status := getAuthHeader(t, base+"/v1/payouts", devToken,
+		map[string]string{"Stripe-Account": "acct-alpha"})
+	if status != 200 {
+		t.Fatalf("list payouts (alpha) -> %d; %s", status, listBody)
+	}
+	var list map[string]any
+	_ = json.Unmarshal([]byte(listBody), &list)
+	if got := len(list["data"].([]any)); got != 1 {
+		t.Fatalf("alpha sees %d payouts, want 1", got)
+	}
+	listBody, status = getAuthHeader(t, base+"/v1/payouts", devToken,
+		map[string]string{"Stripe-Account": "acct-beta"})
+	if status != 200 {
+		t.Fatalf("list payouts (beta) -> %d; %s", status, listBody)
+	}
+	_ = json.Unmarshal([]byte(listBody), &list)
+	if got := len(list["data"].([]any)); got != 0 {
+		t.Fatalf("beta sees %d payouts, want 0 (payouts are account-scoped)", got)
+	}
+
+	// The webhook payload must not carry the internal key either.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		mu.Lock()
+		n := len(bodies)
+		mu.Unlock()
+		if n > 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(bodies) == 0 {
+		t.Fatal("no payout.created webhook delivered")
+	}
+	if strings.Contains(bodies[0], "_account") {
+		t.Fatal("_account leaked into the payout.created webhook payload")
+	}
+}

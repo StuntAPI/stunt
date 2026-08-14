@@ -27,13 +27,29 @@ create in one request is visible in subsequent requests within the same
 | POST | `/upload/drive/v3/files` | `files.star#on_upload` | Upload a file (JSON `{name, content}` or folder via `mimeType`) |
 | GET | `/drive/v3/files/{id}` | `files.star#on_get` | Retrieve file metadata |
 | GET | `/drive/v3/files/{id}?alt=media` | `files.star#on_get` | Download file content |
-| GET | `/drive/v3/files` | `files.star#on_list` | List all non-trashed files |
+| GET | `/drive/v3/files` | `files.star#on_list` | List files (honors `q`, `orderBy`, `fields` + paging) |
 | PATCH | `/drive/v3/files/{id}` | `files.star#on_patch` | Update file metadata (name, trashed, …) |
 | DELETE | `/drive/v3/files/{id}` | `files.star#on_delete` | Permanently delete a file |
 | GET | `/drive/v3/about` | `misc.star#on_about` | Return synthetic storage quota + user |
 | GET | `/drive/v3/changes` | `misc.star#on_changes` | Return a minimal (empty) change list |
 
 Any unmatched route returns `404 {"error":"resource_not_found"}`.
+
+## Listing params
+
+`GET /drive/v3/files` honors the real Drive list params, applied before
+paging:
+
+- `q` — clauses joined by ` and `: `name = 'x'`, `name != 'x'`,
+  `name contains 'x'`, the `mimeType` equivalents, and
+  `trashed = true|false`. Other clause forms are ignored rather than
+  guessed. Trashed files stay excluded by default; an explicit `trashed`
+  clause overrides that, like the real API.
+- `orderBy` — comma-separated keys; the first recognized one wins
+  (`createdTime`, `modifiedTime`, `name`, `quotaBytesUsed`), each with an
+  optional `desc`/`asc` suffix.
+- `fields` — a `files(id,name,...)` selection projects each file object.
+- `pageSize`/`pageToken` — paging (unchanged).
 
 ## Backing stores
 

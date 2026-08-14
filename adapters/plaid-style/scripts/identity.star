@@ -50,6 +50,9 @@ def on_get_identity(req):
             }],
         })
 
+    # Real identity/get also honors options.account_ids.
+    accounts = _filter_account_ids(body, accounts)
+
     return respond(200, {
         "accounts": accounts,
         "request_id": _request_id(),

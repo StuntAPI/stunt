@@ -124,6 +124,10 @@ def _account_txlist(req, address):
                 "confirmations": tx.get("confirmations", "0"),
             })
 
+    # Real txlist params, applied after address scoping: startblock/endblock,
+    # filter_by (from/to), sort (asc/desc), page + offset (paging).
+    result = _apply_txlist_filters(req, result, address)
+
     return respond(200, _ok(result))
 
 # --- module: contract ---
@@ -212,6 +216,19 @@ def _token_holders(req):
             "TokenHolderAddress": h.get("TokenHolderAddress", ""),
             "TokenHolderQuantity": h.get("TokenHolderQuantity", "0"),
         })
+
+    # Real tokenholderlist paging: page (1-based) + offset (records per page).
+    q = req.get("query")
+    if q == None:
+        q = {}
+    page = _to_int(q.get("page", ""))
+    offset = _to_int(q.get("offset", ""))
+    if offset > 0:
+        skip = 0
+        if page > 1:
+            skip = (page - 1) * offset
+        result = query_select(result, None, None, "", offset, skip, None)
+
     return respond(200, _ok(result))
 
 # --- module: stats ---
@@ -283,6 +300,67 @@ def _handle_proxy(req, action):
         return respond(200, _ok("0x0"))
 
 # --- helpers ---
+
+# _to_int parses a decimal string to int. Returns 0 for None, empty, or
+# non-numeric input.
+def _to_int(s):
+    if s == None or s == "":
+        return 0
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch >= "0" and ch <= "9":
+            n = n * 10 + (ord(ch) - ord("0"))
+        else:
+            return 0
+    return n
+
+# _apply_txlist_filters maps the real Etherscan txlist query params onto
+# query_select. blockNumber/timeStamp are stored as numeric strings, so the
+# string params (also numeric strings) compare numerically. Addresses are
+# matched case-insensitively (stored lowercase).
+def _apply_txlist_filters(req, txs, address):
+    q = req.get("query")
+    if q == None:
+        q = {}
+
+    f = []
+    startblock = q.get("startblock", "")
+    if startblock != None and startblock != "" and _to_int(startblock) > 0:
+        f.append(["blockNumber", ">=", startblock])
+    endblock = q.get("endblock", "")
+    if endblock != None and endblock != "" and _to_int(endblock) > 0:
+        f.append(["blockNumber", "<=", endblock])
+
+    addr = address
+    if addr == None:
+        addr = ""
+    filter_by = q.get("filter_by", "")
+    if filter_by == "from":
+        f.append(["from", "=", addr.lower()])
+    elif filter_by == "to":
+        f.append(["to", "=", addr.lower()])
+
+    order_by = None
+    order_dir = ""
+    sort = q.get("sort", "")
+    if sort == "asc" or sort == "desc":
+        order_by = "timeStamp"
+        order_dir = sort
+
+    # page (1-based) + offset (records per page).
+    page = _to_int(q.get("page", ""))
+    offset = _to_int(q.get("offset", ""))
+    limit = None
+    skip = None
+    if offset > 0:
+        limit = offset
+        if page > 1:
+            skip = (page - 1) * offset
+
+    if len(f) == 0 and order_by == None and limit == None:
+        return txs
+    return query_select(txs, f if len(f) > 0 else None, order_by, order_dir, limit, skip, None)
 
 # _split_commas splits a comma-separated string into a list.
 def _split_commas(s):

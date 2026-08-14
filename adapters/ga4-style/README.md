@@ -14,15 +14,15 @@ A stunt adapter simulating the **Google Analytics GA4 Data API + Admin API**, fo
 | Method | Route | Description |
 |--------|-------|-------------|
 | GET | `/v1admin/accounts` | List analytics accounts. |
-| GET | `/v1admin/properties` | List properties (optional `?filter=parent:accounts/100001`). |
+| GET | `/v1admin/properties` | List properties (optional `?filter=parent:accounts/100001`, `pageSize`/`pageToken`). |
 | GET | `/v1admin/properties/{property}/dataStreams` | List data streams for a property. |
 
 ### Data API (Bearer required)
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| POST | `/v1beta/properties/{property}:runReport` | Run a report (dimensions, metrics, dateRanges, limit, offset). |
-| POST | `/v1beta/properties/{property}:runRealtimeReport` | Run a realtime report. |
+| POST | `/v1beta/properties/{property}:runReport` | Run a report (dimensions, metrics, dateRanges, limit, offset, dimensionFilter/metricFilter, orderBys). |
+| POST | `/v1beta/properties/{property}:runRealtimeReport` | Run a realtime report (dimensions, metrics, limit, offset, dimensionFilter/metricFilter, orderBys). |
 
 ## Key shapes
 
@@ -31,6 +31,7 @@ A stunt adapter simulating the **Google Analytics GA4 Data API + Admin API**, fo
 - Report response: `{dimensionHeaders, metricHeaders, rows:[{dimensionValues, metricValues}], rowCount, metadata}`.
 - Deterministic dimensions: `date`, `country`, `deviceCategory`.
 - Deterministic metrics: `sessions`, `activeUsers`, `screenPageViews`.
+- Unknown dimension/metric names (in `dimensions`, `metrics`, filter `fieldName`s, or `orderBys`) return `400 INVALID_ARGUMENT` like the real Data API.
 
 ## Usage
 

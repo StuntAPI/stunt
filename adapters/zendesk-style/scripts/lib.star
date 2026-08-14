@@ -124,3 +124,13 @@ def _list_page(req, docs):
         cursor = ""
     page_docs, next_cursor = paginate(docs, page_size, cursor)
     return page_docs, next_cursor
+
+# _zd_sorted applies the Zendesk sort/sort_order query params (the search
+# endpoint names its param sort_by) via query_select, BEFORE paging like the
+# real API. Returns the list unchanged when no sort field is given.
+def _zd_sorted(req, docs, sort_param):
+    sort = _get_query(req, sort_param, "")
+    if sort == "":
+        return docs
+    order_dir = _get_query(req, "sort_order", "asc")
+    return query_select(docs, None, sort, order_dir, None, None, None)

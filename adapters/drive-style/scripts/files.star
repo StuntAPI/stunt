@@ -117,21 +117,137 @@ def on_get(req):
 
     return respond(200, doc)
 
-# GET /drive/v3/files — list all files (metadata only).
+# GET /drive/v3/files — list files (metadata only).
+# Honors the real Drive files.list params the mock can back: q, orderBy and
+# fields (see _apply_file_filters), plus pageSize/pageToken paging.
 def on_list(req):
     c = store_collection("files")
     docs = c.list()
-    # Filter out trashed files by default (like real Drive).
-    visible = []
-    for d in docs:
-        if not d.get("trashed", False):
-            visible.append(d)
+    visible = _apply_file_filters(req, docs)
     # Apply Drive-style paging (pageSize / pageToken) after filtering.
     page, next_token = _list_page(req, visible)
     result = {"files": page}
     if next_token != None:
         result["nextPageToken"] = next_token
     return respond(200, result)
+
+# --- list helpers ---
+
+# _apply_file_filters maps the real Drive files.list params the mock stores
+# can honor onto query_select clauses, applied before paging like the real
+# API:
+#   q       -> clauses joined by " and ": "name = 'x'", "name != 'x'",
+#              "name contains 'x'", the mimeType equivalents, and
+#              "trashed = true|false". Other clause forms (parents, fullText,
+#              properties, ...) are ignored — no invented matching.
+#   orderBy -> comma-separated keys; the first recognized one wins
+#              (createdTime, modifiedTime, name, quotaBytesUsed -> size),
+#              each with an optional "desc"/"asc" suffix.
+#   fields  -> a "files(k1,k2,...)" selection projects each file object.
+# Trashed files are excluded by default (like real Drive); an explicit
+# trashed clause in q overrides that.
+def _apply_file_filters(req, docs):
+    q = _get_query(req).get("q", "")
+    if q == None:
+        q = ""
+
+    f = []
+    trashed_clause = False
+    if q != "":
+        for clause in q.split(" and "):
+            triple = _parse_q_clause(clause.strip())
+            if triple != None:
+                if triple[0] == "trashed":
+                    trashed_clause = True
+                f.append(triple)
+
+    flt = None
+    if len(f) > 0:
+        flt = f
+
+    base = []
+    for d in docs:
+        if trashed_clause:
+            base.append(d)
+        elif not d.get("trashed", False):
+            base.append(d)
+
+    order_by, order_dir = _order_by(req)
+    return query_select(base, flt, order_by, order_dir, None, None, _fields_for(req))
+
+# _parse_q_clause translates one Drive q clause into a query_select triple,
+# or None when the clause is not one of the supported forms.
+def _parse_q_clause(clause):
+    if clause == "trashed = true":
+        return ["trashed", "=", True]
+    if clause == "trashed = false":
+        return ["trashed", "=", False]
+    if clause.startswith("name contains "):
+        return ["name", "contains", _strip_quotes(clause[len("name contains "):].strip())]
+    if clause.startswith("name = "):
+        return ["name", "=", _strip_quotes(clause[len("name = "):].strip())]
+    if clause.startswith("name != "):
+        return ["name", "!=", _strip_quotes(clause[len("name != "):].strip())]
+    if clause.startswith("mimeType contains "):
+        return ["mimeType", "contains", _strip_quotes(clause[len("mimeType contains "):].strip())]
+    if clause.startswith("mimeType = "):
+        return ["mimeType", "=", _strip_quotes(clause[len("mimeType = "):].strip())]
+    if clause.startswith("mimeType != "):
+        return ["mimeType", "!=", _strip_quotes(clause[len("mimeType != "):].strip())]
+    return None
+
+# _strip_quotes removes one matching pair of surrounding single or double
+# quotes from a q literal, if present.
+def _strip_quotes(s):
+    if len(s) >= 2 and (s[0] == "'" or s[0] == "\"") and s[len(s) - 1] == s[0]:
+        return s[1:len(s) - 1]
+    return s
+
+# _order_by parses the Drive orderBy param and returns (field, dir) for the
+# first recognized key, or ("", "") when none apply.
+def _order_by(req):
+    ob = _get_query(req).get("orderBy", "")
+    if ob == None or ob == "":
+        return "", ""
+    for seg in ob.split(","):
+        seg = seg.strip()
+        dir = "asc"
+        if seg.endswith(" desc"):
+            dir = "desc"
+            seg = seg[:len(seg) - len(" desc")].strip()
+        elif seg.endswith(" asc"):
+            seg = seg[:len(seg) - len(" asc")].strip()
+        field = ""
+        if seg == "createdTime" or seg == "modifiedTime" or seg == "name":
+            field = seg
+        elif seg == "quotaBytesUsed":
+            field = "size"
+        if field != "":
+            return field, dir
+    return "", ""
+
+# _fields_for parses a Drive fields param like "files(id,name)" (optionally
+# with sibling selections such as ",nextPageToken") into the list of keys
+# each file object is projected onto, or None when no projection applies.
+def _fields_for(req):
+    fields = _get_query(req).get("fields", "")
+    if fields == None or fields == "":
+        return None
+    idx = fields.find("files(")
+    if idx < 0:
+        return None
+    rest = fields[idx + len("files("):]
+    end = rest.find(")")
+    if end < 0:
+        return None
+    names = []
+    for part in rest[:end].split(","):
+        part = part.strip()
+        if part != "" and part != "*":
+            names.append(part)
+    if len(names) == 0:
+        return None
+    return names
 
 # PATCH /drive/v3/files/{id} — update file metadata (e.g., name, trashed).
 def on_patch(req):

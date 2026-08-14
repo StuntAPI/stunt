@@ -21,18 +21,21 @@ JSON:API conventions, and app/version/build management.
 - **Sales reports:** `GET /v1/salesReports`.
 - **JSON:API error shape:** `{errors:[{status,code,title,detail}]}`.
 - **Stateful apps:** created apps persist and appear in subsequent list calls.
+- **List filtering:** the real JSON:API list params (`filter[...]`, `sort`
+  with a leading `-` for descending, `fields[...]` projections) are applied
+  before paging, like the real API.
 
 ## Endpoints
 
 | Method | Route | Handler | Description |
 |--------|-------|---------|-------------|
-| GET | `/v1/apps` | `apps.star#on_list_apps` | List apps (JSON:API) |
+| GET | `/v1/apps` | `apps.star#on_list_apps` | List apps (params: `filter[name]`, `filter[bundleId]`, `filter[sku]`, `sort`, `fields[apps]`, `limit`/`cursor`). |
 | POST | `/v1/apps` | `apps.star#on_create_app` | Create an app (201) |
 | GET | `/v1/apps/{id}` | `apps.star#on_get_app` | Get a single app |
-| GET | `/v1/apps/{id}/appStoreVersions` | `apps.star#on_list_app_versions` | App versions |
-| GET | `/v1/apps/{id}/builds` | `apps.star#on_list_builds` | App builds |
+| GET | `/v1/apps/{id}/appStoreVersions` | `apps.star#on_list_app_versions` | App versions (params: `filter[appStoreState]`, `filter[versionString]`, `sort`). |
+| GET | `/v1/apps/{id}/builds` | `apps.star#on_list_builds` | App builds (params: `filter[processingState]`, `filter[version]`, `sort`). |
 | GET | `/v1/apps/{id}/appPrices` | `apps.star#on_list_app_prices` | App prices |
-| GET | `/v1/users` | `misc.star#on_list_users` | List users |
+| GET | `/v1/users` | `misc.star#on_list_users` | List users (params: `filter[username]`, `filter[roles]`, `sort`, `limit`/`cursor`). |
 | GET | `/v1/salesReports` | `misc.star#on_sales_reports` | Sales reports |
 
 Any unmatched route returns `404` (JSON:API error shape).

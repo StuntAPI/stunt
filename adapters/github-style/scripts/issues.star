@@ -21,9 +21,6 @@ def on_list_issues(req):
     owner = req["params"]["owner"]
     repo = req["params"]["repo"]
     repo_key = _repo_key(owner, repo)
-    state_filter = req["query"].get("state", "open")
-    if state_filter == None:
-        state_filter = "open"
 
     ic = store_collection("issues")
     all_issues = ic.list()
@@ -31,10 +28,9 @@ def on_list_issues(req):
     for i in all_issues:
         if i.get("repo", "") != repo_key:
             continue
-        if state_filter != "all" and i.get("state", "") != state_filter:
-            continue
         result.append(_issue_view(i))
 
+    result = _apply_issue_filters(req, result)
     page, next_link = _list_page(req, result)
     return respond(200, page, _gh_link_headers(next_link))
 
@@ -148,6 +144,53 @@ def on_update_issue(req):
     return _gh_not_found()
 
 # --- helpers ---
+
+# _apply_issue_filters maps the real GitHub issue-list query params onto
+# query_select, applied after repo scoping and before paging like the real
+# API. state defaults to "open" (GitHub's default). labels requires the
+# issue to carry every requested label name. since filters on updated_at.
+# sort supports created (default) / updated (comments falls back to
+# created — no comment counts are stored); direction defaults to desc.
+def _apply_issue_filters(req, docs):
+    labels_q = _get_query(req, "labels", "")
+    if labels_q != "":
+        wanted = []
+        for part in labels_q.split(","):
+            part = part.strip()
+            if part != "":
+                wanted.append(part)
+        kept = []
+        for d in docs:
+            names = []
+            for l in d.get("labels", []):
+                names.append(l.get("name", ""))
+            ok = True
+            for w in wanted:
+                if w not in names:
+                    ok = False
+                    break
+            if ok:
+                kept.append(d)
+        docs = kept
+
+    f = []
+    state = _get_query(req, "state", "open")
+    if state != "all":
+        f.append(["state", "=", state])
+    creator = _get_query(req, "creator", "")
+    if creator != "":
+        f.append(["user.login", "=", creator])
+    since = _get_query(req, "since", "")
+    if since != "":
+        f.append(["updated_at", ">=", since])
+
+    sort = _get_query(req, "sort", "created")
+    order_by = "created_at"
+    if sort == "updated":
+        order_by = "updated_at"
+    direction = _get_query(req, "direction", "desc")
+
+    return query_select(docs, f, order_by, direction)
 
 def _issue_view(i):
     return {

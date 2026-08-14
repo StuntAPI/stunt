@@ -124,6 +124,17 @@ def _get_body(req):
         return {}
     return body
 
+# _get_query reads a single query-param value from req, returning "" for a
+# missing param or a None value.
+def _get_query(req, key):
+    q = req.get("query")
+    if q == None:
+        return ""
+    v = q.get(key, "")
+    if v == None:
+        return ""
+    return v
+
 # ====================================================================
 # ID generation
 # ====================================================================

@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -256,7 +257,17 @@ func TestPSD2StyleAdapter(t *testing.T) {
 
 	// ===== get transactions =====
 
+	// Berlin Group: bookingStatus and dateFrom are required — their absence
+	// is a 400 PARAMETER_MISSING, not the full history.
 	body, status = psd2Get(t, base+"/v1/accounts/"+resourceID+"/transactions", oauthToken)
+	if status != 400 {
+		t.Fatalf("get transactions without params -> %d, want 400; body %s", status, body)
+	}
+	if !strings.Contains(body, "PARAMETER_MISSING-BOOKINGSTATUS") {
+		t.Fatalf("missing-param error code: %s", body)
+	}
+
+	body, status = psd2Get(t, base+"/v1/accounts/"+resourceID+"/transactions?bookingStatus=booked&dateFrom=2024-01-01", oauthToken)
 	if status != 200 {
 		t.Fatalf("get transactions -> %d, want 200; body %s", status, body)
 	}

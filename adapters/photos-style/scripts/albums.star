@@ -1,13 +1,18 @@
 # Albums handlers — list, create, get.
 #
 # GET  /v1/albums (Bearer) -> { albums: [...], nextPageToken? }
+#   Honors the real list params: pageSize (default 20, max 50) and pageToken.
 # POST /v1/albums (Bearer; { album: { title } }) -> { id, title, ... }
 # GET  /v1/albums/{id} (Bearer) -> { id, title, ... }
 
-# Shared helpers (_bearer, _user_for_token, _to_int) are preloaded from
-# scripts/lib.star.
+# Shared helpers (_bearer, _user_for_token, _to_int, _to_num, _paginate) are
+# preloaded from scripts/lib.star.
 
-# on_list_albums returns all albums for the authenticated user.
+# The real albums.list defaults to 20 albums per page and caps at 50.
+_DEFAULT_ALBUM_PAGE_SIZE = 20
+_MAX_ALBUM_PAGE_SIZE = 50
+
+# on_list_albums returns the user's albums, paginated like the real API.
 def on_list_albums(req):
     user = _user_for_token(req)
     if user == None:
@@ -21,7 +26,18 @@ def on_list_albums(req):
             continue
         albums.append(_public_album(doc))
 
-    return respond(200, {"albums": albums})
+    page_size = _to_num(req["query"].get("pageSize", ""), _DEFAULT_ALBUM_PAGE_SIZE)
+    if page_size > _MAX_ALBUM_PAGE_SIZE:
+        page_size = _MAX_ALBUM_PAGE_SIZE
+    page_token = req["query"].get("pageToken", "")
+    if page_token == None:
+        page_token = ""
+
+    page, next_token = _paginate(albums, page_size, page_token)
+    result = {"albums": page}
+    if next_token != None:
+        result["nextPageToken"] = next_token
+    return respond(200, result)
 
 # on_create_album creates a new album.
 def on_create_album(req):

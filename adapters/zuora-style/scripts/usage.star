@@ -72,7 +72,11 @@ def on_list_usage(req):
             "Status": d.get("Status", "Imported"),
         })
 
+    # Zuora list query params (filter[]/sort[] before paging, fields[] after),
+    # same convention as the accounts and payments list endpoints.
+    usage = _apply_zuora_filters(req, usage)
     usage, next_cursor = _list_page(req, usage)
+    usage = _apply_zuora_fields(req, usage)
 
     resp = {
         "success": True,

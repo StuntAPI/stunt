@@ -17,7 +17,8 @@ helpdesk/customer-support integrations during local development:
   `email@example.com/token:api_token` as the basic auth username:password pair) OR
   `Authorization: Bearer <token>`.
 - **Tickets (stateful):** `GET /api/v2/tickets` → `{tickets:[...], meta:{has_more},
-  links:{next}}` (cursor pagination). `POST /api/v2/tickets` → create
+  links:{next}}` (cursor pagination; honors `sort` + `sort_order`, e.g.
+  `?sort=updated_at&sort_order=desc`). `POST /api/v2/tickets` → create
   (`{ticket:{subject, comment:{body}, requester}}`; the initial comment is stored).
   `GET .../tickets/{id}` → get. `PUT .../tickets/{id}` → update (an embedded
   `comment` in the update body is stored as a new comment). `DELETE
@@ -26,14 +27,20 @@ helpdesk/customer-support integrations during local development:
   (returns a Zendesk-style `{audit:{events:[...]}}` envelope). `GET
   .../tickets/{id}/comments` → list comments.
 - **Ticket tags:** `POST .../tickets/{id}/tags` → set tags.
-- **Users:** `GET /api/v2/users` → `{users:[{id, name, email, role, active}]}`.
-- **Organizations:** `GET /api/v2/organizations` → `{organizations:[...]}`.
-- **Groups:** `GET /api/v2/groups` → `{groups:[...]}`.
+- **Users:** `GET /api/v2/users` → `{users:[{id, name, email, role, active}]}`
+  (honors `sort` + `sort_order`).
+- **Organizations:** `GET /api/v2/organizations` → `{organizations:[...]}`
+  (honors `sort` + `sort_order`).
+- **Groups:** `GET /api/v2/groups` → `{groups:[...]}` (honors `sort` +
+  `sort_order`).
 - **Search:** `GET /api/v2/search.json?query=...` → `{results:[...], meta, links}` —
   case-insensitive substring match over ticket `subject` and `description`; an empty
-  query returns all tickets.
-- **Requests:** `GET /api/v2/requests` → end-user-facing requests.
-- **Views + Triggers:** `GET /api/v2/views`, `GET /api/v2/triggers` → automations.
+  query returns all tickets. Honors `sort_by` + `sort_order` and `per_page`/`page`
+  pagination.
+- **Requests:** `GET /api/v2/requests` → end-user-facing requests; honors
+  `sort` + `sort_order`.
+- **Views + Triggers:** `GET /api/v2/views`, `GET /api/v2/triggers` → automations
+  (triggers honor `sort` + `sort_order`).
 - **Webhooks:** `GET/POST /api/v2/webhooks` → webhook management. `DELETE
   /api/v2/webhooks/{id}` → delete (204).
 - **Suspended tickets:** `GET /api/v2/suspended_tickets` (always empty).

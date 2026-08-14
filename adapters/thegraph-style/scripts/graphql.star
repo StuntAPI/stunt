@@ -71,14 +71,13 @@ def on_schema(req):
 # =====================================================================
 
 # _query_pools returns deterministic pool entities based on the query.
+# Real subgraph collection args are honored: where, orderBy, orderDirection,
+# first, skip.
 def _query_pools(query, subgraph_id):
     pc = store_collection("pools")
     pools = pc.list()
 
-    # Extract limit from "pools(first:N)".
-    first = _extract_arg_int(_extract_header(query, "pools"), "first")
-    if first > 0 and len(pools) > first:
-        pools = pools[:first]
+    pools = _apply_graph_args(query, "pools", pools, _extract_header(query, "pools"))
 
     result = []
     for p in pools:
@@ -86,13 +85,13 @@ def _query_pools(query, subgraph_id):
     return result
 
 # _query_tokens returns deterministic token entities based on the query.
+# Real subgraph collection args are honored: where, orderBy, orderDirection,
+# first, skip.
 def _query_tokens(query, subgraph_id):
     tc = store_collection("tokens")
     tokens = tc.list()
 
-    first = _extract_arg_int(_extract_header(query, "tokens"), "first")
-    if first > 0 and len(tokens) > first:
-        tokens = tokens[:first]
+    tokens = _apply_graph_args(query, "tokens", tokens, _extract_header(query, "tokens"))
 
     result = []
     for t in tokens:
@@ -100,13 +99,13 @@ def _query_tokens(query, subgraph_id):
     return result
 
 # _query_domains returns deterministic domain entities based on the query.
+# Real subgraph collection args are honored: where, orderBy, orderDirection,
+# first, skip.
 def _query_domains(query, subgraph_id):
     dc = store_collection("domains")
     domains = dc.list()
 
-    first = _extract_arg_int(_extract_header(query, "domains"), "first")
-    if first > 0 and len(domains) > first:
-        domains = domains[:first]
+    domains = _apply_graph_args(query, "domains", domains, _extract_header(query, "domains"))
 
     result = []
     for d in domains:

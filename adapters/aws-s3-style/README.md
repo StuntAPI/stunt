@@ -48,6 +48,24 @@ ListObjectsV2 supports S3 cursor pagination:
 
 Prefix filtering (`prefix=...`) is applied **before** pagination, as in real S3.
 
+ListObjectsV2 also honors the real S3 list params:
+
+- **`start-after=...`** — list keys lexicographically after the given key
+  (ListObjectsV2 only; echoed as `<StartAfter>`).
+- **`delimiter=...`** — keys sharing the prefix up to and including the first
+  delimiter occurrence roll up into `<CommonPrefixes>` entries (echoed as
+  `<Delimiter>`).
+- **`marker=...`** — ListObjects V1 (requests without `list-type=2`): list
+  keys lexicographically after the given one (echoed as `<Marker>`).
+- **`encoding-type=url`** — percent-encode keys, prefixes, delimiter,
+  `start-after` and `marker` in the response (echoed as `<EncodingType>`).
+  Any other value returns a `400 InvalidArgument` XML error, like real S3.
+- **`fetch-owner=true`** — ListObjectsV2: include an `<Owner>` element in
+  each `<Contents>` entry.
+
+Keys and common prefixes are returned in ascending lexicographic order, and
+all list filters are applied before pagination, as in real S3.
+
 All XML responses use the correct S3 namespace:
 `http://s3.amazonaws.com/doc/2006-03-01/`.
 
@@ -148,6 +166,7 @@ All errors use S3-shaped XML:
 | `AuthorizationHeaderMalformed` | 403 | Credential not `<AK>/YYYYMMDD/region/s3/aws4_request` |
 | `AuthorizationQueryParametersError` | 403 | Invalid presigned `X-Amz-*` query params |
 | `SignatureDoesNotMatch` | 403 | Malformed SigV4 algorithm or non-hex signature |
+| `InvalidArgument` | 400 | `encoding-type` other than `url` on a list request |
 | `NoSuchBucket` | 404 | Bucket doesn't exist |
 | `NoSuchKey` | 404 | Object key doesn't exist |
 | `BucketAlreadyOwnedByYou` | 409 | Bucket already exists on PUT |

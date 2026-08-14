@@ -34,7 +34,9 @@ def on_list_accounts(req):
     for d in docs:
         accounts.append(_account_shape(d))
 
+    accounts = _apply_zuora_filters(req, accounts)
     accounts, next_cursor = _list_page(req, accounts)
+    accounts = _apply_zuora_fields(req, accounts)
 
     resp = {
         "success": True,

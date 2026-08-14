@@ -129,3 +129,226 @@ def _pad6(n):
     while len(s) < 6:
         s = "0" + s
     return s
+
+# --- selector (find/report) helpers ---
+#
+# Apple Search Ads find/report endpoints accept a POST body selector:
+#   { "selector": { "conditions": [{field, operator, values}],
+#                   "orderBy": [{field, sortOrder}],
+#                   "pagination": {offset, limit} } }
+# (older clients send the same keys at the top level, which we tolerate).
+
+# _asa_selector returns the selector dict from a request body: the nested
+# body["selector"] when present, else the body itself.
+def _asa_selector(body):
+    if body == None:
+        return {}
+    sel = body.get("selector", None)
+    if sel != None and type(sel) == "dict":
+        return sel
+    return body
+
+# _asa_to_int coerces a JSON number or digit-string to int. Returns 0 for
+# anything unparseable.
+def _asa_to_int(v):
+    if v == None:
+        return 0
+    if type(v) == "int":
+        return v
+    if type(v) == "float":
+        return int(v)
+    if type(v) == "string":
+        n = 0
+        for i in range(len(v)):
+            ch = v[i]
+            if ch >= "0" and ch <= "9":
+                n = n * 10 + (ord(ch) - ord("0"))
+            else:
+                return 0
+        return n
+    return 0
+
+# _asa_num_str stringifies a JSON number the way money amounts are stored
+# ("5000", no ".0"). Non-numbers pass through unchanged.
+def _asa_num_str(v):
+    if type(v) == "int":
+        return str(v)
+    if type(v) == "float":
+        if v == int(v):
+            return str(int(v))
+        return str(v)
+    return v
+
+# _asa_coerce_values normalizes a condition's values list. numeric=True
+# converts digit-string values to ints (numeric id fields); amount=True
+# stringifies numbers (money amounts stored as strings). None values are
+# dropped. A non-list value is treated as a single value.
+def _asa_coerce_values(values, numeric, amount):
+    if values == None:
+        values = []
+    if type(values) != "list":
+        values = [values]
+    vals = []
+    for v in values:
+        if v == None:
+            continue
+        if numeric and type(v) == "string":
+            vals.append(_asa_to_int(v))
+        elif amount and (type(v) == "int" or type(v) == "float"):
+            vals.append(_asa_num_str(v))
+        else:
+            vals.append(v)
+    return vals
+
+# _asa_get_path returns the value at a dotted path ("a.b") in row, or None
+# when the path is absent.
+def _asa_get_path(row, path):
+    cur = row
+    for part in path.split("."):
+        if type(cur) != "dict":
+            return None
+        cur = cur.get(part, None)
+        if cur == None:
+            return None
+    return cur
+
+# _asa_notin_exclude implements NOT-IN (multi-value NOT_EQUALS) as a manual
+# exclusion pass — query_select has no not-in op and its != triples are
+# AND'ed per value, which would wrongly match rows missing the field.
+# Rows whose value at path equals any of vals (or that lack the field) are
+# dropped.
+def _asa_notin_exclude(rows, path, vals):
+    out = []
+    for r in rows:
+        v = _asa_get_path(r, path)
+        if v == None:
+            continue
+        hit = False
+        for x in vals:
+            if x == v:
+                hit = True
+                break
+        if not hit:
+            out.append(r)
+    return out
+
+# _asa_path_in reports whether path appears in the paths list.
+def _asa_path_in(path, paths):
+    for p in paths:
+        if p == path:
+            return True
+    return False
+
+# _asa_triples translates one selector condition {field, operator, values}
+# into query_select [path, op, value] triples. numeric=True converts
+# digit-string values to ints (numeric id fields); amount=True stringifies
+# numbers (money amounts stored as strings). Unknown operators are ignored.
+#
+# Values within one condition are OR'd alternatives (real ASA semantics), so
+# multi-value EQUALS becomes a single "in" clause — NOT one "=" per value,
+# which query_select would AND together into an always-false filter.
+# Multi-value NOT_EQUALS (NOT IN) cannot be expressed as a triple; callers
+# must handle it via _asa_notin_exclude (see _asa_apply_conditions).
+def _asa_triples(path, operator, values, numeric, amount):
+    out = []
+    if path == None or operator == None or type(operator) != "string":
+        return out
+    op = operator.upper()
+    vals = _asa_coerce_values(values, numeric, amount)
+    if len(vals) == 0:
+        return out
+
+    if op == "EQUALS":
+        if len(vals) == 1:
+            out.append([path, "=", vals[0]])
+        else:
+            out.append([path, "in", vals])
+    elif op == "NOT_EQUALS":
+        if len(vals) == 1:
+            out.append([path, "!=", vals[0]])
+    elif op == "IN":
+        out.append([path, "in", vals])
+    elif op == "CONTAINS" or op == "CONTAINS_ALL":
+        # Substring match; only valid on string fields — numeric/amount
+        # fields are skipped (the builtin's contains op needs strings).
+        if not numeric and not amount:
+            for v in vals:
+                if type(v) == "string":
+                    out.append([path, "contains", v])
+    elif op == "GREATER_THAN" or op == "GREATER_THAN_OR_EQUAL":
+        for v in vals:
+            out.append([path, ">" if op == "GREATER_THAN" else ">=", v])
+    elif op == "LESS_THAN" or op == "LESS_THAN_OR_EQUAL":
+        for v in vals:
+            out.append([path, "<" if op == "LESS_THAN" else "<=", v])
+    return out
+
+# _asa_apply_conditions applies a selector conditions list to rows the way
+# the real find/report endpoints do: each condition {field, operator, values}
+# is AND'ed, with values inside one condition as OR'd alternatives.
+# field_map maps a condition field name to a (possibly dotted) response path,
+# or None to skip the condition. numeric_paths / amount_paths list paths whose
+# values are numeric ids / money-amount strings.
+def _asa_apply_conditions(rows, conditions, field_map, numeric_paths, amount_paths):
+    if conditions == None or type(conditions) != "list":
+        return rows
+    f = []
+    for cond in conditions:
+        if cond == None or type(cond) != "dict":
+            continue
+        path = field_map(cond.get("field", ""))
+        if path == None:
+            continue
+        numeric = _asa_path_in(path, numeric_paths)
+        amount = _asa_path_in(path, amount_paths)
+        operator = cond.get("operator", None)
+        op = ""
+        if operator != None and type(operator) == "string":
+            op = operator.upper()
+        if op == "NOT_EQUALS":
+            vals = _asa_coerce_values(cond.get("values", None), numeric, amount)
+            if len(vals) > 1:
+                # NOT IN: manual exclusion pass, no query_select triple.
+                rows = _asa_notin_exclude(rows, path, vals)
+                continue
+        for t in _asa_triples(path, operator, cond.get("values", None), numeric, amount):
+            f.append(t)
+    if len(f) > 0:
+        rows = query_select(rows, f, None, "", None, None, None)
+    return rows
+
+# _asa_apply_order applies a selector orderBy list to items via query_select,
+# applying keys in reverse so the stable sort yields multi-key order.
+# field_map maps an ASA orderBy field name to a (possibly dotted) path, or
+# None to skip.
+def _asa_apply_order(items, order_by, field_map):
+    if order_by == None or type(order_by) != "list":
+        return items
+    i = len(order_by) - 1
+    while i >= 0:
+        ob = order_by[i]
+        i = i - 1
+        if ob == None or type(ob) != "dict":
+            continue
+        path = field_map(ob.get("field", ""))
+        if path == None:
+            continue
+        direction = ob.get("sortOrder", "ASCENDING")
+        order_dir = "asc"
+        if type(direction) == "string" and direction.upper() == "DESCENDING":
+            order_dir = "desc"
+        items = query_select(items, None, path, order_dir, None, None, None)
+    return items
+
+# _asa_pagination extracts (offset, limit) from a selector pagination block.
+# Defaults mirror the real find endpoints: offset 0, limit 1000.
+def _asa_pagination(sel):
+    offset = 0
+    limit = 1000
+    p = sel.get("pagination", None)
+    if p != None and type(p) == "dict":
+        offset = _asa_to_int(p.get("offset", 0))
+        limit = _asa_to_int(p.get("limit", 1000))
+        if limit <= 0:
+            limit = 1000
+    return offset, limit

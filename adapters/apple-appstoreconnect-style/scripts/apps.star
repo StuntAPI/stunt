@@ -78,6 +78,10 @@ def on_list_apps(req):
     for d in docs:
         data.append(_app_entity(d))
 
+    # Real Find Apps params (filter[name]/filter[bundleId]/filter[sku],
+    # sort, fields[apps]) filter before paging.
+    data = _apply_apps_query(req, data)
+
     page, next_cursor, limit = _list_page(req, data)
 
     return respond(200, {
@@ -148,24 +152,29 @@ def on_list_app_versions(req):
     if doc == None:
         return _not_found_err("App", app_id)
 
+    data = [
+        {
+            "id": "av_" + app_id,
+            "type": "appStoreVersions",
+            "attributes": {
+                "versionString": "1.0.0",
+                "appStoreState": "READY_FOR_SALE",
+                "releaseType": "AFTER_APPROVAL",
+                "usesIdfa": False,
+            },
+            "relationships": {
+                "app": {
+                    "data": {"type": "apps", "id": app_id},
+                },
+            },
+        }
+    ]
+
+    # Real list params (filter[appStoreState], filter[versionString], sort).
+    data = _apply_version_query(req, data)
+
     return respond(200, {
-        "data": [
-            {
-                "id": "av_" + app_id,
-                "type": "appStoreVersions",
-                "attributes": {
-                    "versionString": "1.0.0",
-                    "appStoreState": "READY_FOR_SALE",
-                    "releaseType": "AFTER_APPROVAL",
-                    "usesIdfa": False,
-                },
-                "relationships": {
-                    "app": {
-                        "data": {"type": "apps", "id": app_id},
-                    },
-                },
-            }
-        ],
+        "data": data,
         "links": {
             "self": "/v1/apps/" + app_id + "/appStoreVersions",
         },
@@ -182,24 +191,29 @@ def on_list_builds(req):
     if doc == None:
         return _not_found_err("App", app_id)
 
+    data = [
+        {
+            "id": "bld_" + app_id + "_1",
+            "type": "builds",
+            "attributes": {
+                "version": "1",
+                "uploadedDate": "2024-01-15T10:00:00Z",
+                "processingState": "VALID",
+                "usesNonExemptEncryption": False,
+            },
+            "relationships": {
+                "app": {
+                    "data": {"type": "apps", "id": app_id},
+                },
+            },
+        }
+    ]
+
+    # Real list params (filter[processingState], filter[version], sort).
+    data = _apply_build_query(req, data)
+
     return respond(200, {
-        "data": [
-            {
-                "id": "bld_" + app_id + "_1",
-                "type": "builds",
-                "attributes": {
-                    "version": "1",
-                    "uploadedDate": "2024-01-15T10:00:00Z",
-                    "processingState": "VALID",
-                    "usesNonExemptEncryption": False,
-                },
-                "relationships": {
-                    "app": {
-                        "data": {"type": "apps", "id": app_id},
-                    },
-                },
-            }
-        ],
+        "data": data,
         "included": None,
         "links": {
             "self": "/v1/apps/" + app_id + "/builds",
@@ -240,3 +254,77 @@ def on_list_app_prices(req):
             "self": "/v1/apps/" + app_id + "/appPrices",
         },
     })
+
+# --- list query helpers ---
+
+# _apply_apps_query maps the real Find Apps query params to query_select
+# clauses over JSON:API app entities (dotted attribute paths), then applies
+# the fields[apps] projection. Applied before paging like the real API.
+def _apply_apps_query(req, data):
+    f = []
+
+    v = _get_query(req, "filter[name]")
+    if v != "":
+        f.append(["attributes.name", "=", v])
+    v = _get_query(req, "filter[bundleId]")
+    if v != "":
+        f.append(["attributes.bundleId", "=", v])
+    v = _get_query(req, "filter[sku]")
+    if v != "":
+        f.append(["attributes.sku", "=", v])
+
+    sort_field, desc = _asc_sort(req)
+    order_by = None
+    if sort_field == "name" or sort_field == "bundleId" or sort_field == "sku":
+        order_by = "attributes." + sort_field
+        order_dir = "desc" if desc else "asc"
+    else:
+        order_dir = ""
+
+    data = query_select(data, f if len(f) > 0 else None, order_by, order_dir, None, None, None)
+
+    return _project_jsonapi_fields(data, _get_query(req, "fields[apps]"))
+
+# _apply_version_query maps the real appStoreVersions list params
+# (filter[appStoreState], filter[versionString], sort) over the entities.
+def _apply_version_query(req, data):
+    f = []
+
+    v = _get_query(req, "filter[appStoreState]")
+    if v != "":
+        f.append(["attributes.appStoreState", "=", v])
+    v = _get_query(req, "filter[versionString]")
+    if v != "":
+        f.append(["attributes.versionString", "=", v])
+
+    sort_field, desc = _asc_sort(req)
+    order_by = None
+    if sort_field == "versionString" or sort_field == "appStoreState":
+        order_by = "attributes." + sort_field
+        order_dir = "desc" if desc else "asc"
+    else:
+        order_dir = ""
+
+    return query_select(data, f if len(f) > 0 else None, order_by, order_dir, None, None, None)
+
+# _apply_build_query maps the real builds list params
+# (filter[processingState], filter[version], sort) over the entities.
+def _apply_build_query(req, data):
+    f = []
+
+    v = _get_query(req, "filter[processingState]")
+    if v != "":
+        f.append(["attributes.processingState", "=", v])
+    v = _get_query(req, "filter[version]")
+    if v != "":
+        f.append(["attributes.version", "=", v])
+
+    sort_field, desc = _asc_sort(req)
+    order_by = None
+    if sort_field == "version" or sort_field == "uploadedDate" or sort_field == "processingState":
+        order_by = "attributes." + sort_field
+        order_dir = "desc" if desc else "asc"
+    else:
+        order_dir = ""
+
+    return query_select(data, f if len(f) > 0 else None, order_by, order_dir, None, None, None)

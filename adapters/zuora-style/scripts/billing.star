@@ -53,7 +53,9 @@ def on_list_payments(req):
             "currency": d.get("currency", "USD"),
         })
 
+    payments = _apply_zuora_filters(req, payments)
     payments, next_cursor = _list_page(req, payments)
+    payments = _apply_zuora_fields(req, payments)
 
     resp = {
         "success": True,
