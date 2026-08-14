@@ -92,6 +92,23 @@ def on_token(req):
         body = {}
     grant_type = body.get("grant_type", "")
 
+    if grant_type == "refresh_token":
+        rt = body.get("refresh_token", "")
+        if rt == "" or store_kv_get("xarticles", "refresh_" + rt) == None:
+            return respond(400, {"error": "invalid_grant"})
+        # Rotate: invalidate the presented refresh, issue a fresh pair.
+        store_kv_delete("xarticles", "refresh_" + rt)
+        access = _rand_token("mock_access")
+        refresh = _rand_token("mock_refresh")
+        store_kv_set("xarticles", "refresh_" + refresh, "1")
+        return respond(200, {
+            "token_type": "bearer",
+            "access_token": access,
+            "refresh_token": refresh,
+            "expires_in": 7200,
+            "scope": "tweet.read tweet.write users.read offline.access",
+        })
+
     if grant_type != "authorization_code":
         return respond(400, {"error": "unsupported_grant_type"})
 
@@ -114,10 +131,13 @@ def on_token(req):
     if verifier == "":
         return respond(400, {"error": "invalid_grant", "detail": "PKCE verifier mismatch"})
 
+    access = _rand_token("mock_access")
+    refresh = _rand_token("mock_refresh")
+    store_kv_set("xarticles", "refresh_" + refresh, "1")
     return respond(200, {
         "token_type": "bearer",
-        "access_token": _rand_token("mock_access"),
-        "refresh_token": _rand_token("mock_refresh"),
+        "access_token": access,
+        "refresh_token": refresh,
         "expires_in": 7200,
         "scope": "tweet.read tweet.write users.read offline.access",
     })

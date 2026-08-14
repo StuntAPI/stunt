@@ -47,6 +47,22 @@ def on_access_token(req):
         body = {}
     grant_type = body.get("grant_type", "")
 
+    if grant_type == "refresh_token":
+        rt = body.get("refresh_token", "")
+        uid = store_kv_get("threads", "refresh_" + rt)
+        if rt == "" or uid == None:
+            return respond(400, {"error": "invalid_grant", "error_description": "invalid refresh_token"})
+        store_kv_delete("threads", "refresh_" + rt)
+        token = _mint_token({"user_id": uid, "username": ""})
+        new_refresh = "mock_refresh_" + str(store_kv_incr("threads", "refresh_seq"))
+        store_kv_set("threads", "refresh_" + new_refresh, uid)
+        return respond(200, {
+            "access_token": token,
+            "token_type": "bearer",
+            "expires_in": 5184000,
+            "user_id": uid,
+        })
+
     if grant_type != "authorization_code":
         return respond(400, {"error": "unsupported_grant_type"})
 
@@ -70,12 +86,15 @@ def on_access_token(req):
 
     user = _mint_user()
     token = _mint_token(user)
+    refresh = "mock_refresh_" + str(store_kv_incr("threads", "refresh_seq"))
+    store_kv_set("threads", "refresh_" + refresh, user["user_id"])
 
     return respond(200, {
         "access_token": token,
         "token_type": "bearer",
         "expires_in": 5184000,
         "user_id": user["user_id"],
+        "refresh_token": refresh,
     })
 
 def _mint_user():
