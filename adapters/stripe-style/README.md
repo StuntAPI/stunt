@@ -12,11 +12,14 @@ All data is synthetic — no real API data is included.
 
 ## What it simulates
 
-A broader-than-minimal MVP of a Stripe-style payments API: charges (create,
-retrieve, list, capture, refund), customers (CRUD), and account balance —
-plus **Stripe Connect**: connected accounts (create/retrieve/update/list),
-account links (onboarding URLs), transfers (create/retrieve/list/reverse),
-and payouts (create/list).
+A broader-than-minimal MVP of a Stripe-style payments API: **PaymentIntents**
+(create/retrieve/list, confirm, capture — the canonical SCA/3DS-ready flow
+with `requires_payment_method → succeeded`/`requires_capture` states),
+**PaymentMethods** (create/retrieve/attach/detach/list), **Refunds**
+(create/retrieve/list, full or partial), charges (create/retrieve/list/capture/
+refund), customers (CRUD), and account balance — plus **Stripe Connect**:
+connected accounts (create/retrieve/update/list), account links (onboarding
+URLs), transfers (create/retrieve/list/reverse), and payouts (create/list).
 
 State persists in an on-disk SQLite-backed collection store (under `.stunt/state/`),
 so data you create in one request is visible in subsequent requests and survives
@@ -79,6 +82,10 @@ the operation still succeeds.
 | `POST /v1/charges` (create) | `charge.created` |
 | `POST /v1/charges/{id}/capture` | `charge.updated` |
 | `POST /v1/charges/{id}/refund` | `charge.refunded` |
+| `POST /v1/payment_intents` (create) | `payment_intent.created` (+ `.succeeded`/`.requires_capture` if confirmed) |
+| `POST /v1/payment_intents/{id}/confirm` | `payment_intent.succeeded` / `.requires_capture` |
+| `POST /v1/payment_intents/{id}/capture` | `payment_intent.succeeded` |
+| `POST /v1/refunds` | `refund.created`, `charge.refunded` |
 | `POST /v1/accounts` (create) | `account.updated` |
 | `POST /v1/accounts/{id}` (update) | `account.updated` |
 | `POST /v1/transfers` (create) | `transfer.created` |
