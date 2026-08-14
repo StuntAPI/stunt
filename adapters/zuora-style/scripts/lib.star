@@ -515,7 +515,12 @@ def _emit_if_subscribed(event_type, payload):
     hooks = hc.list()
     if len(hooks) == 0:
         return
+    # events_register re-points delivery to the LATEST hook; sign with that
+    # hook's secret, not the oldest matching one.
+    target = events_target()
     for h in hooks:
+        if target != None and h.get("url", "") != target:
+            continue
         types = h.get("event_types", [])
         if types == None:
             types = []

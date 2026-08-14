@@ -65,7 +65,12 @@ def _signed_emit(event_type, payload, secret):
 # registered without one.
 def _emit_if_subscribed(repo_key, event_type, payload):
     hc = store_collection("hooks")
+    # events_register re-points delivery to the LATEST hook; sign with that
+    # hook's secret, not the oldest matching one.
+    target = events_target()
     for h in hc.list():
+        if target != None and h.get("url", "") != target:
+            continue
         if h.get("repo", "") == repo_key and event_type in h.get("events", []):
             _signed_emit(event_type, payload, h.get("secret", ""))
             return

@@ -160,10 +160,16 @@ def _list_page(req, docs):
 
 _WEBHOOK_SECRET = "stunt_mock_slack_signing_secret_2026"
 
-# _signing_secret returns the most recently registered app's signing secret,
-# falling back to the fixed synthetic default.
+# _signing_secret returns the signing secret of the hook the emitter is
+# currently targeting (events_target), falling back to the fixed synthetic
+# default — re-registration must not leave a stale secret on the new URL.
 def _signing_secret():
-    for h in store_collection("webhooks").list():
+    hooks = store_collection("webhooks").list()
+    target = events_target()
+    for i in range(len(hooks) - 1, -1, -1):
+        h = hooks[i]
+        if target != None and h.get("url", "") != target:
+            continue
         s = h.get("signing_secret", "")
         if s != None and s != "":
             return s

@@ -181,7 +181,12 @@ def _signed_emit(event_type, payload, secret):
 # everything, mirroring trigger-connected webhooks without event filters).
 def _emit_if_subscribed(event_type, payload):
     wc = store_collection("webhooks")
+    # events_register re-points delivery to the LATEST hook; sign with that
+    # hook's secret, not the oldest matching one.
+    target = events_target()
     for w in wc.list():
+        if target != None and w.get("endpoint", "") != target:
+            continue
         subs = w.get("subscriptions", [])
         if subs == None:
             subs = []

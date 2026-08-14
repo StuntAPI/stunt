@@ -185,7 +185,12 @@ def _webhook_payload(event_type, shop_id, data):
 # for this topic exists (Printify does not deliver unsubscribed topics).
 def _emit_if_subscribed(event_type, shop_id, data):
     wc = store_collection("webhooks")
+    # events_register re-points delivery to the LATEST hook; sign with that
+    # hook's secret, not the oldest matching one.
+    target = events_target()
     for w in wc.list():
+        if target != None and w.get("url", "") != target:
+            continue
         if w.get("topic", "") == event_type:
             _signed_emit(event_type, _webhook_payload(event_type, shop_id, data))
             return
