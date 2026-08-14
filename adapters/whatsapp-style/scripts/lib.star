@@ -233,3 +233,81 @@ def _signed_emit(event_type, payload):
     body = events_body(event_type, payload)
     sig = crypto.hmac_sha256(_WEBHOOK_SECRET, body)
     events_emit(event_type, payload, {"X-Hub-Signature-256": "sha256=" + sig})
+
+# ============================================================================
+# ASYNC MESSAGE STATUS LIFECYCLE (derive-on-read state machine)
+# ============================================================================
+# Real WhatsApp outbound messages report status through webhooks and the
+# message-status lookup: sent right after the send, then delivered (or
+# failed). This adapter reproduces that with a derive-on-read state machine:
+#
+#   sent -> delivered   (timings: delivered derived at +3s after the send;
+#                        Meta's vocabulary has no separate in-transit state)
+#   sent -> failed      (simulate_fail: true in the send body — simulator
+#                        extension, see README)
+#
+# Every read (GET /v21.0/{wamid...}) derives the status from the clock,
+# persists the transition, and emits Meta's real status-webhook payload
+# (signed, X-Hub-Signature-256) exactly once per NEW terminal status.
+
+# _num coerces a JSON-round-tripped number (int or float) to int.
+def _num(v):
+    if v == None:
+        return 0
+    if type(v) == "int":
+        return v
+    if type(v) == "float":
+        return int(v)
+    return _to_int(v)
+
+# _lifecycle_stamp writes the internal async schedule onto a doc at CREATE
+# time: in-flight at now + 1s, terminal at now + 3s (clock-derived, so
+# integration tests can sleep through the window deterministically).
+def _lifecycle_stamp(doc):
+    now = clock.now_unix()
+    doc["_running_at"] = now + 1
+    doc["_done_at"] = now + 3
+    doc["_stage"] = 0
+
+# _lifecycle_stage returns the clock-derived target stage for a doc:
+# 0 = initial (pre-1s), 1 = in-flight (1s..3s), 2 = terminal (>=3s).
+def _lifecycle_stage(doc):
+    now = clock.now_unix()
+    if now >= _num(doc.get("_done_at", 0)):
+        return 2
+    if now >= _num(doc.get("_running_at", 0)):
+        return 1
+    return 0
+
+# _advance_message_status derives a stored message's stage from the clock,
+# persists each transition, and — when a NEW terminal status is first
+# observed — emits the signed webhook event "message_status" carrying Meta's
+# real status payload shape ({messaging_product, statuses: [{id, status,
+# timestamp, recipient_id}]}), exactly once. Returns the updated doc.
+def _advance_message_status(msg):
+    stage = _num(msg.get("_stage", 0))
+    target = _lifecycle_stage(msg)
+    if target <= stage:
+        return msg
+    mc = store_collection("messages")
+    while stage < target:
+        stage = stage + 1
+        if stage == 1:
+            msg["status"] = "sent"
+        elif msg.get("_fail_mode", "") == "failed":
+            msg["status"] = "failed"
+        else:
+            msg["status"] = "delivered"
+        msg["_stage"] = stage
+        mc.update(msg["id"], msg)
+        if stage == 2:
+            _signed_emit("message_status", {
+                "messaging_product": "whatsapp",
+                "statuses": [{
+                    "id": msg["id"],
+                    "status": msg["status"],
+                    "timestamp": str(clock.now_unix()),
+                    "recipient_id": msg.get("wa_id", ""),
+                }],
+            })
+    return msg

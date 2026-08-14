@@ -201,6 +201,79 @@ func TestChainlinkStyleAdapter(t *testing.T) {
 		t.Fatalf("get upkeep -> %d, want 200; body %s", status, body)
 	}
 
+	// ===== Functions createRequest + async lifecycle =====
+	//
+	// Requests derive status from the clock on read:
+	//   pending (0-1s) -> in_flight (1-3s) -> fulfilled | failed (>=3s)
+
+	body, status = clPostJSON(t, base+"/v2/functions/createRequest", "Bearer cl-token", map[string]any{
+		"subscriptionId": 1234,
+	})
+	if status != 200 {
+		t.Fatalf("createRequest -> %d, want 200; body %s", status, body)
+	}
+	var reqResp map[string]any
+	if err := json.Unmarshal([]byte(body), &reqResp); err != nil {
+		t.Fatalf("unmarshal createRequest resp: %v (body %s)", err, body)
+	}
+	requestID, ok := reqResp["requestID"].(string)
+	if !ok || requestID == "" {
+		t.Fatalf("requestID = %v, want non-empty", reqResp["requestID"])
+	}
+	if reqResp["status"] != "pending" {
+		t.Fatalf("initial status = %v, want 'pending'", reqResp["status"])
+	}
+
+	// Negative path: simulate_fail -> terminal "failed".
+	body, status = clPostJSON(t, base+"/v2/functions/createRequest", "Bearer cl-token", map[string]any{
+		"subscriptionId": 1234,
+		"simulate_fail":  true,
+	})
+	if status != 200 {
+		t.Fatalf("createRequest (fail) -> %d, want 200; body %s", status, body)
+	}
+	var failResp map[string]any
+	if err := json.Unmarshal([]byte(body), &failResp); err != nil {
+		t.Fatalf("unmarshal fail resp: %v (body %s)", err, body)
+	}
+	failRequestID, _ := failResp["requestID"].(string)
+
+	// Immediately after creation both requests are pending.
+	body, status = clGet(t, base+"/v2/functions/request/"+requestID, "Bearer cl-token")
+	if status != 200 {
+		t.Fatalf("get request -> %d, want 200; body %s", status, body)
+	}
+	var pollResp map[string]any
+	if err := json.Unmarshal([]byte(body), &pollResp); err != nil {
+		t.Fatalf("unmarshal poll resp: %v (body %s)", err, body)
+	}
+	if pollResp["status"] != "pending" && pollResp["status"] != "in_flight" {
+		t.Fatalf("immediate status = %v, want 'pending' (or 'in_flight' on a slow host)", pollResp["status"])
+	}
+
+	// Sleep past the 3s terminal mark, then both must be terminal.
+	time.Sleep(3500 * time.Millisecond)
+
+	body, _ = clGet(t, base+"/v2/functions/request/"+requestID, "Bearer cl-token")
+	if err := json.Unmarshal([]byte(body), &pollResp); err != nil {
+		t.Fatalf("unmarshal terminal poll: %v (body %s)", err, body)
+	}
+	if pollResp["status"] != "fulfilled" {
+		t.Fatalf("terminal status = %v, want 'fulfilled'", pollResp["status"])
+	}
+	if _, ok := pollResp["result"]; !ok {
+		t.Fatalf("fulfilled request missing result: %v", pollResp)
+	}
+
+	body, _ = clGet(t, base+"/v2/functions/request/"+failRequestID, "Bearer cl-token")
+	var failPoll map[string]any
+	if err := json.Unmarshal([]byte(body), &failPoll); err != nil {
+		t.Fatalf("unmarshal fail poll: %v (body %s)", err, body)
+	}
+	if failPoll["status"] != "failed" {
+		t.Fatalf("simulate_fail terminal status = %v, want 'failed'", failPoll["status"])
+	}
+
 	// ===== CCIP messages (auth required) =====
 
 	body, status = clGet(t, base+"/v2/ccip/messages", "Bearer cl-token")

@@ -31,6 +31,11 @@ endpoints:
     method: GET
     handler: scripts/profile.star#on_profile
 
+  # --- Container processing status (poll until finished, then publish) ---
+  - route: /v1.0/{container_id}
+    method: GET
+    handler: scripts/publish.star#on_container_status
+
   # --- Insights (per-media metrics) ---
   - route: /v1.0/{id}/insights
     method: GET

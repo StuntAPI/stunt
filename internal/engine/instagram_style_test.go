@@ -22,7 +22,10 @@ import (
 //   - access_token (auth code) → {access_token, user_id}
 //   - /v21.0/me with bearer → profile with followers_count, media_count
 //   - two-step publish: create media container (image_url + caption) → 200;
-//     publish → 200 media id; bad container → 404; missing image_url → 400
+//     container status derives IN_PROGRESS → FINISHED after ~3s (poll
+//     GET /v21.0/{container_id}?fields=status_code); publish before FINISHED →
+//     400 code 9007; publish after → 200 media id; simulate_fail container →
+//     ERROR and publish → 400; bad container → 404; missing image_url → 400
 //   - insights → all 4 metrics (impressions, reach, likes, comments), finite
 //   - list media → contains the published media
 //   - no bearer → 401
@@ -180,6 +183,73 @@ func TestInstagramStyleAdapter(t *testing.T) {
 	})
 	if status != 400 {
 		t.Fatalf("missing image_url -> status %d, want 400", status)
+	}
+
+	// ===== Container processing lifecycle (derive-on-read) =====
+
+	// A fresh container is IN_PROGRESS and media_publish is gated on FINISHED.
+	body, status = getAuth(t, base+"/v21.0/"+containerID+"?fields=id,status_code", accessToken)
+	if status != 200 {
+		t.Fatalf("container status -> status %d, want 200; body %s", status, body)
+	}
+	var statusResp map[string]any
+	if err := json.Unmarshal([]byte(body), &statusResp); err != nil {
+		t.Fatalf("unmarshal container status: %v (body %s)", err, body)
+	}
+	if statusResp["status_code"] != "IN_PROGRESS" {
+		t.Fatalf("fresh container status_code = %v, want IN_PROGRESS", statusResp["status_code"])
+	}
+
+	_, status = instagramPostNoBodyAuth(t, base+"/v21.0/"+igUserID+"/media_publish?creation_id="+containerID, accessToken)
+	if status != 400 {
+		t.Fatalf("publish while IN_PROGRESS -> status %d, want 400 (code 9007)", status)
+	}
+
+	// Simulator-only failure injection: simulate_fail=true ends in ERROR.
+	body, status = instagramPostFormAuth(t, base+"/v21.0/"+igUserID+"/media", accessToken, url.Values{
+		"image_url":     {"https://mock-instagram.example/broken.jpg"},
+		"simulate_fail": {"true"},
+	})
+	if status != 200 {
+		t.Fatalf("create simulate_fail container -> status %d, want 200; body %s", status, body)
+	}
+	var failContainerResp map[string]any
+	if err := json.Unmarshal([]byte(body), &failContainerResp); err != nil {
+		t.Fatalf("unmarshal simulate_fail container response: %v (body %s)", err, body)
+	}
+	failContainerID, ok := failContainerResp["id"].(string)
+	if !ok || !strings.HasPrefix(failContainerID, "c_") {
+		t.Fatalf("simulate_fail container id = %v, want c_* prefix", failContainerResp["id"])
+	}
+
+	// Advance the clock past the ~3s processing window.
+	time.Sleep(3200 * time.Millisecond)
+
+	body, status = getAuth(t, base+"/v21.0/"+containerID+"?fields=status_code", accessToken)
+	if status != 200 {
+		t.Fatalf("container status after window -> status %d, want 200; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &statusResp); err != nil {
+		t.Fatalf("unmarshal container status after window: %v (body %s)", err, body)
+	}
+	if statusResp["status_code"] != "FINISHED" {
+		t.Fatalf("container status_code after window = %v, want FINISHED", statusResp["status_code"])
+	}
+
+	body, status = getAuth(t, base+"/v21.0/"+failContainerID+"?fields=status_code", accessToken)
+	if status != 200 {
+		t.Fatalf("simulate_fail container status -> status %d, want 200; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &statusResp); err != nil {
+		t.Fatalf("unmarshal simulate_fail container status: %v (body %s)", err, body)
+	}
+	if statusResp["status_code"] != "ERROR" {
+		t.Fatalf("simulate_fail container status_code = %v, want ERROR", statusResp["status_code"])
+	}
+
+	_, status = instagramPostNoBodyAuth(t, base+"/v21.0/"+igUserID+"/media_publish?creation_id="+failContainerID, accessToken)
+	if status != 400 {
+		t.Fatalf("publish ERROR container -> status %d, want 400", status)
 	}
 
 	// ===== Publish container → 200 media id =====

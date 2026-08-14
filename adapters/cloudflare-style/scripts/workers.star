@@ -3,8 +3,11 @@
 # GET  /accounts/{account_id}/workers/scripts        -> list scripts
 # PUT  /accounts/{account_id}/workers/scripts/{name}  -> deploy worker
 # GET  /accounts/{account_id}/workers/scripts/{name}  -> get script
+# GET  /accounts/{account_id}/workers/scripts/{name}/deployments -> list deployments
 #
-# Stateful: deployed workers appear in the scripts list.
+# Stateful: deployed workers appear in the scripts list, and each PUT records
+# a deployment whose rollout status is derived on read (see
+# on_list_deployments).
 #
 # Shared helpers (_require_auth, _cf_ok, _cf_err, _gen_id) are preloaded
 # from scripts/lib.star.
@@ -73,6 +76,28 @@ def on_deploy_script(req):
     else:
         wc.insert(doc)
 
+    # Record a deployment for this upload with the derive-on-read
+    # timestamps (see on_list_deployments).
+    fail = False
+    if body != None:
+        fail = body.get("simulate_fail", False)
+        if fail == None:
+            fail = False
+    now = clock.now_unix()
+    dc = store_collection("deployments")
+    dc.insert({
+        "id": _gen_id("deploy"),
+        "account_id": account_id,
+        "script_name": script_name,
+        "strategy": "percentage",
+        "versions": [{"version_id": _gen_id("wver"), "percentage": 100}],
+        "status": "active",
+        "created_on": _iso8601(),
+        "_running_at": now + 1,
+        "_done_at": now + 3,
+        "_fail": fail,
+    })
+
     return _cf_ok({
         "script": script_name,
         "modified_on": _iso8601(),
@@ -126,6 +151,68 @@ def on_delete_script(req):
 # ====================================================================
 # Helpers
 # ====================================================================
+
+# on_list_deployments returns the deployments recorded for a Worker script.
+# GET /accounts/{account_id}/workers/scripts/{script_name}/deployments
+# Each PUT of the script records a deployment whose rollout status is a
+# derive-on-read state machine: active (prior version still serving) ->
+# in_progress (rollout underway) -> deployed (100% of traffic). The real
+# Cloudflare Deployment object has no status field (versions carry rollout
+# percentages); exposing `status` is a simulator extension for polling.
+def on_list_deployments(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
+    account_id = req["params"]["account_id"]
+    script_name = req["params"]["script_name"]
+
+    dc = store_collection("deployments")
+    result = []
+    for d in dc.list():
+        if d.get("account_id", "") != account_id or d.get("script_name", "") != script_name:
+            continue
+        _advance_deployment(d, dc)
+        result.append(_deployment_result(d))
+
+    return _cf_ok(result)
+
+# _derive_deployment_status maps the clock onto the rollout status
+# vocabulary: active -> in_progress -> deployed, or failed when the upload
+# was flagged simulate_fail.
+def _derive_deployment_status(d):
+    if d.get("_done_at", None) == None:
+        return d.get("status", "deployed")
+    now = clock.now_unix()
+    if now < d.get("_running_at", 0):
+        return "active"
+    if now < d["_done_at"]:
+        return "in_progress"
+    if d.get("_fail", False):
+        return "failed"
+    return "deployed"
+
+# _advance_deployment derives the current status and persists the transition
+# back to the deployments collection so repeated polls agree. Cloudflare has
+# no deployment webhook, so no events are emitted.
+def _advance_deployment(d, dc):
+    status = _derive_deployment_status(d)
+    if d.get("status", "") == status:
+        return status
+    d["status"] = status
+    dc.update(d.get("id", ""), d)
+    return status
+
+# _deployment_result returns a clean deployment object for the API response.
+def _deployment_result(d):
+    return {
+        "id": d.get("id", ""),
+        "script_name": d.get("script_name", ""),
+        "status": d.get("status", "active"),
+        "strategy": d.get("strategy", "percentage"),
+        "versions": d.get("versions", []),
+        "created_on": d.get("created_on", _iso8601()),
+    }
 
 # _worker_result returns a clean worker object for the API response.
 def _worker_result(w):

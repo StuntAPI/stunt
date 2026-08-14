@@ -19,7 +19,8 @@ client uses:
 - **Profile:** `GET /v21.0/me` (Bearer) returns the authenticated user's profile.
 - **Two-step publish:** create a media container with
   `POST /v21.0/{ig_user_id}/media`, then publish it with
-  `POST /v21.0/{ig_user_id}/media_publish`. (Route ordering matters: `media_publish`
+  `POST /v21.0/{ig_user_id}/media_publish` once its processing status is
+  `FINISHED`. (Route ordering matters: `media_publish`
   is declared before `media` so it matches first.)
 - **List media:** `GET /v21.0/{ig_user_id}/media` returns the user's published media.
 - **Insights:** `GET /v21.0/{media_id}/insights` returns per-media engagement
@@ -39,7 +40,8 @@ request is visible when publishing in the next, within the same `stunt up` sessi
 | POST | `/oauth/access_token` | `oauth.star#on_access_token` | Exchange code for access token |
 | GET | `/v21.0/me` | `profile.star#on_profile` | Authenticated user profile (Bearer) |
 | GET | `/v21.0/{media_id}/insights` | `insights.star#on_insights` | Per-media insights metrics (honors `metric=`) |
-| POST | `/v21.0/{ig_user_id}/media_publish` | `publish.star#on_publish` | Publish a media container (Bearer) |
+| GET | `/v21.0/{container_id}` | `publish.star#on_container_status` | Container processing status: `status_code` = `IN_PROGRESS` → `FINISHED` (Bearer) |
+| POST | `/v21.0/{ig_user_id}/media_publish` | `publish.star#on_publish` | Publish a media container (Bearer; gated on `FINISHED`) |
 | POST | `/v21.0/{ig_user_id}/media` | `publish.star#on_create` | Create a media container (Bearer) |
 | GET | `/v21.0/{ig_user_id}/media` | `publish.star#on_list_media` | List a user's media (Bearer; honors `fields=`, `limit`/`after`) |
 
@@ -56,8 +58,30 @@ requested names (all four metrics are returned when `metric` is absent).
 |------------|---------|
 | `tokens` | Access token records |
 | `codes` | Single-use OAuth2 authorization codes |
-| `containers` | Unpublished media containers (create step) |
+| `containers` | Media containers (create step), including their processing status |
 | `media` | Published media records |
+
+## Container processing lifecycle
+
+Like the real API, a media container is **not publishable the instant it is
+created**: it goes through a processing phase, and `media_publish` fails with
+Graph error `9007` until the container has finished processing.
+
+```
+IN_PROGRESS --(~3s)--> FINISHED
+IN_PROGRESS --(~3s)--> ERROR      (simulate_fail=true only)
+```
+
+- Poll with `GET /v21.0/{container_id}?fields=status_code` →
+  `{id, status_code}`. The status is derived from the clock on read
+  (`IN_PROGRESS` for ~3s after create, then `FINISHED`) and persisted back to
+  the container, so polls and the publish gate always agree.
+- `POST /v21.0/{ig_user_id}/media_publish` returns `400` (error `9007`) while
+  the container is `IN_PROGRESS`, and also after it errored.
+- **Failure injection (simulator extension):** pass `simulate_fail=true` in
+  the `POST .../media` form body to make the container end in `ERROR`
+  instead of `FINISHED` after the same ~3s window. The real API has no such
+  switch; it exists so clients can exercise their failure paths.
 
 ## Auth
 

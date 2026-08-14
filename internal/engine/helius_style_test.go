@@ -132,6 +132,99 @@ func TestHeliusStyleAdapter(t *testing.T) {
 		t.Fatalf("result (signature) = %v, want non-empty string", sendResp["result"])
 	}
 
+	// ===== Transaction lifecycle: null -> processed/confirmed -> finalized =====
+	//
+	// getSignatureStatuses derives confirmationStatus from the clock:
+	//   null (0-1s) -> processed (1-2s) -> confirmed (2-3s) -> finalized (>=3s)
+
+	// Negative path: a transaction sent with simulate_fail in the config
+	// object lands with an on-chain error.
+	body, status = heliusPost(t, rpcURL, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      5,
+		"method":  "sendTransaction",
+		"params":  []any{"base64encodedtxdata-fail", map[string]any{"simulate_fail": true}},
+	})
+	if status != 200 {
+		t.Fatalf("sendTransaction (fail) -> status %d, want 200; body %s", status, body)
+	}
+	var failSendResp map[string]any
+	if err := json.Unmarshal([]byte(body), &failSendResp); err != nil {
+		t.Fatalf("unmarshal sendTransaction (fail): %v (body %s)", err, body)
+	}
+	failSig, _ := failSendResp["result"].(string)
+
+	// Immediately after submission the signature has no status yet (null).
+	body, status = heliusPost(t, rpcURL, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      6,
+		"method":  "getSignatureStatuses",
+		"params":  []any{[]string{sig}},
+	})
+	if status != 200 {
+		t.Fatalf("getSignatureStatuses -> status %d, want 200; body %s", status, body)
+	}
+	var sigResp map[string]any
+	if err := json.Unmarshal([]byte(body), &sigResp); err != nil {
+		t.Fatalf("unmarshal getSignatureStatuses: %v (body %s)", err, body)
+	}
+	sigResult, ok := sigResp["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("getSignatureStatuses result = %v, want object", sigResp["result"])
+	}
+	sigValues, ok := sigResult["value"].([]any)
+	if !ok || len(sigValues) != 1 {
+		t.Fatalf("value = %v, want array of 1", sigResult["value"])
+	}
+	if early, ok := sigValues[0].(map[string]any); ok {
+		cs, _ := early["confirmationStatus"].(string)
+		if cs == "finalized" {
+			t.Fatalf("early confirmationStatus = finalized, want earlier state")
+		}
+	} // else: null entry for a just-submitted signature — also valid.
+
+	// Sleep past the 3s finalization mark, then both must be finalized.
+	time.Sleep(3500 * time.Millisecond)
+
+	body, status = heliusPost(t, rpcURL, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      7,
+		"method":  "getSignatureStatuses",
+		"params":  []any{[]string{sig, failSig}},
+	})
+	if status != 200 {
+		t.Fatalf("getSignatureStatuses (final) -> status %d, want 200; body %s", status, body)
+	}
+	var finalResp map[string]any
+	if err := json.Unmarshal([]byte(body), &finalResp); err != nil {
+		t.Fatalf("unmarshal final statuses: %v (body %s)", err, body)
+	}
+	finalResult := finalResp["result"].(map[string]any)
+	finalValues, ok := finalResult["value"].([]any)
+	if !ok || len(finalValues) != 2 {
+		t.Fatalf("final value = %v, want array of 2", finalResult["value"])
+	}
+	okTx, ok := finalValues[0].(map[string]any)
+	if !ok {
+		t.Fatalf("final status[0] = %v, want object (tx should be finalized)", finalValues[0])
+	}
+	if okTx["confirmationStatus"] != "finalized" {
+		t.Fatalf("confirmationStatus = %v, want finalized", okTx["confirmationStatus"])
+	}
+	if okTx["err"] != nil {
+		t.Fatalf("err = %v, want nil for a successful tx", okTx["err"])
+	}
+	failTx, ok := finalValues[1].(map[string]any)
+	if !ok {
+		t.Fatalf("final status[1] = %v, want object (failed tx should be finalized)", finalValues[1])
+	}
+	if failTx["confirmationStatus"] != "finalized" {
+		t.Fatalf("failed tx confirmationStatus = %v, want finalized", failTx["confirmationStatus"])
+	}
+	if failTx["err"] == nil {
+		t.Fatalf("failed tx err = nil, want InstructionError")
+	}
+
 	// ===== 401 without api-key =====
 
 	_, status = heliusPost(t, base+"/", map[string]any{

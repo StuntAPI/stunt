@@ -16,7 +16,8 @@ JSON:API conventions, and app/version/build management.
 
 - **JWT auth:** `Authorization: Bearer <jwt>` — validated structurally AND against the token registry (see below).
 - **Apps CRUD:** `GET /v1/apps`, `GET /v1/apps/{id}`, `POST /v1/apps`.
-- **App relationships:** versions, builds, prices.
+- **App relationships:** versions, builds, prices. Builds progress through
+  Apple's real `processingState` on a derive-on-read clock (see below).
 - **Users:** `GET /v1/users`.
 - **Sales reports:** `GET /v1/salesReports`.
 - **JSON:API error shape:** `{errors:[{status,code,title,detail}]}`.
@@ -34,11 +35,40 @@ JSON:API conventions, and app/version/build management.
 | GET | `/v1/apps/{id}` | `apps.star#on_get_app` | Get a single app |
 | GET | `/v1/apps/{id}/appStoreVersions` | `apps.star#on_list_app_versions` | App versions (params: `filter[appStoreState]`, `filter[versionString]`, `sort`). |
 | GET | `/v1/apps/{id}/builds` | `apps.star#on_list_builds` | App builds (params: `filter[processingState]`, `filter[version]`, `sort`). |
+| GET | `/v1/builds/{id}` | `apps.star#on_get_build` | Get a single build |
 | GET | `/v1/apps/{id}/appPrices` | `apps.star#on_list_app_prices` | App prices |
 | GET | `/v1/users` | `misc.star#on_list_users` | List users (params: `filter[username]`, `filter[roles]`, `sort`, `limit`/`cursor`). |
 | GET | `/v1/salesReports` | `misc.star#on_sales_reports` | Sales reports |
 
 Any unmatched route returns `404` (JSON:API error shape).
+
+## Build processing lifecycle (derive-on-read)
+
+Each app's first build is created at app creation (seeded app included) and
+progresses through Apple's real `processingState` vocabulary on a
+derive-on-read clock:
+
+```
+PROCESSING --(+3s)--> VALID
+```
+
+Timings are computed from the injectable clock (done at +3s; Apple has no
+separate in-flight state). Every build read (`GET /v1/apps/{id}/builds` or
+`GET /v1/builds/{id}`) derives the current state from the clock and persists
+the transition back to the builds collection, so repeated polls, lists, and
+the `filter[processingState]` param agree. App Store Connect has no build
+webhooks, so no events are emitted.
+
+### Failure injection (simulator extension)
+
+Apple's sandbox has no failure trigger, so the create-app attributes accept a
+simulator-only flag:
+
+```json
+{"data": {"attributes": {"name": "My App", "bundleId": "com.example.app", "simulate_fail": true}}}
+```
+
+That app's build settles in `INVALID` instead of `VALID`.
 
 ## JWT validation
 

@@ -13,9 +13,16 @@
 # 24H WINDOW RULE: Outside the 24-hour customer service window, only APPROVED
 # templates are allowed (documented in lib.star). This adapter does not
 # enforce the window by default.
+#
+# ASYNC STATUS LIFECYCLE (derive-on-read): a send is accepted with status
+# "sent"; reads of GET /v21.0/{message_id} then derive the real Meta status
+# from the clock — "delivered" at +3s (or "failed" with failure injection) —
+# persisting the transition and emitting the signed status webhook exactly
+# once per NEW terminal status. See scripts/lib.star and the README.
 
 # Shared helpers (_require_auth, _wa_unauthorized, _next_msg_id,
-# _normalize_phone, _now, _seed) are preloaded from scripts/lib.star.
+# _normalize_phone, _now, _seed, _lifecycle_stamp) are preloaded from
+# scripts/lib.star.
 
 # on_send_message sends a WhatsApp message.
 def on_send_message(req):
@@ -36,6 +43,13 @@ def on_send_message(req):
     if msg_type == None:
         msg_type = "text"
 
+    # Failure injection: simulator-only body flag selecting the "failed"
+    # terminal status (see README).
+    fail_mode = ""
+    sf = body.get("simulate_fail", False)
+    if sf != None and sf:
+        fail_mode = "failed"
+
     msg_id = _next_msg_id()
     wa_id = _normalize_phone(to)
 
@@ -49,6 +63,8 @@ def on_send_message(req):
         "status": "sent",
         "created_at": _now(),
     }
+    msg["_fail_mode"] = fail_mode
+    _lifecycle_stamp(msg)
     if msg_type == "text":
         text_body = body.get("text", {})
         if text_body == None:

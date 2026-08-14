@@ -17,7 +17,8 @@ analytics / engagement pipeline:
 - **OAuth2 (Meta):** authorize redirect, access-token exchange (single-use code),
   and `refresh_token` grant (single-use, rotating refresh tokens).
 - **Profile:** `GET /v1.0/me`.
-- **Publish (two-step):** create a media container, then publish it.
+- **Publish (two-step):** create a media container, poll its processing
+  status until `finished`, then publish it.
 - **Insights:** per-media metrics (views, likes, replies, reposts).
 - **Engagement:** inbox ingest with synthetic reply children.
 
@@ -33,7 +34,8 @@ session.
 | POST | `/oauth/access_token` | `oauth.star#on_access_token` | Token exchange (auth code, single-use) or refresh grant |
 | GET | `/v1.0/me` | `profile.star#on_profile` | Profile (Bearer validation) |
 | GET | `/v1.0/{id}/insights` | `insights.star#on_insights` | Per-media metrics (4 metrics) |
-| POST | `/v1.0/{id}/threads_publish` | `publish.star#on_publish` | Publish container → media (step 2) |
+| GET | `/v1.0/{container_id}` | `publish.star#on_container_status` | Container processing status: `status` = `in_progress` → `finished` |
+| POST | `/v1.0/{id}/threads_publish` | `publish.star#on_publish` | Publish container → media (step 2; gated on `finished`) |
 | POST | `/v1.0/{id}/threads` | `publish.star#on_create` | Create media container (step 1) |
 | GET | `/v1.0/{id}/threads` | `engagement.star#on_engagement` | Engagement inbox (media + replies) |
 
@@ -45,7 +47,7 @@ Any unmatched route returns `404`.
 |------------|---------|
 | `tokens` | Access token → user binding (minted by OAuth) |
 | `codes` | Single-use OAuth authorization codes |
-| `containers` | Media containers (id → {text, user_id}) |
+| `containers` | Media containers (id → {text, user_id, status}) |
 | `media` | Published media (id → {user_id, container_id, text, ts}) |
 
 KV is used for monotonic sequence counters (`user_seq`, `container_seq`,
@@ -83,11 +85,34 @@ The Threads API uses a two-step publish flow:
 
 1. **Create container:** `POST /v1.0/{user_id}/threads` with a form-encoded
    body (`media_type=TEXT&text=<text>`) → `201 {id: "c_<seq>"}`.
-2. **Publish:** `POST /v1.0/{user_id}/threads_publish?creation_id=<container_id>`
+2. **Wait for processing:** poll `GET /v1.0/{container_id}?fields=status` →
+   `{id, status}` until `status` is `finished` (see the lifecycle below).
+3. **Publish:** `POST /v1.0/{user_id}/threads_publish?creation_id=<container_id>`
    (no body) → `201 {id: "m_<seq>"}`.
 
 Route ordering: `/threads_publish` is declared before `/threads` so the
 publish step matches its own route and not the create route.
+
+### Container processing lifecycle
+
+Like the real API, a media container is **not publishable the instant it is
+created**: it goes through a processing phase, and `threads_publish` fails
+until the container has finished processing.
+
+```
+in_progress --(~3s)--> finished
+in_progress --(~3s)--> error      (simulate_fail=true only)
+```
+
+- The status is derived from the clock on read (`in_progress` for ~3s after
+  create, then `finished`) and persisted back to the container, so polls and
+  the publish gate always agree.
+- `POST /v1.0/{user_id}/threads_publish` returns `400` while the container is
+  still `in_progress`, and also after it errored.
+- **Failure injection (simulator extension):** pass `simulate_fail=true` in
+  the `POST .../threads` form body to make the container end in `error`
+  instead of `finished` after the same ~3s window. The real API has no such
+  switch; it exists so clients can exercise their failure paths.
 
 ## Usage
 

@@ -23,7 +23,8 @@ import (
 //   - 401 without bearer token
 //   - Send text message → {messages:[{id:"wamid...."}]}
 //   - Send template message
-//   - Message status query
+//   - Message status query (derive-on-read: sent → delivered after 3s;
+//     simulate_fail send → failed)
 //   - Create template → status PENDING
 //   - List templates (includes PENDING one)
 //   - Approve template (simulate lifecycle PENDING → APPROVED)
@@ -162,6 +163,55 @@ func TestWhatsAppStyleAdapter(t *testing.T) {
 	}
 	if _, ok := statusObj["message_status"].(string); !ok {
 		t.Fatalf("message_status = %v", statusObj["message_status"])
+	}
+	// Right after the send the message is still "sent" (derive-on-read).
+	if statusObj["message_status"] != "sent" {
+		t.Fatalf("message_status = %v, want sent before the 3s window", statusObj["message_status"])
+	}
+
+	// ===== Async status lifecycle: sent -> delivered at +3s; =====
+	// simulate_fail send (simulator extension) -> failed.
+
+	body, status = waPost(t, base+"/v21.0/"+phoneID+"/messages", token, map[string]any{
+		"messaging_product": "whatsapp",
+		"to":                "15550002222",
+		"type":              "text",
+		"text": map[string]any{
+			"body": "doomed to fail",
+		},
+		"simulate_fail": true,
+	})
+	if status != 200 {
+		t.Fatalf("POST simulate_fail message -> status %d; body %s", status, body)
+	}
+	var failResp map[string]any
+	if err := json.Unmarshal([]byte(body), &failResp); err != nil {
+		t.Fatalf("unmarshal fail response: %v", err)
+	}
+	failID := failResp["messages"].([]any)[0].(map[string]any)["id"].(string)
+
+	time.Sleep(3500 * time.Millisecond)
+
+	body, status = waGet(t, base+"/v21.0/"+msgID, token)
+	if status != 200 {
+		t.Fatalf("GET delivered status -> status %d; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &statusObj); err != nil {
+		t.Fatalf("unmarshal delivered status: %v", err)
+	}
+	if statusObj["message_status"] != "delivered" {
+		t.Fatalf("message_status = %v, want delivered", statusObj["message_status"])
+	}
+
+	body, status = waGet(t, base+"/v21.0/"+failID, token)
+	if status != 200 {
+		t.Fatalf("GET failed status -> status %d; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &statusObj); err != nil {
+		t.Fatalf("unmarshal failed status: %v", err)
+	}
+	if statusObj["message_status"] != "failed" {
+		t.Fatalf("fail message_status = %v, want failed", statusObj["message_status"])
 	}
 
 	// ===== Create template → PENDING =====

@@ -13,7 +13,7 @@
 # Requires Bearer access token.
 
 # Shared helpers (_require_auth, _wa_unauthorized, _wa_not_found, _wa_err,
-# _seed) are preloaded from scripts/lib.star.
+# _seed, _advance_message_status) are preloaded from scripts/lib.star.
 
 # _media_view is defined in media.star and available via preloaded lib
 # (shared across scripts in the same directory).
@@ -45,12 +45,16 @@ def on_get_resource(req):
     # Not found in any collection.
     return _wa_not_found("resource")
 
-# _lookup_message returns the status for a wamid.* message id.
+# _lookup_message returns the status for a wamid.* message id. The async
+# status is derived from the clock first (persisted + signed status webhook
+# emitted on the terminal transition) so lookups and webhooks always agree.
 def _lookup_message(msg_id):
     mc = store_collection("messages")
     msg = mc.get(msg_id)
     if msg == None:
         return _wa_not_found("message")
+
+    msg = _advance_message_status(msg)
 
     return respond(200, {
         "messaging_product": "whatsapp",

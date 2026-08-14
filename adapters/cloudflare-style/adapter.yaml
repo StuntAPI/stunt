@@ -56,6 +56,9 @@ endpoints:
   - route: /accounts/{account_id}/workers/scripts/{script_name}
     method: DELETE
     handler: scripts/workers.star#on_delete_script
+  - route: /accounts/{account_id}/workers/scripts/{script_name}/deployments
+    method: GET
+    handler: scripts/workers.star#on_list_deployments
 
   # --- R2 ---
   - route: /accounts/{account_id}/r2/buckets
@@ -88,6 +91,8 @@ resources:
     kind: collection
   - name: workers
     kind: collection
+  - name: deployments
+    kind: collection
   - name: buckets
     kind: collection
   - name: databases
@@ -116,5 +121,6 @@ rules:
 # Resources notes:
 # - zones: {id, name, account{id,name}, status, name_servers, type}
 # - workers: {name, account_id, created_on, modified_on}
+# - deployments: {id, account_id, script_name, status, strategy, versions, created_on}
 # - buckets: {name, creation_date}
 # - databases: {uuid, name, created_at}

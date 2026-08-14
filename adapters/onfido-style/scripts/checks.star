@@ -33,6 +33,9 @@ def on_create_check(req):
     seq = store_kv_incr("onfido", "check_seq")
     check_id = _gen_id("chk", seq)
 
+    # Async lifecycle: derive-on-read timestamps (see lib.star).
+    now = clock.now_unix()
+
     cc = store_collection("checks")
     cc.insert({
         "id": check_id,
@@ -43,6 +46,9 @@ def on_create_check(req):
         "get_count": 0,
         "created_at": "2024-01-15T10:00:15.000Z",
         "href": "/v3.6/checks/" + check_id,
+        "_running_at": now + 1,
+        "_done_at": now + 3,
+        "_fail": body.get("simulate_fail", False) == True,
     })
 
     return respond(201, {
@@ -65,12 +71,34 @@ def on_get_check(req):
     if doc == None:
         return respond(404, _err("not_found", "Check not found", None))
 
-    # Advance: in_progress → complete on first GET.
-    if doc["status"] == "in_progress":
-        doc["status"] = "complete"
-        doc["result"] = "clear"
-        doc["get_count"] = 1
+    # Derive current status from the clock and persist any transition so
+    # lists/webhooks agree with the poll.
+    new_status = _derive_check_status(doc)
+    if new_status != doc["status"]:
+        doc["status"] = new_status
+        doc["result"] = _derive_check_result(doc)
         cc.update(check_id, doc)
+
+        # Side effects fire exactly once, at the transition Onfido notifies.
+        if new_status == "complete":
+            _signed_emit("check.completed", {
+                "payload": {
+                    "resource_type": "check",
+                    "action": "check.completed",
+                    "object": {
+                        "id": check_id,
+                        "status": "complete",
+                        "result": doc["result"],
+                        "href": doc.get("href", ""),
+                    },
+                },
+            })
+    elif doc["status"] == "complete" and doc.get("result", None) == None:
+        doc["result"] = _derive_check_result(doc)
+        cc.update(check_id, doc)
+
+    doc["get_count"] = doc.get("get_count", 0) + 1
+    cc.update(check_id, doc)
 
     result = {
         "id": doc["id"],
@@ -84,16 +112,17 @@ def on_get_check(req):
 
     # Include breakdown when complete.
     if doc["status"] == "complete":
-        result["breakdown"] = _build_breakdown(doc.get("report_names", []))
+        result["breakdown"] = _build_breakdown(doc.get("report_names", []), doc.get("result", "clear"))
 
     return respond(200, result)
 
-# _build_breakdown creates a synthetic check breakdown.
-def _build_breakdown(report_names):
+# _build_breakdown creates a synthetic check breakdown; each report matches
+# the overall check result.
+def _build_breakdown(report_names, overall):
     breakdown = {}
     for r in report_names:
         breakdown[r] = {
-            "result": "clear",
+            "result": overall,
             "sub_checks": [],
         }
     return breakdown

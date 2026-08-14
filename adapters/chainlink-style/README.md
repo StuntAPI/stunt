@@ -46,7 +46,8 @@ Requests without auth on protected endpoints return `401`.
 | GET | `/feeds/{feedID}` | No | Get a feed's latestAnswer |
 | POST | `/v2/functions/createSecrets` | Yes | Create encrypted secrets |
 | POST | `/v2/functions/encryptSecrets` | Yes | Encrypt a secrets payload |
-| POST | `/v2/functions/createRequest` | Yes | Create a Functions request |
+| POST | `/v2/functions/createRequest` | Yes | Create a Functions request (starts `pending`) |
+| GET | `/v2/functions/request/{id}` | Yes | Poll a request — status derived from the clock |
 | POST | `/v2/automation/registerUpkeep` | Yes | Register an upkeep |
 | GET | `/v2/automation/upkeeps` | Yes | List registered upkeeps |
 | GET | `/v2/automation/{id}` | Yes | Get a single upkeep |
@@ -71,4 +72,38 @@ Requests without auth on protected endpoints return `401`.
 
 // Error
 { "error": { "code": "UNAUTHORIZED", "message": "..." } }
+```
+
+## Functions request lifecycle
+
+A Functions request is a real async state machine (derive-on-read): status is
+computed from the engine clock when polled and persisted back, so repeated
+polls agree.
+
+```
+pending (0-1s) -> in_flight (1-3s) -> fulfilled (>=3s)
+                                     \-> failed   (>=3s, via simulate_fail)
+```
+
+The states are the real Chainlink Functions vocabulary (the subscription
+manager shows a request as *Pending* while the DON has not picked it up,
+*In flight* while executing, then *Fulfilled* or failed/timed out). There are
+no webhooks — the real provider delivers results on-chain via the fulfillment
+callback — so the only side effect is persisting the transition (terminal
+requests gain `result` + `completedAt`, or `errorMessage` on failure).
+
+**Failure injection (simulator extension):** pass `"simulate_fail": true` in
+the `createRequest` body to make the request land in `failed` instead of
+`fulfilled` (the real sandbox has no failure trigger for Functions).
+
+```bash
+curl -X POST http://localhost:8080/v2/functions/createRequest \
+  -H "Authorization: Bearer your-token" -H "Content-Type: application/json" \
+  -d '{"subscriptionId": 1234, "simulate_fail": false}'
+# -> { "requestID": "6000000001", "status": "pending", ... }
+
+sleep 4
+curl http://localhost:8080/v2/functions/request/6000000001 \
+  -H "Authorization: Bearer your-token"
+# -> { "requestID": "6000000001", "status": "fulfilled", "result": "0x...", ... }
 ```

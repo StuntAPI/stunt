@@ -23,7 +23,10 @@ import (
 //   - access_token (auth code) → token pair with user_id
 //   - /v1.0/me with bearer → profile; no bearer → 401
 //   - two-step publish: create container (media_type=TEXT, text required) → 201 c_<id>;
-//     publish → 201 m_<id>; bad container id → 404; missing text → 400
+//     container status derives in_progress → finished after ~3s (poll
+//     GET /v1.0/{container_id}?fields=status); publish before finished → 400;
+//     publish after → 201 m_<id>; simulate_fail container → error and
+//     publish → 400; bad container id → 404; missing text → 400
 //   - insights → all 4 metrics present (views/likes/replies/reposts), finite
 //   - engagement → published media with a reply child; wrong user_id → empty data
 func TestThreadsStyleAdapter(t *testing.T) {
@@ -186,6 +189,74 @@ func TestThreadsStyleAdapter(t *testing.T) {
 	})
 	if status != 400 {
 		t.Fatalf("missing text -> status %d, want 400", status)
+	}
+
+	// ===== Container processing lifecycle (derive-on-read) =====
+
+	// A fresh container is in_progress and threads_publish is gated on finished.
+	body, status = getAuth(t, base+"/v1.0/"+containerID+"?fields=id,status", accessToken)
+	if status != 200 {
+		t.Fatalf("container status -> status %d, want 200; body %s", status, body)
+	}
+	var statusResp map[string]any
+	if err := json.Unmarshal([]byte(body), &statusResp); err != nil {
+		t.Fatalf("unmarshal container status: %v (body %s)", err, body)
+	}
+	if statusResp["status"] != "in_progress" {
+		t.Fatalf("fresh container status = %v, want in_progress", statusResp["status"])
+	}
+
+	_, status = threadsPostNoBodyAuth(t, base+"/v1.0/"+userID+"/threads_publish?creation_id="+containerID, accessToken)
+	if status != 400 {
+		t.Fatalf("publish while in_progress -> status %d, want 400", status)
+	}
+
+	// Simulator-only failure injection: simulate_fail=true ends in error.
+	body, status = threadsPostFormAuth(t, base+"/v1.0/"+userID+"/threads", accessToken, url.Values{
+		"media_type":    {"TEXT"},
+		"text":          {"this container is doomed"},
+		"simulate_fail": {"true"},
+	})
+	if status != 201 {
+		t.Fatalf("create simulate_fail container -> status %d, want 201; body %s", status, body)
+	}
+	var failContainerResp map[string]any
+	if err := json.Unmarshal([]byte(body), &failContainerResp); err != nil {
+		t.Fatalf("unmarshal simulate_fail container response: %v (body %s)", err, body)
+	}
+	failContainerID, ok := failContainerResp["id"].(string)
+	if !ok || !strings.HasPrefix(failContainerID, "c_") {
+		t.Fatalf("simulate_fail container id = %v, want c_* prefix", failContainerResp["id"])
+	}
+
+	// Advance the clock past the ~3s processing window.
+	time.Sleep(3200 * time.Millisecond)
+
+	body, status = getAuth(t, base+"/v1.0/"+containerID+"?fields=status", accessToken)
+	if status != 200 {
+		t.Fatalf("container status after window -> status %d, want 200; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &statusResp); err != nil {
+		t.Fatalf("unmarshal container status after window: %v (body %s)", err, body)
+	}
+	if statusResp["status"] != "finished" {
+		t.Fatalf("container status after window = %v, want finished", statusResp["status"])
+	}
+
+	body, status = getAuth(t, base+"/v1.0/"+failContainerID+"?fields=status", accessToken)
+	if status != 200 {
+		t.Fatalf("simulate_fail container status -> status %d, want 200; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &statusResp); err != nil {
+		t.Fatalf("unmarshal simulate_fail container status: %v (body %s)", err, body)
+	}
+	if statusResp["status"] != "error" {
+		t.Fatalf("simulate_fail container status = %v, want error", statusResp["status"])
+	}
+
+	_, status = threadsPostNoBodyAuth(t, base+"/v1.0/"+userID+"/threads_publish?creation_id="+failContainerID, accessToken)
+	if status != 400 {
+		t.Fatalf("publish error container -> status %d, want 400", status)
 	}
 
 	// ===== Publish container → 201 m_<id> =====

@@ -333,3 +333,93 @@ func cfPut(t *testing.T, rawurl, auth string, body []byte) (string, int) {
 	b, _ := io.ReadAll(resp.Body)
 	return string(b), resp.StatusCode
 }
+
+// TestCloudflareStyleAsyncLifecycles proves the derive-on-read state
+// machines: a created zone goes pending -> initializing -> active, and a
+// Worker deployment goes active -> in_progress -> deployed (failed with the
+// simulator-only simulate_fail flag).
+func TestCloudflareStyleAsyncLifecycles(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "cloudflare-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"cf": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["cf"]
+
+	const bearer = "Bearer stunt-api-token-123"
+	const accountID = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+	// Create a zone: immediately pending (or initializing).
+	zoneBody, _ := json.Marshal(map[string]any{"name": "lifecycle.example"})
+	body, status := cfPost(t, base+"/zones", bearer, zoneBody)
+	if status != 200 {
+		t.Fatalf("create zone -> %d; body %s", status, body)
+	}
+	var zoneResp map[string]any
+	json.Unmarshal([]byte(body), &zoneResp)
+	zoneResult := zoneResp["result"].(map[string]any)
+	zoneID, _ := zoneResult["id"].(string)
+	if zoneResult["status"] != "pending" && zoneResult["status"] != "initializing" {
+		t.Fatalf("immediate zone status = %v, want pending|initializing", zoneResult["status"])
+	}
+
+	// Deploy a worker normally and with simulate_fail.
+	if _, status := cfPut(t, base+"/accounts/"+accountID+"/workers/scripts/lc-worker", bearer, []byte(`{"main_module":"ok"}`)); status != 200 {
+		t.Fatalf("deploy ok worker -> %d", status)
+	}
+	if _, status := cfPut(t, base+"/accounts/"+accountID+"/workers/scripts/lc-worker-fail", bearer, []byte(`{"main_module":"bad","simulate_fail":true}`)); status != 200 {
+		t.Fatalf("deploy fail worker -> %d", status)
+	}
+
+	// After the 3s window: zone active, deployments deployed / failed.
+	time.Sleep(3500 * time.Millisecond)
+
+	body, status = cfGet(t, base+"/zones/"+zoneID, bearer)
+	if status != 200 {
+		t.Fatalf("get zone -> %d; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &zoneResp)
+	if zoneResp["result"].(map[string]any)["status"] != "active" {
+		t.Fatalf("zone after window = %v, want active", zoneResp["result"].(map[string]any)["status"])
+	}
+
+	body, status = cfGet(t, base+"/accounts/"+accountID+"/workers/scripts/lc-worker/deployments", bearer)
+	if status != 200 {
+		t.Fatalf("get deployments -> %d; body %s", status, body)
+	}
+	var depResp map[string]any
+	json.Unmarshal([]byte(body), &depResp)
+	deps := depResp["result"].([]any)
+	if len(deps) != 1 || deps[0].(map[string]any)["status"] != "deployed" {
+		t.Fatalf("ok deployment = %v, want one deployed", depResp["result"])
+	}
+
+	body, status = cfGet(t, base+"/accounts/"+accountID+"/workers/scripts/lc-worker-fail/deployments", bearer)
+	if status != 200 {
+		t.Fatalf("get fail deployments -> %d; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &depResp)
+	deps = depResp["result"].([]any)
+	if len(deps) != 1 || deps[0].(map[string]any)["status"] != "failed" {
+		t.Fatalf("fail deployment = %v, want one failed", depResp["result"])
+	}
+}

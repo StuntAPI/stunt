@@ -80,6 +80,8 @@ func twilioGetNoAuth(t *testing.T, url string) (string, int) {
 //   - POST message → 201 with sid SM..., status queued
 //   - GET message list → shows the sent message (STATEFUL)
 //   - GET message by sid → shows persisted message
+//   - Async lifecycle → queued derives to delivered after 3s;
+//     simulate_fail send derives to undelivered
 //   - POST call → 201 with sid CA..., status queued
 //   - Verify create → pending; check with wrong code → pending; check with
 //     right code → approved
@@ -201,6 +203,62 @@ func TestTwilioStyleAdapter(t *testing.T) {
 	_, status = twilioGet(t, base+"/2010-06-01/Accounts/"+accountSID+"/Messages/SMnotfound.json")
 	if status != 404 {
 		t.Fatalf("GET nonexistent message -> status %d, want 404", status)
+	}
+
+	// ===== Async lifecycle: derive-on-read status machine =====
+	// queued -> sent -> delivered (timings 1s/3s); a simulate_fail send
+	// terminates in undelivered.
+
+	body, status = twilioPostJSON(t, msgPath, map[string]any{
+		"To":            "+15551234567",
+		"From":          "+15557654321",
+		"Body":          "doomed to bounce",
+		"simulate_fail": true,
+	})
+	if status != 201 {
+		t.Fatalf("POST fail message -> status %d, want 201; body %s", status, body)
+	}
+	var failMsg map[string]any
+	if err := json.Unmarshal([]byte(body), &failMsg); err != nil {
+		t.Fatalf("unmarshal fail message: %v (body %s)", err, body)
+	}
+	failSID, ok := failMsg["sid"].(string)
+	if !ok || !strings.HasPrefix(failSID, "SM") {
+		t.Fatalf("fail message sid = %v, want SM* prefix", failMsg["sid"])
+	}
+
+	time.Sleep(3500 * time.Millisecond)
+
+	// Normal message -> delivered, with date_sent now set.
+	body, status = twilioGet(t, base+"/2010-06-01/Accounts/"+accountSID+"/Messages/"+msgSID+".json")
+	if status != 200 {
+		t.Fatalf("GET delivered message -> status %d, want 200; body %s", status, body)
+	}
+	var delivered map[string]any
+	if err := json.Unmarshal([]byte(body), &delivered); err != nil {
+		t.Fatalf("unmarshal delivered: %v (body %s)", err, body)
+	}
+	if delivered["status"] != "delivered" {
+		t.Fatalf("delivered status = %v, want delivered", delivered["status"])
+	}
+	if delivered["date_sent"] == nil {
+		t.Fatalf("delivered date_sent = %v, want a timestamp", delivered["date_sent"])
+	}
+
+	// Failure-injected message -> undelivered with an error code.
+	body, status = twilioGet(t, base+"/2010-06-01/Accounts/"+accountSID+"/Messages/"+failSID+".json")
+	if status != 200 {
+		t.Fatalf("GET undelivered message -> status %d, want 200; body %s", status, body)
+	}
+	var undelivered map[string]any
+	if err := json.Unmarshal([]byte(body), &undelivered); err != nil {
+		t.Fatalf("unmarshal undelivered: %v (body %s)", err, body)
+	}
+	if undelivered["status"] != "undelivered" {
+		t.Fatalf("fail status = %v, want undelivered", undelivered["status"])
+	}
+	if undelivered["error_code"] == nil {
+		t.Fatalf("fail error_code = %v, want a code", undelivered["error_code"])
 	}
 
 	// ===== POST call → 201, sid CA..., status queued =====

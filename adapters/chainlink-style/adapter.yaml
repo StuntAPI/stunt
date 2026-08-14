@@ -37,6 +37,9 @@ endpoints:
   - route: /v2/functions/createRequest
     method: POST
     handler: scripts/functions.star#on_create_request
+  - route: /v2/functions/request/{requestID}
+    method: GET
+    handler: scripts/functions.star#on_get_request
 
   # --- Automation (auth required) ---
   - route: /v2/automation/registerUpkeep
@@ -62,6 +65,8 @@ resources:
   - name: feeds
     kind: collection
   - name: secrets
+    kind: collection
+  - name: requests
     kind: collection
   - name: upkeeps
     kind: collection

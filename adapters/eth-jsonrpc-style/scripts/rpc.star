@@ -10,6 +10,18 @@
 #     logs, and increments the sender's nonce — so a subsequent
 #     eth_getTransactionReceipt returns the receipt with logs.
 #   - eth_getLogs returns the logs from sent transactions.
+#
+# TRANSACTION LIFECYCLE (derive-on-read): a sent transaction no longer mines
+# instantly. The stored tx/receipt/log docs carry a clock-derived mining
+# milestone and the current state is computed when polled:
+#   mempool (0-1s) -> pending/mining (1-3s) -> mined (>=3s)
+# Before "mined": eth_getTransactionReceipt returns null (real nodes have no
+# receipt until inclusion), eth_getTransactionByHash returns the tx with
+# null block fields, and eth_getLogs excludes the tx's logs. Transitions are
+# persisted back so repeated polls agree. SIMULATOR EXTENSION: pass
+# {"simulate_fail": true} as the second params element to
+# eth_sendRawTransaction to mine the transaction with status "0x0"
+# (execution reverted).
 
 # Shared helpers are preloaded from scripts/lib.star.
 
@@ -120,6 +132,13 @@ def _handle_send_raw_tx(id, params):
     if raw_tx == None:
         return _rpc_err(id, -32000, "missing raw transaction")
 
+    # Simulator extension: {"simulate_fail": true} in the optional config
+    # object (params[1]) mines the tx with status "0x0" (reverted).
+    fail = _cfg_flag(_second_raw(params), "simulate_fail")
+
+    now = clock.now_unix()
+    mined_at = now + 3
+
     # Deterministic tx hash from the raw transaction data.
     tx_hash = _deterministic_hash(raw_tx)
 
@@ -152,9 +171,10 @@ def _handle_send_raw_tx(id, params):
         "transactionIndex": "0x0",
         "logIndex": "0x0",
         "removed": False,
+        "_mined_at": mined_at,
     }
 
-    # Store the transaction.
+    # Store the transaction (with its lifecycle milestone).
     txc = store_collection("transactions")
     txc.insert({
         "hash": tx_hash,
@@ -170,9 +190,12 @@ def _handle_send_raw_tx(id, params):
         "value": "0xde0b6b3a7640000",
         "type": "0x0",
         "chainId": "0x1",
+        "state": "pending",
+        "_mined_at": mined_at,
+        "_fail": fail,
     })
 
-    # Store the receipt (STATEFUL — a sent tx has a receipt).
+    # Store the receipt (STATEFUL); served once the tx is mined (>=3s).
     rc = store_collection("receipts")
     rc.insert({
         "transactionHash": tx_hash,
@@ -189,6 +212,9 @@ def _handle_send_raw_tx(id, params):
         "logs": [log_entry],
         "logsBloom": "0x" + _hex64(),
         "contractAddress": None,
+        "state": "pending",
+        "_mined_at": mined_at,
+        "_fail": fail,
     })
 
     # Store the log for eth_getLogs.
@@ -248,9 +274,18 @@ def _handle_get_receipt(id, params):
         return _rpc_err(id, -32000, "missing tx hash")
 
     rc = store_collection("receipts")
+    now = clock.now_unix()
     for r in rc.list():
         if r.get("transactionHash", "") == tx_hash:
-            return _rpc_ok(id, r)
+            if now < r.get("_mined_at", 0):
+                # Real nodes: no receipt until the tx is mined.
+                return _rpc_ok(id, None)
+            if r.get("state", "") != "mined":
+                r["state"] = "mined"
+                if r.get("_fail", False):
+                    r["status"] = "0x0"
+                rc.update(r["id"], r)
+            return _rpc_ok(id, _receipt_view(r))
 
     # No receipt found.
     return _rpc_ok(id, None)
@@ -261,9 +296,20 @@ def _handle_get_tx_by_hash(id, params):
         return _rpc_ok(id, None)
 
     txc = store_collection("transactions")
+    now = clock.now_unix()
     for tx in txc.list():
         if tx.get("hash", "") == tx_hash:
-            return _rpc_ok(id, tx)
+            if now >= tx.get("_mined_at", 0):
+                if tx.get("state", "") != "mined":
+                    tx["state"] = "mined"
+                    txc.update(tx["id"], tx)
+                return _rpc_ok(id, _tx_view(tx))
+            # Still in the mempool: block placement fields are null.
+            view = _tx_view(tx)
+            view["blockNumber"] = None
+            view["blockHash"] = None
+            view["transactionIndex"] = None
+            return _rpc_ok(id, view)
 
     return _rpc_ok(id, None)
 
@@ -322,7 +368,11 @@ def _handle_get_logs(id, params):
 
     lc = store_collection("logs")
     result = []
+    now = clock.now_unix()
     for log in lc.list():
+        # Logs are only visible once their transaction is mined.
+        if now < log.get("_mined_at", 0):
+            continue
         log_block = _from_hex(log.get("blockNumber", "0x0"))
         if log_block < from_block or log_block > to_block:
             continue
@@ -341,7 +391,7 @@ def _handle_get_logs(id, params):
             else:
                 continue
 
-        result.append(log)
+        result.append(_log_view(log))
 
     return _rpc_ok(id, result)
 
@@ -411,6 +461,77 @@ def _handle_fee_history(id, params):
 
 # --- helpers ---
 
+# _second_raw returns the optional second params element (the sendRawTransaction
+# config object), or None when absent.
+def _second_raw(params):
+    if params == None or len(params) < 2:
+        return None
+    return params[1]
+
+# _cfg_flag reads a boolean flag from a config object, tolerating None /
+# non-dict values.
+def _cfg_flag(cfg, key):
+    if cfg == None:
+        return False
+    v = cfg.get(key, False)
+    if v == None:
+        return False
+    return v
+
+# _receipt_view returns the public receipt shape (internal _-prefixed
+# lifecycle fields are stripped).
+def _receipt_view(r):
+    logs = []
+    for l in r.get("logs", []):
+        logs.append(_log_view(l))
+    return {
+        "transactionHash": r.get("transactionHash", ""),
+        "blockNumber": r.get("blockNumber", "0x0"),
+        "blockHash": r.get("blockHash", ""),
+        "gasUsed": r.get("gasUsed", "0x0"),
+        "cumulativeGasUsed": r.get("cumulativeGasUsed", "0x0"),
+        "effectiveGasPrice": r.get("effectiveGasPrice", "0x0"),
+        "status": r.get("status", "0x1"),
+        "from": r.get("from", ""),
+        "to": r.get("to", ""),
+        "transactionIndex": r.get("transactionIndex", "0x0"),
+        "type": r.get("type", "0x0"),
+        "logs": logs,
+        "logsBloom": r.get("logsBloom", "0x" + _hex64()),
+        "contractAddress": r.get("contractAddress", None),
+    }
+
+# _tx_view returns the public transaction shape.
+def _tx_view(tx):
+    return {
+        "hash": tx.get("hash", ""),
+        "blockNumber": tx.get("blockNumber", "0x0"),
+        "blockHash": tx.get("blockHash", ""),
+        "from": tx.get("from", ""),
+        "to": tx.get("to", ""),
+        "gas": tx.get("gas", "0x0"),
+        "gasPrice": tx.get("gasPrice", "0x0"),
+        "input": tx.get("input", "0x"),
+        "nonce": tx.get("nonce", "0x0"),
+        "transactionIndex": tx.get("transactionIndex", "0x0"),
+        "value": tx.get("value", "0x0"),
+        "type": tx.get("type", "0x0"),
+        "chainId": tx.get("chainId", "0x1"),
+    }
+
+# _log_view returns the public log shape.
+def _log_view(log):
+    return {
+        "address": log.get("address", ""),
+        "topics": log.get("topics", []),
+        "data": log.get("data", "0x"),
+        "blockNumber": log.get("blockNumber", "0x0"),
+        "transactionHash": log.get("transactionHash", ""),
+        "transactionIndex": log.get("transactionIndex", "0x0"),
+        "logIndex": log.get("logIndex", "0x0"),
+        "removed": log.get("removed", False),
+    }
+
 # _block_response builds a block response object. If full_tx is True,
 # transactions are expanded to full objects; otherwise they are just hashes.
 def _block_response(blk, full_tx):
@@ -423,7 +544,7 @@ def _block_response(blk, full_tx):
         for tx_hash in txs:
             for tx in txc.list():
                 if tx.get("hash", "") == tx_hash:
-                    expanded.append(tx)
+                    expanded.append(_tx_view(tx))
                     break
         txs = expanded
 

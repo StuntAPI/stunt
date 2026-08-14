@@ -83,6 +83,44 @@ func TestJumioStyleAdapter(t *testing.T) {
 		t.Fatalf("no auth -> status %d, want 401", status)
 	}
 
+	// ===== GET scan immediately → still PENDING (completes at +3s) =====
+
+	body, status = jumioGet(t, base+"/netverify/v2/scans/"+scanRef, token)
+	if status != 200 {
+		t.Fatalf("get scan (immediate) -> status %d, want 200; body %s", status, body)
+	}
+	var scanEarly map[string]any
+	if err := json.Unmarshal([]byte(body), &scanEarly); err != nil {
+		t.Fatalf("unmarshal: %v (body %s)", err, body)
+	}
+	if scanEarly["status"] != "PENDING" {
+		t.Fatalf("immediate scan status = %v, want PENDING", scanEarly["status"])
+	}
+
+	// ===== Create a failing scan (simulator extension: simulate_fail) =====
+
+	body, status = jumioPost(t, base+"/netverify/v2/scans", token, map[string]any{
+		"merchantScanReference": "merchant-ref-002",
+		"country":               "USA",
+		"type":                  "PASSPORT",
+		"simulate_fail":         true,
+	})
+	if status != 200 {
+		t.Fatalf("create failing scan -> status %d, want 200; body %s", status, body)
+	}
+	var failCreate map[string]any
+	if err := json.Unmarshal([]byte(body), &failCreate); err != nil {
+		t.Fatalf("unmarshal: %v (body %s)", err, body)
+	}
+	failScanRefStr, ok := failCreate["scanReference"].(string)
+	if !ok || failScanRefStr == "" {
+		t.Fatalf("failing scanReference = %v, want non-empty", failCreate["scanReference"])
+	}
+
+	// ===== Sleep past the 3s completion window =====
+
+	time.Sleep(3500 * time.Millisecond)
+
 	// ===== GET scan → DONE =====
 
 	body, status = jumioGet(t, base+"/netverify/v2/scans/"+scanRef, token)
@@ -95,6 +133,26 @@ func TestJumioStyleAdapter(t *testing.T) {
 	}
 	if scanGet["status"] != "DONE" {
 		t.Fatalf("scan status = %v, want DONE", scanGet["status"])
+	}
+
+	// ===== GET failing scan → FAILED =====
+
+	body, status = jumioGet(t, base+"/netverify/v2/scans/"+failScanRefStr, token)
+	if status != 200 {
+		t.Fatalf("get failing scan -> status %d, want 200; body %s", status, body)
+	}
+	var scanFail map[string]any
+	if err := json.Unmarshal([]byte(body), &scanFail); err != nil {
+		t.Fatalf("unmarshal: %v (body %s)", err, body)
+	}
+	if scanFail["status"] != "FAILED" {
+		t.Fatalf("failing scan status = %v, want FAILED", scanFail["status"])
+	}
+
+	// Failing scan data → 409, no extracted data.
+	_, status = jumioGet(t, base+"/netverify/v2/scans/"+failScanRefStr+"/data", token)
+	if status != 409 {
+		t.Fatalf("failing scan data -> status %d, want 409", status)
 	}
 
 	// ===== GET scan/data → extractedData =====

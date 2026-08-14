@@ -162,6 +162,57 @@ func TestEthJsonrpcStyleAdapter(t *testing.T) {
 		t.Fatalf("blockNumber after send = %d, want %d", newBlock, initialBlock+1)
 	}
 
+	// ===== Lifecycle: receipt is null until the tx is mined (>=3s) =====
+
+	body, status = ethRPC(t, base, map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "eth_getTransactionReceipt",
+		"params":  []any{txHash},
+		"id":      7,
+	})
+	if status != 200 {
+		t.Fatalf("early receipt -> status %d, want 200; body %s", status, body)
+	}
+	var earlyResp map[string]any
+	json.Unmarshal([]byte(body), &earlyResp)
+	if earlyResp["result"] != nil {
+		t.Fatalf("early receipt = %v, want null (tx still in mempool)", earlyResp["result"])
+	}
+
+	// Negative path: a tx sent with {"simulate_fail": true} (second params
+	// element) mines reverted — receipt status "0x0".
+	failRawTx := rawTx + "ff"
+	body, status = ethRPC(t, base, map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "eth_sendRawTransaction",
+		"params":  []any{failRawTx, map[string]any{"simulate_fail": true}},
+		"id":      17,
+	})
+	if status != 200 {
+		t.Fatalf("sendRawTransaction (fail) -> status %d, want 200; body %s", status, body)
+	}
+	var failSendResp map[string]any
+	json.Unmarshal([]byte(body), &failSendResp)
+	failTxHash, ok := failSendResp["result"].(string)
+	if !ok || len(failTxHash) != 66 || failTxHash[:2] != "0x" {
+		t.Fatalf("fail txHash = %v, want 0x + 64 hex chars", failSendResp["result"])
+	}
+
+	// Sleep past the 3s mining mark.
+	time.Sleep(3500 * time.Millisecond)
+
+	// The fail-tx send advanced the block again; capture the current number
+	// for the later batch assertion.
+	body, _ = ethRPC(t, base, map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "eth_blockNumber",
+		"params":  []any{},
+		"id":      19,
+	})
+	var curBlockResp map[string]any
+	json.Unmarshal([]byte(body), &curBlockResp)
+	currentBlockStr, _ := curBlockResp["result"].(string)
+
 	// ===== eth_getTransactionReceipt(hash) → status 0x1 + logs =====
 
 	body, _ = ethRPC(t, base, map[string]any{
@@ -199,6 +250,27 @@ func TestEthJsonrpcStyleAdapter(t *testing.T) {
 	}
 	if firstLog["blockNumber"] != newBlockStr {
 		t.Fatalf("log blockNumber = %v, want %v", firstLog["blockNumber"], newBlockStr)
+	}
+
+	// ===== simulate_fail tx → receipt with status "0x0" =====
+
+	body, status = ethRPC(t, base, map[string]any{
+		"jsonrpc": "2.0",
+		"method":  "eth_getTransactionReceipt",
+		"params":  []any{failTxHash},
+		"id":      18,
+	})
+	if status != 200 {
+		t.Fatalf("fail receipt -> status %d, want 200; body %s", status, body)
+	}
+	var failReceiptResp map[string]any
+	json.Unmarshal([]byte(body), &failReceiptResp)
+	failReceipt, ok := failReceiptResp["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("fail receipt = %v, want object", failReceiptResp["result"])
+	}
+	if failReceipt["status"] != "0x0" {
+		t.Fatalf("simulate_fail receipt status = %v, want 0x0", failReceipt["status"])
 	}
 
 	// ===== eth_getLogs → returns the logs =====
@@ -264,8 +336,8 @@ func TestEthJsonrpcStyleAdapter(t *testing.T) {
 		t.Fatalf("batch[0] result = %v, want 0x1", first["result"])
 	}
 	second := batchResp[1].(map[string]any)
-	if second["result"] != newBlockStr {
-		t.Fatalf("batch[1] result = %v, want %v", second["result"], newBlockStr)
+	if second["result"] != currentBlockStr {
+		t.Fatalf("batch[1] result = %v, want %v", second["result"], currentBlockStr)
 	}
 	third := batchResp[2].(map[string]any)
 	if third["result"] != "1" {

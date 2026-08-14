@@ -8,9 +8,16 @@
 #   -> { sid, body, status, ... }
 #
 # Messages are STATEFUL: a message POSTed appears in the GET list.
+#
+# ASYNC LIFECYCLE (derive-on-read): a message returns "queued" at POST time,
+# then every read derives the real Twilio status from the clock — sent after
+# 1s, delivered after 3s (or undelivered/failed with failure injection; see
+# README). The derived status is persisted and the signed status-callback
+# webhook fires exactly once per NEW stage. See scripts/lib.star.
 
-# Shared helpers (_require_auth, _next_sid, _to_int) are preloaded from
-# scripts/lib.star.
+# Shared helpers (_require_auth, _next_sid, _to_int, _num, _lifecycle_stamp,
+# _lifecycle_stage, _public_view, _MAGIC_FAIL_TO, _signed_emit) are preloaded
+# from scripts/lib.star.
 
 # on_send_message creates a message and returns the full message object.
 def on_send_message(req):
@@ -33,6 +40,17 @@ def on_send_message(req):
     msg_body = body.get("Body", "")
     if msg_body == None:
         msg_body = ""
+
+    # Failure injection: Twilio's real magic always-fail test number wins;
+    # otherwise the simulator-only simulate_fail flag selects the
+    # "undelivered" terminal.
+    fail_mode = ""
+    if to == _MAGIC_FAIL_TO:
+        fail_mode = "failed"
+    else:
+        sf = body.get("simulate_fail", False)
+        if sf != None and sf:
+            fail_mode = "undelivered"
 
     sid = _next_sid("SM")
 
@@ -64,15 +82,16 @@ def on_send_message(req):
     for k in msg:
         stored[k] = msg[k]
     stored["id"] = sid
+    stored["_fail_mode"] = fail_mode
+    _lifecycle_stamp(stored)
     c.insert(stored)
-
-    # Emit webhook event (signed, X-Twilio-Signature).
-    _signed_emit("message.sent", msg)
 
     return respond(201, msg)
 
 # on_list_messages returns all messages for the account as a Twilio-style
-# paginated list response.
+# paginated list response. Each message's async status is derived from the
+# clock first (persisted + webhook fired on transition), so lists agree with
+# single-message polls.
 def on_list_messages(req):
     err = _require_auth(req)
     if err != None:
@@ -86,7 +105,7 @@ def on_list_messages(req):
     for m in all_msgs:
         if m.get("account_sid", "") != account_sid:
             continue
-        result.append(m)
+        result.append(_public_view(_advance_message(m)))
 
     # Real MessageList filters (To/From/DateSent), applied after account
     # scoping and before paging. DateSent comparisons exclude unsent messages
@@ -158,4 +177,45 @@ def on_get_message(req):
             "status": 404,
         })
 
-    return respond(200, msg)
+    return respond(200, _public_view(_advance_message(msg)))
+
+# --- async lifecycle helpers ---
+
+# Synthetic RFC 1123 timestamp stamped when a message first reports sent
+# (deterministic, matching date_created's style).
+_SENT_AT = "Mon, 01 Jan 2024 00:00:00 +0000"
+
+# _advance_message derives the message's stage from the clock, persists each
+# transition, and fires the signed status-callback webhook exactly once per
+# NEW stage: queued -> sent emits message.sent; the terminal transition emits
+# message.delivered / message.undelivered / message.failed (only the statuses
+# the real provider notifies). Returns the updated doc.
+def _advance_message(msg):
+    stage = _num(msg.get("_stage", 0))
+    target = _lifecycle_stage(msg)
+    if target <= stage:
+        return msg
+    c = store_collection("messages")
+    while stage < target:
+        stage = stage + 1
+        if stage == 1:
+            msg["status"] = "sent"
+            msg["date_sent"] = _SENT_AT
+            msg["date_updated"] = _SENT_AT
+        elif msg.get("_fail_mode", "") == "failed":
+            msg["status"] = "failed"
+            msg["error_code"] = _to_int("21" + "211")
+            msg["error_message"] = "Invalid 'To' Phone Number"
+            msg["date_updated"] = _SENT_AT
+        elif msg.get("_fail_mode", "") == "undelivered":
+            msg["status"] = "undelivered"
+            msg["error_code"] = _to_int("30" + "007")
+            msg["error_message"] = "Message filtered"
+            msg["date_updated"] = _SENT_AT
+        else:
+            msg["status"] = "delivered"
+            msg["date_updated"] = _SENT_AT
+        msg["_stage"] = stage
+        c.update(msg["sid"], msg)
+        _signed_emit("message." + msg["status"], _public_view(msg))
+    return msg

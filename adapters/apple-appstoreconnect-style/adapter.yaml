@@ -43,10 +43,15 @@ endpoints:
   - route: /v1/apps/{id}/appPrices
     method: GET
     handler: scripts/apps.star#on_list_app_prices
+  - route: /v1/builds/{id}
+    method: GET
+    handler: scripts/apps.star#on_get_build
 
 # Backing stores — collections for stateful data.
 resources:
   - name: apps
+    kind: collection
+  - name: builds
     kind: collection
 
 # Auth scheme metadata.

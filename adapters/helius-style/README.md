@@ -51,10 +51,11 @@ curl -X POST "http://localhost:8080/v0/webhooks?api-key=your-key" \
 - `authHeader` — optional static value sent as the `Authorization` header on
   every delivery; use it as the shared secret.
 
-This simulator fires a webhook for each `sendTransaction` JSON-RPC call, with
-the real parsed-transaction shape. Real Helius batches deliveries as a JSON
-**array** of these objects; stunt's event engine delivers each transaction as
-a single object — treat every received payload as one array element:
+This simulator fires a webhook when a sent transaction first **confirms**
+(see the lifecycle below), with the real parsed-transaction shape. Real Helius
+batches deliveries as a JSON **array** of these objects; stunt's event engine
+delivers each transaction as a single object — treat every received payload
+as one array element:
 
 ```json
 {
@@ -76,6 +77,30 @@ a single object — treat every received payload as one array element:
 **Unsigned by design.** Real Helius does not HMAC-sign webhook deliveries —
 there is no signature header and no body MAC. Verification is the optional
 `authHeader` (delivered as `Authorization`); reply 401 when it does not match.
+
+## Transaction lifecycle
+
+`sendTransaction` no longer lands instantly: the stored transaction carries
+clock-derived milestones and `getSignatureStatuses` computes the current
+status on read (derive-on-read), persisting each transition so repeated polls
+agree:
+
+```
+null / not found (0-1s) -> processed (1-2s) -> confirmed (2-3s) -> finalized (>=3s)
+```
+
+That is Solana's real `confirmationStatus` vocabulary (`processed`,
+`confirmed`, `finalized`), with the real value-item shape
+(`{slot, confirmations, err, status: {Ok|Err}, confirmationStatus}`) and
+`null` for a just-submitted signature that has no status yet. The enhanced
+webhook delivery fires exactly once, when a transaction first reaches
+`confirmed`.
+
+**Failure injection (simulator extension):** pass
+`{"simulate_fail": true}` as the `sendTransaction` config object (`params[1]`)
+to land the transaction with an on-chain error — `err`/`status.Err` is set to
+an `InstructionError` while confirmation still progresses, exactly like a real
+failed Solana transaction.
 
 ## Deterministic
 

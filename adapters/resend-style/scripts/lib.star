@@ -145,3 +145,47 @@ def _emit_if_subscribed(event_type, payload):
         if len(evts) == 0 or event_type in evts:
             _signed_emit(event_type, payload)
             return
+
+# ============================================================================
+# ASYNC DELIVERY LIFECYCLE (derive-on-read state machine)
+# ============================================================================
+# Real Resend accepts a send, then emits email.sent (handed to the provider)
+# and later email.delivered (or email.bounced). This adapter reproduces that
+# with a derive-on-read state machine:
+#
+#   queued -> sent -> delivered   (timings: sent at +1s, delivered at +3s)
+#   queued -> sent -> bounced     (simulate_fail: true in the send body —
+#                                  simulator extension, see README)
+#
+# Every read (GET /emails/{id} and GET /emails) derives the email's stage
+# from the clock, persists the transition, and emits the webhook event
+# exactly once per NEW stage, so polls, lists, and webhooks always agree.
+
+# _num coerces a JSON-round-tripped number (int or float) to int.
+def _num(v):
+    if v == None:
+        return 0
+    if type(v) == "int":
+        return v
+    if type(v) == "float":
+        return int(v)
+    return _to_int(str(v))
+
+# _lifecycle_stamp writes the internal async schedule onto a doc at CREATE
+# time: in-flight at now + 1s, terminal at now + 3s (clock-derived, so
+# integration tests can sleep through the window deterministically).
+def _lifecycle_stamp(doc):
+    now = clock.now_unix()
+    doc["_running_at"] = now + 1
+    doc["_done_at"] = now + 3
+    doc["_stage"] = 0
+
+# _lifecycle_stage returns the clock-derived target stage for a doc:
+# 0 = initial (pre-1s), 1 = in-flight (1s..3s), 2 = terminal (>=3s).
+def _lifecycle_stage(doc):
+    now = clock.now_unix()
+    if now >= _num(doc.get("_done_at", 0)):
+        return 2
+    if now >= _num(doc.get("_running_at", 0)):
+        return 1
+    return 0

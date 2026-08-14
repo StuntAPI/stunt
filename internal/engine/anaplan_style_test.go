@@ -19,8 +19,10 @@ import (
 //   - Auth required: 401 without auth
 //   - List workspaces → {meta, items}
 //   - List models → items
-//   - Run import → async task ID
-//   - Get task status → COMPLETE
+//   - Run import → async task ID (CREATED)
+//   - Task status immediately → pre-terminal (NOT_STARTED/IN_PROGRESS)
+//   - Get task status after the 3s window → COMPLETE
+//   - simulate_fail import → COMPLETE with result.successful=false
 //   - List exports
 func TestAnaplanStyleAdapter(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "anaplan-style")
@@ -127,6 +129,42 @@ func TestAnaplanStyleAdapter(t *testing.T) {
 		t.Fatalf("taskState = %v, want CREATED", taskObj["taskState"])
 	}
 
+	// ===== Run import with simulate_fail → unsuccessful COMPLETE =====
+
+	body, status = anaplanPost(t, base+"/2/0/workspaces/"+wsID+"/models/"+modelID+"/imports/imp001/tasks", basicAuth, map[string]any{
+		"simulate_fail": true,
+	})
+	if status != 200 {
+		t.Fatalf("run fail import -> status %d, want 200; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		t.Fatalf("unmarshal fail import: %v (body %s)", err, body)
+	}
+	failTaskObj, ok := resp["task"].(map[string]any)
+	if !ok {
+		t.Fatalf("fail task = %v, want object", resp["task"])
+	}
+	failTaskID, ok := failTaskObj["taskId"].(string)
+	if !ok || failTaskID == "" {
+		t.Fatalf("fail taskId = %v, want non-empty string", failTaskObj["taskId"])
+	}
+
+	// ===== Task status immediately → pre-terminal =====
+
+	body, status = anaplanGet(t, base+"/2/0/workspaces/"+wsID+"/models/"+modelID+"/tasks/"+taskID, basicAuth)
+	if status != 200 {
+		t.Fatalf("task status (early) -> status %d, want 200; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		t.Fatalf("unmarshal early task: %v (body %s)", err, body)
+	}
+	if early, _ := resp["taskState"].(string); early == "COMPLETE" {
+		t.Fatalf("early taskState = %v, want NOT_STARTED/IN_PROGRESS", early)
+	}
+
+	// Sleep past the simulated task window (1s running / 3s done).
+	time.Sleep(3200 * time.Millisecond)
+
 	// ===== Get task status → COMPLETE =====
 
 	body, status = anaplanGet(t, base+"/2/0/workspaces/"+wsID+"/models/"+modelID+"/tasks/"+taskID, basicAuth)
@@ -145,6 +183,26 @@ func TestAnaplanStyleAdapter(t *testing.T) {
 	}
 	if result["successful"] != true {
 		t.Fatalf("successful = %v, want true", result["successful"])
+	}
+
+	// ===== Fail-injected task → COMPLETE with unsuccessful result =====
+
+	body, status = anaplanGet(t, base+"/2/0/workspaces/"+wsID+"/models/"+modelID+"/tasks/"+failTaskID, basicAuth)
+	if status != 200 {
+		t.Fatalf("fail task status -> status %d, want 200; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		t.Fatalf("unmarshal fail task: %v (body %s)", err, body)
+	}
+	if resp["taskState"] != "COMPLETE" {
+		t.Fatalf("fail taskState = %v, want COMPLETE", resp["taskState"])
+	}
+	failResult, ok := resp["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("fail result = %v, want object", resp["result"])
+	}
+	if failResult["successful"] != false {
+		t.Fatalf("fail successful = %v, want false", failResult["successful"])
 	}
 
 	// ===== List exports =====

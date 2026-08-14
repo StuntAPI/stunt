@@ -13,7 +13,7 @@ then fetch paginated results. The async polling + cursor pagination is the integ
 |---|---|---|
 | `/api/v1/query/{id}/execute` | POST | Execute a query → PENDING |
 | `/api/v1/query/{id}/result` | POST | Run inline → COMPLETED + rows |
-| `/api/v1/execution/{id}/status` | GET | Poll status → COMPLETED |
+| `/api/v1/execution/{id}/status` | GET | Poll status (async state machine) |
 | `/api/v1/execution/{id}/results` | GET | Get results → rows + metadata |
 | `/api/v1/auth/validate` | GET | Validate API key |
 
@@ -28,10 +28,28 @@ Bearer token (`Authorization: Bearer <key>`).
 ## Execution lifecycle
 
 ```
-QUERY_STATE_PENDING → QUERY_STATE_COMPLETED
+QUERY_STATE_PENDING → QUERY_STATE_EXECUTING → QUERY_STATE_COMPLETED
 ```
 
-First status poll completes the execution. Results are deterministic based on query_id.
+Derive-on-read state machine (timings: EXECUTING at +1s, COMPLETED at +3s
+after execute, computed from the injectable clock). Status polls and result
+fetches derive the current state from the clock and persist the transition
+back to the executions collection. GET results returns 404 until the
+execution reaches COMPLETED. Results are deterministic based on query_id.
+
+### Failure injection (simulator extension)
+
+The real Dune API has no sandbox failure trigger, so this adapter accepts a
+simulator-only flag in the POST `/execute` body:
+
+```json
+{"simulate_fail": true}
+```
+
+The execution then terminates in `QUERY_STATE_FAILED` (Dune's real failure
+vocabulary) instead of COMPLETED, and GET results returns 404.
+
+Dune has no execution webhooks, so no events are emitted on transitions.
 
 ---
 

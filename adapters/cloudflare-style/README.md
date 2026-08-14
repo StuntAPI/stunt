@@ -52,6 +52,40 @@ Without auth → `401 {success:false, errors:[{code:10000, message:"Authenticati
 | PUT | `/accounts/{account_id}/workers/scripts/{name}` | Deploy (create or update) Worker. |
 | GET | `/accounts/{account_id}/workers/scripts/{name}` | Get Worker script. |
 | DELETE | `/accounts/{account_id}/workers/scripts/{name}` | Delete Worker script. `result: null`. |
+| GET | `/accounts/{account_id}/workers/scripts/{name}/deployments` | List deployments for a script, with rollout status. |
+
+## Async lifecycles (derive-on-read)
+
+Two surfaces progress through the real provider's state vocabulary on a
+derive-on-read clock (timings computed from the injectable clock; reads derive
+the current state and persist the transition back, so polls and lists agree):
+
+```
+zone:          pending --(+1s)--> initializing --(+3s)--> active
+deployment:    active  --(+1s)--> in_progress  --(+3s)--> deployed
+```
+
+- **Zones:** `POST /zones` returns the zone in `pending` (like real
+  Cloudflare, which only flips to `active` once nameservers verify) and the
+  status filter on `GET /zones` honors the derived state.
+- **Worker deployments:** each `PUT .../workers/scripts/{name}` records a
+  deployment; poll `GET .../deployments` for its rollout status. The real
+  Cloudflare Deployment object has no `status` field (versions carry rollout
+  percentages), so exposing `status` here is a simulator extension.
+- Cloudflare has no webhooks for these transitions, so no events are emitted.
+
+### Failure injection (simulator extension)
+
+The real API has no sandbox failure trigger, so the create/deploy bodies accept
+a simulator-only flag:
+
+```json
+{"name": "example.org", "simulate_fail": true}          // POST /zones -> "moved"
+{"main_module": "...", "simulate_fail": true}           // PUT script  -> deployment "failed"
+```
+
+The zone settles in `"moved"` (Cloudflare's real vocabulary for a zone that
+moved away) and the deployment in `"failed"`.
 
 ### R2
 
