@@ -3,6 +3,7 @@ package starlark
 import (
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -190,4 +191,50 @@ func rsaPublicJWK(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple)
 	d.SetKey(sk.String("n"), sk.String(base64.RawURLEncoding.EncodeToString(pub.N.Bytes())))
 	d.SetKey(sk.String("e"), sk.String(base64.RawURLEncoding.EncodeToString(eBytes)))
 	return d, nil
+}
+
+// ed25519Sign signs data with an Ed25519 private key (signs the message
+// directly — Ed25519 does not pre-hash), returning the 64-byte signature
+// encoded per `encoding` (hex default / base64 / base64url).
+func ed25519Sign(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	var privPEM, data, encoding string
+	if err := sk.UnpackArgs(b.Name(), args, kwargs, "private_key", &privPEM, "data", &data, "encoding?", &encoding); err != nil {
+		return nil, err
+	}
+	k, err := parsePrivateKeyPEM(privPEM)
+	if err != nil {
+		return nil, err
+	}
+	priv, ok := k.(ed25519.PrivateKey)
+	if !ok {
+		return nil, fmt.Errorf("crypto.ed25519_sign: key is not an Ed25519 private key")
+	}
+	sig := ed25519.Sign(priv, []byte(data))
+	out, err := encodeDigest(sig, encoding)
+	if err != nil {
+		return nil, err
+	}
+	return sk.String(out), nil
+}
+
+// ed25519Verify verifies an Ed25519 signature against the public key. Returns
+// True on a valid signature, False otherwise.
+func ed25519Verify(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	var pubPEM, data, sigStr, encoding string
+	if err := sk.UnpackArgs(b.Name(), args, kwargs, "public_key", &pubPEM, "data", &data, "signature", &sigStr, "encoding?", &encoding); err != nil {
+		return nil, err
+	}
+	k, err := parsePublicKeyPEM(pubPEM)
+	if err != nil {
+		return nil, err
+	}
+	pub, ok := k.(ed25519.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("crypto.ed25519_verify: key is not an Ed25519 public key")
+	}
+	sig, err := decodeDigest(sigStr, encoding)
+	if err != nil {
+		return nil, fmt.Errorf("crypto.ed25519_verify: signature: %w", err)
+	}
+	return sk.Bool(ed25519.Verify(pub, []byte(data), sig)), nil
 }
