@@ -15,20 +15,29 @@ CRM integrations during local development:
 
 - **OAuth2:** `POST /services/oauth2/token` (password, authorization_code, or
   refresh_token grants) → `{access_token:"00D...", instance_url, token_type:"Bearer",
-  id, issued_at, signature}`.
+  id, issued_at, signature, refresh_token}`. Refresh tokens are single-use: each
+  token response issues a new `refresh_token`, and redeeming it via the
+  `refresh_token` grant rotates it (the old one is invalidated and a fresh
+  access + refresh token pair is issued for the same user).
 - **sObjects describe global:** `GET /services/data/v60.0/sobjects` → list of
   available objects (Account, Contact, Opportunity, Lead, User).
 - **sObjects describe object:** `GET /services/data/v60.0/sobjects/Account` →
   object metadata with fields.
 - **SOQL query:** `GET /services/data/v60.0/query?q=SELECT+Id,+Name+FROM+Account` →
   `{totalSize, records:[{attributes:{type,url}, Id, Name, ...}], done:true}`.
-  Pattern-matches the `FROM <Entity>` token and SELECT field list — no full SOQL
-  parser. Supports `WHERE Id = '...'` for single-record queries.
+  Supports `WHERE` with comparators (`=`, `!=`, `<`, `<=`, `>`, `>=`), `IN`,
+  `LIKE` (with leading/trailing `%` wildcards), and `AND`/`OR` combinations
+  (no parenthesized grouping), plus `ORDER BY` (`ASC`/`DESC`), `LIMIT`, and
+  `OFFSET`. `SELECT *` projects all fields. Works against all five objects
+  (Account, Contact, Opportunity, Lead, User).
 - **queryAll:** Same as query (includes deleted records conceptually).
 - **Account/Contact/Opportunity CRUD:** `POST` (create, 201), `GET /{id}`
   (retrieve), `PATCH /{id}` (update, 204), `DELETE /{id}` (204).
 - **Composite batch:** `POST /services/data/v60.0/composite` → processes
-  sub-requests sequentially, returns per-request results.
+  sub-requests sequentially, returns per-request results. Sub-request URLs are
+  pattern-matched as `/services/data/v60.0/sobjects/<Type>[/<id>]` and support
+  `GET` (single record by Id, or the full list when no Id is given), `POST`,
+  `PATCH`, and `DELETE`.
 
 Salesforce ID format: 3-char key prefix + 15-char alphanumeric (Account=001,
 Contact=003, Opportunity=006, Lead=00Q, User=005).
@@ -38,7 +47,10 @@ Contact=003, Opportunity=006, Lead=00Q, User=005).
 OAuth2 bearer tokens. API calls require `Authorization: Bearer <token>`. The token
 endpoint supports the password grant for local testing convenience (real Salesforce
 requires the web-server or JWT flow). The session token is `00D`-prefixed (the org
-key prefix).
+key prefix). The `refresh_token` grant is also supported: pass the
+`refresh_token` returned by a previous token response to mint a new access token
+for the same user. Refresh tokens are single-use — each redemption consumes the
+presented token and returns a newly issued one (rotation).
 
 ## Endpoints
 
@@ -55,7 +67,9 @@ key prefix).
 | GET | `/services/data/v60.0/queryAll` | `query.star#on_query` | SOQL query (incl. deleted) |
 | POST | `/services/data/v60.0/composite` | `composite.star#on_composite` | Composite batch |
 
-(Contact, Opportunity, Lead, User have the same CRUD pattern as Account.)
+(Contact and Opportunity have the same CRUD pattern as Account. Lead and User
+are describe-only — no CRUD routes are registered for them — but both remain
+queryable via SOQL `SELECT ... FROM Lead` / `FROM User`.)
 
 ## Error shape
 
@@ -73,14 +87,23 @@ Salesforce uses an **array** error envelope:
 
 401 when no/invalid bearer → `errorCode:"INVALID_SESSION_ID"`.
 
-## SOQL pattern-matching
+## SOQL query support
 
-The query handler does NOT implement a full SOQL parser. It:
+The query handler evaluates a practical SOQL subset. It:
 
 1. Extracts the `FROM <Entity>` token to determine the object type.
-2. Splits the SELECT field list on commas to determine which fields to project.
-3. If `WHERE Id = 'value'` is present, filters records to that single Id.
-4. Returns seeded + created records with the `attributes: {type, url}` block.
+2. Splits the SELECT field list on commas to determine which fields to project
+   (`SELECT *` returns all fields; field lookup is case-insensitive).
+3. Applies the `WHERE` clause as a boolean filter: comparators (`=`, `!=`, `<`,
+   `<=`, `>`, `>=`), `IN (...)` lists, and `LIKE` (leading/trailing `%`
+   wildcards; case-insensitive). Terms combine with `AND`/`OR` — `OR` splits
+   first, then `AND` within each segment — with standard precedence but no
+   parenthesized grouping. Literals may be single-quoted strings, `true`,
+   `false`, `null`, or bare tokens; both sides compare numerically when they
+   both parse as integers.
+4. Sorts with `ORDER BY <field> [ASC|DESC]` (ascending by default; records
+   missing the field sort first), then applies `OFFSET` followed by `LIMIT`.
+5. Returns seeded + created records with the `attributes: {type, url}` block.
 
 ## Backing stores
 

@@ -21,11 +21,16 @@ upload, listing, playlists, and channels:
   modeled simply — single POST returns the resource).
 - **Video list:** `GET /youtube/v3/videos?id=...&part=snippet` →
   `{items:[{id, snippet:{title, description}}]}` — STATEFUL: uploaded videos
-  appear here.
-- **Playlists:** create (`POST /youtube/v3/playlists`) and list
-  (`GET /youtube/v3/playlists?mine=true`).
+  appear here. With no `id`, returns all of the authenticated user's videos
+  (scoped to the token's user). Paginated (`maxResults` / `pageToken`, see
+  below).
+- **Video delete:** `DELETE /youtube/v3/videos?id=...` → `204`.
+- **Playlists:** create (`POST /youtube/v3/playlists`), list
+  (`GET /youtube/v3/playlists` — the authenticated user's playlists, paginated),
+  and delete (`DELETE /youtube/v3/playlists?id=...` → `204`).
 - **Playlist items:** `POST /youtube/v3/playlistItems` — add a video to a
-  playlist (validates both playlist and video exist).
+  playlist (validates both playlist and video exist) — and
+  `DELETE /youtube/v3/playlistItems?id=...` to remove an item (→ `204`).
 - **Channels:** `GET /youtube/v3/channels?part=snippet&mine=true` → the
   channel for the authenticated user.
 
@@ -40,12 +45,14 @@ session.
 | GET | `/o/oauth2/auth` | `oauth.star#on_authorize` | 302 redirect with code + state |
 | POST | `/o/oauth2/token` | `oauth.star#on_token` | Token exchange (auth code + refresh) |
 | POST | `/upload/youtube/v3/videos` | `videos.star#on_upload_video` | Upload video → video resource |
-| GET | `/youtube/v3/videos` | `videos.star#on_list_videos` | List/get videos (stateful) |
+| GET | `/youtube/v3/videos` | `videos.star#on_list_videos` | List/get videos (stateful, paginated) |
 | DELETE | `/youtube/v3/videos` | `videos.star#on_delete_video` | Delete video |
 | GET | `/youtube/v3/channels` | `channels.star#on_channels` | Get channel (mine) |
 | POST | `/youtube/v3/playlists` | `playlists.star#on_create_playlist` | Create playlist |
-| GET | `/youtube/v3/playlists` | `playlists.star#on_list_playlists` | List playlists |
+| GET | `/youtube/v3/playlists` | `playlists.star#on_list_playlists` | List playlists (paginated) |
+| DELETE | `/youtube/v3/playlists` | `playlists.star#on_delete_playlist` | Delete playlist (`?id=...` → 204) |
 | POST | `/youtube/v3/playlistItems` | `playlists.star#on_add_playlist_item` | Add video to playlist |
+| DELETE | `/youtube/v3/playlistItems` | `playlists.star#on_delete_playlist_item` | Delete playlist item (`?id=...` → 204) |
 
 Any unmatched route returns `404`.
 
@@ -71,6 +78,15 @@ The real YouTube API uses a two-phase resumable upload:
 This adapter **models it simply**: the single `POST /upload/youtube/v3/videos`
 returns the complete video resource directly. This is sufficient for testing
 client code that parses the response shape.
+
+## Pagination
+
+The list endpoints (`GET /youtube/v3/videos` without `id`, and
+`GET /youtube/v3/playlists`) paginate like the real API:
+
+- `maxResults` — page size (omitted or `<= 0` returns all items)
+- `pageToken` — opaque cursor from a previous response's `nextPageToken`
+- the response includes `nextPageToken` only when more items remain
 
 ## Usage
 

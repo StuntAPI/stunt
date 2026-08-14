@@ -21,15 +21,26 @@ Three Firebase surfaces with their distinctive shapes:
   `POST .../signupNewUser`, `POST .../getAccountInfo`, `POST .../refreshToken`.
 - Returns `{localId, idToken, refreshToken, expiresIn, email}`.
 - Users are **stateful** — a user created via signUp persists and can sign in.
+- **Refresh tokens are stateful too:** every issued `refreshToken` is bound to
+  its user, and `POST .../relyingparty/refreshToken` (body `refresh_token` or
+  `refreshToken`) exchanges it for fresh tokens:
+  `{user_id, id_token, refresh_token, expires_in, token_type:"Bearer"}`.
+  Unknown refresh tokens return `400 INVALID_REFRESH_TOKEN`.
 
 ### Firestore
 
 - `GET /v1/projects/{project}/databases/(default)/documents/{collection}` → list.
 - `POST .../documents/{collection}` → create.
 - `GET .../documents/{collection}/{id}` → get.
-- `PATCH .../documents/{collection}/{id}` → upsert.
+- `PATCH .../documents/{collection}/{id}` → upsert (existing fields are merged).
+- `DELETE .../documents/{collection}/{id}` → delete (200 with empty body;
+  404 if the document does not exist).
 - **Typed values:** every field is `{stringValue:"x"}`, `{integerValue:"5"}`,
   `{booleanValue:true}`, `{arrayValue:{values:[...]}}`, `{mapValue:{fields:{...}}}`.
+- **Cursor pagination on list:** `GET .../documents/{collection}` accepts
+  `pageSize` and `pageToken` query params; when more documents remain the
+  response includes `nextPageToken`. Without `pageSize` the whole list is
+  returned in one page.
 
 ### FCM (Cloud Messaging)
 
@@ -49,7 +60,8 @@ Three Firebase surfaces with their distinctive shapes:
 | GET | `.../documents/{collection}` | `firestore.star#on_list_documents` | List docs |
 | POST | `.../documents/{collection}` | `firestore.star#on_create_document` | Create doc |
 | GET | `.../documents/{collection}/{id}` | `firestore.star#on_get_document` | Get doc |
-| PATCH | `.../documents/{collection}/{id}` | `firestore.star#on_upsert_document` | Upsert doc |
+| PATCH | `.../documents/{collection}/{id}` | `firestore.star#on_upsert_document` | Upsert doc (merge) |
+| DELETE | `.../documents/{collection}/{id}` | `firestore.star#on_delete_document` | Delete doc |
 | POST | `/v1/projects/{project}/messages:send` | `fcm.star#on_send_message` | Send FCM |
 
 ## Backing stores

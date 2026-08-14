@@ -23,9 +23,13 @@ unblock accounting/billing integrations during local development:
   Customer` → `{QueryResponse:{Customer:[...]}, time}`. Pattern-matches entity
   name (Customer, Invoice, etc.) — no real SQL parsing.
 - **Customer CRUD:** `POST /v3/company/{realmId}/customer`, `GET
+  /v3/company/{realmId}/customer` (with `?id=` or list-all), `GET/DELETE
   /v3/company/{realmId}/customer/{id}`.
-- **Invoice CRUD:** `POST /v3/company/{realmId}/invoice`, `GET
+- **Invoice CRUD:** `POST /v3/company/{realmId}/invoice`, `GET/DELETE
   /v3/company/{realmId}/invoice/{id}`.
+- **Delete responses:** Both DELETE endpoints return
+  `{Customer|Invoice: {Id, domain:"QBO", status:"Deleted"}, time}` (a hard
+  delete from the store, not QBO's sparse-update deactivation).
 - **Fault errors:** QBO's distinctive `{Fault:{Error:[{Message, code, Detail}],
   type}}` envelope. 401 on expired/invalid token → `code:"32001"`.
 
@@ -49,8 +53,10 @@ invalidated — the infamous QBO refresh churn).
 | POST | `/v3/company/{realmId}/customer` | `customer.star#on_create_customer` | Create customer |
 | GET | `/v3/company/{realmId}/customer` | `customer.star#on_read_customer` | List/get customer |
 | GET | `/v3/company/{realmId}/customer/{id}` | `customer.star#on_read_customer_by_id` | Get customer by ID |
+| DELETE | `/v3/company/{realmId}/customer/{id}` | `customer.star#on_delete_customer_by_id` | Delete customer (returns `status:"Deleted"`) |
 | POST | `/v3/company/{realmId}/invoice` | `invoice.star#on_create_invoice` | Create invoice |
 | GET | `/v3/company/{realmId}/invoice/{id}` | `invoice.star#on_read_invoice` | Get invoice by ID |
+| DELETE | `/v3/company/{realmId}/invoice/{id}` | `invoice.star#on_delete_invoice` | Delete invoice (returns `status:"Deleted"`) |
 
 ## Error shape
 
@@ -67,6 +73,8 @@ QBO's distinctive Fault envelope:
 ```
 
 401 when token expired/invalid → `code:"32001"`, `Message:"Authentication required"`.
+400 on a missing required field (e.g. `DisplayName`, invoice `Line`) →
+`code:"610"`. 404 when an entity does not exist → `code:"620"`.
 
 ## Backing stores
 

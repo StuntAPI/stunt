@@ -24,10 +24,17 @@ commerce integrations during local development:
   `fulfillment_status` to `fulfilled`.
 - **Transactions:** `POST /orders/{id}/transactions.json` (capture/refund).
 - **Customers:** `GET /customers.json`.
-- **Webhooks:** register + list subscriptions. Events are emitted via
-  `events_emit` when webhooks are subscribed.
+- **Webhooks:** register, list, and delete subscriptions. Events are emitted
+  (signed, see below) via `events_emit` when webhooks are subscribed, and the
+  subscription `address` is registered with the events emitter on create.
+- **Cursor pagination:** every list endpoint (`products.json`, `orders.json`,
+  `customers.json`, `webhooks.json`) honors Shopify's `limit` (page size) and
+  `page_info` (opaque cursor) query params, with the continuation cursor
+  round-tripped in a `Link: <url>; rel="next"` response header. When `limit`
+  is missing or `<= 0`, paging is disabled and the whole list is returned.
 - **GraphQL:** `POST /graphql.json` with pattern-matched operations
-  (`products(first:)`, `orders(first:)`, `customer`, `shop`).
+  (`products(first:)`, `orders(first:)`, `customer`, `shop`) returning
+  relay-style `edges`/`pageInfo` payloads with `gid://shopify/...` IDs.
 
 Products, orders, and customers are **stateful** — created data persists across
 requests for the duration of the server session.
@@ -63,11 +70,17 @@ if !hmac.Equal([]byte(expected), []byte(r.Header.Get("X-Shopify-Hmac-SHA256"))) 
 }
 ```
 
+For the roster of all stunt adapters that compute signed webhook deliveries
+(headers, mock secrets, encodings), see the **Signed-delivery roster** in
+[`../README.md`](../README.md).
+
 **Critical:** webhooks must be acknowledged with a `200 OK` and an **empty body**.
 Shopify retries non-200 responses and eventually disables the subscription.
 
-The OAuth install callback also carries an `hmac` query param =
+In the real OAuth install flow, the callback carries an `hmac` query param =
 `hex(HMAC-SHA256(api_secret_key, querystring_with_hmac_removed_and_sorted))`.
+This adapter documents that scheme (see `scripts/lib.star`) but does not
+compute it on its own authorize redirect.
 
 ## Endpoints
 
@@ -87,6 +100,7 @@ The OAuth install callback also carries an `hmac` query param =
 | GET | `/admin/api/2024-10/customers.json` | `customers.star#on_list_customers` | List customers |
 | GET | `/admin/api/2024-10/webhooks.json` | `webhooks.star#on_list_webhooks` | List webhooks |
 | POST | `/admin/api/2024-10/webhooks.json` | `webhooks.star#on_create_webhook` | Register webhook (201) |
+| DELETE | `/admin/api/2024-10/webhooks/{id}.json` | `webhooks.star#on_delete_webhook` | Delete webhook (200 {}) |
 | POST | `/admin/api/2024-10/graphql.json` | `graphql.star#on_graphql` | GraphQL (pattern-matched) |
 
 ## Usage

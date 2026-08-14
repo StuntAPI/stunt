@@ -45,7 +45,8 @@ Path-style URLs: `/{container}/{blob}`.
 | GET | `/{container}/{blob}` | Download blob. |
 | HEAD | `/{container}/{blob}` | Blob metadata (`x-ms-blob-type`, `Content-Length`, `ETag`). |
 | DELETE | `/{container}/{blob}` | Delete blob. |
-| PUT | `/{container}/{blob}?comp=properties` | Set blob properties. |
+| PUT | `/{container}/{blob}?comp=properties` | Set blob properties (`x-ms-blob-content-type`). |
+| GET | `/{container}/{blob}?comp=properties` | Get blob properties (headers). |
 | GET | `/{container}/{blob}?comp=metadata` | Get blob metadata. |
 | PUT | `/{container}/{blob}?comp=metadata` | Set blob metadata. |
 | PUT | `/{container}/{blob}?comp=block` | Upload block. |
@@ -55,6 +56,31 @@ Path-style URLs: `/{container}/{blob}`.
 
 Listings use **XML** (`Content-Type: application/xml`) with the
 `<EnumerationResults>` shape. Errors use `<?xml version="1.0"?><Error><Code/><Message/></Error>`.
+
+## Pagination
+
+ListContainers (`GET /?comp=list`) and ListBlobs (`GET /{container}?restype=container&comp=list`)
+support Azure Storage's marker-based paging:
+
+- `maxresults` — page size.
+- `marker` — continuation token from the previous response.
+
+Responses carry a `<NextMarker>` element; it is empty (`<NextMarker />`) on the
+last page. `prefix` filtering on ListBlobs is applied before paging.
+
+## Binary content (byte-exact round-trip)
+
+Blob uploads are stored **verbatim**: the raw request bytes (`raw_body`) go into
+a byte-exact blob store, and `GET /{container}/{blob}` returns those identical
+bytes. Binary payloads (images, gzip, protobuf — any `Content-Type`) round-trip
+losslessly, and `Content-Length`/`<ContentLength>` reflect the stored byte count.
+Re-uploading an existing blob name overwrites it in place (same backing blob).
+
+## Statefulness notes
+
+- Creating a container that already exists updates it in place (201).
+- `DELETE /{container}` also deletes all blobs in that container (202).
+- `DELETE /{container}/{blob}` removes both the record and the stored bytes (202).
 
 ## Example
 

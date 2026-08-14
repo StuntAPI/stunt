@@ -49,6 +49,14 @@ Braintree accepts either:
 
 Requests without auth return `401`.
 
+## Idempotency
+
+`POST /merchants/{id}/transactions` honors the `Idempotency-Key` header: a
+create carrying the header remembers its response, and a retry with the same
+key replays the original transaction response instead of creating a duplicate.
+Keys are scoped by method + path + collection, so a reused key never collides
+across endpoints. This makes client retry/idempotency logic testable.
+
 ## GraphQL Operations
 
 | Mutation | Description |
@@ -74,12 +82,18 @@ Requests without auth return `401`.
 
 ## Webhooks
 
-Braintree webhook signature scheme:
+`POST /webhooks` accepts an inbound Braintree webhook notification:
+
 ```
 bt_signature: "public_key|signature_hex"
 bt_payload:   base64-encoded payload
 ```
-Verification: `signature_hex = hex(HMAC-SHA256(private_key, bt_payload))`
+
+The real scheme verifies `signature_hex = hex(HMAC-SHA256(private_key, bt_payload))`.
+This simulator checks presence only: any non-empty `bt_signature` + `bt_payload`
+pair returns `200`; a missing field returns `400`. Outbound *signed* webhook
+deliveries are not implemented for this adapter — see the signature roster in
+[`../README.md`](../README.md) for the providers that do sign deliveries.
 
 ## Response shapes
 

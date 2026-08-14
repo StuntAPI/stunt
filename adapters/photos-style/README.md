@@ -35,7 +35,9 @@ two-step upload pipeline:
   serve the ORIGINAL uploaded bytes; a bare `{id}` serves a deterministic
   derivative payload with different bytes, so clients that forget the
   suffix fail byte-comparison loudly.
-- **Albums:** list, create, and get album details.
+- **Albums:** list, create, get album details, and delete an album
+  (`DELETE /v1/albums/{id}` removes the album but leaves its media items
+  intact, mirroring the real API; returns an empty object).
 
 `baseUrl` is computed at read time from the request Host header
 (`http://{host}/v1/media-dl/{id}`), so responses always point back at the
@@ -60,6 +62,7 @@ session.
 | GET | `/v1/albums` | `albums.star#on_list_albums` | List albums |
 | POST | `/v1/albums` | `albums.star#on_create_album` | Create album |
 | GET | `/v1/albums/{id}` | `albums.star#on_get_album` | Get album details |
+| DELETE | `/v1/albums/{id}` | `albums.star#on_delete_album` | Delete album (media items are left intact) |
 
 Any unmatched route returns `404`.
 

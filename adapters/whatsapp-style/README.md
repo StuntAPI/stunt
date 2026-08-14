@@ -24,23 +24,43 @@ A faithful behavioral mock of Meta's WhatsApp Business Cloud API surface:
   `POST /v21.0/{phone_number_id}/register` → `{success: true}`.
 - **Media:** `POST /v21.0/{phone_number_id}/media` (upload) → `{id}`.
   `GET /v21.0/{media_id}` → media metadata.
-- **Templates:** `GET /v21.0/{waba_id}/message_templates` (list).
+- **Templates:** `GET /v21.0/{waba_id}/message_templates` (list,
+  cursor-paginated via `limit`/`after`).
   `POST /v21.0/{waba_id}/message_templates` (create → status **PENDING**).
   `POST /v21.0/{template_id}` (update status → **APPROVED** / **REJECTED**).
 - **Template approval lifecycle:** PENDING → APPROVED or PENDING → REJECTED.
   New templates start PENDING (matching the real 24h+ review process).
+- **Webhook events:** every successful message send emits a signed `messages`
+  webhook event (Meta `X-Hub-Signature-256`) to your configured sink — see
+  [Webhook signature scheme](#webhook-signature-scheme) below.
 
 Messages and templates are **stateful** — created data persists across requests.
 
 ## Webhook signature scheme
 
 Meta signs every webhook delivery with HMAC-SHA256. This adapter **documents**
-the exact scheme (see `scripts/lib.star`):
+the exact scheme (see `scripts/lib.star`) **and signs every webhook delivery it
+emits** with it:
 
 ```
 X-Hub-Signature-256: sha256=<hex(HMAC-SHA256(app_secret, raw_body))>
 X-Hub-Signature:     sha1=<hex(HMAC-SHA1(app_secret, raw_body))>   (legacy)
 ```
+
+**Signed deliveries:** each `POST /v21.0/{phone_number_id}/messages` emits a
+`messages` webhook event (`{from: wa_id, id: wamid...}`) delivered to the
+`webhook_url` configured in your `stunt.yaml`. The signature is computed over
+the exact on-wire body — the same bytes your sink receives — using the mock
+app secret:
+
+```
+whatsapp_stunt_mock_app_secret_2026
+```
+
+Configure your WhatsApp/Meta webhook receiver with that exact string to verify
+stunt's deliveries. The secret is public/low-entropy on purpose (local stunt
+only). For the full signed-delivery roster across all adapters (headers, mock
+secrets, encodings), see [../README.md](../README.md).
 
 **Webhook verification (GET challenge):** When registering a webhook URL, Meta
 sends a GET with `hub.mode=subscribe`, `hub.challenge=<value>`,
@@ -60,14 +80,34 @@ WhatsApp enforces a 24-hour customer service window:
 This adapter does **not** enforce the window by default (it's a local simulator),
 but the rules are documented here for client-code testing.
 
+## Pagination
+
+`GET /v21.0/{waba_id}/message_templates` follows Meta Graph API cursor
+pagination:
+
+- `?limit=N` — page size; omitted or `<= 0` returns all items.
+- `?after=<cursor>` — the opaque cursor from a prior response.
+
+When more pages remain, the response includes a `paging` envelope:
+
+```json
+{
+  "data": ["..."],
+  "paging": {
+    "cursors": {"after": "<cursor>"},
+    "next": "v21.0/{waba_id}/message_templates?after=<cursor>"
+  }
+}
+```
+
 ## Endpoints
 
 | Method | Route | Handler | Description |
 |--------|-------|---------|-------------|
-| POST | `/v21.0/{phone_number_id}/messages` | `messages.star#on_send_message` | Send text/template message |
+| POST | `/v21.0/{phone_number_id}/messages` | `messages.star#on_send_message` | Send text/template message (+ signed webhook event) |
 | POST | `/v21.0/{phone_number_id}/register` | `phonenumber.star#on_register` | Register phone number |
 | POST | `/v21.0/{phone_number_id}/media` | `media.star#on_upload_media` | Upload media |
-| GET | `/v21.0/{waba_id}/message_templates` | `templates.star#on_list_templates` | List templates |
+| GET | `/v21.0/{waba_id}/message_templates` | `templates.star#on_list_templates` | List templates (cursor-paginated: `limit`/`after`) |
 | POST | `/v21.0/{waba_id}/message_templates` | `templates.star#on_create_template` | Create template (PENDING) |
 | GET | `/v21.0/{resource_id}` | `resource.star#on_get_resource` | Message status / phone / media |
 | POST | `/v21.0/{template_id}` | `templates.star#on_update_template` | Update template status |

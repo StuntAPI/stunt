@@ -28,7 +28,7 @@ existing handlers and break its test contract. Hence a separate
 | Method | Route | Description |
 |--------|-------|-------------|
 | GET | `/2/oauth2/authorize` | 302 redirect with `code` + `state` (stores S256 challenge) |
-| POST | `/2/oauth2/token` | Exchange code for access + refresh tokens (HTTP Basic + PKCE) |
+| POST | `/2/oauth2/token` | Exchange code for access + refresh tokens (HTTP Basic + PKCE), or refresh via `grant_type=refresh_token` |
 
 ### Articles
 
@@ -51,13 +51,23 @@ existing handlers and break its test contract. Hence a separate
 | POST | `/2/tweets` | Create a tweet (280-char limit + reply-chain) → `201 { data:{ id, text } }` |
 | GET | `/2/tweets/{id}` | Retrieve a tweet → `200 { data: tweet }` |
 
+## Token refresh (refresh_token grant)
+
+`POST /2/oauth2/token` also accepts `grant_type=refresh_token` (HTTP Basic
+client creds still required). Presented refresh tokens are honored and
+**rotated on use** — the presented token is invalidated and a fresh
+access + refresh pair (`expires_in: 7200`) is issued, so the
+401 → refresh → retry loop is testable. A missing or unknown
+`refresh_token` returns `400 { "error": "invalid_grant" }`.
+
 ## PKCE S256 relaxation
 
 The real X server verifies `code_verifier` by computing
 `base64url_no_pad(sha256(code_verifier))` and comparing against the stored
-`code_challenge`. Starlark in stunt has **no crypto builtins** (no sha256, no
-base64), so this mock performs a **relaxed** check: `code_verifier` must be
-present and non-empty, but the cryptographic match is not verified.
+`code_challenge`. This adapter performs a **relaxed** check:
+`code_verifier` must be present and non-empty, but the cryptographic match
+is not verified (stunt does provide `crypto.sha256` / `crypto.base64url_encode`
+builtins, but this adapter deliberately keeps the relaxed presence check).
 
 This is acceptable for a pipeline double — it validates the pipeline, not real authz. A real client generating a valid
 S256 pair will always pass; a client that omits the verifier fails

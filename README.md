@@ -62,7 +62,7 @@ brew install --cask stuntapi/tap/stunt
 ```powershell
 # clone the manifest repo, then install from the local manifest dir
 git clone --depth 1 https://github.com/stuntapi/winget
-winget install --manifest winget/manifests/s/StuntAPI/Stunt/0.24.0
+winget install --manifest winget/manifests/s/StuntAPI/Stunt/0.25.0
 ```
 
 > Once stunt is submitted to the default winget source, this becomes simply
@@ -133,12 +133,16 @@ stunt adapter test ./myapi-style              # conformance vs your local real t
 stunt catalog search stripe                   # browse the adapter registry
 ```
 
-**Reference adapters in this repo** (all unofficial, synthetic-data-only, with a DISCLAIMER):
+**Reference adapters in this repo** — 91 of them (Stripe, Salesforce, Discord, Twilio,
+Square, Adyen, AWS S3, Google/Microsoft/Apple families, blockchain RPCs, …; all unofficial,
+synthetic-data-only, with a DISCLAIMER). Browse them with `stunt catalog search`. Highlights:
 
 | Adapter | Simulates | Backing |
 |---|---|---|
-| `stripe-style` | payments — charges (create/retrieve/list/capture/refund), customers (CRUD), balance, auth + webhooks | Collection + Starlark |
-| `drive-style` | files API — upload/get/download/list/patch/delete, folders, about/quota | Blob + Collection |
+| `stripe-style` | payments — **PaymentIntents (confirm/capture) + PaymentMethods + Refunds**, charges, customers, Connect, **Idempotency-Key**, cursor-paginated lists, **signed webhooks** | Collection + Starlark |
+| `salesforce-style` | CRM — sObjects CRUD, **general SOQL** (WHERE/IN/LIKE/AND/OR, ORDER BY, LIMIT/OFFSET), OAuth (password/auth-code/**refresh**) | Collection + Starlark |
+| `discord-style` | bot API — REST + **WebSocket Gateway (HELLO→IDENTIFY→READY→dispatch)** + **Ed25519-signed interactions** | Collection + Starlark |
+| `drive-style` | files API — upload/get/download/list/patch/delete, folders, about/quota, resumable uploads | Blob + Collection |
 | `dropbox-style` | files API (RPC-style) — upload/download/list_folder/get_metadata | Blob + Collection |
 | `twitter-style` | mock OAuth, tweets (CRUD), users, timeline | Collection (pure-mock) |
 | `echo-style` | gRPC service (unary + streaming) + WebSocket — multi-transport reference | Collection + KV |
