@@ -719,3 +719,163 @@ func TestStripeStylePagination(t *testing.T) {
 		t.Fatalf("bad starting_after -> %d, want 400; body %s", statusBad, bodyBad)
 	}
 }
+
+// TestStripeStylePaymentIntents exercises the canonical modern payment flow:
+// PaymentMethod → PaymentIntent (automatic + manual capture) → confirm/capture
+// state machine → first-class Refunds (full + partial) → list, plus the
+// "confirm without payment_method" error path.
+func TestStripeStylePaymentIntents(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "stripe-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"stripe": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["stripe"]
+
+	// --- PaymentMethod ---
+	body, status := postJSONAuth(t, base+"/v1/payment_methods", devToken, map[string]any{
+		"type": "card",
+		"card": map[string]any{"number": "4242424242424242", "exp_month": 12, "exp_year": 2030, "cvc": "123"},
+	})
+	if status != 201 {
+		t.Fatalf("create payment_method -> %d; body %s", status, body)
+	}
+	var pm map[string]any
+	json.Unmarshal([]byte(body), &pm)
+	pmID, _ := pm["id"].(string)
+	if !strings.HasPrefix(pmID, "pm_") {
+		t.Fatalf("payment_method id = %v, want pm_*", pm["id"])
+	}
+
+	// --- PaymentIntent, automatic capture, confirm at create → succeeded ---
+	body, status = postJSONAuth(t, base+"/v1/payment_intents", devToken, map[string]any{
+		"amount": 5000, "currency": "usd", "payment_method": pmID, "confirm": true,
+	})
+	if status != 201 {
+		t.Fatalf("create PI (auto) -> %d; body %s", status, body)
+	}
+	var piAuto map[string]any
+	json.Unmarshal([]byte(body), &piAuto)
+	piAutoID, _ := piAuto["id"].(string)
+	if piAuto["status"] != "succeeded" {
+		t.Fatalf("auto PI status = %v, want succeeded", piAuto["status"])
+	}
+	if piAuto["amount_received"].(float64) != 5000 {
+		t.Fatalf("auto PI amount_received = %v, want 5000", piAuto["amount_received"])
+	}
+
+	// Retrieve → succeeded persisted.
+	body, status = getAuth(t, base+"/v1/payment_intents/"+piAutoID, devToken)
+	if status != 200 {
+		t.Fatalf("retrieve PI -> %d", status)
+	}
+	var got map[string]any
+	json.Unmarshal([]byte(body), &got)
+	if got["status"] != "succeeded" {
+		t.Fatalf("retrieved PI status = %v, want succeeded", got["status"])
+	}
+
+	// --- PaymentIntent, manual capture: create → confirm → requires_capture → capture → succeeded ---
+	body, status = postJSONAuth(t, base+"/v1/payment_intents", devToken, map[string]any{
+		"amount": 3000, "currency": "usd", "capture_method": "manual",
+	})
+	if status != 201 {
+		t.Fatalf("create PI (manual) -> %d; body %s", status, body)
+	}
+	var piMan map[string]any
+	json.Unmarshal([]byte(body), &piMan)
+	piManID, _ := piMan["id"].(string)
+	if piMan["status"] != "requires_payment_method" {
+		t.Fatalf("manual PI initial status = %v, want requires_payment_method", piMan["status"])
+	}
+
+	body, status = postJSONAuth(t, base+"/v1/payment_intents/"+piManID+"/confirm", devToken, map[string]any{"payment_method": pmID})
+	if status != 200 {
+		t.Fatalf("confirm PI (manual) -> %d; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &piMan)
+	if piMan["status"] != "requires_capture" {
+		t.Fatalf("confirmed manual PI status = %v, want requires_capture", piMan["status"])
+	}
+	if piMan["amount_capturable"].(float64) != 3000 {
+		t.Fatalf("amount_capturable = %v, want 3000", piMan["amount_capturable"])
+	}
+
+	body, status = postJSONAuth(t, base+"/v1/payment_intents/"+piManID+"/capture", devToken, map[string]any{})
+	if status != 200 {
+		t.Fatalf("capture PI -> %d; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &piMan)
+	if piMan["status"] != "succeeded" {
+		t.Fatalf("captured PI status = %v, want succeeded", piMan["status"])
+	}
+
+	// Capture of a non-capturable PI → 400.
+	if _, status := postJSONAuth(t, base+"/v1/payment_intents/"+piAutoID+"/capture", devToken, map[string]any{}); status != 400 {
+		t.Fatalf("capture already-succeeded PI -> %d, want 400", status)
+	}
+
+	// --- Refunds: full (auto PI) + partial (manual PI) ---
+	body, status = postJSONAuth(t, base+"/v1/refunds", devToken, map[string]any{"payment_intent": piAutoID})
+	if status != 201 {
+		t.Fatalf("full refund -> %d; body %s", status, body)
+	}
+	var rfFull map[string]any
+	json.Unmarshal([]byte(body), &rfFull)
+	if rfFull["amount"].(float64) != 5000 {
+		t.Fatalf("full refund amount = %v, want 5000", rfFull["amount"])
+	}
+	rfFullID, _ := rfFull["id"].(string)
+
+	body, status = postJSONAuth(t, base+"/v1/refunds", devToken, map[string]any{"payment_intent": piManID, "amount": 1000})
+	if status != 201 {
+		t.Fatalf("partial refund -> %d; body %s", status, body)
+	}
+	var rfPart map[string]any
+	json.Unmarshal([]byte(body), &rfPart)
+	if rfPart["amount"].(float64) != 1000 {
+		t.Fatalf("partial refund amount = %v, want 1000", rfPart["amount"])
+	}
+
+	// List refunds filtered by the auto PI → exactly the one full refund.
+	body, status = getAuth(t, base+"/v1/refunds?payment_intent="+piAutoID, devToken)
+	if status != 200 {
+		t.Fatalf("list refunds -> %d", status)
+	}
+	var rfList map[string]any
+	json.Unmarshal([]byte(body), &rfList)
+	rfData, _ := rfList["data"].([]any)
+	if len(rfData) != 1 || rfData[0].(map[string]any)["id"] != rfFullID {
+		t.Fatalf("refunds for PI = %v, want 1 = %s", rfData, rfFullID)
+	}
+
+	// Confirm without a payment_method → 400.
+	body, status = postJSONAuth(t, base+"/v1/payment_intents", devToken, map[string]any{"amount": 1000, "currency": "usd"})
+	if status != 201 {
+		t.Fatalf("create bare PI -> %d; body %s", status, body)
+	}
+	var piBare map[string]any
+	json.Unmarshal([]byte(body), &piBare)
+	if _, status := postJSONAuth(t, base+"/v1/payment_intents/"+piBare["id"].(string)+"/confirm", devToken, map[string]any{}); status != 400 {
+		t.Fatalf("confirm without payment_method -> %d, want 400", status)
+	}
+}

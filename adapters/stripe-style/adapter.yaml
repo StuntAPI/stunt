@@ -38,6 +38,51 @@ endpoints:
     method: POST
     handler: scripts/charges.star#on_refund_charge
 
+  # --- PaymentIntents (canonical payment object, SCA/3DS-ready) ---
+  - route: /v1/payment_intents
+    method: POST
+    handler: scripts/payment_intents.star#on_create_payment_intent
+  - route: /v1/payment_intents/{id}/confirm
+    method: POST
+    handler: scripts/payment_intents.star#on_confirm_payment_intent
+  - route: /v1/payment_intents/{id}/capture
+    method: POST
+    handler: scripts/payment_intents.star#on_capture_payment_intent
+  - route: /v1/payment_intents/{id}
+    method: GET
+    handler: scripts/payment_intents.star#on_retrieve_payment_intent
+  - route: /v1/payment_intents
+    method: GET
+    handler: scripts/payment_intents.star#on_list_payment_intents
+
+  # --- PaymentMethods ---
+  - route: /v1/payment_methods
+    method: POST
+    handler: scripts/payment_methods.star#on_create_payment_method
+  - route: /v1/payment_methods/{id}/attach
+    method: POST
+    handler: scripts/payment_methods.star#on_attach_payment_method
+  - route: /v1/payment_methods/{id}/detach
+    method: POST
+    handler: scripts/payment_methods.star#on_detach_payment_method
+  - route: /v1/payment_methods/{id}
+    method: GET
+    handler: scripts/payment_methods.star#on_retrieve_payment_method
+  - route: /v1/payment_methods
+    method: GET
+    handler: scripts/payment_methods.star#on_list_payment_methods
+
+  # --- Refunds (first-class resource) ---
+  - route: /v1/refunds
+    method: POST
+    handler: scripts/refunds.star#on_create_refund
+  - route: /v1/refunds/{id}
+    method: GET
+    handler: scripts/refunds.star#on_retrieve_refund
+  - route: /v1/refunds
+    method: GET
+    handler: scripts/refunds.star#on_list_refunds
+
   # --- Customers ---
   - route: /v1/customers
     method: POST
@@ -115,6 +160,12 @@ resources:
   - name: transfers
     kind: collection
   - name: payouts
+    kind: collection
+  - name: payment_intents
+    kind: collection
+  - name: payment_methods
+    kind: collection
+  - name: refunds
     kind: collection
 
 # Auth scheme: bearer token validated via identity_validate.
