@@ -68,3 +68,31 @@ def _list_page(req, docs):
         cursor = ""
     page, next_cursor = paginate(docs, limit, cursor)
     return page, next_cursor
+
+# ============================================================================
+# OUTBOUND WEBHOOKS (UNSIGNED BY DESIGN — DOCUMENTATION)
+# ============================================================================
+# Braze's "Webhooks" messaging channel sends arbitrary HTTP requests whose
+# method, headers, and body the CUSTOMER configures per message; Braze applies
+# no provider-side signature to those deliveries (event analytics streaming
+# goes through Braze Currents to S3/Azure/Data warehouse, not webhooks). There
+# is consequently no documented outbound signature scheme to reproduce, and
+# this adapter emits UNSIGNED deliveries with a synthetic payload shape.
+#
+# Receivers that need authentication should treat these like a Braze webhook
+# configured with a customer-supplied Authorization header — which, by
+# design, this simulator does not add.
+# ============================================================================
+
+# _emit_if_subscribed delivers an unsigned event to the registered webhook
+# target when a hook subscribes to the event type (empty events list
+# subscribes to everything). No delivery when no webhook is registered.
+def _emit_if_subscribed(event_type, payload):
+    wc = store_collection("webhooks")
+    for h in wc.list():
+        evts = h.get("events", [])
+        if evts == None:
+            evts = []
+        if len(evts) == 0 or event_type in evts:
+            events_emit(event_type, payload)
+            return

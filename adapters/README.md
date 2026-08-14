@@ -294,9 +294,12 @@ events_emit("push", payload, {"X-Hub-Signature-256": "sha256=" + sig, "X-GitHub-
 | twilio-style | yes | `X-Twilio-Signature` (SHA-1, URL+body) | `twilio_auth_token` | base64 |
 | discord-style | yes | `X-Signature-Ed25519` + `X-Signature-Timestamp` (Ed25519 over ts+body) | Ed25519 keypair in adapter (`_ED25519_PUBLIC_KEY`); verify deliveries/interactions against it | hex |
 | adyen-style | deferred | — | — | — |
-| braintree-style | deferred | — | — | — |
+| braintree-style | yes | body/header `bt_signature` (`public_key\|hex(HMAC-SHA1(private_key, bt_payload))`) + `bt-hash` | `stunt_mock_public_key_2026` / `stunt_mock_private_key_2026` (SHA-1 over the base64 `bt_payload`, not the outer JSON body) | hex |
+| zuora-style | yes | `X-Zuora-Signature` | `zuora_stunt_mock_webhook_secret_2026` (per-hook `secret` at registration wins) | hex |
 
-Deferred providers need schemes the current primitives don't cover yet: Adyen signs an in-body `hmacSignature` over a derived field-concatenation; Braintree needs raw-byte HMAC keys + form-encoded delivery. (Twilio was deferred for HMAC-SHA-1 over the sink URL + body — now shipped, via `crypto.hmac_sha1` + the new `events_target()` builtin for the delivery URL.) Square likewise MACs the notification URL + body.
+Unsigned-by-design emitters (real provider has no receiver-computable HMAC): paypal-style (cert-based signature verified via the `POST /v1/notifications/verify-webhook-signature` API, which the adapter also serves) and revenuecat-style (v1 webhooks are unsigned; validate the `app_user_id` via `GET /v1/subscribers/{id}`).
+
+Deferred providers need schemes the current primitives don't cover yet: Adyen signs an in-body `hmacSignature` over a derived field-concatenation. (Twilio was deferred for HMAC-SHA-1 over the sink URL + body — now shipped, via `crypto.hmac_sha1` + the new `events_target()` builtin for the delivery URL.) Square likewise MACs the notification URL + body. Braintree was deferred for raw-byte HMAC keys + form-encoded delivery — now shipped, simplified to the SHA-1-over-base64-payload MAC delivered as JSON body + headers.
 
 To receive events, set `config.webhook_url` in your `stunt.yaml`:
 

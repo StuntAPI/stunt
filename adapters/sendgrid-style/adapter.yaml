@@ -24,6 +24,17 @@ endpoints:
     method: GET
     handler: scripts/mail.star#on_list_messages
 
+  # --- Event Webhook settings (real SendGrid paths) ---
+  - route: /v3/user/webhooks/event/settings
+    method: POST
+    handler: scripts/webhooks.star#on_update_settings
+  - route: /v3/user/webhooks/event/settings
+    method: GET
+    handler: scripts/webhooks.star#on_get_settings
+  - route: /v3/user/webhooks/event/test
+    method: POST
+    handler: scripts/webhooks.star#on_send_test_event
+
 # Backing stores — collections for stateful data.
 resources:
   - name: mail

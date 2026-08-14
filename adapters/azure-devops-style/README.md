@@ -32,6 +32,7 @@ lets you test projects, git repos, work items, and iterations locally.
 | GET | `/{org}/{project}/_apis/work/teamsettings/iterations` | List iterations. |
 | GET | `/{org}/{project}/_apis/wit/workitems/{id}` | Get work item. |
 | POST | `/{org}/{project}/_apis/wit/workitems` | Create work item (PATCH-style body). |
+| POST | `/{org}/_apis/hooks/subscriptions` | Register a service-hook webhook subscription. |
 
 ## Key shapes
 
@@ -42,5 +43,41 @@ lets you test projects, git repos, work items, and iterations locally.
 
 ## Data model
 
-Projects, repos, and work items are **stateful**. Two sample projects, one repo,
-and one work item are seeded. Created work items persist and are retrievable.
+Projects, repos, work items, and webhook subscriptions are **stateful**. Two
+sample projects, one repo, and one work item are seeded. Created work items
+persist and are retrievable.
+
+## Service hooks (webhooks)
+
+Register a generic webhook subscription with
+`POST /{org}/_apis/hooks/subscriptions`, using the real service-hooks request
+shape:
+
+```json
+{
+  "consumerId": "webHooks",
+  "consumerActionId": "httpRequest",
+  "eventType": "workitem.created",
+  "consumerInputs": {"url": "http://localhost:9999/hook", "httpMethod": "POST"},
+  "publisherInputs": {},
+  "resourceVersion": "1.0"
+}
+```
+
+The `consumerInputs.url` is registered with the event emitter. Activity then
+emits events with the service-hook envelope:
+
+| Event type | Emitted when |
+|------------|--------------|
+| `workitem.created` | `POST /{org}/{project}/_apis/wit/workitems` |
+| `git.push` | `POST /{org}/{project}/_apis/git/repositories/{repoId}/pushes` |
+
+Payload shape: `{subscriptionId, notificationId, id, eventType, publisherId,
+message:{text}, detailedMessage:{text}, resource:{...}, resourceVersion,
+createdDate}` — `resource` is the work-item / push object itself.
+
+**Unsigned by design.** Azure DevOps signs nothing on service-hook deliveries;
+authentication is configured on the subscription (basic auth, bearer token, or
+custom headers on the real consumer inputs). stunt does not invent a signature —
+deliveries carry the real envelope with no signature headers. Secure your
+receiver with a secret path segment or an auth check of your own.

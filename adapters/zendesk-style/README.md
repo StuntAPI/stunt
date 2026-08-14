@@ -41,8 +41,9 @@ helpdesk/customer-support integrations during local development:
   `sort` + `sort_order`.
 - **Views + Triggers:** `GET /api/v2/views`, `GET /api/v2/triggers` → automations
   (triggers honor `sort` + `sort_order`).
-- **Webhooks:** `GET/POST /api/v2/webhooks` → webhook management. `DELETE
-  /api/v2/webhooks/{id}` → delete (204).
+- **Webhooks:** `GET/POST /api/v2/webhooks` → webhook management (create registers the
+  delivery URL and per-hook signing secret). `DELETE /api/v2/webhooks/{id}` → delete
+  (204). Ticket events are delivered signed — see [Webhooks](#webhooks).
 - **Suspended tickets:** `GET /api/v2/suspended_tickets` (always empty).
 
 All tickets, comments, and users are **stateful** — seed data is pre-loaded so lists
@@ -75,17 +76,56 @@ records are returned with `links.next: null`. All list endpoints paginate this w
 }
 ```
 
-## Webhook signatures
+## Webhooks
 
-Zendesk webhooks are signed with:
+Register a webhook with `POST /api/v2/webhooks` (`{webhook: {name, endpoint,
+subscriptions, signing_secret}}`). The endpoint URL is registered with the event
+emitter; the per-webhook signing secret is stored on the webhook doc. Ticket
+activity then emits events with Zendesk's trigger-style payload envelope:
 
-- `X-Zendesk-Webhook-Signature` = base64(HMAC-SHA256(webhook_secret, body))
-- `X-Zendesk-Webhook-Timestamp` = unix timestamp
+| Event type | Emitted when | Payload |
+|------------|--------------|---------|
+| `ticket.created` | `POST /api/v2/tickets` | `{"ticket": {...}}` |
+| `ticket.updated` | `PUT /api/v2/tickets/{id}` | `{"ticket": {...}}` |
+| `comment.created` | `POST /api/v2/tickets/{id}/comments` | `{"ticket": {...}, "comment": {...}}` |
 
-This mock does not implement outbound webhook delivery; the signing scheme is documented
-for reference. For the stunt adapters that do compute (not just document) a provider
-signature on every delivery, see the signed-delivery roster in
-[../README.md](../README.md).
+A webhook with an empty `subscriptions` list receives every event.
+
+### Webhook signature scheme
+
+Zendesk signs every delivery **per webhook** with HMAC-SHA256 (base64) over the
+timestamp concatenated directly with the raw body:
+
+```
+X-Zendesk-Webhook-Signature:           base64(HMAC-SHA256(secret, TIMESTAMP + BODY))
+X-Zendesk-Webhook-Signature-Timestamp: <unix seconds>
+```
+
+The secret is the `signing_secret` from the webhook create payload (real Zendesk
+auto-generates one and reveals it in Admin Center). When omitted, the fallback
+mock secret is used — configure your receiver with this exact string (public +
+low-entropy, local stunt only):
+
+```
+zd_whsec_stunt_mock_2026
+```
+
+Stunt delivers the `{type, payload}` envelope, so the raw-body MAC verifies but
+this exercises your signature-verification path, not Zendesk's placeholder-
+substitution parser.
+
+Verification in Go:
+
+```go
+mac := hmac.New(sha256.New, []byte(signingSecret))
+mac.Write(append([]byte(r.Header.Get("X-Zendesk-Webhook-Signature-Timestamp")), rawBody...))
+expected := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+if !hmac.Equal([]byte(expected), []byte(r.Header.Get("X-Zendesk-Webhook-Signature"))) {
+	return 401 // invalid signature
+}
+```
+
+Also compare the timestamp against the current time to reject replayed requests.
 
 ## Error shape
 
@@ -134,7 +174,7 @@ Zendesk's error envelope:
 | `organizations` | Organization records (seeded) |
 | `groups` | Support groups (seeded) |
 | `tags` | Ticket tags |
-| `webhooks` | Webhook configurations |
+| `webhooks` | Webhook configurations (endpoint, per-hook signing secret, subscriptions) |
 
 ## Usage
 

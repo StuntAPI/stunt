@@ -29,11 +29,21 @@ endpoints:
     method: POST
     handler: scripts/receipts.star#on_post_receipt
 
+  # --- Webhooks ---
+  - route: /v1/webhooks
+    method: POST
+    handler: scripts/webhooks.star#on_create_webhook
+  - route: /v1/webhooks
+    method: GET
+    handler: scripts/webhooks.star#on_list_webhooks
+
 # Backing stores — collections for stateful data.
 resources:
   - name: subscribers
     kind: collection
   - name: entitlements
+    kind: collection
+  - name: webhooks
     kind: collection
 
 # Auth scheme metadata (mock: accept any non-empty bearer key, like a dev key).

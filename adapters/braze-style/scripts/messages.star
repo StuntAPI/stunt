@@ -19,9 +19,23 @@ def on_send(req):
     if messages == None:
         messages = {}
 
+    dispatch_id = "disp-" + str(store_kv_incr("braze", "dispatch_seq") + 1)
+
+    # Deliver an unsigned webhook event for the dispatch (unsigned-by-design:
+    # Braze's webhook channel applies no provider signature — see lib.star).
+    channels = []
+    for ch in messages:
+        channels.append(ch)
+    _emit_if_subscribed("message.sent", {
+        "dispatch_id": dispatch_id,
+        "recipients": len(external_ids),
+        "channels": channels,
+        "timestamp": clock.now_rfc3339(),
+    })
+
     return respond(200, {
         "message": "success",
-        "dispatch_id": "disp-" + str(store_kv_incr("braze", "dispatch_seq") + 1),
+        "dispatch_id": dispatch_id,
         "recipients": len(external_ids),
     })
 

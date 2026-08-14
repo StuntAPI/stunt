@@ -36,11 +36,45 @@ and Basic auth (`client_id:secret`). API calls require `Authorization: Bearer <t
 
 ## Webhooks
 
-PayPal webhook signature is **certificate-based** (`PayPal-Transmission-Sig` +
-cert URL, verified via PayPal cert chain). It is one of the hardest webhook sigs
-to verify. **In this local mock, signatures are documented but not cryptographically
-enforced** — the mock emits events via `events_emit` so you can test your handler
-wiring. Events emitted: `PAYMENT.CAPTURE.COMPLETED`, `PAYMENT.CAPTURE.REFUNDED`.
+### Registration
+
+Webhooks are registered through the real PayPal surface:
+
+```bash
+curl -X POST http://localhost:8080/v1/notifications/webhooks \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "http://localhost:9090/paypal/webhook",
+        "event_types": [{"name": "PAYMENT.CAPTURE.COMPLETED"}] }'
+```
+
+(`GET /v1/notifications/webhooks` lists subscriptions;
+`DELETE /v1/notifications/webhooks/{id}` removes one.)
+
+### Signature: unsigned by design
+
+Real PayPal signs webhook deliveries with a certificate-based scheme
+(`PayPal-Transmission-Sig`, `PayPal-Cert-Url`, `PayPal-Transmission-Id`, ...)
+that receivers verify by calling
+`POST /v1/notifications/verify-webhook-signature` with the transmitted headers
+and the webhook ID — there is no shared HMAC the receiver could compute. The
+simulator therefore emits **unsigned** deliveries with the real event
+envelope, and exposes the verify endpoint (answering `SUCCESS` for a known
+`webhook_id`, `FAILURE` otherwise) so client verification flows can be
+exercised end-to-end.
+
+### Payload + emitted events
+
+Each delivery carries the full PayPal webhook event envelope inside the
+engine's `{"type", "payload"}` wrapper: `{id, event_version, create_time,
+resource_type, event_type, summary, resource, links}`.
+
+| Event type | Emitted when |
+|------------|--------------|
+| `PAYMENT.CAPTURE.COMPLETED` | `POST /v2/checkout/orders/{id}/capture` (one per capture) |
+| `CHECKOUT.ORDER.COMPLETED` | order captured or authorized |
+| `PAYMENT.AUTHORIZATION.CREATED` | `POST /v2/checkout/orders/{id}/authorize` (one per authorization) |
+| `PAYMENT.CAPTURE.REFUNDED` | `POST /v2/payments/captures/{capture_id}/refund` |
 
 ## Idempotency
 
@@ -58,6 +92,10 @@ request ID — same ID → same result.
 | POST | `/v2/checkout/orders/{id}/authorize` | `orders.star#on_authorize_order` | Authorize order |
 | GET | `/v2/payments/captures/{id}` | `payments.star#on_get_capture` | Get capture |
 | POST | `/v2/payments/captures/{capture_id}/refund` | `payments.star#on_refund` | Refund capture |
+| POST | `/v1/notifications/webhooks` | `webhooks.star#on_create_webhook` | Register webhook |
+| GET | `/v1/notifications/webhooks` | `webhooks.star#on_list_webhooks` | List webhooks |
+| DELETE | `/v1/notifications/webhooks/{id}` | `webhooks.star#on_delete_webhook` | Delete webhook |
+| POST | `/v1/notifications/verify-webhook-signature` | `webhooks.star#on_verify_webhook_signature` | Verify webhook signature (always SUCCESS for a known webhook_id) |
 
 ## Error shape
 

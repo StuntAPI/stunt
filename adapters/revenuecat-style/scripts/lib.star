@@ -80,3 +80,26 @@ def _grant_entitlement(app_user_id, entitlement_id, product_id):
 # _now_iso returns a synthetic ISO 8601 timestamp (stable across calls).
 def _now_iso():
     return "2024-01-01T00:00:00Z"
+
+# ============================================================================
+# OUTBOUND WEBHOOKS (RevenueCat v1 event envelope)
+# ============================================================================
+# Real RevenueCat v1 webhooks POST:
+#   { "api_version": "1.0", "event": { "type": "...", "app_user_id": "...",
+#     "product_id": "...", "purchased_at_ms": ..., "expiration_at_ms": ..., ... } }
+# to the URL configured in the dashboard (there is no REST registration
+# endpoint and no v1 signing scheme — deliveries are UNSIGNED BY DESIGN;
+# RevenueCat's documented guidance is to validate the app_user_id afterwards
+# via GET /v1/subscribers/{app_user_id}. RevenueCat's newer v2 webhooks are
+# Ed25519-signed, but this adapter simulates the v1 surface).
+#
+# stunt therefore emits unsigned, with the real v1 envelope carried inside the
+# engine's {"type", "payload"} delivery envelope. Timestamps are epoch
+# milliseconds minted from the engine clock.
+
+# _emit_event delivers one unsigned v1 webhook event.
+def _emit_event(event):
+    events_emit(event.get("type", ""), {
+        "api_version": "1.0",
+        "event": event,
+    })

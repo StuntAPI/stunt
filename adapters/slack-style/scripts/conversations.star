@@ -58,6 +58,18 @@ def on_create_conversation(req):
     cc = store_collection("channels")
     cc.insert(stored)
 
+    # Deliver a signed Events API channel_created event (fire-and-forget).
+    _emit_if_subscribed("channel_created", {
+        "type": "channel_created",
+        "channel_id": channel_id,
+        "channel": {
+            "id": channel_id,
+            "name": name,
+            "created": channel["created"],
+            "creator": USER_ID,
+        },
+    })
+
     return _ok({"channel": channel})
 
 # on_list_conversations returns all channels.

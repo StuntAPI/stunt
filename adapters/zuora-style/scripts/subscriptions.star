@@ -103,6 +103,21 @@ def on_create_subscription(req):
     col = store_collection("subscriptions")
     col.insert(doc)
 
+    # Webhook callout: SubscriptionActivated (subscriptions are Active on
+    # creation in this simulator).
+    _emit_if_subscribed("SubscriptionActivated", _callout(
+        "Subscription",
+        "SubscriptionActivated",
+        "Subscription",
+        sub_id,
+        {
+            "SubscriptionNumber": sub_number,
+            "AccountNumber": doc.get("accountNumber", ""),
+            "Status": "Active",
+            "TermType": term_type,
+        },
+    ))
+
     return respond(200, {
         "success": True,
         "subscriptionId": sub_id,
@@ -140,6 +155,20 @@ def on_update_subscription(req):
         updated["termType"] = body.get("termType")
 
     col.update(doc.get("id", ""), updated)
+
+    # Webhook callout: SubscriptionUpdated.
+    _emit_if_subscribed("SubscriptionUpdated", _callout(
+        "Subscription",
+        "SubscriptionUpdated",
+        "Subscription",
+        updated.get("subscriptionId", ""),
+        {
+            "SubscriptionNumber": updated.get("subscriptionNumber", ""),
+            "AccountNumber": updated.get("accountNumber", ""),
+            "Status": updated.get("status", "Active"),
+        },
+    ))
+
     return respond(200, {
         "success": True,
         "subscriptionId": updated.get("subscriptionId", ""),
@@ -171,6 +200,20 @@ def on_cancel_subscription(req):
     updated["status"] = "Canceled"
 
     col.update(doc.get("id", ""), updated)
+
+    # Webhook callout: SubscriptionCancelled.
+    _emit_if_subscribed("SubscriptionCancelled", _callout(
+        "Subscription",
+        "SubscriptionCancelled",
+        "Subscription",
+        updated.get("subscriptionId", ""),
+        {
+            "SubscriptionNumber": updated.get("subscriptionNumber", ""),
+            "AccountNumber": updated.get("accountNumber", ""),
+            "Status": "Canceled",
+        },
+    ))
+
     return respond(200, {
         "success": True,
         "subscriptionId": updated.get("subscriptionId", ""),

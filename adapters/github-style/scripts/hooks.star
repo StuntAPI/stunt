@@ -7,6 +7,9 @@
 # WEBHOOK SIGNATURE SCHEME:
 # GitHub sends X-Hub-Signature-256 = "sha256=" + hex(HMAC-SHA256(secret, body))
 # along with X-GitHub-Event (event type) and X-GitHub-Delivery (delivery id).
+# The secret is PER-HOOK: this handler stores config.secret on the hook doc,
+# and later deliveries for this repo are MACed with that stored secret
+# (falling back to the documented mock secret when omitted).
 # See scripts/lib.star for the full documentation + Go verification snippet.
 
 # Shared helpers (_require_auth, _gh_not_found, _next_id, _repo_key, _now)

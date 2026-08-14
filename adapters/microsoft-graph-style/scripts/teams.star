@@ -121,6 +121,9 @@ def on_send_chat_message(req):
     cmc = store_collection("chat_messages")
     cmc.insert(doc)
 
+    # Notify subscriptions on chats/{id}/messages (fire-and-forget).
+    _notify_subscriptions("created", "chats/" + chat_id + "/messages", "#Microsoft.Graph.ChatMessage", msg_id)
+
     entity = _chat_message_entity(doc)
     entity["@odata.context"] = "https://graph.microsoft.com/v1.0/$metadata#chats('" + chat_id + "')/messages/$entity"
     return respond(201, entity)

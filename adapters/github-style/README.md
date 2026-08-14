@@ -26,7 +26,8 @@ A faithful behavioral mock of GitHub's App API surface:
 - **Actions:** `POST /repos/{owner}/{repo}/dispatches` → 204 (workflow dispatch).
   `GET /repos/{owner}/{repo}/actions/runs` → `{workflow_runs:[...]}`.
 - **Webhooks:** `POST /repos/{owner}/{repo}/hooks` (register). Events emitted via
-  `events_emit` using GitHub event types (`push`, `pull_request`, `issues`).
+  `events_emit` using GitHub event types (`push`, `pull_request`, `issues`), signed
+  with the per-hook `config.secret` — see below.
 - **GraphQL:** `POST /graphql` with pattern-matched operations (`viewer`,
   `repository`, `issues`).
 
@@ -46,10 +47,14 @@ the JWT signature; for local testing any token is accepted).
 
 ## Webhook signature scheme
 
-GitHub signs every webhook delivery with HMAC-SHA256. This adapter **computes
-and attaches** the exact scheme on every delivery (see `scripts/lib.star`):
+GitHub signs every webhook delivery with HMAC-SHA256, using the **per-hook
+secret** configured at registration (`config.secret` on `POST
+/repos/{owner}/{repo}/hooks`). This adapter stores that secret on the hook doc
+and **computes and attaches** the signature with that same secret on every
+delivery for the repo (see `scripts/lib.star`).
 
-**Mock signing secret** (configure your receiver with this exact string;
+**Fallback mock signing secret** — used only when a hook was registered without
+a `config.secret` (configure your receiver with this exact string in that case;
 public + low-entropy, local stunt only):
 
 ```
@@ -83,6 +88,17 @@ if !hmac.Equal([]byte(expected), []byte(r.Header.Get("X-Hub-Signature-256"))) {
 
 **Important:** GitHub expects 200 for successful processing. Non-2xx responses
 trigger retries with exponential backoff.
+
+### Emitted events
+
+| Event type | Emitted when | Payload |
+|------------|--------------|---------|
+| `issues` | issue created / updated / closed / reopened | `{action, issue, repository, sender}` (`action` is `opened`, `edited`, `closed`, or `reopened`) |
+| `pull_request` | PR created | `{action:"opened", pull_request, repository, sender}` |
+| `workflow_dispatch` | `POST /repos/{owner}/{repo}/dispatches` | `{repo}` |
+
+Deliveries go only to hooks whose `events` list includes the event type
+(GitHub does not deliver unsubscribed events).
 
 ## Endpoints
 

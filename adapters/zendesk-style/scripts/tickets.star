@@ -94,6 +94,9 @@ def on_create(req):
         "public": True,
     })
 
+    # Emit signed webhook event if subscribed (trigger-style ticket payload).
+    _emit_if_subscribed("ticket.created", {"ticket": _ticket_shape(doc)})
+
     return respond(201, {"ticket": _ticket_shape(doc)})
 
 def on_get(req):
@@ -166,6 +169,10 @@ def on_update(req):
         })
 
     col.update(ticket_id, updated)
+
+    # Emit signed webhook event if subscribed.
+    _emit_if_subscribed("ticket.updated", {"ticket": _ticket_shape(updated)})
+
     return respond(200, {"ticket": _ticket_shape(updated)})
 
 def on_add_comment(req):
@@ -212,6 +219,19 @@ def on_add_comment(req):
         updated[k] = doc[k]
     updated["updated_at"] = _now()
     col.update(ticket_id, updated)
+
+    # Emit signed webhook event if subscribed.
+    _emit_if_subscribed("comment.created", {
+        "ticket": _ticket_shape(updated),
+        "comment": {
+            "id": cmt_id,
+            "ticket_id": ticket_id,
+            "body": body_text,
+            "author_id": "201",
+            "created_at": _now(),
+            "public": is_public,
+        },
+    })
 
     return respond(201, {"audit": {"events": [{"type": "Comment", "body": body_text, "public": is_public}]}})
 

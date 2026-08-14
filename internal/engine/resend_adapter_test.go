@@ -76,8 +76,18 @@ func TestResendStyleAdapter(t *testing.T) {
 	base := addrs["resend"]
 	const apiKey = "re_test_key"
 
+	// ===== Register webhook (new contract: emissions gated on registration) =====
+
+	wbBody, status := resendPostJSON(t, base+"/webhooks", apiKey, map[string]any{
+		"endpoint": sink.URL,
+		"events":   []string{"email.sent", "email.delivered"},
+	})
+	if status != 200 && status != 201 {
+		t.Fatalf("POST /webhooks -> %d; %s", status, wbBody)
+	}
+
 	// ===== 401: no auth =====
-	_, status := resendPostJSON(t, base+"/emails", "", map[string]any{
+	_, status = resendPostJSON(t, base+"/emails", "", map[string]any{
 		"from":    "test@example.com",
 		"to":      "user@example.com",
 		"subject": "Hello",

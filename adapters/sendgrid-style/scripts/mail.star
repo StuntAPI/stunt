@@ -70,23 +70,15 @@ def on_send_mail(req):
     c = store_collection("mail")
     c.insert(doc)
 
-    # Emit a webhook event (fire-and-forget).
-    events_emit("mail.sent", {
-        "message_id": msg_id,
-        "email": recipients,
-        "event": "processed",
-        "sg_event_id": "event_" + msg_id,
-        "sg_message_id": msg_id,
-        "timestamp": 1705312800,
-    })
-    events_emit("mail.delivered", {
-        "message_id": msg_id,
-        "email": recipients,
-        "event": "delivered",
-        "sg_event_id": "event_" + msg_id,
-        "sg_message_id": msg_id,
-        "timestamp": 1705312801,
-    })
+    # Emit ECDSA-signed Event Webhook events (fire-and-forget): one
+    # "processed" + "delivered" event object per recipient, matching the real
+    # per-recipient event stream. See scripts/lib.star for the signature
+    # scheme; deliveries only fire when an Event Webhook is enabled via
+    # POST /v3/user/webhooks/event/settings.
+    for r in recipients:
+        email = r.get("email", "")
+        _emit_event("processed", msg_id, email)
+        _emit_event("delivered", msg_id, email)
 
     # Real SendGrid returns 202 Accepted with empty body.
     return respond(202, "", {

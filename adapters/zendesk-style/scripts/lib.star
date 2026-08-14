@@ -134,3 +134,57 @@ def _zd_sorted(req, docs, sort_param):
         return docs
     order_dir = _get_query(req, "sort_order", "asc")
     return query_select(docs, None, sort, order_dir, None, None, None)
+
+# ============================================================================
+# ZENDESK WEBHOOK SIGNATURE SCHEME (DOCUMENTATION)
+# ============================================================================
+# Zendesk signs every webhook delivery per webhook with a signing secret:
+#
+#   X-Zendesk-Webhook-Signature:           base64(HMAC-SHA256(secret, TIMESTAMP + BODY))
+#   X-Zendesk-Webhook-Signature-Timestamp: <unix seconds>   (the TIMESTAMP above)
+#
+# The signing input is the timestamp string concatenated DIRECTLY with the raw
+# request body (no separator).
+#
+# Verification in Go:
+#   mac := hmac.New(sha256.New, []byte(signingSecret))
+#   mac.Write(append([]byte(timestamp), rawBody...))
+#   expected := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+#   if !hmac.Equal([]byte(expected), []byte(r.Header.Get("X-Zendesk-Webhook-Signature"))) {
+#       return 401 // invalid signature
+#   }
+#
+# The secret is PER-WEBHOOK: it is stored on the webhook doc when the webhook
+# is created via POST /api/v2/webhooks (real Zendesk auto-generates one and you
+# reveal it in Admin Center; the simulator accepts "signing_secret" in the
+# create payload). The constant below is the fallback used for webhooks created
+# without one. Public + low-entropy: local stunt only.
+_ZD_WEBHOOK_SECRET = "zd_whsec_stunt_mock_2026"
+
+# _signed_emit MACs the exact on-wire body with the first matching webhook's
+# stored secret and delivers with Zendesk's signature headers. The same
+# (event_type, payload) feeds events_body (signing input) and events_emit
+# (delivery), so the signature verifies against the bytes the sink receives.
+def _signed_emit(event_type, payload, secret):
+    if secret == None or secret == "":
+        secret = _ZD_WEBHOOK_SECRET
+    ts = str(clock.now_unix())
+    body = events_body(event_type, payload)
+    sig = crypto.hmac_sha256(secret, ts + body, encoding="base64")
+    events_emit(event_type, payload, {
+        "X-Zendesk-Webhook-Signature": sig,
+        "X-Zendesk-Webhook-Signature-Timestamp": ts,
+    })
+
+# _emit_if_subscribed delivers a signed event only if a registered webhook
+# subscribes to event_type (a webhook with an empty subscriptions list receives
+# everything, mirroring trigger-connected webhooks without event filters).
+def _emit_if_subscribed(event_type, payload):
+    wc = store_collection("webhooks")
+    for w in wc.list():
+        subs = w.get("subscriptions", [])
+        if subs == None:
+            subs = []
+        if len(subs) == 0 or event_type in subs:
+            _signed_emit(event_type, payload, w.get("signing_secret", ""))
+            return

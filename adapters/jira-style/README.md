@@ -26,6 +26,10 @@ tracking and project management integrations during local development:
   `POST .../transitions` → do transition (204). Standard workflow: To Do → In Progress →
   Done → Reopened.
 - **Comments:** `POST /rest/api/3/issue/{key}/comment` → create comment (201).
+- **Webhooks:** `POST /rest/api/3/webhook` → register a dynamic webhook
+  (`{url, events, jqlFilter}`); `DELETE /rest/api/3/webhook` → delete by
+  `{"webhookRegistrationIds":[...]}` (202). Issue events are delivered with
+  Jira's payload envelope — see [Webhooks](#webhooks).
 - **Pagination:** `startAt`/`maxResults` query params.
 
 Issues are **stateful** — a seed issue is pre-loaded so searches return data immediately.
@@ -51,6 +55,9 @@ Jira Cloud accepts both `Authorization: Basic <base64(email:api_token)>` and
 | GET | `/rest/api/3/issue/{key}/transitions` | `issue.star#on_list_transitions` | List transitions |
 | POST | `/rest/api/3/issue/{key}/transitions` | `issue.star#on_do_transition` | Do transition |
 | POST | `/rest/api/3/issue/{key}/comment` | `issue.star#on_add_comment` | Add comment |
+| POST | `/rest/api/3/webhook` | `webhook.star#on_register_webhook` | Register dynamic webhook |
+| GET | `/rest/api/3/webhook` | `webhook.star#on_get_webhooks` | List registered webhooks (simulator-only) |
+| DELETE | `/rest/api/3/webhook` | `webhook.star#on_delete_webhook` | Delete webhooks by IDs (202) |
 
 ## Error shape
 
@@ -82,6 +89,35 @@ The search handler does NOT implement a real JQL parser. It:
 | `projects` | Project records (seeded) |
 | `comments` | Issue comments |
 | `transitions` | Transition history |
+| `webhooks` | Dynamic webhook registrations (url, events, jqlFilter) |
+
+## Webhooks
+
+Register a dynamic webhook with `POST /rest/api/3/webhook`:
+
+```json
+{
+  "url": "http://localhost:9999/jira-hook",
+  "events": ["jira:issue_created", "jira:issue_updated", "comment_created"],
+  "jqlFilter": "project = TEST"
+}
+```
+
+The URL is registered with the event emitter; a hook with an empty `events`
+list receives everything. Issue activity then emits events with Jira's payload
+envelope:
+
+| Event type | Emitted when | Payload |
+|------------|--------------|---------|
+| `jira:issue_created` | `POST /rest/api/3/issue` | `{timestamp, webhookEvent, issue:{id, key, fields}}` |
+| `jira:issue_updated` | `PUT /rest/api/3/issue/{key}` and transitions | `{timestamp, webhookEvent, issue:{...}}` |
+| `comment_created` | `POST /rest/api/3/issue/{key}/comment` | `{timestamp, webhookEvent, comment:{...}, issue:{...}}` |
+
+**Unsigned by design.** Jira Cloud documents no HMAC or other content signature
+for webhook deliveries — Atlassian relies on secret tokens in the URL, basic
+auth on the target, or fetch-back verification via the REST API. stunt mirrors
+that: deliveries carry the real envelope and no signature headers. Do not
+invent a signature check client-side; use a secret path segment instead.
 
 ## Usage
 

@@ -15,6 +15,10 @@ real API data is included.
 ## What it simulates
 
 - **Profile:** `GET /v1.0/me` → user profile.
+- **Webhook subscriptions:** `POST /v1.0/subscriptions`,
+  `GET /v1.0/subscriptions`, `GET /v1.0/subscriptions/{id}`,
+  `DELETE /v1.0/subscriptions/{id}` (204) — with change notifications on
+  supported resources (see [Webhooks](#webhooks)).
 - **Users:** `GET /v1.0/users` (OData list), `GET /v1.0/users/{id}`.
 - **Outlook mail:** `GET /v1.0/me/messages`, `GET /v1.0/me/messages/{id}`,
   `DELETE /v1.0/me/messages/{id}` (204), `POST /v1.0/me/sendMail`
@@ -70,6 +74,10 @@ the page size and `$skip` carries the opaque cursor token emitted in `@odata.nex
 | Method | Route | Handler | Description |
 |--------|-------|---------|-------------|
 | GET | `/v1.0/me` | `me.star#on_me` | Current user profile |
+| POST | `/v1.0/subscriptions` | `subscriptions.star#on_create_subscription` | Create webhook subscription |
+| GET | `/v1.0/subscriptions` | `subscriptions.star#on_list_subscriptions` | List subscriptions |
+| GET | `/v1.0/subscriptions/{id}` | `subscriptions.star#on_get_subscription` | Get subscription |
+| DELETE | `/v1.0/subscriptions/{id}` | `subscriptions.star#on_delete_subscription` | Delete subscription → 204 |
 | GET | `/v1.0/users` | `users.star#on_list_users` | List users (OData) |
 | GET | `/v1.0/users/{id}` | `users.star#on_get_user` | Get user |
 | GET | `/v1.0/me/mailFolders` | `mail.star#on_list_folders` | Mail folders |
@@ -114,9 +122,66 @@ the page size and `$skip` carries the opaque cursor token emitted in `@odata.nex
 | `chat_messages` | Teams chat messages (per chat) |
 | `files` | OneDrive files/folders (with `parentId` for per-parent listing) |
 | `sessions` | OneDrive resumable upload sessions (next offset, total, conflict behavior; 48h TTL) |
+| `subscriptions` | Webhook subscriptions (notificationUrl, resource, changeType, clientState) |
 
 File content lives in the blob store, keyed by driveItem id (in-flight
 session chunks accumulate under `up-{session}` until the final range).
+
+## Webhooks
+
+Create a subscription (Graph's webhook model):
+
+```http
+POST /v1.0/subscriptions
+Authorization: Bearer <token>
+
+{
+  "changeType": "created,updated,deleted",
+  "notificationUrl": "http://localhost:9090/notifications",
+  "resource": "me/events",
+  "clientState": "my-secret-client-state",
+  "expirationDateTime": "2026-12-31T00:00:00Z"
+}
+```
+
+**Supported notification resources:** `me/events` (calendar events:
+`created`/`updated`/`deleted` on POST/PATCH/DELETE), `me/messages` (mail:
+`created` on `POST /me/sendMail`), and `chats/{chatId}/messages` (Teams chat
+messages: `created` on `POST /chats/{id}/messages`). A leading `/` on the
+resource is normalized away when matching.
+
+**Validation handshake:** real Graph validates `notificationUrl` by POSTing a
+`validationToken` (text/plain) that the endpoint must echo with 200 within 10
+seconds. stunt cannot gate on that round trip (deliveries are
+fire-and-forget), so the subscription is accepted immediately and a
+`subscriptionValidation` event carrying `{"validationToken": "..."}` is
+delivered to the notification URL so receivers can exercise their echo path.
+
+**Notification envelope** (Graph shape, delivered as the
+`changeNotification` event type):
+
+```json
+{
+  "value": [{
+    "subscriptionId": "sub-000001",
+    "changeType": "created",
+    "clientState": "my-secret-client-state",
+    "subscriptionExpirationDateTime": "2026-12-31T00:00:00Z",
+    "resource": "me/events",
+    "resourceData": {
+      "@odata.type": "#Microsoft.Graph.Event",
+      "@odata.id": "me/events/evt-000001",
+      "id": "evt-000001"
+    },
+    "tenantId": "mock-tenant"
+  }]
+}
+```
+
+**Signature: none (unsigned-by-design).** Microsoft Graph does not sign change
+notifications; the documented verification is the `clientState` you set at
+subscription creation, echoed verbatim in every notification. Drop any
+notification whose `clientState` does not match your expected secret.
 
 ## Auth
 

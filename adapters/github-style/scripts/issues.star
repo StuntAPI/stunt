@@ -82,8 +82,8 @@ def on_create_issue(req):
     ic = store_collection("issues")
     ic.insert(issue)
 
-    # Emit webhook event if subscribed.
-    _emit_if_subscribed(repo_key, "issues", _issue_view(issue))
+    # Emit webhook event if subscribed (action "opened" per GitHub's payload).
+    _emit_if_subscribed(repo_key, "issues", _gh_event_payload(repo_key, "opened", "issue", _issue_view(issue)))
 
     return respond(201, _issue_view(issue))
 
@@ -131,6 +131,7 @@ def on_update_issue(req):
     all_issues = ic.list()
     for i in all_issues:
         if i.get("repo", "") == repo_key and i.get("number", 0) == number:
+            prev_state = i.get("state", "open")
             if body.get("state", None) != None:
                 i["state"] = body["state"]
             if body.get("title", None) != None:
@@ -139,6 +140,17 @@ def on_update_issue(req):
                 i["body"] = body["body"]
             i["updated_at"] = _now()
             ic.update(i["id"], i)
+
+            # Emit webhook event if subscribed. GitHub reports state changes as
+            # closed/reopened; other edits as "edited".
+            action = "edited"
+            if prev_state != i.get("state", prev_state):
+                if i.get("state", "") == "closed":
+                    action = "closed"
+                else:
+                    action = "reopened"
+            _emit_if_subscribed(repo_key, "issues", _gh_event_payload(repo_key, action, "issue", _issue_view(i)))
+
             return respond(200, _issue_view(i))
 
     return _gh_not_found()

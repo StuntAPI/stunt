@@ -3,10 +3,11 @@
 # GET  /v2/store/orders          (Bearer) -> {data: [...]}
 # POST /v2/store/orders          (Bearer; JSON {recipient, items, shipping})
 #      -> {id, external_id, status, shipping, recipient, items}
-#      emits "order_created" webhook
+#      emits signed "order_created" webhook (X-Pful-Signature)
 # POST /v2/store/orders/{id}     (Bearer; JSON {status})
 #      -> {id, status}
-#      emits "order_updated" webhook (or "order_canceled" if status=canceled)
+#      emits signed "order_updated" webhook (or "order_canceled" if
+#      status=canceled)
 #
 # Shared helpers (_bearer, _require_auth, _to_int, _next_order_id)
 # are preloaded from scripts/lib.star.
@@ -58,7 +59,9 @@ def on_create_v1_order(req):
     # Persist under a string id so GET /orders/{id} can retrieve it.
     store_collection("orders").insert({"id": str(oid), "result": result})
 
-    events_emit("order_created", {"order_id": oid, "status": "draft"})
+    # Emit signed webhook (fire-and-forget; only when the store's webhook
+    # subscribes to the type). Payload uses Printful's envelope.
+    _emit_if_subscribed("order_created", result)
     return respond(200, {"result": result})
 
 # on_get_v1_order handles GET /orders/{order_id} -> {"result": {...}}.
@@ -124,11 +127,9 @@ def on_create_order(req):
     c = store_collection("orders")
     c.insert(order)
 
-    # Emit webhook (fire-and-forget).
-    events_emit("order_created", {
-        "order_id": oid,
-        "status": order["status"],
-    })
+    # Emit signed webhook (fire-and-forget; only when the store's webhook
+    # subscribes to the type). Payload uses Printful's envelope.
+    _emit_if_subscribed("order_created", order)
 
     return respond(200, order)
 
@@ -156,16 +157,11 @@ def on_update_order(req):
 
     c.update(oid, doc)
 
-    # Emit appropriate webhook.
+    # Emit appropriate signed webhook (fire-and-forget; only when the
+    # store's webhook subscribes to the type).
     if new_status == "canceled":
-        events_emit("order_canceled", {
-            "order_id": oid,
-            "status": "canceled",
-        })
+        _emit_if_subscribed("order_canceled", doc)
     else:
-        events_emit("order_updated", {
-            "order_id": oid,
-            "status": doc["status"],
-        })
+        _emit_if_subscribed("order_updated", doc)
 
     return respond(200, {"id": oid, "status": doc["status"]})

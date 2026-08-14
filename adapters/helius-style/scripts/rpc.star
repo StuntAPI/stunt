@@ -58,6 +58,28 @@ def on_rpc(req):
     elif method == "sendTransaction":
         seq = store_kv_incr("helius", "tx_seq")
         result = _gen_signature(seq)
+        # Landing a transaction fires the enhanced webhook (unsigned, with
+        # the hook's authHeader as Authorization) for subscribed hooks.
+        _webhook_emit({
+            "signature": result,
+            "timestamp": clock.now_unix(),
+            "slot": _slot(seq),
+            "type": "TRANSFER",
+            "source": "SYSTEM_PROGRAM",
+            "description": "Transfer 0.5 SOL",
+            "fee": 5000,
+            "feePayer": _hex_addr(seq + 100),
+            "nativeTransfers": [
+                {
+                    "fromUserAccount": _hex_addr(seq + 200),
+                    "toUserAccount": _hex_addr(seq + 300),
+                    "amount": 5000 * 1000 * 100,
+                },
+            ],
+            "tokenTransfers": [],
+            "accountData": [],
+            "events": {},
+        })
     else:
         error = {"code": -32601, "message": "Method not found: " + method}
 

@@ -76,3 +76,72 @@ def _list_page(req, items):
     limit = _to_int(_get_query(req, "limit", ""))
     cursor = _get_query(req, "after", "")
     return paginate(items, limit, cursor)
+
+# ============================================================================
+# WEBHOOK SIGNATURE SCHEME (SVIX — DOCUMENTATION)
+# ============================================================================
+# Resend delivers webhooks through Svix. Every delivery carries:
+#   svix-id:         unique message id ("msg_...")
+#   svix-timestamp:  Unix seconds
+#   svix-signature:  "v1,<base64(HMAC-SHA256(secret, svix-id + "." +
+#                     svix-timestamp + "." + raw_body))>"
+#
+# Verification in Go:
+#   mac := hmac.New(sha256.New, []byte(secret))
+#   mac.Write([]byte(svixID + "." + svixTimestamp + "." + string(rawBody)))
+#   expected := "v1," + base64.StdEncoding.EncodeToString(mac.Sum(nil))
+#   if expected != r.Header.Get("svix-signature") { return 401 }
+#
+# The secret below is the simulator's default signing secret ("whsec_...",
+# Resend's prefix). A webhook registered via POST /webhooks may carry its own
+# "secret"; deliveries are then signed with THAT per-hook secret. Public +
+# low-entropy: local stunt only.
+# ============================================================================
+
+_WEBHOOK_SECRET = "whsec_stunt_resend_mock_signing_key"
+
+# _hook_secret returns the most recently registered webhook's secret (Resend
+# issues one signing secret per webhook endpoint), falling back to the fixed
+# synthetic default so deliveries verify without any registration-time setup.
+def _hook_secret():
+    wc = store_collection("webhooks")
+    hooks = wc.list()
+    i = len(hooks) - 1
+    while i >= 0:
+        s = hooks[i].get("secret", "")
+        if s != None and s != "":
+            return s
+        i = i - 1
+    return _WEBHOOK_SECRET
+
+# _next_svix_id mints a Svix-style message id ("msg_...").
+def _next_svix_id():
+    return "msg_stunt_" + str(store_kv_incr("resend", "svix_msg_seq"))
+
+# _signed_emit MACs the exact on-wire body and delivers with Svix headers.
+# The signed content is svix-id + "." + svix-timestamp + "." + body, so the
+# signature verifies against the bytes the sink receives.
+def _signed_emit(event_type, payload):
+    ts = clock.now_unix()
+    body = events_body(event_type, payload)
+    msg_id = _next_svix_id()
+    sig = crypto.hmac_sha256(_hook_secret(), msg_id + "." + str(ts) + "." + body, "base64")
+    events_emit(event_type, payload, {
+        "svix-id": msg_id,
+        "svix-timestamp": str(ts),
+        "svix-signature": "v1," + sig,
+    })
+
+# _emit_if_subscribed delivers a signed event only when a registered webhook
+# subscribes to the event type (Resend filters deliveries per endpoint; an
+# empty events list subscribes to everything). No delivery when no webhook is
+# registered.
+def _emit_if_subscribed(event_type, payload):
+    wc = store_collection("webhooks")
+    for h in wc.list():
+        evts = h.get("events", [])
+        if evts == None:
+            evts = []
+        if len(evts) == 0 or event_type in evts:
+            _signed_emit(event_type, payload)
+            return

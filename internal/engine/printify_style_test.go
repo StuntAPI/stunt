@@ -78,6 +78,16 @@ func TestPrintifyStyleAdapter(t *testing.T) {
 	base := addrs["printify"]
 	const token = "test-printify-api-key"
 
+	// ===== Register webhooks (one per topic — the real model) =====
+
+	for _, topic := range []string{"product:updated", "order:created", "order:send:fulfilled", "shipment:sent"} {
+		regBody, _ := json.Marshal(map[string]any{"address": sink.URL, "topic": topic})
+		body, status := printifyPost(t, base+"/v1/shops/1/webhooks.json", token, regBody)
+		if status != 200 && status != 201 {
+			t.Fatalf("register webhook %s -> %d; %s", topic, status, body)
+		}
+	}
+
 	// ===== List blueprints =====
 
 	body, status := printifyGet(t, base+"/v1/catalog/blueprints.json", token)
@@ -285,7 +295,7 @@ func TestPrintifyStyleAdapter(t *testing.T) {
 		et, _ := ev["type"].(string)
 		eventTypes[et] = true
 	}
-	expectedEvents := []string{"product.updated", "order:created", "order:send:fulfilled", "shipment:sent"}
+	expectedEvents := []string{"product:updated", "order:created", "order:send:fulfilled", "shipment:sent"}
 	for _, expected := range expectedEvents {
 		if !eventTypes[expected] {
 			t.Errorf("missing webhook event %q; received events: %v", expected, eventTypes)
