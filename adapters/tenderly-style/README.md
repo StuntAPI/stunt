@@ -26,8 +26,15 @@ Bearer token (`Authorization: Bearer <key>`).
 
 ## Simulation result
 
-Deterministic: status `true`, gas_used based on input length, call trace with
-nested calls.
+Deterministic: `status` defaults to `true` with gas_used based on input length
+and a call trace. The revert path is reachable two ways — an explicit
+`{"revert": true, "revert_reason": "..."}` body flag, or calldata beginning
+with the `Error(string)` selector `0x08c379a0` — producing `status: false`, a
+`revert_reason`, and an ABI-encoded revert `output`. Value transfers
+(`value > 0`) synthesize a Transfer event log and balance overrides.
+
+Stored simulations are retrievable via
+`GET .../simulations/{id}` and listable via `GET .../simulations`.
 
 ---
 

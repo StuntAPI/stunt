@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -157,6 +158,119 @@ func TestTenderlyStyleAdapter(t *testing.T) {
 	}
 	if len(networks) < 1 {
 		t.Fatalf("networks count = %d, want >= 1", len(networks))
+	}
+}
+
+// TestTenderlyStyleRevertAndRetrieve exercises the revert/failure path (the
+// simulator's core "will this revert, and why?" promise) plus value-transfer
+// artifacts and retrieval of a stored simulation.
+func TestTenderlyStyleRevertAndRetrieve(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "tenderly-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"tenderly": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["tenderly"]
+	const token = "test-token-tenderly"
+	simURL := base + "/api/v1/account/myacct/project/myproject/simulate"
+
+	txn := func(input, value string, extra map[string]any) map[string]any {
+		body := map[string]any{
+			"network_id": "1",
+			"transaction": map[string]any{
+				"from":      "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+				"to":        "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+				"gas":       100000,
+				"gas_price": "1000000000",
+				"value":     value,
+				"input":     input,
+			},
+		}
+		for k, v := range extra {
+			body[k] = v
+		}
+		return body
+	}
+
+	// Revert via explicit flag → status false + revert_reason + ABI output.
+	body, status := tenderlyPost(t, simURL, token, txn("0x", "0", map[string]any{"revert": true, "revert_reason": "insufficient balance"}))
+	if status != 200 {
+		t.Fatalf("revert sim -> %d; body %s", status, body)
+	}
+	var rev map[string]any
+	json.Unmarshal([]byte(body), &rev)
+	revTx := rev["transaction"].(map[string]any)
+	if revTx["status"] != false {
+		t.Fatalf("revert status = %v, want false", revTx["status"])
+	}
+	if revTx["revert_reason"] != "insufficient balance" {
+		t.Fatalf("revert_reason = %v, want 'insufficient balance'", revTx["revert_reason"])
+	}
+	if out, _ := revTx["output"].(string); !strings.HasPrefix(out, "0x08c379a0") {
+		t.Fatalf("revert output = %q, want 0x08c379a0 prefix", out)
+	}
+	if trace := rev["sim_call_trace"].(map[string]any); trace["status"] != false {
+		t.Fatalf("revert trace status = %v, want false", trace["status"])
+	}
+	revertSimID, _ := rev["simulationId"].(string)
+
+	// Selector-detected revert: input starting with 0x08c379a0 (Error(string)).
+	body, _ = tenderlyPost(t, simURL, token, txn("0x08c379a0", "0", nil))
+	json.Unmarshal([]byte(body), &rev)
+	if rev["transaction"].(map[string]any)["status"] != false {
+		t.Fatal("selector-revert: want status false")
+	}
+
+	// Value transfer → status true + a Transfer log + balance overrides.
+	body, _ = tenderlyPost(t, simURL, token, txn("0x", "1000000000000000000", nil))
+	json.Unmarshal([]byte(body), &rev)
+	if rev["transaction"].(map[string]any)["status"] != true {
+		t.Fatal("value transfer: want status true")
+	}
+	if logs, _ := rev["logs"].([]any); len(logs) != 1 {
+		t.Fatalf("value transfer logs = %d, want 1", len(logs))
+	}
+	if bo, _ := rev["balanceOverrides"].(map[string]any); len(bo) != 2 {
+		t.Fatalf("balanceOverrides = %d entries, want 2", len(bo))
+	}
+
+	// Retrieve the stored revert simulation by id.
+	getURL := base + "/api/v1/account/myacct/project/myproject/simulations/" + revertSimID
+	body, status = tenderlyGet(t, getURL, token)
+	if status != 200 {
+		t.Fatalf("retrieve sim -> %d; body %s", status, body)
+	}
+	var got map[string]any
+	json.Unmarshal([]byte(body), &got)
+	if got["simulationId"] != revertSimID {
+		t.Fatalf("retrieved simulationId = %v, want %s", got["simulationId"], revertSimID)
+	}
+	if got["transaction"].(map[string]any)["status"] != false {
+		t.Fatal("retrieved sim should be the reverted one (status false)")
+	}
+
+	// Unknown id → 404.
+	if _, status := tenderlyGet(t, base+"/api/v1/account/myacct/project/myproject/simulations/sim_nope", token); status != 404 {
+		t.Fatalf("unknown sim -> %d, want 404", status)
 	}
 }
 
