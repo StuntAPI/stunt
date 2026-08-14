@@ -160,14 +160,12 @@ def _upload_blob(req, container, blob):
     if content_type == None:
         content_type = "application/octet-stream"
 
-    # Content from body (parsed JSON) or raw (nil body)
-    body = req.get("body")
-    if body == None:
-        content_str = ""
-    else:
-        content_str = _body_to_str(body)
-
-    content_length = len(content_str)
+    # Byte-exact content in the blob store; raw_body is the verbatim request
+    # bytes (a parsed body map cannot represent binary content).
+    raw = req.get("raw_body", "")
+    if raw == None:
+        raw = ""
+    content_length = len(raw)
     etag = _gen_etag()
 
     # Collect x-ms-meta-* metadata headers
@@ -177,17 +175,22 @@ def _upload_blob(req, container, blob):
             metadata[k] = headers[k]
 
     bc = store_collection("blobs")
-    # Check if blob already exists -> update
+    # Reuse the existing blob id on overwrite; otherwise mint a path-safe one.
+    bid = None
     existing_id = None
     for b in bc.list():
         if b.get("container", "") == container and b.get("name", "") == blob:
+            bid = b.get("bid", "")
             existing_id = b.get("id", "")
             break
+    if bid == None or bid == "":
+        bid = "azb_" + str(store_kv_incr("azure", "blob_seq"))
+    store_blob("az-blobs").put(bid, raw, content_type)
 
     doc = {
         "container": container,
         "name": blob,
-        "content": content_str,
+        "bid": bid,
         "contentType": content_type,
         "blobType": blob_type,
         "contentLength": content_length,
@@ -238,7 +241,7 @@ def on_get_blob(req):
     if b == None:
         return _blob_not_found(container, blob)
 
-    content = b.get("content", "")
+    content = store_blob("az-blobs").get(b.get("bid", ""))
     if content == None:
         content = ""
     content_type = b.get("contentType", "application/octet-stream")
@@ -293,12 +296,16 @@ def on_delete_blob(req):
 
     bc = store_collection("blobs")
     b_id = None
+    bid = None
     for blk in bc.list():
         if blk.get("container", "") == container and blk.get("name", "") == blob:
             b_id = blk.get("id", "")
+            bid = blk.get("bid", "")
             break
     if b_id != None and b_id != "":
         bc.delete(b_id)
+    if bid != None and bid != "":
+        store_blob("az-blobs").delete(bid)
 
     return respond(202, "", {"x-ms-request-id": _req_id()})
 
@@ -404,12 +411,6 @@ def _get_block_list(req, container, blob):
 # ====================================================================
 # Helpers
 # ====================================================================
-
-# _body_to_str converts a parsed body map to a string representation.
-def _body_to_str(body):
-    if body == None:
-        return ""
-    return str(body)
 
 # ====================================================================
 # Error responses (Azure Storage XML shape)

@@ -59,15 +59,13 @@ def on_put_object(req):
     if bucket_doc == None:
         return _no_such_bucket(bucket)
 
-    # Content: the body is the parsed JSON (if JSON) or nil.
-    # For non-JSON content the framework passes nil; we store the raw
-    # body as empty string in that case (limitation of the dispatch layer).
-    body = req.get("body")
-    if body == None:
-        content_str = ""
-    else:
-        content_str = _body_to_str(body)
-
+    # Content goes in the byte-exact blob store (filesystem-backed), keyed by
+    # bucket/key; the collection holds metadata only. raw_body is the verbatim
+    # request bytes, so binary uploads round-trip exactly — a parsed body map
+    # (or its stringification) cannot represent non-JSON content.
+    raw = req.get("raw_body", "")
+    if raw == None:
+        raw = ""
     headers = req.get("headers")
     if headers == None:
         headers = {}
@@ -75,21 +73,27 @@ def on_put_object(req):
     if ct == None:
         ct = "application/octet-stream"
 
-    size = len(content_str)
+    size = len(raw)
     etag = _etag()
 
     oc = store_collection("objects")
-    # Check if key already exists -> update
+    # Reuse the existing blob id on overwrite; otherwise mint a path-safe one
+    # (the blob store forbids '/' in names to prevent path traversal).
+    bid = None
     obj_id = None
     for o in oc.list():
         if o.get("bucket", "") == bucket and o.get("key", "") == key:
+            bid = o.get("bid", "")
             obj_id = o.get("id", "")
             break
+    if bid == None or bid == "":
+        bid = "obj_" + str(store_kv_incr("s3", "blob_seq"))
+    store_blob("s3-objects").put(bid, raw, ct)
 
     doc = {
         "bucket": bucket,
         "key": key,
-        "content": content_str,
+        "bid": bid,
         "contentType": ct,
         "etag": etag,
         "lastModified": _iso8601(),
@@ -104,14 +108,6 @@ def on_put_object(req):
         "ETag": '"' + etag + '"',
         "x-amz-request-id": _req_id(),
     })
-
-# _body_to_str converts a parsed body map to a string representation.
-# Since the dispatch layer parses JSON, the content is stored as the
-# Starlark str() representation of the parsed body.
-def _body_to_str(body):
-    if body == None:
-        return ""
-    return str(body)
 
 # on_get_object returns the object content (raw body).
 def on_get_object(req):
@@ -131,7 +127,7 @@ def on_get_object(req):
     if obj == None:
         return _no_such_key(bucket, key)
 
-    content = obj.get("content", "")
+    content = store_blob("s3-objects").get(obj.get("bid", ""))
     if content == None:
         content = ""
     ct = obj.get("contentType", "application/octet-stream")
@@ -196,12 +192,16 @@ def on_delete_object(req):
 
     oc = store_collection("objects")
     obj_id = None
+    bid = None
     for o in oc.list():
         if o.get("bucket", "") == bucket and o.get("key", "") == key:
             obj_id = o.get("id", "")
+            bid = o.get("bid", "")
             break
     if obj_id != None and obj_id != "":
         oc.delete(obj_id)
+    if bid != None and bid != "":
+        store_blob("s3-objects").delete(bid)
 
     return respond(204, "", {
         "x-amz-request-id": _req_id(),

@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -281,4 +282,60 @@ func s3Delete(t *testing.T, rawurl, auth string) *http.Response {
 		t.Fatal(err)
 	}
 	return resp
+}
+
+// TestAWSS3StyleBinaryRoundTrip proves binary content round-trips byte-exact:
+// invalid-UTF-8 bytes (0xff/0xfe) that a JSON-backed collection would corrupt
+// survive PUT then GET unchanged, with a correct Content-Length.
+func TestAWSS3StyleBinaryRoundTrip(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["s3"]
+	const sigv4 = "AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20260120/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-date, Signature=fe5f80f77d5fa3beca038a248ff027d044aca418"
+
+	if _, status := s3Put(t, base+"/mybucket", sigv4, nil); status != 200 {
+		t.Fatalf("create bucket -> %d", status)
+	}
+
+	// PNG magic + invalid-UTF-8 bytes (0xff/0xfe) + NUL + valid multibyte.
+	bin := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0xff, 0xfe, 0x00, 0x80, 0xc3, 0xa9}
+	if _, status := s3Put(t, base+"/mybucket/bin.dat", sigv4, bin); status != 200 {
+		t.Fatalf("put binary -> %d", status)
+	}
+
+	got, status := s3Get(t, base+"/mybucket/bin.dat", sigv4)
+	if status != 200 {
+		t.Fatalf("get binary -> %d", status)
+	}
+	if !bytes.Equal([]byte(got), bin) {
+		t.Fatalf("binary round-trip mismatch: got %v (%d bytes), want %v (%d bytes)", []byte(got), len(got), bin, len(bin))
+	}
+
+	// HEAD reports the byte length, not a UTF-8-rounded one.
+	hdr := s3Head(t, base+"/mybucket/bin.dat", sigv4)
+	if hdr.Header.Get("Content-Length") != strconv.Itoa(len(bin)) {
+		t.Fatalf("HEAD Content-Length = %q, want %d", hdr.Header.Get("Content-Length"), len(bin))
+	}
 }
