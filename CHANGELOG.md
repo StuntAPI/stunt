@@ -6,6 +6,8 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.26.0] — 2026-08-14
+
 ### Added
 
 - **`parse_multipart(content_type, body)` builtin** — decodes
