@@ -233,6 +233,32 @@ when the part omits them, and `data` carries the raw bytes (Starlark strings are
 binary parts round-trip through `store_blob` exactly). Returns a 2-tuple `(parts, err)` — `err` is
 `None` on success so the handler can answer 400 instead of surfacing a 500.
 
+### Filter/sort builtin (`query_select`)
+
+`query_select` is the semantic core behind every provider's list-filter params — the Starlark twin
+of what the real service's query engine does. Pure builtin; filter → sort → offset/limit → project
+in one call:
+
+```python
+res = query_select(docs, [
+    ["status", "=", "open"],
+    ["amount", ">=", 100],
+    ["customer.name", "like", "acme%"],
+], order_by="created_at", order_dir="desc", limit=20, fields=["id", "amount"])
+```
+
+| Argument | Type | Default | Notes |
+|----------|------|---------|-------|
+| `items` | iterable | required | The full (unfiltered) list |
+| `filter` | list of `[field, op, value]` | `None` | Clauses AND'ed. Ops: `=`, `!=`, `>`, `>=`, `<`, `<=`, `contains`, `startswith`, `endswith`, `in` (value is a list), `like` (`%` = any run, `_` = one char). `field` may be a dotted path (`customer.name`). Missing field matches only `!=`. Numbers compare numerically; strings lexicographically (ISO-8601 timestamps compare chronologically) |
+| `order_by` / `order_dir` | str | `""` / `"asc"` | Stable sort; `order_dir="desc"`; missing values sort last |
+| `limit` / `offset` | int | `None` | Slice after filtering/sorting (compose with `paginate` for cursor envelopes) |
+| `fields` | list of keys | `None` | Project each dict to those keys (missing keys omitted) |
+
+**The adapter owns translating its provider's syntax** (`$filter`, SOQL `WHERE`, `q=`,
+`sysparm_query`, …) into `[field, op, value]` triples — that per-provider mapping is intentionally
+adapter-side, like the paginate cursor wrappers.
+
 ### Signing webhooks (`crypto`, `clock`)
 
 A receiver that verifies a webhook signature (Stripe `Stripe-Signature`, GitHub `X-Hub-Signature-256`, Shopify, Slack, Twilio, Adyen) can now be exercised against stunt. Three primitives — all string-in/string-out (Starlark has no bytes):

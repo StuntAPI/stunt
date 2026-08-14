@@ -13,3 +13,4 @@ DOGFOOD_REPORT*.md
 docs/dogfood/
 *-findings.md
 GOAL.md
+.DS_Store

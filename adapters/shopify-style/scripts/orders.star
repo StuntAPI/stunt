@@ -13,7 +13,9 @@
 # on_list_orders returns orders as {orders:[...]}. Shopify REST pages via the
 # `limit` (page size) and `page_info` (opaque cursor) query params; the next
 # cursor round-trips through a 'Link: <url>; rel="next"' header. When `limit`
-# is missing paging is disabled and the whole list is returned.
+# is missing paging is disabled and the whole list is returned. The real list
+# params (status, financial_status, fulfillment_status, since_id, ids,
+# created_at_min/max, fields) filter before paging.
 def on_list_orders(req):
     err = _require_token(req)
     if err != None:
@@ -26,6 +28,7 @@ def on_list_orders(req):
     for o in all_orders:
         result.append(_order_view(o))
 
+    result = _apply_order_filters(req, result)
     page, next_cursor = _list_page(req, result)
     headers = None
     link = _next_link(req, next_cursor, _to_int(_get_query(req, "limit")))
@@ -148,9 +151,75 @@ def _order_view(o):
         "customer": o.get("customer", {}),
         "order_number": o.get("order_number", 0),
         "name": o.get("name", ""),
+        "closed_at": o.get("closed_at", None),
+        "cancelled_at": o.get("cancelled_at", None),
         "created_at": o.get("created_at", _now()),
         "updated_at": o.get("updated_at", _now()),
     }
+
+# _apply_order_filters maps the real Shopify REST order-list query params to
+# query_select clauses, applied before paging like the real API. `status` is
+# derived from closed_at/cancelled_at the way Shopify derives it.
+def _apply_order_filters(req, docs):
+    f = []
+
+    status = _get_query(req, "status")
+    if status == None or status == "":
+        status = "open"
+    if status == "open":
+        f.append(["closed_at", "=", None])
+        f.append(["cancelled_at", "=", None])
+    elif status == "closed":
+        f.append(["closed_at", "!=", None])
+    elif status == "cancelled":
+        f.append(["cancelled_at", "!=", None])
+
+    fs = _get_query(req, "financial_status")
+    if fs != None and fs != "":
+        f.append(["financial_status", "=", fs])
+
+    fls = _get_query(req, "fulfillment_status")
+    if fls != None and fls != "" and fls != "any":
+        if fls == "unfulfilled" or fls == "unshipped" or fls == "null":
+            f.append(["fulfillment_status", "=", None])
+        else:
+            f.append(["fulfillment_status", "=", fls])
+
+    since_id = _to_int(_get_query(req, "since_id"))
+    if since_id > 0:
+        f.append(["id", ">", since_id])
+
+    ids = _get_query(req, "ids")
+    if ids != None and ids != "":
+        id_list = []
+        for part in ids.split(","):
+            part = part.strip()
+            if part != "":
+                id_list.append(_num_id(part))
+        if len(id_list) > 0:
+            f.append(["id", "in", id_list])
+
+    created_min = _get_query(req, "created_at_min")
+    if created_min != None and created_min != "":
+        f.append(["created_at", ">=", created_min])
+    created_max = _get_query(req, "created_at_max")
+    if created_max != None and created_max != "":
+        f.append(["created_at", "<=", created_max])
+
+    kwargs = {}
+    if len(f) > 0:
+        kwargs["filter"] = f
+    fields = _get_query(req, "fields")
+    if fields != None and fields != "":
+        fl = []
+        for part in fields.split(","):
+            part = part.strip()
+            if part != "":
+                fl.append(part)
+        if len(fl) > 0:
+            kwargs["fields"] = fl
+
+    return query_select(docs, kwargs.get("filter", None), None, "", None, None, kwargs.get("fields", None))
 
 # _emit_fulfillment_event emits a webhook event if subscribed.
 def _emit_fulfillment_event(topic, payload):
