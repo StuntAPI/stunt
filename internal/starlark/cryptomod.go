@@ -40,6 +40,8 @@ var cryptoModule = &starlarkstruct.Module{
 		"rsa_sign":          sk.NewBuiltin("crypto.rsa_sign", rsaSign),
 		"rsa_verify":        sk.NewBuiltin("crypto.rsa_verify", rsaVerify),
 		"rsa_public_jwk":    sk.NewBuiltin("crypto.rsa_public_jwk", rsaPublicJWK),
+		"ed25519_sign":      sk.NewBuiltin("crypto.ed25519_sign", ed25519Sign),
+		"ed25519_verify":    sk.NewBuiltin("crypto.ed25519_verify", ed25519Verify),
 	},
 }
 

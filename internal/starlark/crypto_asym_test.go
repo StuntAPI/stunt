@@ -2,6 +2,7 @@ package starlark
 
 import (
 	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
@@ -45,6 +46,25 @@ func testRSAKeyPair(t *testing.T) (priv, pub string) {
 		t.Fatal(err)
 	}
 	priv = string(pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: privDER}))
+	pub = string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDER}))
+	return
+}
+
+func testEd25519KeyPair(t *testing.T) (priv, pub string) {
+	t.Helper()
+	pubKey, privKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privDER, err := x509.MarshalPKCS8PrivateKey(privKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pubDER, err := x509.MarshalPKIXPublicKey(pubKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	priv = string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: privDER}))
 	pub = string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDER}))
 	return
 }
@@ -140,6 +160,43 @@ func TestAsymWrongKeyTypeErrors(t *testing.T) {
 	// Garbage PEM → error.
 	if err := callAsymErr("rsa_sign", sk.Tuple{sk.String("not a pem"), sk.String("x"), sk.String("hex")}); err == nil {
 		t.Error("rsa_sign with garbage: want error, got nil")
+	}
+}
+
+func TestEd25519SignVerifyRoundTrip(t *testing.T) {
+	priv, pub := testEd25519KeyPair(t)
+	const data = "the quick brown fox"
+	for _, enc := range []string{"hex", "base64", "base64url"} {
+		sig := string(callAsym(t, "ed25519_sign", sk.Tuple{sk.String(priv), sk.String(data), sk.String(enc)}).(sk.String))
+		if sig == "" {
+			t.Fatalf("enc=%s: empty signature", enc)
+		}
+		ok := bool(callAsym(t, "ed25519_verify", sk.Tuple{sk.String(pub), sk.String(data), sk.String(sig), sk.String(enc)}).(sk.Bool))
+		if !ok {
+			t.Errorf("enc=%s: verify failed", enc)
+		}
+	}
+}
+
+func TestEd25519TamperFails(t *testing.T) {
+	priv, pub := testEd25519KeyPair(t)
+	sig := string(callAsym(t, "ed25519_sign", sk.Tuple{sk.String(priv), sk.String("original"), sk.String("hex")}).(sk.String))
+	ok := bool(callAsym(t, "ed25519_verify", sk.Tuple{sk.String(pub), sk.String("tampered"), sk.String(sig), sk.String("hex")}).(sk.Bool))
+	if ok {
+		t.Error("verify succeeded on tampered data; want false")
+	}
+	// Ed25519 is deterministic: same input → same signature.
+	a := string(callAsym(t, "ed25519_sign", sk.Tuple{sk.String(priv), sk.String("original"), sk.String("hex")}).(sk.String))
+	b := string(callAsym(t, "ed25519_sign", sk.Tuple{sk.String(priv), sk.String("original"), sk.String("hex")}).(sk.String))
+	if a != b {
+		t.Error("ed25519_sign not deterministic")
+	}
+}
+
+func TestEd25519WrongKeyTypeErrors(t *testing.T) {
+	rsaPriv, _ := testRSAKeyPair(t)
+	if err := callAsymErr("ed25519_sign", sk.Tuple{sk.String(rsaPriv), sk.String("x"), sk.String("hex")}); err == nil {
+		t.Error("ed25519_sign with RSA key: want error, got nil")
 	}
 }
 
