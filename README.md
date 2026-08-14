@@ -144,6 +144,7 @@ synthetic-data-only, with a DISCLAIMER). Browse them with `stunt catalog search`
 | `discord-style` | bot API — REST + **WebSocket Gateway (HELLO→IDENTIFY→READY→dispatch)** + **Ed25519-signed interactions** | Collection + Starlark |
 | `drive-style` | files API — upload/get/download/list/patch/delete, folders, about/quota, resumable uploads | Blob + Collection |
 | `dropbox-style` | files API (RPC-style) — upload/download/list_folder/get_metadata | Blob + Collection |
+| `twitter-style` | mock OAuth, tweets (CRUD), users, timeline | Collection (pure-mock) |
 | `echo-style` | gRPC service (unary + streaming) + WebSocket — multi-transport reference | Collection + KV |
 | `blog-style` | GraphQL blog API — users/posts/comments, nested relations, mutations | Collection + Starlark |
 
