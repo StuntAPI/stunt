@@ -62,7 +62,7 @@ brew install --cask stuntapi/tap/stunt
 ```powershell
 # clone the manifest repo, then install from the local manifest dir
 git clone --depth 1 https://github.com/stuntapi/winget
-winget install --manifest winget/manifests/s/StuntAPI/Stunt/0.2.2
+winget install --manifest winget/manifests/s/StuntAPI/Stunt/0.24.0
 ```
 
 > Once stunt is submitted to the default winget source, this becomes simply
