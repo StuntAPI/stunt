@@ -6,6 +6,29 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.29.0] — 2026-08-14
+
+### Adapters
+
+- **Per-provider signed webhook delivery across 17 adapters.** Every adapter
+  now emits its provider's real webhook events at the right state changes,
+  registered through the provider's real endpoint, signed with the provider's
+  real scheme where one exists: resend (Svix `svix-*` headers), sendgrid
+  (ECDSA P-256 over ts+body, public key documented), slack
+  (`X-Slack-Signature` `v0=` + `url_verification` handshake), github
+  (`X-Hub-Signature-256` with the **per-hook** secret, no longer a global
+  constant), braintree (`bt_signature`/`bt_payload` + `bt-hash` HMAC-SHA1,
+  signed `check` on registration), adyen (`additionalData.hmacSignature`
+  base64 HMAC-SHA256 over the escaped-field signing string), zuora, printify
+  (`X-Potify-Signature`), printful (`X-Pful-Signature`), zendesk (base64
+  HMAC over ts+body). microsoft-graph implements the validationToken +
+  clientState subscription model. Adapters whose providers sign nothing
+  (braze, revenuecat, paypal, jira, azure-devops, helius) emit real-shaped
+  envelopes unsigned-by-design with the rationale documented — nothing
+  invented. Deliveries gate on per-hook event/topic subscription, and secret
+  selection matches the hook the emitter is actually targeting (re-registration
+  never signs with a stale key).
+
 ## [0.28.0] — 2026-08-14
 
 ### Adapters
