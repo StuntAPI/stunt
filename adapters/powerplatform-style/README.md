@@ -25,7 +25,7 @@ lets you test environment enumeration and Dataverse queries locally.
 | Method | Route | Description |
 |--------|-------|-------------|
 | GET | `/v2/environments` | List environments (OData). |
-| GET | `/v2/environments/{env}/api/data/v9.2/accounts` | List Dataverse accounts (OData; `$select`, `$count`). |
+| GET | `/v2/environments/{env}/api/data/v9.2/accounts` | List Dataverse accounts (OData; `$filter`, `$orderby`, `$skip`, `$select`, `$count`). |
 | POST | `/v2/environments/{env}/api/data/v9.2/accounts` | Create an account (201 + `Location` + `OData-Version: 4.0`). |
 | GET | `/v2/environments/{env}/api/data/v9.2/accounts({accountid})` | Retrieve a single account. |
 | PATCH | `/v2/environments/{env}/api/data/v9.2/accounts({accountid})` | Update an account (204). |

@@ -21,6 +21,10 @@ def on_list(req):
     col = store_collection("tickets")
     docs = col.list()
 
+    # Real list params: sort/sort_order (e.g. ?sort=updated_at&sort_order=desc),
+    # applied before paging like the real API.
+    docs = _zd_sorted(req, docs, "sort")
+
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, docs)
 
@@ -290,11 +294,22 @@ def on_search(req):
             if _contains(subject.lower(), query.lower()) or _contains(desc.lower(), query.lower()):
                 results.append(_ticket_shape(d))
 
-    return respond(200, {
-        "results": results,
-        "meta": {"has_more": False},
-        "links": {"next": None},
-    })
+    # Real search params: sort_by/sort_order ordering, plus per_page/page
+    # pagination, applied after the query match.
+    results = _zd_sorted(req, results, "sort_by")
+
+    page_size = _to_int(_get_query(req, "per_page", "100"))
+    paged, next_cursor = _list_page(req, results)
+
+    resp = {
+        "results": paged,
+        "meta": {"has_more": next_cursor != None},
+    }
+    if next_cursor != None:
+        resp["links"] = {"next": _next_link("/api/v2/search.json", next_cursor, page_size)}
+    else:
+        resp["links"] = {"next": None}
+    return respond(200, resp)
 
 def on_list_requests(req):
     ok, err = _require_auth(req)
@@ -303,6 +318,9 @@ def on_list_requests(req):
 
     col = store_collection("tickets")
     docs = col.list()
+
+    # Real list params: sort/sort_order, applied before paging.
+    docs = _zd_sorted(req, docs, "sort")
 
     requests = []
     for d in docs:

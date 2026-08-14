@@ -55,7 +55,8 @@ def on_create_playlist(req):
 
     return respond(200, _public_playlist(doc))
 
-# on_list_playlists returns all playlists for the authenticated user.
+# on_list_playlists returns the authenticated user's playlists. The real
+# playlists.list params id (comma-separated) and part are honored.
 def on_list_playlists(req):
     user = _user_for_token(req)
     if user == None:
@@ -69,11 +70,40 @@ def on_list_playlists(req):
             continue
         items.append(_public_playlist(doc))
 
+    items = _apply_playlist_query(req, items)
+
     page, next_token = _list_page(req, items)
     result = {"items": page}
     if next_token != None:
         result["nextPageToken"] = next_token
     return respond(200, result)
+
+# _apply_playlist_query maps the real playlists.list params to query_select
+# clauses: id (comma-separated) selects, part projects (id always kept).
+# Applied before paging, like the real API.
+def _apply_playlist_query(req, items):
+    f = []
+    ids = _query_get(req, "id", "")
+    if ids != "":
+        id_list = []
+        for part in ids.split(","):
+            part = part.strip()
+            if part != "":
+                id_list.append(part)
+        if len(id_list) > 0:
+            f.append(["id", "in", id_list])
+
+    fields = None
+    part = _query_get(req, "part", "")
+    if part != "":
+        wanted = ["id"]
+        for p in part.split(","):
+            p = p.strip()
+            if p != "" and p != "id":
+                wanted.append(p)
+        fields = wanted
+
+    return query_select(items, f, None, "", None, None, fields)
 
 # on_add_playlist_item adds a video to a playlist.
 def on_add_playlist_item(req):

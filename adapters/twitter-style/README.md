@@ -30,7 +30,7 @@ create in one request are visible in subsequent requests within the same
 | GET | `/2/users/me` | `users.star#on_me` | Return the current synthetic user |
 | GET | `/2/users/by/username/{username}` | `users.star#on_lookup` | Lookup user by username |
 | GET | `/2/users/{id}` | `users.star#on_show` | Show a user by ID |
-| GET | `/2/users/{id}/timelines/reverse_chronological` | `timeline.star#on_timeline` | Reverse-chronological timeline |
+| GET | `/2/users/{id}/timelines/reverse_chronological` | `timeline.star#on_timeline` | Reverse-chronological timeline (honors `start_time`, `end_time`, `exclude=replies`) |
 
 Any unmatched route returns `404 {"error":"resource_not_found"}`.
 

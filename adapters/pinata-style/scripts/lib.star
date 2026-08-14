@@ -85,6 +85,32 @@ def _pin_row(doc):
         "metadata": doc.get("metadata", {"name": ""}),
     }
 
+# --- query-param helpers ---
+
+# _get_query reads a query param, returning "" when absent (never None).
+def _get_query(req, key):
+    q = req.get("query")
+    if q == None:
+        return ""
+    v = q.get(key, "")
+    if v == None:
+        return ""
+    return v
+
+# _to_int parses a decimal string to int. Returns 0 for None, empty string,
+# or any non-numeric input (never crashes on None).
+def _to_int(s):
+    if s == None or s == "":
+        return 0
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch >= "0" and ch <= "9":
+            n = n * 10 + (ord(ch) - ord("0"))
+        else:
+            return 0
+    return n
+
 # _pin_result returns the Pinata-shaped pin result (from pinFileToIPFS / pinJSONToIPFS).
 def _pin_result(doc):
     return {

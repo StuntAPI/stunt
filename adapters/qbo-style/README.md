@@ -49,7 +49,7 @@ invalidated — the infamous QBO refresh churn).
 |--------|-------|---------|-------------|
 | GET | `/oauth/v2/authorize` | `oauth.star#on_authorize` | 302 redirect with code+state+realmId |
 | POST | `/oauth/v2/tokens/bearer` | `oauth.star#on_token` | Token exchange + refresh |
-| GET/POST | `/v3/company/{realmId}/query` | `query.star#on_query` | SQL-like query |
+| GET/POST | `/v3/company/{realmId}/query` | `query.star#on_query` | SQL-like query (honors `WHERE` = != > >= < <= LIKE IN, `ORDER BY` ASC/DESC and `MAXRESULTS n`) |
 | POST | `/v3/company/{realmId}/customer` | `customer.star#on_create_customer` | Create customer |
 | GET | `/v3/company/{realmId}/customer` | `customer.star#on_read_customer` | List/get customer |
 | GET | `/v3/company/{realmId}/customer/{id}` | `customer.star#on_read_customer_by_id` | Get customer by ID |

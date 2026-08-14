@@ -30,8 +30,8 @@ locally without provisioning an Apple Developer account or managing keys.
 |--------|-------|-------------|
 | GET | `/v1/catalog/{storefront}/songs/{id}` | Get a song by id. |
 | GET | `/v1/catalog/{storefront}/albums/{id}` | Get an album by id. |
-| GET | `/v1/catalog/{storefront}/search?term=&types=songs` | Search catalog. |
-| GET | `/v1/me/library/songs` | Get user library songs (Music-User-Token). |
+| GET | `/v1/catalog/{storefront}/search?term=&types=songs` | Search catalog (params: `term`, `types`, `limit`, `offset`). |
+| GET | `/v1/me/library/songs` | Get user library songs (Music-User-Token; params: `limit`, `offset`, `fields[library-songs]`). |
 
 ## Key shapes
 

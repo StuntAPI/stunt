@@ -50,14 +50,17 @@ Requests without auth return `401`.
 | POST | `/pinning/pinFileToIPFS` | Pin a file (multipart upload) → CID |
 | POST | `/pinning/pinJSONToIPFS` | Pin a JSON object → CID |
 | DELETE | `/pinning/unpin/{cid}` | Unpin by CID |
-| GET | `/data/pinList` | List all pins |
+| GET | `/data/pinList` | List pins (params: `hashContains`, `pinStart`/`pinEnd`, `pinSizeMin`/`pinSizeMax`, `status`, `metadata` name, `pageLimit`/`pageOffset`) |
 | GET | `/data/testAuthentication` | Verify auth |
 | GET | `/data/pinByHash` | Lookup pin by hash |
 
 ## Stateful behavior
 
 Pins are stored in a local collection. `pinList` shows all previously pinned
-CIDs. Unpinning removes them.
+CIDs and honors the real pinList filters (`hashContains`, `pinStart`/`pinEnd`
+date range, `pinSizeMin`/`pinSizeMax`, `status`, `metadata` name) plus
+`pageLimit`/`pageOffset` paging, applied before slicing with `count` still
+reflecting the filtered total. Unpinning removes them.
 
 ## Response shapes
 

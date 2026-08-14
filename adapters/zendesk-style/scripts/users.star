@@ -26,6 +26,10 @@ def on_list_users(req):
             "active": d.get("active", True),
         })
 
+    # Real list params: sort/sort_order (e.g. ?sort=name&sort_order=desc),
+    # applied before paging like the real API.
+    users = _zd_sorted(req, users, "sort")
+
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, users)
 
@@ -57,6 +61,9 @@ def on_list_organizations(req):
             "created_at": d.get("created_at", _now()),
         })
 
+    # Real list params: sort/sort_order, applied before paging.
+    orgs = _zd_sorted(req, orgs, "sort")
+
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, orgs)
 
@@ -86,6 +93,9 @@ def on_list_groups(req):
             "description": d.get("description", ""),
             "default": d.get("default", False),
         })
+
+    # Real list params: sort/sort_order, applied before paging.
+    groups = _zd_sorted(req, groups, "sort")
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, groups)
@@ -134,6 +144,10 @@ def on_list_triggers(req):
         {"id": "2", "title": "Auto-close resolved tickets after 4 days", "active": True},
         {"id": "3", "title": "Escalate priority tickets", "active": False},
     ]
+
+    # Real list params: sort/sort_order (e.g. ?sort=title), applied before
+    # paging.
+    triggers = _zd_sorted(req, triggers, "sort")
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, triggers)

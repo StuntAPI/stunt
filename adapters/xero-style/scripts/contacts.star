@@ -22,8 +22,26 @@ def on_list_contacts(req):
     for doc in docs:
         contacts.append(_contact_public(doc))
 
+    contacts = _apply_contact_filters(req, contacts)
     contacts, next_page = _list_page(req, contacts)
     return _envelope("Contacts", contacts, next_page)
+
+# _apply_contact_filters maps the real Xero GET /Contacts query params to
+# filters, applied before paging like the real API: `search` (case-blind
+# partial match on Name or EmailAddress) plus the shared `where`/`order`
+# params.
+def _apply_contact_filters(req, contacts):
+    search = _trim(_get_query(req, "search"))
+    if search != "":
+        low = _lower(search)
+        out = []
+        for ct in contacts:
+            name = _lower(str(ct.get("Name", "")))
+            email = _lower(str(ct.get("EmailAddress", "")))
+            if _contains(name, low) or _contains(email, low):
+                out.append(ct)
+        contacts = out
+    return _apply_list_filters(req, contacts)
 
 # on_put_contacts creates or updates contacts.
 def on_put_contacts(req):

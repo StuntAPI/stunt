@@ -35,13 +35,13 @@ Without auth → `401 {success:false, errors:[{code:10000, message:"Authenticati
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| GET | `/zones` | List zones. **Stateful.** Paginated. |
+| GET | `/zones` | List zones. **Stateful.** Paginated. Honors `name`, `status`, `account.id`, `account.name`, `order`, `direction`. |
 | POST | `/zones` | Create zone (`{name}`). Duplicate name → `400 {code:1061}`. |
 | GET | `/zones/{zone_id}` | Get single zone. |
 | DELETE | `/zones/{zone_id}` | Delete zone. Returns `{id}` of the deleted zone. |
-| GET | `/zones/{zone_id}/dns_records` | List DNS records. Paginated. |
+| GET | `/zones/{zone_id}/dns_records` | List DNS records. Paginated. Honors `type`, `name`, `content`, `order`, `direction`. |
 | GET | `/zones/{zone_id}/firewall/rules` | List firewall rules. Paginated. |
-| GET | `/zones/{zone_id}/page_rules` | List page rules. Paginated. |
+| GET | `/zones/{zone_id}/page_rules` | List page rules. Paginated. Honors `status`. |
 | POST | `/zones/{zone_id}/purge_cache` | Purge cache (`{files:[...]}` or everything). |
 
 ### Workers
@@ -91,6 +91,11 @@ token) query params:
   omitted when there are no more pages.
 - **R2** list responses use a flat `{buckets: [...]}` result with the
   next cursor as a top-level `cursor` field alongside `buckets`.
+
+List filters are applied before pagination, like the real API: `GET /zones`
+filters by `name`/`status` (and `account.id`/`account.name`) and sorts by
+`order` + `direction`; `GET .../dns_records` filters by `type`/`name`/`content`
+and sorts by `order` + `direction`; `GET .../page_rules` filters by `status`.
 
 ## D1 query semantics
 

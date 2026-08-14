@@ -16,7 +16,8 @@ integrations during local development:
 - **Auth:** `Authorization: Bearer <access_token>` OR `?hapikey=<key>` query param.
 - **Objects CRUD (contacts, companies, deals, tickets):**
   - `GET /crm/v3/objects/contacts` → `{results:[...], paging:{next:{after}}}` (cursor
-    pagination).
+    pagination); honors `limit`/`after`, `archived=true` (otherwise only live
+    records are returned), and `properties=a,b,c` projection.
   - `POST /crm/v3/objects/contacts` → create (201).
   - `GET /crm/v3/objects/contacts/{id}` → retrieve.
   - `PATCH /crm/v3/objects/contacts/{id}` → update (200).
@@ -24,7 +25,7 @@ integrations during local development:
 - **Associations:** `PUT .../contacts/{id}/associations/{toObjectType}/{toObjectId}/
   {associationType}` → link objects. `GET .../associations/{toObjectType}` → list.
 - **Batch operations:** `/batch/create`, `/batch/read`, `/batch/update` for bulk
-  operations.
+  operations; `batch/read` honors its body `properties` projection list.
 
 All objects are **stateful** — seed data is pre-loaded so lists return data immediately.
 

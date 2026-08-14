@@ -4,9 +4,9 @@
 # POST /v1beta/properties/{property}:runRealtimeReport
 #
 # The body specifies dateRanges, dimensions, metrics, limit, offset, and
-# optional dimensionFilter. The response includes dimensionHeaders,
-# metricHeaders, rows (each with dimensionValues + metricValues), rowCount,
-# and metadata.
+# optional dimensionFilter/metricFilter/orderBys. The response includes
+# dimensionHeaders, metricHeaders, rows (each with dimensionValues +
+# metricValues), rowCount, and metadata.
 #
 # This mock produces DETERMINISTIC report data from a small set of synthetic
 # dimensions (date, country, deviceCategory) and metrics (sessions,
@@ -74,10 +74,10 @@ def _run_report(req):
 
     dimensions = _extract_dimension_names(body.get("dimensions", []))
     metrics = _extract_metric_names(body.get("metrics", []))
-    limit = _to_int(str(body.get("limit", "10000")))
+    limit = _body_int(body, "limit", 10000)
     if limit == 0:
         limit = 10000
-    offset = _to_int(str(body.get("offset", "0")))
+    offset = _body_int(body, "offset", 0)
 
     # Build dimension headers and metric headers.
     dimension_headers = []
@@ -87,9 +87,17 @@ def _run_report(req):
     for m in metrics:
         metric_headers.append({"name": m, "type": "TYPE_INTEGER"})
 
-    # Build rows from deterministic data.
-    rows = _build_rows(dimensions, metrics, limit, offset)
-    total_row_count = _total_row_count(dimensions)
+    # Build rows from deterministic data as name-keyed dicts, then apply the
+    # real report query clauses (dimensionFilter, metricFilter, orderBys)
+    # before limit/offset paging, like the real Data API.
+    row_dicts = _build_row_dicts(dimensions, metrics)
+    row_dicts = _apply_report_query(body, row_dicts)
+    total_row_count = len(row_dicts)
+    row_dicts = query_select(row_dicts, None, "", "", limit, offset, None)
+
+    rows = []
+    for rd in row_dicts:
+        rows.append(_dict_to_row(rd, dimensions, metrics))
 
     return respond(200, {
         "dimensionHeaders": dimension_headers,
@@ -119,6 +127,10 @@ def _run_realtime_report(req):
 
     dimensions = _extract_dimension_names(body.get("dimensions", []))
     metrics = _extract_metric_names(body.get("metrics", []))
+    limit = _body_int(body, "limit", 10000)
+    if limit == 0:
+        limit = 10000
+    offset = _body_int(body, "offset", 0)
 
     # Realtime reports use smaller numbers.
     dimension_headers = []
@@ -128,14 +140,23 @@ def _run_realtime_report(req):
     for m in metrics:
         metric_headers.append({"name": m, "type": "TYPE_INTEGER"})
 
-    # Build a smaller set of rows for realtime.
-    rows = _build_realtime_rows(dimensions, metrics)
+    # Build a smaller set of rows for realtime, then apply the same query
+    # clauses the real realtime report honors (dimensionFilter,
+    # metricFilter, orderBys) before limit/offset paging.
+    row_dicts = _build_realtime_row_dicts(dimensions, metrics)
+    row_dicts = _apply_report_query(body, row_dicts)
+    total_row_count = len(row_dicts)
+    row_dicts = query_select(row_dicts, None, "", "", limit, offset, None)
+
+    rows = []
+    for rd in row_dicts:
+        rows.append(_dict_to_row(rd, dimensions, metrics))
 
     return respond(200, {
         "dimensionHeaders": dimension_headers,
         "metricHeaders": metric_headers,
         "rows": rows,
-        "rowCount": len(rows),
+        "rowCount": total_row_count,
         "kind": "analyticsData#runRealtimeReport",
     })
 
@@ -159,72 +180,307 @@ def _extract_metric_names(mets):
             out.append(name)
     return out
 
-# _build_rows generates report rows from the deterministic data.
-def _build_rows(dimensions, metrics, limit, offset):
+# _build_row_dicts generates report rows from the deterministic data as
+# dicts keyed by dimension/metric name (the shape query_select filters and
+# sorts). The conversion to the wire shape ({dimensionValues, metricValues})
+# happens after the query is applied.
+def _build_row_dicts(dimensions, metrics):
     if len(dimensions) == 0:
         # No dimensions → single aggregate row.
-        return [_aggregate_row(metrics)]
+        row = {}
+        totals = {"sessions": "15630", "activeUsers": "11760", "screenPageViews": "45300"}
+        for m in metrics:
+            row[m] = totals.get(m, "0")
+        return [row]
 
     # Use the first dimension as the primary grouping.
     primary = dimensions[0]
     keys = _DATA_KEYS.get(primary, [])
     rows = []
     for key in keys:
-        dim_values = {}
+        row = {}
         for d in dimensions:
             if d == primary:
-                dim_values[d] = key
+                row[d] = key
             else:
-                dim_values[d] = "All"
+                row[d] = "All"
         metric_data = _DATA.get(primary, {}).get(key, {})
-        metric_values = {}
         for m in metrics:
-            metric_values[m] = metric_data.get(m, "0")
-        rows.append(_make_row(dimensions, metrics, dim_values, metric_values))
+            row[m] = metric_data.get(m, "0")
+        rows.append(row)
+    return rows
 
-    # Apply offset + limit.
-    end = offset + limit
-    if end > len(rows):
-        end = len(rows)
-    if offset > len(rows):
-        offset = len(rows)
-    return rows[offset:end]
-
-def _build_realtime_rows(dimensions, metrics):
+# _build_realtime_row_dicts generates the smaller realtime dataset as
+# name-keyed row dicts (same shape as _build_row_dicts, so the report query
+# clauses apply unchanged).
+def _build_realtime_row_dicts(dimensions, metrics):
     if len(dimensions) == 0:
-        return [_make_row(dimensions, metrics, {}, {
-            "sessions": "42",
-            "activeUsers": "28",
-            "screenPageViews": "95",
-        })]
+        row = {}
+        totals = {"sessions": "42", "activeUsers": "28", "screenPageViews": "95"}
+        for m in metrics:
+            row[m] = totals.get(m, "0")
+        return [row]
 
     primary = dimensions[0]
     keys = _DATA_KEYS.get(primary, [])
     # Take only the first 2 for realtime.
     rows = []
     for key in keys[:2]:
-        dim_values = {}
+        row = {}
         for d in dimensions:
             if d == primary:
-                dim_values[d] = key
+                row[d] = key
             else:
-                dim_values[d] = "All"
-        rows.append(_make_row(dimensions, metrics, dim_values, {
-            "sessions": "15",
-            "activeUsers": "12",
-            "screenPageViews": "38",
-        }))
+                row[d] = "All"
+        totals = {"sessions": "15", "activeUsers": "12", "screenPageViews": "38"}
+        for m in metrics:
+            row[m] = totals.get(m, "0")
+        rows.append(row)
     return rows
 
-def _aggregate_row(metrics):
+# --- report query clauses (dimensionFilter / metricFilter / orderBys) ---
+
+# _body_int reads an int from the JSON body. JSON numbers can arrive as
+# floats (limit: 2 → 2.0); str(2.0) is not a decimal int for _to_int, so
+# convert the value directly before falling back to the string path.
+def _body_int(body, key, default):
+    v = body.get(key, None)
+    if v == None:
+        return default
+    if type(v) == "int":
+        return v
+    if type(v) == "float":
+        return int(v)
+    n = _to_int(str(v))
+    if n == 0:
+        return default
+    return n
+
+# _apply_report_query applies the body's dimensionFilter, metricFilter, and
+# orderBys to name-keyed row dicts via query_select. Paging (limit/offset)
+# is applied separately by the caller so rowCount can reflect the filtered
+# total, like the real Data API.
+def _apply_report_query(body, rows):
+    dim_filter = body.get("dimensionFilter", None)
+    if dim_filter == None:
+        dim_filter = {}
+    rows = _filter_rows(rows, dim_filter)
+
+    met_filter = body.get("metricFilter", None)
+    if met_filter == None:
+        met_filter = {}
+    rows = _filter_rows(rows, met_filter)
+
+    order_bys = _order_bys(body.get("orderBys", []))
+    # query_select sorts by one key; applying the orderBys last-to-first
+    # composes them into a multi-key sort (each pass is stable).
+    for i in range(len(order_bys) - 1, -1, -1):
+        ob = order_bys[i]
+        rows = query_select(rows, None, ob[0], ob[1], None, None, None)
+    return rows
+
+# _filter_rows evaluates a GA4 FilterExpression (leaf filter, andGroup,
+# orGroup, notExpression — arbitrarily nested) against the row dicts.
+# starlark-go forbids recursion, so the expression tree is walked with an
+# explicit stack; each node evaluates to a per-row boolean list.
+def _filter_rows(rows, expr):
+    if expr == None:
+        return rows
+    matched = _expr_matches(expr, rows)
+    out = []
+    for i in range(len(rows)):
+        if matched[i]:
+            out.append(rows[i])
+    return out
+
+# _expr_matches computes the per-row boolean match list for a
+# FilterExpression. Stack entries are ["expr", node], ["fold", op, count],
+# and ["not"]; leaves push their boolean list, folds combine the top
+# `count` lists.
+def _expr_matches(expr, rows):
+    n = len(rows)
+    results = []
+    stack = [["expr", expr]]
+    while len(stack) > 0:
+        top = stack.pop()
+        if top[0] == "not":
+            a = results.pop()
+            out = []
+            for i in range(n):
+                out.append(not a[i])
+            results.append(out)
+            continue
+        if top[0] == "fold":
+            count = top[2]
+            group = []
+            for i in range(count):
+                group.append(results.pop())
+            acc = group[0]
+            for i in range(1, count):
+                acc = _combine_bools(acc, group[i], top[1])
+            results.append(acc)
+            continue
+
+        e = top[1]
+        leaf = e.get("filter", None)
+        if leaf != None:
+            results.append(_leaf_matches(leaf, rows, n))
+            continue
+
+        and_group = e.get("andGroup", None)
+        if and_group != None:
+            exprs = and_group.get("expressions", [])
+            if exprs == None:
+                exprs = []
+            if len(exprs) == 0:
+                results.append(_all_bools(n, True))
+                continue
+            stack.append(["fold", "and", len(exprs)])
+            for sub in exprs:
+                stack.append(["expr", sub])
+            continue
+
+        or_group = e.get("orGroup", None)
+        if or_group != None:
+            exprs = or_group.get("expressions", [])
+            if exprs == None:
+                exprs = []
+            if len(exprs) == 0:
+                results.append(_all_bools(n, False))
+                continue
+            stack.append(["fold", "or", len(exprs)])
+            for sub in exprs:
+                stack.append(["expr", sub])
+            continue
+
+        not_expr = e.get("notExpression", None)
+        if not_expr != None:
+            stack.append(["not"])
+            stack.append(["expr", not_expr])
+            continue
+
+        # Empty/unknown expression matches everything.
+        results.append(_all_bools(n, True))
+    return results.pop()
+
+def _combine_bools(a, b, op):
+    out = []
+    if op == "and":
+        for i in range(len(a)):
+            out.append(a[i] and b[i])
+    else:
+        for i in range(len(a)):
+            out.append(a[i] or b[i])
+    return out
+
+def _all_bools(n, v):
+    out = []
+    for i in range(n):
+        out.append(v)
+    return out
+
+# _leaf_matches computes the per-row boolean list for a single GA4 Filter
+# (stringFilter, inListFilter, or numericFilter) on fieldName. query_select
+# preserves row order, so the selected subsequence marks the matches.
+def _leaf_matches(leaf, rows, n):
+    field = leaf.get("fieldName", "")
+    if field == "":
+        return _all_bools(n, True)
+    f = _leaf_triples(leaf, field)
+    if len(f) == 0:
+        return _all_bools(n, True)
+    selected = query_select(rows, f)
+    bools = []
+    for i in range(n):
+        bools.append(False)
+    j = 0
+    for i in range(n):
+        if j < len(selected) and rows[i] == selected[j]:
+            bools[i] = True
+            j = j + 1
+    return bools
+
+# _leaf_triples maps a GA4 Filter to query_select [field, op, value] triples.
+# stringFilter matchType EXACT is the default.
+def _leaf_triples(leaf, field):
+    sf = leaf.get("stringFilter", None)
+    if sf != None:
+        value = sf.get("value", "")
+        if value == None:
+            value = ""
+        match_type = sf.get("matchType", "EXACT")
+        if match_type == "CONTAINS":
+            return [[field, "contains", value]]
+        if match_type == "STARTS_WITH":
+            return [[field, "startswith", value]]
+        if match_type == "ENDS_WITH":
+            return [[field, "endswith", value]]
+        return [[field, "=", value]]
+
+    il = leaf.get("inListFilter", None)
+    if il != None:
+        values = il.get("values", [])
+        if values == None:
+            values = []
+        if len(values) > 0:
+            return [[field, "in", values]]
+        return []
+
+    nf = leaf.get("numericFilter", None)
+    if nf != None:
+        operation = nf.get("operation", "")
+        val = nf.get("value", None)
+        if val == None:
+            val = {}
+        num = val.get("int64Value", None)
+        if num == None:
+            num = val.get("doubleValue", None)
+        if num == None:
+            return []
+        if operation == "EQUAL":
+            return [[field, "=", str(num)]]
+        if operation == "GREATER_THAN":
+            return [[field, ">", str(num)]]
+        if operation == "GREATER_THAN_OR_EQUAL":
+            return [[field, ">=", str(num)]]
+        if operation == "LESS_THAN":
+            return [[field, "<", str(num)]]
+        if operation == "LESS_THAN_OR_EQUAL":
+            return [[field, "<=", str(num)]]
+        return []
+
+    return []
+
+# _order_bys maps the body's orderBys to [field, "asc"/"desc"] pairs
+# (dimension.dimensionName / metric.metricName).
+def _order_bys(obs):
+    out = []
+    if obs == None:
+        return out
+    for ob in obs:
+        d = ob.get("dimension", None)
+        if d != None and d.get("dimensionName", "") != "":
+            out.append([d["dimensionName"], _order_dir(ob)])
+            continue
+        m = ob.get("metric", None)
+        if m != None and m.get("metricName", "") != "":
+            out.append([m["metricName"], _order_dir(ob)])
+    return out
+
+def _order_dir(ob):
+    if ob.get("desc", False):
+        return "desc"
+    return "asc"
+
+# _dict_to_row converts a name-keyed row dict back to the wire shape.
+def _dict_to_row(row, dimensions, metrics):
+    dim_values = {}
     metric_values = {}
-    totals = {"sessions": "15630", "activeUsers": "11760", "screenPageViews": "45300"}
+    for d in dimensions:
+        dim_values[d] = row.get(d, "")
     for m in metrics:
-        metric_values[m] = totals.get(m, "0")
-    row = {"dimensionValues": [], "metricValues": []}
-    for m in metrics:
-        row["metricValues"].append({"value": metric_values[m]})
-    return row
+        metric_values[m] = row.get(m, "0")
+    return _make_row(dimensions, metrics, dim_values, metric_values)
 
 def _make_row(dimensions, metrics, dim_values, metric_values):
     row = {"dimensionValues": [], "metricValues": []}
@@ -233,9 +489,3 @@ def _make_row(dimensions, metrics, dim_values, metric_values):
     for m in metrics:
         row["metricValues"].append({"value": metric_values.get(m, "0")})
     return row
-
-def _total_row_count(dimensions):
-    if len(dimensions) == 0:
-        return 1
-    primary = dimensions[0]
-    return len(_DATA_KEYS.get(primary, []))

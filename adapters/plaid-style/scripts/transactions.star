@@ -23,6 +23,16 @@ def on_sync(req):
     access_token = body.get("access_token", "")
     cursor = body.get("cursor", "")
 
+    # Real /transactions/sync `count` param: 1-500, default 100. Caps the
+    # number of transactions returned per sync.
+    count = body.get("count", 100)
+    if count == None or count <= 0:
+        count = 100
+    if count > 500:
+        count = 500
+    # JSON numbers may arrive as floats; query_select's limit needs an int.
+    count = int(count)
+
     item_id = _resolve_item_id(access_token)
     if item_id == "":
         return respond(400, {
@@ -57,7 +67,16 @@ def on_sync(req):
         if tx_batch == batch:
             added.append(_tx_public(t))
 
+    # Cap the returned batch at `count`. When truncation occurs the cursor
+    # replays the same batch on the next sync, so the capped records are
+    # re-served (progress resumes once count >= batch size).
     next_cursor = _new_cursor(batch)
+    if len(added) > count:
+        added = query_select(added, None, None, "", count, None, None)
+        if batch > 0:
+            next_cursor = _new_cursor(batch - 1)
+        else:
+            next_cursor = ""
 
     # Emit a webhook event for the initial update (if webhooks are set).
     if len(added) > 0:

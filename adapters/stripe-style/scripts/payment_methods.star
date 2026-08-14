@@ -83,6 +83,20 @@ def on_detach_payment_method(req):
     c.update(id, doc)
     return respond(200, _pm_public(doc))
 
+# _apply_payment_method_filters maps the real Stripe PaymentMethod-list query
+# params (customer, type) to query_select clauses, applied before paging.
+def _apply_payment_method_filters(req, docs):
+    f = []
+    cust = _get_query(req, "customer")
+    if cust != "":
+        f.append(["customer", "=", cust])
+    pmt = _get_query(req, "type")
+    if pmt != "":
+        f.append(["type", "=", pmt])
+    if len(f) == 0:
+        return docs
+    return query_select(docs, f)
+
 # GET /v1/payment_methods — list PaymentMethods (optional ?customer=).
 def on_list_payment_methods(req):
     err = _require_auth(req)
@@ -90,11 +104,7 @@ def on_list_payment_methods(req):
         return err
 
     docs = store_collection("payment_methods").list()
-    q = req.get("query")
-    if q != None:
-        cust = q.get("customer", "")
-        if cust != "":
-            docs = [d for d in docs if d.get("customer") == cust]
+    docs = _apply_payment_method_filters(req, docs)
 
     page, has_more, e = _list_page(req, docs, "payment_method")
     if e != None:

@@ -31,11 +31,11 @@ verification process.
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| GET | `/v4/spreadsheets/{spreadsheetId}/values/{range}` | Read cells (`range` = A1 notation). |
+| GET | `/v4/spreadsheets/{spreadsheetId}/values/{range}` | Read cells (`range` = A1 notation; `?majorDimension=COLUMNS` transposes). |
 | PUT | `/v4/spreadsheets/{spreadsheetId}/values/{range}` | Write cells (`{values:[[...]], valueInputOption}`). |
 | POST | `/v4/spreadsheets/{spreadsheetId}/values/{range}:append` | Append rows after last data. |
 | POST | `/v4/spreadsheets/{spreadsheetId}/values/{range}:clear` | Clear cells. |
-| POST | `/v4/spreadsheets/{spreadsheetId}/values:batchGet` | Read multiple ranges. |
+| POST | `/v4/spreadsheets/{spreadsheetId}/values:batchGet` | Read multiple ranges (`majorDimension` honored). |
 | POST | `/v4/spreadsheets/{spreadsheetId}/values:batchUpdate` | Write multiple ranges. |
 
 ## Key shapes

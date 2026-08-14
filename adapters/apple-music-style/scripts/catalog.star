@@ -76,6 +76,14 @@ def on_search(req):
                 results["data"].append(_album_resource(album))
 
     results["meta"] = {"results": {"order": ["songs", "albums"]}}
+
+    # Real search paging params (limit, offset) slice the merged results
+    # after matching.
+    limit = _to_int(_get_query(req, "limit"))
+    offset = _to_int(_get_query(req, "offset"))
+    if limit > 0 or offset > 0:
+        results["data"] = query_select(results["data"], None, "", "", limit if limit > 0 else None, offset, None)
+
     return respond(200, results)
 
 # _song_resource builds the API response shape for a song.

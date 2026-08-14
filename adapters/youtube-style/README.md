@@ -45,11 +45,11 @@ session.
 | GET | `/o/oauth2/auth` | `oauth.star#on_authorize` | 302 redirect with code + state |
 | POST | `/o/oauth2/token` | `oauth.star#on_token` | Token exchange (auth code + refresh) |
 | POST | `/upload/youtube/v3/videos` | `videos.star#on_upload_video` | Upload video → video resource |
-| GET | `/youtube/v3/videos` | `videos.star#on_list_videos` | List/get videos (stateful, paginated) |
+| GET | `/youtube/v3/videos` | `videos.star#on_list_videos` | List/get videos (stateful, paginated; `id` list + `part` projection honored) |
 | DELETE | `/youtube/v3/videos` | `videos.star#on_delete_video` | Delete video |
 | GET | `/youtube/v3/channels` | `channels.star#on_channels` | Get channel (mine) |
 | POST | `/youtube/v3/playlists` | `playlists.star#on_create_playlist` | Create playlist |
-| GET | `/youtube/v3/playlists` | `playlists.star#on_list_playlists` | List playlists (paginated) |
+| GET | `/youtube/v3/playlists` | `playlists.star#on_list_playlists` | List playlists (paginated; `id` list + `part` projection honored) |
 | DELETE | `/youtube/v3/playlists` | `playlists.star#on_delete_playlist` | Delete playlist (`?id=...` → 204) |
 | POST | `/youtube/v3/playlistItems` | `playlists.star#on_add_playlist_item` | Add video to playlist |
 | DELETE | `/youtube/v3/playlistItems` | `playlists.star#on_delete_playlist_item` | Delete playlist item (`?id=...` → 204) |

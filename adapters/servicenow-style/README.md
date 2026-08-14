@@ -17,7 +17,10 @@ unblock ITSM integrations during local development:
   .../incident/{sys_id}` — and the same pattern for `task`, `change_request`,
   `cmdb_ci`, `sys_user`, `sys_user_group`, `sc_req_item`.
 - **Encoded query:** `?sysparm_query=active=true^short_description=Email` —
-  pattern-matches the `^`-separated `field=value` syntax.
+  pattern-matches the `^`-separated `field=value` syntax, including ordering
+  directives (`^ORDERBYpriority`, `^ORDERBYDESCpriority`).
+- **Field projection:** `?sysparm_fields=sys_id,number,state` returns only
+  the listed fields.
 - **Pagination:** `?sysparm_limit=10&sysparm_offset=0`.
 - **Display values:** `?sysparm_display_value=true` returns display values.
 - **Import sets:** `POST /api/now/import/u_my_table`.
@@ -50,8 +53,13 @@ Supported operators (pattern-matching, not a full engine):
 |----------|---------|---------|
 | `=` | `state=2` | Exact match |
 | `!=` | `priority!=1` | Not equal |
+| `>` `>=` `<` `<=` | `priority>=2` | Numeric/date range (numeric strings compare numerically) |
 | `LIKE` | `short_descriptionLIKEEmail` | Contains substring |
+| `STARTSWITH` | `short_descriptionSTARTSWITHEmail` | Prefix match |
+| `ENDSWITH` | `short_descriptionENDSWITHdown` | Suffix match |
 | `IN` | `stateIN1,2,3` | In comma-separated set |
+| `ORDERBY` | `^ORDERBYnumber` | Sort ascending by field |
+| `ORDERBYDESC` | `^ORDERBYDESCpriority` | Sort descending by field |
 
 Boolean values (`true`/`false`) are handled specially.
 

@@ -28,6 +28,7 @@ def on_list_zones(req):
     for z in zones:
         result.append(_zone_result(z))
 
+    result = _apply_zone_filters(req, result)
     page, next_cursor = _list_page(req, result)
     return _cf_ok_with_info(page, len(result), next_cursor)
 
@@ -172,6 +173,10 @@ def on_list_dns_records(req):
             "modified_on": _iso8601(),
         },
     ]
+    # Real List DNS Records filters (type/name/content), applied before
+    # paging like the real API.
+    records = _apply_dns_record_filters(req, records)
+
     page, next_cursor = _list_page(req, records)
     return _cf_ok_with_info(page, len(records), next_cursor)
 
@@ -218,6 +223,10 @@ def on_list_page_rules(req):
             "modified_on": _iso8601(),
         },
     ]
+
+    # Real List Page Rules filter (status), applied before paging.
+    rules = _apply_page_rule_filters(req, rules)
+
     page, next_cursor = _list_page(req, rules)
     return _cf_ok_with_info(page, len(rules), next_cursor)
 
@@ -250,6 +259,59 @@ def on_purge_cache(req):
 # ====================================================================
 # Helpers
 # ====================================================================
+
+# _apply_zone_filters maps the real Cloudflare List Zones query params to
+# query_select clauses, applied before paging like the real API: name/status
+# and account.id/account.name exact filters plus order/direction sorting
+# (order: name, id, status, ...).
+def _apply_zone_filters(req, zones):
+    f = []
+    name = _get_query(req, "name", "")
+    if name != "":
+        f.append(["name", "=", name])
+    status = _get_query(req, "status", "")
+    if status != "":
+        f.append(["status", "=", status])
+    account_id = _get_query(req, "account.id", "")
+    if account_id != "":
+        f.append(["account.id", "=", account_id])
+    account_name = _get_query(req, "account.name", "")
+    if account_name != "":
+        f.append(["account.name", "=", account_name])
+    order = _get_query(req, "order", "")
+    direction = _get_query(req, "direction", "asc")
+    if len(f) == 0 and order == "":
+        return zones
+    return query_select(zones, f if len(f) > 0 else None, order, direction, None, None, None)
+
+# _apply_dns_record_filters maps the real Cloudflare List DNS Records query
+# params (type/name/content exact matches, order/direction sorting) to
+# query_select clauses, applied before paging like the real API.
+def _apply_dns_record_filters(req, records):
+    f = []
+    rtype = _get_query(req, "type", "")
+    if rtype != "":
+        f.append(["type", "=", rtype])
+    name = _get_query(req, "name", "")
+    if name != "":
+        f.append(["name", "=", name])
+    content = _get_query(req, "content", "")
+    if content != "":
+        f.append(["content", "=", content])
+    order = _get_query(req, "order", "")
+    direction = _get_query(req, "direction", "asc")
+    if len(f) == 0 and order == "":
+        return records
+    return query_select(records, f if len(f) > 0 else None, order, direction, None, None, None)
+
+# _apply_page_rule_filters maps the real Cloudflare List Page Rules query
+# param (status: active/deleted) to a query_select clause, applied before
+# paging like the real API.
+def _apply_page_rule_filters(req, rules):
+    status = _get_query(req, "status", "")
+    if status == "":
+        return rules
+    return query_select(rules, [["status", "=", status]])
 
 # _default_account_id returns a fixed synthetic account ID.
 def _default_account_id():

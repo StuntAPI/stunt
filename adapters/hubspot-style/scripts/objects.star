@@ -22,6 +22,7 @@ def on_list(req):
         return _hs_error(404, "The requested object type was not found.", "OBJECT_NOT_FOUND")
 
     docs = col.list()
+    docs = _apply_object_filters(req, docs)
     paged, next_after = _paginate(req, docs)
 
     results = []
@@ -136,3 +137,30 @@ def on_delete(req):
 
     col.delete(record_id)
     return respond(204)
+
+# --- helpers ---
+
+# _apply_object_filters maps HubSpot's documented list query params for
+# GET /crm/v3/objects/{objectType} to query_select, applied BEFORE paging:
+#
+#   archived=true|false — HubSpot returns only live records unless
+#     archived=true is requested (default false).
+#
+# The properties param (comma-separated projection) targets the nested
+# "properties" object of each record, so it is applied after the
+# query_select pass record-by-record.
+def _apply_object_filters(req, docs):
+    archived = _get_query(req, "archived", "false")
+    want_archived = False
+    if archived == "true":
+        want_archived = True
+    docs = query_select(docs, [["archived", "=", want_archived]], None, "", None, None, None)
+
+    props_param = _get_query(req, "properties", "")
+    if props_param == "":
+        return docs
+    wanted = []
+    for part in _split(props_param, ","):
+        if part != "":
+            wanted.append(part)
+    return _project_properties(docs, wanted)

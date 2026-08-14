@@ -14,8 +14,9 @@ def on_list_drafts(req):
     _seed()
 
     dc = store_collection("drafts")
+    docs = _apply_draft_filters(req, dc.list())
     drafts = []
-    for doc in dc.list():
+    for doc in docs:
         drafts.append({
             "id": doc["id"],
             "message": {
@@ -101,3 +102,23 @@ def on_delete_draft(req):
             return respond(204)
 
     return _not_found("Draft not found: " + draft_id)
+
+# _apply_draft_filters applies the real drafts.list q param before paging:
+# case-insensitive substring match against the draft's Subject header or body
+# text. The OR shape is not expressible as query_select triples, so this is a
+# manual scan.
+def _apply_draft_filters(req, docs):
+    q = req["query"].get("q", "")
+    if q == None or q == "":
+        return docs
+
+    needle = q.lower()
+    result = []
+    for doc in docs:
+        subject = ""
+        for h in doc.get("headers", []):
+            if h["name"].lower() == "subject":
+                subject = h["value"]
+        if needle in subject.lower() or needle in doc.get("bodyText", "").lower():
+            result.append(doc)
+    return result

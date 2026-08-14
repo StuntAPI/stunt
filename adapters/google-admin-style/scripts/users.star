@@ -8,7 +8,8 @@
 
 # on_list_users returns all users in the directory.
 # GET /admin/directory/v1/users (Bearer)
-# Optional query: ?domain=example.com (ignored — mock has one domain)
+# Optional query: ?domain=, ?query=, ?orderBy=, ?sortOrder= (see
+# _apply_user_filters), plus maxResults/pageToken paging.
 def on_list_users(req):
     _, err = _require_bearer(req)
     if err != None:
@@ -27,6 +28,7 @@ def on_list_users(req):
     for d in docs:
         users.append(_user_entity(d))
 
+    users = _apply_user_filters(req, users)
     page, next_token = _list_page(req, users)
     result = {
         "kind": "admin#directory#users",
@@ -194,6 +196,90 @@ def on_list_tokens(req):
     return respond(200, result)
 
 # --- helpers ---
+
+# _apply_user_filters maps the real Directory users.list query params to
+# query_select clauses, applied before paging like the real API:
+#   domain    -> primaryEmail domain suffix
+#   query     -> case-insensitive substring match; supports the documented
+#                forms "email:<term>", "name:<term>", "orgUnitPath=<path>",
+#                "isSuspended=true|false" and a bare term (matched against
+#                the primary email)
+#   orderBy   -> email | familyName | givenName (name.* is a dotted path)
+#   sortOrder -> ASCENDING (default) | DESCENDING
+def _apply_user_filters(req, users):
+    f = []
+
+    domain = _query_get(req, "domain", "")
+    if domain != "":
+        f.append(["primaryEmail", "endswith", "@" + domain])
+
+    # Directory text queries are case-insensitive, so the substring forms
+    # (email:, name:, bare term) are pre-filtered manually with both sides
+    # lowered; the exact/equality forms stay as query_select clauses.
+    query = _query_get(req, "query", "")
+    if query != "":
+        low = query.lower()
+        if low[:6] == "email:":
+            term = query[6:].strip()
+            if term != "":
+                users = _ci_contains(users, "primaryEmail", term)
+        elif low[:5] == "name:":
+            term = query[5:].strip()
+            if term != "":
+                users = _ci_contains(users, "name.fullName", term)
+        elif low[:12] == "orgunitpath=":
+            term = query[12:].strip()
+            if term != "":
+                f.append(["orgUnitPath", "=", term])
+        elif low[:12] == "issuspended=":
+            term = query[12:].strip()
+            if term == "true":
+                f.append(["suspended", "=", True])
+            elif term == "false":
+                f.append(["suspended", "=", False])
+        else:
+            users = _ci_contains(users, "primaryEmail", query)
+
+    flt = None
+    if len(f) > 0:
+        flt = f
+
+    order_by = ""
+    ob = _query_get(req, "orderBy", "")
+    if ob == "email":
+        order_by = "primaryEmail"
+    elif ob == "familyName":
+        order_by = "name.familyName"
+    elif ob == "givenName":
+        order_by = "name.givenName"
+
+    order_dir = ""
+    if _query_get(req, "sortOrder", "").upper() == "DESCENDING":
+        order_dir = "desc"
+
+    return query_select(users, flt, order_by, order_dir)
+
+# _ci_contains keeps only the dicts whose field (a dotted path is allowed)
+# contains term case-insensitively, like Directory text queries.
+def _ci_contains(users, path, term):
+    low = term.lower()
+    out = []
+    for u in users:
+        v = _dig_path(u, path)
+        if v != None and str(v).lower().find(low) >= 0:
+            out.append(u)
+    return out
+
+# _dig_path resolves a dotted path ("name.fullName") against a dict, or None.
+def _dig_path(d, path):
+    cur = d
+    for seg in path.split("."):
+        if not hasattr(cur, "get"):
+            return None
+        cur = cur.get(seg, None)
+        if cur == None:
+            return None
+    return cur
 
 def _find_user(key):
     uc = store_collection("users")

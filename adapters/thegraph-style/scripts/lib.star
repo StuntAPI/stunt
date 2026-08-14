@@ -123,37 +123,35 @@ def _trim(s):
             break
     return s[start:end]
 
-# _extract_arg_int extracts an integer argument from a GraphQL field header.
-# e.g. from "pools(first:5, orderBy:volumeUSD)" with key="first" → 5.
-def _extract_arg_int(header, key):
-    pattern = key + ":"
-    idx = _find_str(header, pattern)
-    if idx < 0:
-        return 0
-    val_start = idx + len(pattern)
-    val = ""
-    for i in range(val_start, len(header)):
-        ch = header[i]
-        if ch == "," or ch == ")" or ch == " ":
-            break
-        val = val + ch
-    return _to_int(_trim(val))
-
-# _extract_arg_str extracts a string argument from a GraphQL field header.
-# e.g. from "pools(orderBy:volumeUSD)" with key="orderBy" → "volumeUSD".
-def _extract_arg_str(header, key):
+# _extract_arg_raw extracts an argument's raw string value from a GraphQL
+# field header, tolerating whitespace around the colon and separators.
+# e.g. from "pools(first: 5, orderBy: volumeUSD)" key="first" → "5".
+def _extract_arg_raw(header, key):
     pattern = key + ":"
     idx = _find_str(header, pattern)
     if idx < 0:
         return ""
-    val_start = idx + len(pattern)
+    i = idx + len(pattern)
+    while i < len(header) and (header[i] == " " or header[i] == "\t" or header[i] == "\n"):
+        i = i + 1
     val = ""
-    for i in range(val_start, len(header)):
+    while i < len(header):
         ch = header[i]
-        if ch == "," or ch == ")" or ch == " ":
+        if ch == "," or ch == ")":
             break
         val = val + ch
+        i = i + 1
     return _trim(val)
+
+# _extract_arg_int extracts an integer argument from a GraphQL field header.
+# e.g. from "pools(first: 5, orderBy:volumeUSD)" with key="first" → 5.
+def _extract_arg_int(header, key):
+    return _to_int(_extract_arg_raw(header, key))
+
+# _extract_arg_str extracts a string argument from a GraphQL field header.
+# e.g. from "pools(orderBy: volumeUSD)" with key="orderBy" → "volumeUSD".
+def _extract_arg_str(header, key):
+    return _extract_arg_raw(header, key)
 
 # _find_str finds the index of a substring, or -1.
 def _find_str(s, sub):
@@ -172,3 +170,174 @@ def _find_str(s, sub):
 # _has_field checks if a field name appears in the GraphQL query fragment.
 def _has_field(query, field):
     return _contains(query, field)
+
+# _ends_with reports whether s ends with suffix.
+def _ends_with(s, suffix):
+    if len(suffix) > len(s):
+        return False
+    return s[len(s) - len(suffix):] == suffix
+
+# --- GraphQL where/orderBy/orderDirection/skip support ---
+#
+# The Graph entity queries accept collection-level args that this simulator
+# maps onto the query_select builtin:
+#   pools(first: 10, skip: 5, orderBy: volumeUSD, orderDirection: desc,
+#         where: { feeTier: "3000", token0: "0x...", txCount_gt: 100 })
+
+# _extract_where_block returns the raw text inside the where: { ... } block
+# belonging to the given entity's field, or "". The block may contain nested
+# braces in exotic queries; balanced-brace scanning handles that.
+def _extract_where_block(query, entity):
+    ent_idx = _find_str(query, entity)
+    if ent_idx < 0:
+        return ""
+    idx = _find_str(query[ent_idx:], "where:")
+    if idx < 0:
+        return ""
+    idx = ent_idx + idx
+    # Find the opening brace after "where:".
+    i = idx + 6
+    while i < len(query):
+        if query[i] == "{":
+            break
+        i = i + 1
+    if i >= len(query):
+        return ""
+    depth = 1
+    i = i + 1
+    out = ""
+    while i < len(query) and depth > 0:
+        ch = query[i]
+        if ch == "{":
+            depth = depth + 1
+        elif ch == "}":
+            depth = depth - 1
+            if depth == 0:
+                break
+        out = out + ch
+        i = i + 1
+    return out
+
+# _parse_where parses a where block ("feeTier: \"3000\", txCount_gt: 100")
+# into query_select [field, op, value] triples. Supported field suffixes map
+# to query_select ops: _gt _gte _lt _lte _not _in (list or single value),
+# _contains, _starts_with, _ends_with. Unquoted values are treated as
+# strings (stored entity fields are strings).
+def _parse_where(block, entity):
+    filters = []
+    i = 0
+    n = len(block)
+    while i < n:
+        ch = block[i]
+        if ch == " " or ch == "," or ch == "\n" or ch == "\t" or ch == "}":
+            i = i + 1
+            continue
+        field = ""
+        while i < n and block[i] != ":":
+            field = field + block[i]
+            i = i + 1
+        if i >= n:
+            break
+        i = i + 1
+        while i < n and (block[i] == " " or block[i] == "\n" or block[i] == "\t"):
+            i = i + 1
+        if i >= n:
+            break
+        value = ""
+        is_list = False
+        if block[i] == '"':
+            i = i + 1
+            while i < n and block[i] != '"':
+                value = value + block[i]
+                i = i + 1
+            i = i + 1
+        elif block[i] == "[":
+            is_list = True
+            i = i + 1
+            items = []
+            while i < n and block[i] != "]":
+                if block[i] == '"':
+                    i = i + 1
+                    item = ""
+                    while i < n and block[i] != '"':
+                        item = item + block[i]
+                        i = i + 1
+                    i = i + 1
+                    items.append(item)
+                else:
+                    i = i + 1
+            i = i + 1
+            value = items
+        else:
+            while i < n and block[i] != "," and block[i] != "}" and block[i] != " " and block[i] != "\n":
+                value = value + block[i]
+                i = i + 1
+
+        field = _trim(field)
+        f = field
+        op = "="
+        if _ends_with(field, "_gte"):
+            f = field[:len(field) - 4]
+            op = ">="
+        elif _ends_with(field, "_lte"):
+            f = field[:len(field) - 4]
+            op = "<="
+        elif _ends_with(field, "_gt"):
+            f = field[:len(field) - 3]
+            op = ">"
+        elif _ends_with(field, "_lt"):
+            f = field[:len(field) - 3]
+            op = "<"
+        elif _ends_with(field, "_not_in"):
+            f = field[:len(field) - 7]
+            op = "!="
+        elif _ends_with(field, "_not"):
+            f = field[:len(field) - 4]
+            op = "!="
+        elif _ends_with(field, "_contains"):
+            f = field[:len(field) - 9]
+            op = "contains"
+        elif _ends_with(field, "_starts_with"):
+            f = field[:len(field) - 12]
+            op = "startswith"
+        elif _ends_with(field, "_ends_with"):
+            f = field[:len(field) - 10]
+            op = "endswith"
+
+        if is_list:
+            op = "in"
+        elif _ends_with(field, "_in"):
+            f = field[:len(field) - 3]
+            op = "in"
+            value = [value]
+
+        # Stored pool docs keep referenced tokens as token0_id/token1_id.
+        if entity == "pools" and (f == "token0" or f == "token1"):
+            f = f + "_id"
+
+        filters.append([f, op, value])
+    return filters
+
+# _apply_graph_args applies the entity collection-level GraphQL args
+# (where/orderBy/orderDirection/first/skip) to a raw stored-entity list via
+# query_select, before per-field projection. Mirrors the real Graph node
+# ordering: filter, sort, then slice. header is the entity's field header
+# (e.g. "pools(first:5, orderBy:volumeUSD)") as extracted by the caller.
+def _apply_graph_args(query, entity, docs, header):
+    where = _parse_where(_extract_where_block(query, entity), entity)
+
+    order_by = _extract_arg_str(header, "orderBy")
+    order_dir = _extract_arg_str(header, "orderDirection")
+    first = _extract_arg_int(header, "first")
+    skip = _extract_arg_int(header, "skip")
+
+    if order_by == "":
+        order_by = None
+    if order_dir == "":
+        order_dir = ""
+    if first <= 0:
+        first = None
+    if skip <= 0:
+        skip = None
+
+    return query_select(docs, where if len(where) > 0 else None, order_by, order_dir, first, skip, None)

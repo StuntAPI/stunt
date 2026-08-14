@@ -101,9 +101,9 @@ Missing the bearer token returns `401` with a `tppMessages` error.
 | POST | `/v1/consents/{consentId}/authorisations` | Start SCA authorisation |
 | GET | `/v1/consents/{consentId}/authorisations/{authorisationId}` | Get SCA status |
 | PUT | `/v1/consents/{consentId}/authorisations/{authorisationId}` | Update SCA (finalise) |
-| GET | `/v1/accounts` | List accounts |
+| GET | `/v1/accounts` | List accounts (honors `withBalance`, `page`/`size` paging) |
 | GET | `/v1/accounts/{resourceId}/balances` | Get account balances |
-| GET | `/v1/accounts/{resourceId}/transactions` | Get account transactions |
+| GET | `/v1/accounts/{resourceId}/transactions` | Get account transactions (honors `dateFrom`, `dateTo`, `bookingStatus`) |
 
 ## Seeded data
 

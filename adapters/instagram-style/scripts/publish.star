@@ -5,7 +5,8 @@
 # POST /v21.0/{ig_user_id}/media_publish?creation_id=<container_id>  (Bearer; no body)
 #     -> 200 { id: "<media_id>" }       (published media)
 # GET  /v21.0/{ig_user_id}/media?fields=id,caption,media_type,media_url,timestamp
-#     -> 200 { data: [...] }
+#     -> 200 { data: [...] }  (?fields= projects each media object; see
+#        _apply_media_fields)
 #
 # Token-PRESENCE policy: any Bearer header is accepted; the value is NOT
 # validated.
@@ -92,6 +93,7 @@ def on_list_media(req):
         if doc.get("user_id") == user_id:
             user_media.append(doc)
 
+    user_media = _apply_media_fields(req, user_media)
     page, next_cursor = _list_page(req, user_media)
 
     result = {"data": page}
@@ -102,3 +104,22 @@ def on_list_media(req):
         }
 
     return respond(200, result)
+
+# --- helpers ---
+
+# _apply_media_fields applies the Graph API ?fields= projection to a media
+# list: each object is projected onto the requested fields (unknown fields
+# are dropped, like a partial response). Returns the list unchanged when
+# fields is absent or empty.
+def _apply_media_fields(req, items):
+    fields = _get_query(req, "fields", "")
+    if fields == "":
+        return items
+    names = []
+    for part in fields.split(","):
+        part = part.strip()
+        if part != "":
+            names.append(part)
+    if len(names) == 0:
+        return items
+    return query_select(items, None, None, None, None, None, names)

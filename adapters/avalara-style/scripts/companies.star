@@ -36,6 +36,9 @@ def on_list_companies(req):
         },
     ]
 
+    # Apply OData $filter/$orderBy before paging.
+    value = _apply_odata_filters(req, value)
+
     # Apply OData $top/$skip paging.
     page, next_link = _list_page(req, value, "/v2/companies")
 

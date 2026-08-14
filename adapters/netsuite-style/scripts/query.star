@@ -37,13 +37,29 @@ def on_suiteql(req):
     col = store_collection(col_name)
     docs = col.list()
 
+    limit, offset = _suiteql_paging(q, req)
+    total = len(docs)
+    page = query_select(docs, None, "", "", limit, offset, None)
+    has_more = False
+    if limit != None and offset + limit < total:
+        has_more = True
+
+    links = [{
+        "rel": "self",
+        "href": "/services/rest/query/v1/suiteql",
+    }]
+    if has_more:
+        next_offset = offset + limit
+        next_limit = limit
+        links.append({
+            "rel": "next",
+            "href": "/services/rest/query/v1/suiteql?offset=" + _int_to_str(next_offset) + "&limit=" + _int_to_str(next_limit),
+        })
+
     return respond(200, {
-        "items": docs,
-        "count": len(docs),
-        "links": [{
-            "rel": "self",
-            "href": "/services/rest/query/v1/suiteql",
-        }],
+        "items": page,
+        "count": len(page),
+        "links": links,
     })
 
 # _parse_suiteql extracts the table name after FROM from a SuiteQL query.
@@ -64,3 +80,40 @@ def _parse_suiteql(query_str):
         table = table + ch
         i = i + 1
     return _lower(table)
+
+# _suiteql_paging resolves the page window: SuiteQL's LIMIT/OFFSET clauses
+# take precedence, then the documented limit/offset query params. Returns
+# [limit, offset] with limit possibly None (no cap).
+def _suiteql_paging(query_str, req):
+    low = _lower(query_str)
+    limit = None
+    offset = 0
+
+    li = _index(low, " limit ")
+    if li >= 0:
+        n = _suiteql_number(query_str[li + 7:])
+        if n > 0:
+            limit = n
+    oi = _index(low, " offset ")
+    if oi >= 0:
+        n = _suiteql_number(query_str[oi + 8:])
+        if n > 0:
+            offset = n
+
+    query = req.get("query")
+    if query == None:
+        query = {}
+    if limit == None:
+        n = _parse_int(query.get("limit", ""), -1)
+        if n > 0:
+            limit = n
+    if oi < 0:
+        n = _parse_int(query.get("offset", ""), -1)
+        if n > 0:
+            offset = n
+    return [limit, offset]
+
+# _suiteql_number reads a leading integer token from s (stops at any
+# non-digit, e.g. the next clause or ';'). Returns 0 when absent.
+def _suiteql_number(s):
+    return _parse_int(_trim(s), 0)

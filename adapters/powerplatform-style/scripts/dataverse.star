@@ -40,6 +40,15 @@ def on_list_accounts(req):
 
     docs = _accounts().list()
     base_path = "/v2/environments/" + req["params"]["env"] + "/api/data/v9.2/accounts"
+
+    # Real Dataverse OData query options, applied before paging:
+    # $filter, $orderby, $skip (paging uses $top/$skipToken).
+    docs = _apply_odata_filters(req, docs)
+    docs = _apply_odata_orderby(req, docs)
+    skip = _to_int(_get_query(req, "$skip", ""))
+    if skip > 0:
+        docs = docs[skip:]
+
     total = len(docs)
     page, next_link = _list_page(req, docs, base_path)
 
@@ -57,6 +66,118 @@ def on_list_accounts(req):
     if next_link != None:
         resp["@odata.nextLink"] = next_link
     return respond(200, resp)
+
+# --- OData query-option helpers ---
+
+# _apply_odata_filters maps a Dataverse $filter (subset: field eq/ne/gt/ge/
+# lt/le 'value' or number, contains/startswith/endswith functions, AND'ed
+# clauses) to query_select triples, applied before paging.
+def _apply_odata_filters(req, docs):
+    flt = _get_query(req, "$filter", "")
+    if flt == None or flt == "":
+        return docs
+    f = []
+    for clause in _split_and(flt):
+        trip = _parse_odata_clause(clause)
+        if trip != None:
+            f.append(trip)
+    if len(f) == 0:
+        return docs
+    return query_select(docs, f, None, "", None, None, None)
+
+# _apply_odata_orderby maps $orderby ("name desc, revenue") to successive
+# query_select sorts (clauses applied right-to-left; stable sorting preserves
+# earlier keys).
+def _apply_odata_orderby(req, docs):
+    ob = _get_query(req, "$orderby", "")
+    if ob == None or ob == "":
+        return docs
+    clauses = []
+    for part in ob.split(","):
+        part = part.strip()
+        if part == "":
+            continue
+        bits = part.split(" ")
+        field = bits[0]
+        dir = "asc"
+        if len(bits) > 1 and bits[1].lower() == "desc":
+            dir = "desc"
+        clauses.append([field, dir])
+    i = len(clauses) - 1
+    while i >= 0:
+        docs = query_select(docs, None, clauses[i][0], clauses[i][1], None, None, None)
+        i = i - 1
+    return docs
+
+# _split_and splits an OData $filter on top-level " and " separators.
+def _split_and(flt):
+    parts = []
+    current = ""
+    in_quote = False
+    i = 0
+    while i < len(flt):
+        ch = flt[i]
+        if ch == "'":
+            in_quote = not in_quote
+        if not in_quote and (i + 5 <= len(flt)) and flt[i:i + 5].lower() == " and ":
+            parts.append(current)
+            current = ""
+            i = i + 5
+            continue
+        current = current + ch
+        i = i + 1
+    parts.append(current)
+    return parts
+
+# _parse_odata_clause parses one OData filter clause into a query_select
+# [field, op, value] triple, or None when unsupported.
+def _parse_odata_clause(clause):
+    clause = clause.strip()
+    if clause == "":
+        return None
+
+    # Function calls: contains(field,'v') / startswith / endswith.
+    for fn, op in [["contains(", "contains"], ["startswith(", "startswith"], ["endswith(", "endswith"]]:
+        if clause.lower().startswith(fn):
+            inner = clause[len(fn):]
+            if inner.endswith(")"):
+                inner = inner[:len(inner) - 1]
+            comma = inner.find(",")
+            if comma < 0:
+                return None
+            field = inner[:comma].strip()
+            val = inner[comma + 1:].strip()
+            if len(val) >= 2 and val.startswith("'") and val.endswith("'"):
+                val = val[1:len(val) - 1]
+            return [field, op, val]
+
+    # Relational: field op value.
+    for op_text, op in [[" eq ", "="], [" ne ", "!="], [" gt ", ">"], [" ge ", ">="], [" lt ", "<"], [" le ", "<="]]:
+        idx = clause.find(op_text)
+        if idx >= 0:
+            field = clause[:idx].strip()
+            val = clause[idx + len(op_text):].strip()
+            quoted = len(val) >= 2 and val.startswith("'") and val.endswith("'")
+            if quoted:
+                val = val[1:len(val) - 1]
+            elif op == "=" or op == "!=" or _all_digits(val):
+                # Unquoted numbers must compare as ints against numeric fields
+                # (cross-type = is false in query_select); for ordering ops a
+                # numeric string already compares numerically, but converting
+                # is harmless and exact.
+                val = _to_int(val)
+            return [field, op, val]
+    return None
+
+# _all_digits reports whether s is non-empty and all decimal digits.
+def _all_digits(s):
+    if s == "":
+        return False
+    for i in range(len(s)):
+        ch = s[i]
+        if ch < "0" or ch > "9":
+            return False
+    return True
 
 # GET .../accounts({accountid})
 def on_retrieve_account(req):

@@ -7,6 +7,8 @@
 
 # on_list_groups returns all groups in the directory.
 # GET /admin/directory/v1/groups (Bearer)
+# Optional query: ?domain=, ?userKey=, ?query=, ?orderBy=, ?sortOrder= (see
+# _apply_group_filters), plus maxResults/pageToken paging.
 def on_list_groups(req):
     _, err = _require_bearer(req)
     if err != None:
@@ -24,6 +26,7 @@ def on_list_groups(req):
     for d in docs:
         groups.append(_group_entity(d))
 
+    groups = _apply_group_filters(req, groups)
     page, next_token = _list_page(req, groups)
     result = {
         "kind": "admin#directory#groups",
@@ -122,6 +125,8 @@ def on_delete_group(req):
 
 # on_list_members returns all members of a group.
 # GET /admin/directory/v1/groups/{groupKey}/members (Bearer)
+# Optional query: ?roles=OWNER,MANAGER (comma-separated role filter, see
+# _apply_member_filters), plus maxResults/pageToken paging.
 def on_list_members(req):
     _, err = _require_bearer(req)
     if err != None:
@@ -146,6 +151,7 @@ def on_list_members(req):
                 "status": "ACTIVE",
             })
 
+    members = _apply_member_filters(req, members)
     page, next_token = _list_page(req, members)
     result = {
         "kind": "admin#directory#members",
@@ -223,6 +229,77 @@ def on_delete_member(req):
     return respond(204, None)
 
 # --- helpers ---
+
+# _apply_group_filters maps the real Directory groups.list query params to
+# query_select clauses, applied before paging like the real API:
+#   domain    -> group email domain suffix
+#   userKey   -> only groups the given user (member email or member id) is in
+#   query     -> the documented forms "email=<exact>" and "name:<substring>"
+#                (name matching is case-insensitive, like Directory queries)
+#   orderBy   -> email
+#   sortOrder -> ASCENDING (default) | DESCENDING
+def _apply_group_filters(req, groups):
+    f = []
+
+    domain = _query_get(req, "domain", "")
+    if domain != "":
+        f.append(["email", "endswith", "@" + domain])
+
+    user_key = _query_get(req, "userKey", "")
+    if user_key != "":
+        group_emails = []
+        mc = store_collection("members")
+        for d in mc.list():
+            if d.get("email", "") == user_key or d["id"] == user_key:
+                group_emails.append(d.get("groupKey", ""))
+        f.append(["email", "in", group_emails])
+
+    query = _query_get(req, "query", "")
+    if query != "":
+        low = query.lower()
+        if low[:6] == "email=":
+            term = query[6:].strip()
+            if term != "":
+                f.append(["email", "=", term])
+        elif low[:5] == "name:":
+            term = query[5:].strip()
+            if term != "":
+                kept = []
+                tl = term.lower()
+                for g in groups:
+                    if str(g.get("name", "")).lower().find(tl) >= 0:
+                        kept.append(g)
+                groups = kept
+
+    flt = None
+    if len(f) > 0:
+        flt = f
+
+    order_by = ""
+    if _query_get(req, "orderBy", "") == "email":
+        order_by = "email"
+
+    order_dir = ""
+    if _query_get(req, "sortOrder", "").upper() == "DESCENDING":
+        order_dir = "desc"
+
+    return query_select(groups, flt, order_by, order_dir)
+
+# _apply_member_filters maps the real Directory members.list roles param to a
+# query_select clause, applied before paging like the real API:
+#   roles -> comma-separated role filter (OWNER, MANAGER, MEMBER)
+def _apply_member_filters(req, members):
+    roles = _query_get(req, "roles", "")
+    if roles == "":
+        return members
+    wanted = []
+    for part in roles.split(","):
+        part = part.strip().upper()
+        if part != "":
+            wanted.append(part)
+    if len(wanted) == 0:
+        return members
+    return query_select(members, [["role", "in", wanted]])
 
 def _find_group(key):
     gc = store_collection("groups")

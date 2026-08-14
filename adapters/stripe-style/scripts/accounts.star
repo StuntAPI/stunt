@@ -97,7 +97,18 @@ def on_list_accounts(req):
 
     c = store_collection("connect_accounts")
     docs = c.list()
+    docs = _apply_account_filters(req, docs)
     page, has_more, err = _list_page(req, docs, "account")
     if err != None:
         return err
     return respond(200, {"object": "list", "data": page, "has_more": has_more, "url": "/v1/accounts"})
+
+# _apply_account_filters maps the real Stripe account-list query params
+# (created exact/range) to query_select clauses, applied before paging like
+# the real API.
+def _apply_account_filters(req, docs):
+    f = []
+    _created_filters(req, f)
+    if len(f) == 0:
+        return docs
+    return query_select(docs, f)

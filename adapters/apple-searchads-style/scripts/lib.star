@@ -129,3 +129,137 @@ def _pad6(n):
     while len(s) < 6:
         s = "0" + s
     return s
+
+# --- selector (find/report) helpers ---
+#
+# Apple Search Ads find/report endpoints accept a POST body selector:
+#   { "selector": { "conditions": [{field, operator, values}],
+#                   "orderBy": [{field, sortOrder}],
+#                   "pagination": {offset, limit} } }
+# (older clients send the same keys at the top level, which we tolerate).
+
+# _asa_selector returns the selector dict from a request body: the nested
+# body["selector"] when present, else the body itself.
+def _asa_selector(body):
+    if body == None:
+        return {}
+    sel = body.get("selector", None)
+    if sel != None and type(sel) == "dict":
+        return sel
+    return body
+
+# _asa_to_int coerces a JSON number or digit-string to int. Returns 0 for
+# anything unparseable.
+def _asa_to_int(v):
+    if v == None:
+        return 0
+    if type(v) == "int":
+        return v
+    if type(v) == "float":
+        return int(v)
+    if type(v) == "string":
+        n = 0
+        for i in range(len(v)):
+            ch = v[i]
+            if ch >= "0" and ch <= "9":
+                n = n * 10 + (ord(ch) - ord("0"))
+            else:
+                return 0
+        return n
+    return 0
+
+# _asa_num_str stringifies a JSON number the way money amounts are stored
+# ("5000", no ".0"). Non-numbers pass through unchanged.
+def _asa_num_str(v):
+    if type(v) == "int":
+        return str(v)
+    if type(v) == "float":
+        if v == int(v):
+            return str(int(v))
+        return str(v)
+    return v
+
+# _asa_triples translates one selector condition {field, operator, values}
+# into query_select [path, op, value] triples. numeric=True converts
+# digit-string values to ints (numeric id fields); amount=True stringifies
+# numbers (money amounts stored as strings). Unknown operators are ignored.
+def _asa_triples(path, operator, values, numeric, amount):
+    out = []
+    if path == None or operator == None or type(operator) != "string":
+        return out
+    op = operator.upper()
+    if values == None:
+        values = []
+    if type(values) != "list":
+        values = [values]
+    vals = []
+    for v in values:
+        if v == None:
+            continue
+        if numeric and type(v) == "string":
+            vals.append(_asa_to_int(v))
+        elif amount and (type(v) == "int" or type(v) == "float"):
+            vals.append(_asa_num_str(v))
+        else:
+            vals.append(v)
+    if len(vals) == 0:
+        return out
+
+    if op == "EQUALS":
+        for v in vals:
+            out.append([path, "=", v])
+    elif op == "NOT_EQUALS":
+        for v in vals:
+            out.append([path, "!=", v])
+    elif op == "IN":
+        out.append([path, "in", vals])
+    elif op == "CONTAINS" or op == "CONTAINS_ALL":
+        # Substring match; only valid on string fields — numeric/amount
+        # fields are skipped (the builtin's contains op needs strings).
+        if not numeric and not amount:
+            for v in vals:
+                if type(v) == "string":
+                    out.append([path, "contains", v])
+    elif op == "GREATER_THAN" or op == "GREATER_THAN_OR_EQUAL":
+        for v in vals:
+            out.append([path, ">" if op == "GREATER_THAN" else ">=", v])
+    elif op == "LESS_THAN" or op == "LESS_THAN_OR_EQUAL":
+        for v in vals:
+            out.append([path, "<" if op == "LESS_THAN" else "<=", v])
+    return out
+
+# _asa_apply_order applies a selector orderBy list to items via query_select,
+# applying keys in reverse so the stable sort yields multi-key order.
+# field_map maps an ASA orderBy field name to a (possibly dotted) path, or
+# None to skip.
+def _asa_apply_order(items, order_by, field_map):
+    if order_by == None or type(order_by) != "list":
+        return items
+    i = len(order_by) - 1
+    while i >= 0:
+        ob = order_by[i]
+        i = i - 1
+        if ob == None or type(ob) != "dict":
+            continue
+        path = field_map(ob.get("field", ""))
+        if path == None:
+            continue
+        direction = ob.get("sortOrder", "ASCENDING")
+        order_dir = "asc"
+        if type(direction) == "string" and direction.upper() == "DESCENDING":
+            order_dir = "desc"
+        items = query_select(items, None, path, order_dir, None, None, None)
+    return items
+
+# _asa_pagination extracts (offset, limit) from a selector pagination block.
+# Defaults mirror the real find endpoints: offset 0, limit 1000.
+def _asa_pagination(sel):
+    offset = 0
+    limit = 1000
+    p = sel.get("pagination", None)
+    if p != None and type(p) == "dict":
+        offset = _asa_to_int(p.get("offset", 0))
+        limit = _asa_to_int(p.get("limit", 1000))
+        if limit <= 0:
+            limit = 1000
+    return offset, limit

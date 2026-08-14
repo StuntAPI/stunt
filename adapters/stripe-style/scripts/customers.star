@@ -19,6 +19,7 @@ def on_create_customer(req):
         "id": customer_id,
         "object": "customer",
         "name": name,
+        "email": body.get("email", None),
         "description": description,
         "created": 1700000000,
     }
@@ -48,10 +49,25 @@ def on_list_customers(req):
 
     c = store_collection("customers")
     docs = c.list()
+    docs = _apply_customer_filters(req, docs)
     page, has_more, err = _list_page(req, docs, "customer")
     if err != None:
         return err
     return respond(200, {"object": "list", "data": page, "has_more": has_more, "url": "/v1/customers"})
+
+# _apply_customer_filters maps the real Stripe customer-list query params
+# (email exact match, created exact/range) to query_select clauses, applied
+# before paging like the real API. Customers created without an email do not
+# match an `email` filter (missing field matches only !=).
+def _apply_customer_filters(req, docs):
+    f = []
+    email = _get_query(req, "email")
+    if email != "":
+        f.append(["email", "=", email])
+    _created_filters(req, f)
+    if len(f) == 0:
+        return docs
+    return query_select(docs, f)
 
 # POST /v1/customers/{id} — update a customer (merge fields from body).
 def on_update_customer(req):

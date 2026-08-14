@@ -126,6 +126,13 @@ Pagination via `?offset=0&limit=50` (defaults: `offset=0`, `limit=50`). When
 another page exists the response sets `hasMore: true` and appends a
 `{"rel": "next", "href": ...}` link with the next `offset`/`limit`.
 
+Record list endpoints also honor the documented `q` simple-query param
+(`q=companyName LIKE 'Acme%'`, `q=total GE 1000`, `q=status EQ 'Open'` with
+ops = != > >= < <= EQ NE GT LT GE LE LIKE IS IN BETWEEN) and `orderBy`
+(`orderBy=tranId DESC`), applied before paging. SuiteQL honors its SQL
+`LIMIT`/`OFFSET` clauses (falling back to the `limit`/`offset` query params)
+and appends a `next` link when more rows remain.
+
 ## Write response shape
 
 Successful `POST` (create), `PATCH` (update), and `DELETE` return `204 No

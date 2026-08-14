@@ -20,6 +20,7 @@ def on_list(req):
             "Record type '" + record_type + "' does not exist.")
 
     docs = col.list()
+    docs = _ns_apply_list_filters(req, docs)
     return _paginate(req, docs, record_type)
 
 def on_create(req):

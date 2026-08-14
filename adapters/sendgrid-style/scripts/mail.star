@@ -109,6 +109,7 @@ def on_list_messages(req):
 
     c = store_collection("mail")
     all_mail = c.list()
+    all_mail = _apply_message_filters(req, all_mail)
 
     result = []
     for m in all_mail:
@@ -127,3 +128,101 @@ def on_list_messages(req):
     if next_cursor != None and next_cursor != "":
         body["next_offset"] = next_cursor
     return respond(200, body)
+
+# --- helpers ---
+
+# _apply_message_filters implements a subset of the real Email Activity
+# query language for GET /v3/messages?query=...: `field="value"` and
+# `field CONTAINS "value"` terms AND'ed together. Recognized fields:
+# msg_id, from_email, to_email, subject, status, template_id. Applied
+# before paging (like the real API). Terms using other fields or syntax
+# are ignored.
+def _apply_message_filters(req, docs):
+    q = _get_query(req, "query")
+    if q == "":
+        return docs
+
+    f = []
+    for term in q.split(" AND "):
+        term = term.strip()
+        if term == "":
+            continue
+        clause = _parse_query_term(term)
+        if clause == None:
+            continue
+        if clause[0] == "to_email":
+            docs = _filter_to_email(docs, clause[1], clause[2])
+        else:
+            f.append(clause)
+    if len(f) > 0:
+        docs = query_select(docs, f)
+    return docs
+
+# _parse_query_term parses one `field="value"` / `field CONTAINS "value"`
+# / `field!="value"` term into a query_select [field, op, value] triple,
+# mapping Email Activity field names onto stored doc paths. Returns None
+# for unrecognized fields or malformed terms.
+def _parse_query_term(term):
+    ci = term.find(" CONTAINS ")
+    if ci >= 0:
+        field = _map_query_field(term[:ci].strip())
+        if field == "":
+            return None
+        return [field, "contains", _unquote(term[ci + 10:].strip())]
+
+    eq = term.find("=")
+    if eq < 1:
+        return None
+    op = "="
+    fname = term[:eq].strip()
+    if len(fname) > 0 and fname[len(fname) - 1] == "!":
+        op = "!="
+        fname = fname[:len(fname) - 1].strip()
+    field = _map_query_field(fname)
+    if field == "":
+        return None
+    return [field, op, _unquote(term[eq + 1:].strip())]
+
+# _map_query_field maps a real Email Activity field name (case-insensitive)
+# onto the stored mail doc path. Returns "" for unsupported fields.
+def _map_query_field(name):
+    n = name.lower()
+    if n == "msg_id":
+        return "id"
+    if n == "from_email":
+        return "from.email"
+    if n == "to_email":
+        return "to_email"
+    if n == "subject":
+        return "subject"
+    if n == "status":
+        return "status"
+    if n == "template_id":
+        return "template_id"
+    return ""
+
+# _unquote strips one pair of surrounding double or single quotes.
+def _unquote(s):
+    if len(s) >= 2:
+        if (s[0] == '"' and s[len(s) - 1] == '"') or (s[0] == "'" and s[len(s) - 1] == "'"):
+            return s[1:len(s) - 1]
+    return s
+
+# _filter_to_email filters docs on any recipient address (the "to" list
+# stores {email} dicts; query_select cannot express any-of over a list).
+def _filter_to_email(docs, op, val):
+    kept = []
+    for d in docs:
+        hit = False
+        for addr in d.get("to", []):
+            email = addr.get("email", "")
+            if op == "contains":
+                if email.find(val) >= 0:
+                    hit = True
+            elif email == val:
+                hit = True
+        if op == "!=":
+            hit = not hit
+        if hit:
+            kept.append(d)
+    return kept

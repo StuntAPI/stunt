@@ -293,15 +293,27 @@ def _decode_authorization_message(req):
 
 # _list_roles lists IAM roles.
 # ?Action=ListRoles&Version=2010-05-08
+# Real ListRoles params honored: PathPrefix (filter), MaxItems + Marker
+# (pagination), applied before rendering like the real query API.
 def _list_roles(req):
     rc = store_collection("roles")
     _ensure_seed_roles()
     roles = rc.list()
 
+    f = []
+    path_prefix = _get_param(req, "PathPrefix")
+    if path_prefix != "":
+        f.append(["path", "startswith", path_prefix])
+    if len(f) > 0:
+        roles = query_select(roles, f)
+
+    page, marker = _iam_page(req, roles)
+    truncated = marker != None
+
     xml = '<ListRolesResponse xmlns="https://iam.amazonaws.com/doc/2010-05-08/">\n'
     xml = xml + "  <ListRolesResult>\n"
     xml = xml + "    <Roles>\n"
-    for r in roles:
+    for r in page:
         xml = xml + "      <member>\n"
         xml = xml + "        <Path>" + _xml_escape(r.get("path", "/")) + "</Path>\n"
         xml = xml + "        <RoleName>" + _xml_escape(r.get("roleName", "")) + "</RoleName>\n"
@@ -312,7 +324,11 @@ def _list_roles(req):
         xml = xml + "        <MaxSessionDuration>3600</MaxSessionDuration>\n"
         xml = xml + "      </member>\n"
     xml = xml + "    </Roles>\n"
-    xml = xml + "    <IsTruncated>false</IsTruncated>\n"
+    if truncated:
+        xml = xml + "    <IsTruncated>true</IsTruncated>\n"
+        xml = xml + "    <Marker>" + _xml_escape(marker) + "</Marker>\n"
+    else:
+        xml = xml + "    <IsTruncated>false</IsTruncated>\n"
     xml = xml + "  </ListRolesResult>\n"
     xml = xml + "  <ResponseMetadata>\n"
     xml = xml + "    <RequestId>" + _req_id() + "</RequestId>\n"
@@ -400,15 +416,27 @@ def _create_role(req):
 
 # _list_users lists IAM users.
 # ?Action=ListUsers
+# Real ListUsers params honored: PathPrefix (filter), MaxItems + Marker
+# (pagination), applied before rendering like the real query API.
 def _list_users(req):
     _ensure_seed_users()
     uc = store_collection("users")
     users = uc.list()
 
+    f = []
+    path_prefix = _get_param(req, "PathPrefix")
+    if path_prefix != "":
+        f.append(["path", "startswith", path_prefix])
+    if len(f) > 0:
+        users = query_select(users, f)
+
+    page, marker = _iam_page(req, users)
+    truncated = marker != None
+
     xml = '<ListUsersResponse xmlns="https://iam.amazonaws.com/doc/2010-05-08/">\n'
     xml = xml + "  <ListUsersResult>\n"
     xml = xml + "    <Users>\n"
-    for u in users:
+    for u in page:
         xml = xml + "      <member>\n"
         xml = xml + "        <Path>" + _xml_escape(u.get("path", "/")) + "</Path>\n"
         xml = xml + "        <UserName>" + _xml_escape(u.get("userName", "")) + "</UserName>\n"
@@ -417,7 +445,11 @@ def _list_users(req):
         xml = xml + "        <CreateDate>" + _xml_escape(u.get("createDate", "2024-01-01T00:00:00Z")) + "</CreateDate>\n"
         xml = xml + "      </member>\n"
     xml = xml + "    </Users>\n"
-    xml = xml + "    <IsTruncated>false</IsTruncated>\n"
+    if truncated:
+        xml = xml + "    <IsTruncated>true</IsTruncated>\n"
+        xml = xml + "    <Marker>" + _xml_escape(marker) + "</Marker>\n"
+    else:
+        xml = xml + "    <IsTruncated>false</IsTruncated>\n"
     xml = xml + "  </ListUsersResult>\n"
     xml = xml + "  <ResponseMetadata>\n"
     xml = xml + "    <RequestId>" + _req_id() + "</RequestId>\n"
@@ -461,6 +493,16 @@ def _create_access_key(req):
 # ====================================================================
 # Helpers
 # ====================================================================
+
+# _iam_page applies IAM list pagination (MaxItems + Marker) to an already
+# filtered list via the paginate builtin. IAM's default MaxItems is 100.
+# Returns (page, marker) where marker is None when no further pages remain.
+def _iam_page(req, docs):
+    max_items = _parse_int(_get_param(req, "MaxItems"))
+    if max_items <= 0:
+        max_items = 100
+    marker = _get_param(req, "Marker")
+    return paginate(docs, max_items, marker)
 
 # _expiration_time returns a synthetic ISO 8601 expiration timestamp.
 # AWS STS temp creds expire after DurationSeconds (default 3600 = 1 hour).

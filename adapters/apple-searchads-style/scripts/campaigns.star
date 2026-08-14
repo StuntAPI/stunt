@@ -25,12 +25,16 @@ def on_find_campaigns(req):
     for c in all_camps:
         result.append(_campaign_obj(c))
 
+    # Real find selector (conditions + orderBy + pagination), applied like
+    # the real API: filter, sort, then slice.
+    result, total, offset, limit = _apply_campaign_selector(body, result)
+
     return respond(200, {
         "data": result,
         "pagination": {
-            "offset": 0,
-            "limit": 1000,
-            "totalResults": len(result),
+            "offset": offset,
+            "limit": limit,
+            "totalResults": total,
         },
     })
 
@@ -149,3 +153,73 @@ def _to_int(s):
         else:
             return n
     return n
+
+# --- find selector helpers ---
+
+# _campaign_cond_field maps a condition field name to a (possibly dotted)
+# path on the campaign response object. Returns None for unknown fields.
+def _campaign_cond_field(field):
+    if field == "id" or field == "campaignId":
+        return "campaignId"
+    if field == "name" or field == "campaignName":
+        return "name"
+    if field == "budgetAmount":
+        return "budgetAmount.amount"
+    if field == "dailyBudgetAmount":
+        return "dailyBudgetAmount.amount"
+    if field == "servingStatus":
+        return "servingStatus"
+    if field == "creationTime":
+        return "creationTime"
+    if field == "modificationTime":
+        return "modificationTime"
+    return None
+
+# _campaign_order_field maps an orderBy field name to a response path.
+def _campaign_order_field(field):
+    if field == "id" or field == "campaignId":
+        return "campaignId"
+    if field == "name" or field == "campaignName":
+        return "name"
+    if field == "budgetAmount":
+        return "budgetAmount.amount"
+    if field == "dailyBudgetAmount":
+        return "dailyBudgetAmount.amount"
+    if field == "servingStatus":
+        return "servingStatus"
+    if field == "creationTime":
+        return "creationTime"
+    if field == "modificationTime":
+        return "modificationTime"
+    return None
+
+# _apply_campaign_selector applies the real campaigns/find selector to the
+# response objects: selector.conditions filter, selector.orderBy sorts,
+# selector.pagination slices. Returns (rows, total, offset, limit) with total
+# counted before slicing.
+def _apply_campaign_selector(body, rows):
+    sel = _asa_selector(body)
+
+    conditions = sel.get("conditions", [])
+    if conditions == None:
+        conditions = []
+    f = []
+    for cond in conditions:
+        if cond == None or type(cond) != "dict":
+            continue
+        path = _campaign_cond_field(cond.get("field", ""))
+        if path == None:
+            continue
+        numeric = path == "campaignId"
+        amount = path == "budgetAmount.amount" or path == "dailyBudgetAmount.amount"
+        for t in _asa_triples(path, cond.get("operator", None), cond.get("values", []), numeric, amount):
+            f.append(t)
+
+    rows = query_select(rows, f if len(f) > 0 else None, None, "", None, None, None)
+
+    rows = _asa_apply_order(rows, sel.get("orderBy", None), _campaign_order_field)
+
+    total = len(rows)
+    offset, limit = _asa_pagination(sel)
+    rows = query_select(rows, None, "", "", limit, offset, None)
+    return rows, total, offset, limit

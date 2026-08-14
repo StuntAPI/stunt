@@ -23,7 +23,7 @@ requested fields.
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| POST | `/subgraphs/id/{subgraphId}` | GraphQL query |
+| POST | `/subgraphs/id/{subgraphId}` | GraphQL query — honors `first`, `skip`, `orderBy`/`orderDirection`, and `where` (incl. `_gt`/`_lt`/`_in`/`_contains`-style suffixes) |
 | GET | `/subgraphs/id/{subgraphId}/graphql` | SDL schema/introspection |
 
 ### Supported entity queries

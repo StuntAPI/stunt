@@ -32,4 +32,34 @@ def on_library_songs(req):
             },
         })
 
-    return respond(200, {"data": data, "meta": {"total": len(data)}})
+    # Real list params: limit/offset page and fields[library-songs]
+    # projects the attributes. total reflects the count before slicing.
+    total = len(data)
+    limit = _to_int(_get_query(req, "limit"))
+    offset = _to_int(_get_query(req, "offset"))
+    if limit > 0 or offset > 0:
+        data = query_select(data, None, "", "", limit if limit > 0 else None, offset, None)
+
+    fields_param = _get_query(req, "fields[library-songs]")
+    if fields_param != "":
+        wanted = []
+        for part in fields_param.split(","):
+            part = part.strip()
+            if part != "":
+                wanted.append(part)
+        if len(wanted) > 0:
+            out = []
+            for it in data:
+                attrs = it.get("attributes", {})
+                new_attrs = {}
+                for k in wanted:
+                    if k in attrs:
+                        new_attrs[k] = attrs[k]
+                out.append({
+                    "id": it.get("id"),
+                    "type": it.get("type"),
+                    "attributes": new_attrs,
+                })
+            data = out
+
+    return respond(200, {"data": data, "meta": {"total": total}})

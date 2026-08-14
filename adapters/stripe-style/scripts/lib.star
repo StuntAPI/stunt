@@ -75,6 +75,37 @@ def _to_int(s):
             return n
     return n
 
+# _get_query safely returns a query parameter value ("" if absent/None).
+def _get_query(req, key):
+    q = req.get("query")
+    if q == None:
+        return ""
+    v = q.get(key, "")
+    if v == None:
+        return ""
+    return v
+
+# _created_filters maps Stripe's `created` / `created[gt|gte|lt|lte]` query
+# params (exact timestamp or bracketed range, form-encoded) to query_select
+# triples against the int `created` field. Appends to the clause list in
+# place; no-op when none of the params is set.
+def _created_filters(req, f):
+    v = _to_int(_get_query(req, "created"))
+    if v > 0:
+        f.append(["created", "=", v])
+    v = _to_int(_get_query(req, "created[gt]"))
+    if v > 0:
+        f.append(["created", ">", v])
+    v = _to_int(_get_query(req, "created[gte]"))
+    if v > 0:
+        f.append(["created", ">=", v])
+    v = _to_int(_get_query(req, "created[lt]"))
+    if v > 0:
+        f.append(["created", "<", v])
+    v = _to_int(_get_query(req, "created[lte]"))
+    if v > 0:
+        f.append(["created", "<=", v])
+
 # _stripe_account extracts the Stripe-Account header used by Stripe Connect
 # to scope requests to a connected account. Returns None if absent.
 def _stripe_account(req):

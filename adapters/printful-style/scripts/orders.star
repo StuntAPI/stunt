@@ -11,6 +11,23 @@
 # Shared helpers (_bearer, _require_auth, _to_int, _next_order_id)
 # are preloaded from scripts/lib.star.
 
+# --- helpers ---
+
+# _apply_order_filters maps the real Printful v2 GET /v2/store/orders
+# status csv filter to a query_select "in" clause, applied before paging.
+def _apply_order_filters(req, docs):
+    status = _get_query(req, "status")
+    if status == "":
+        return docs
+    statuses = []
+    for part in status.split(","):
+        part = part.strip()
+        if part != "":
+            statuses.append(part)
+    if len(statuses) == 0:
+        return docs
+    return query_select(docs, [["status", "in", statuses]])
+
 # --- Printful v1 order API (result-wrapped) -------------------------------
 # The legacy v1 order endpoints (POST /orders, GET /orders/{id}) wrap the
 # payload in a {"result": {...}} envelope, unlike the v2 store routes above.
@@ -57,6 +74,7 @@ def on_get_v1_order(req):
     return respond(200, {"result": doc["result"]})
 
 # on_list_orders returns all store orders.
+# The real Printful v2 order list filters by status (csv) before paging.
 def on_list_orders(req):
     err = _require_auth(req)
     if err != None:
@@ -64,6 +82,7 @@ def on_list_orders(req):
 
     c = store_collection("orders")
     docs = c.list()
+    docs = _apply_order_filters(req, docs)
     page, next_cursor = _list_page(req, docs)
     limit = _to_int(_get_query(req, "limit"))
     body = {"data": page}

@@ -10,6 +10,10 @@ def on_report_campaigns(req):
     if not _require_auth(req):
         return respond(401, _err("Missing or invalid authorization"))
 
+    body = req.get("body")
+    if body == None:
+        body = {}
+
     _seed_campaigns()
 
     cc = store_collection("campaigns")
@@ -31,6 +35,11 @@ def on_report_campaigns(req):
             "ttr": 0.05,
         })
 
+    # Real report selector orderBy sorts the rows (e.g. impressions
+    # DESCENDING). Applied after rows are built.
+    sel = _asa_selector(body)
+    rows = _asa_apply_order(rows, sel.get("orderBy", None), _report_order_field)
+
     return respond(200, {
         "data": {
             "reportingDataResponse": {
@@ -45,3 +54,32 @@ def on_report_campaigns(req):
             },
         },
     })
+
+# --- report selector helpers ---
+
+# _report_order_field maps a report selector orderBy field name to a
+# (possibly dotted) path on a report row. Returns None for unknown fields.
+def _report_order_field(field):
+    if field == "campaignId" or field == "id":
+        return "campaignId"
+    if field == "campaignName" or field == "name":
+        return "campaignName"
+    if field == "servingStatus":
+        return "servingStatus"
+    if field == "impressions":
+        return "impressions"
+    if field == "taps":
+        return "taps"
+    if field == "installs":
+        return "installs"
+    if field == "spend":
+        return "spend.amount"
+    if field == "avgCPT":
+        return "avgCPT.amount"
+    if field == "avgCPA":
+        return "avgCPA.amount"
+    if field == "conversionRate":
+        return "conversionRate"
+    if field == "ttr":
+        return "ttr"
+    return None

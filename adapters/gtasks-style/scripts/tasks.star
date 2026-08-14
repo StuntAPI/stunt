@@ -22,6 +22,9 @@ def on_list_tasks(req):
         if task.get("tasklistId") == list_id:
             items.append(_task_resource(task))
 
+    # Apply the real tasks.list filter params before paging.
+    items = _apply_task_filters(req, items)
+
     # Apply Google Tasks pagination (maxResults + pageToken) after filtering.
     page, next_cursor = _list_page(req, items)
 
@@ -168,6 +171,55 @@ def on_move_task(req):
     tc.update(task.get("id"), task)
 
     return respond(200, _task_resource(task))
+
+# _apply_task_filters maps the real tasks.list query params to query_select
+# clauses, applied before paging like the real API. showCompleted defaults to
+# true, so only "false" filters (status needsAction). dueMin/dueMax compare
+# the RFC3339 due string (tasks without a due date store "" and never match).
+# completedMin/completedMax exclude uncompleted tasks (completed is None),
+# like the real API. updatedMin compares the stored RFC3339 updated stamp.
+# q is a free-text match over title/notes — its OR shape is not expressible
+# as AND'ed triples, so it runs as a manual scan after query_select.
+def _apply_task_filters(req, items):
+    f = []
+
+    show_completed = req["query"].get("showCompleted", "")
+    if show_completed != None and show_completed == "false":
+        f.append(["status", "=", "needsAction"])
+
+    due_min = req["query"].get("dueMin", "")
+    if due_min != None and due_min != "":
+        f.append(["due", ">=", due_min])
+    due_max = req["query"].get("dueMax", "")
+    if due_max != None and due_max != "":
+        f.append(["due", "<=", due_max])
+
+    completed_min = req["query"].get("completedMin", "")
+    if completed_min != None and completed_min != "":
+        f.append(["completed", "!=", None])
+        f.append(["completed", ">=", completed_min])
+    completed_max = req["query"].get("completedMax", "")
+    if completed_max != None and completed_max != "":
+        f.append(["completed", "!=", None])
+        f.append(["completed", "<=", completed_max])
+
+    updated_min = req["query"].get("updatedMin", "")
+    if updated_min != None and updated_min != "":
+        f.append(["updated", ">", updated_min])
+
+    if len(f) > 0:
+        items = query_select(items, f)
+
+    q = req["query"].get("q", "")
+    if q != None and q != "":
+        needle = q.lower()
+        filtered = []
+        for t in items:
+            if needle in t.get("title", "").lower() or needle in t.get("notes", "").lower():
+                filtered.append(t)
+        items = filtered
+
+    return items
 
 # _find_task returns a task by (list_id, task_id), or None.
 def _find_task(list_id, task_id):

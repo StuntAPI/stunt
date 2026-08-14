@@ -15,12 +15,12 @@ unblock financial-data integrations during local development:
 
 - **Link token:** `POST /link/token/create` → `{link_token, expiration, request_id}`.
 - **Item exchange:** `POST /item/public_token/exchange` → `{access_token, item_id}` (STATEFUL: creates an item with accounts).
-- **Balances:** `POST /accounts/balance/get` → `{accounts:[{account_id, balances, name, subtype}]}`.
+- **Balances:** `POST /accounts/balance/get` → `{accounts:[{account_id, balances, name, subtype}]}` (honors `options.account_ids`).
 - **Transactions sync:** `POST /transactions/sync` → cursor-based pagination
-  (`{added, modified, removed, next_cursor}`). STATEFUL: returns new transactions
-  each sync; advance the cursor.
-- **Identity:** `POST /identity/get` → `{accounts:[{owners:[{names, emails, phone_numbers}]}]}`.
-- **Accounts list:** `POST /accounts/get`.
+  (`{added, modified, removed, next_cursor}`). Honors `count` (1-500, default 100).
+  STATEFUL: returns new transactions each sync; advance the cursor.
+- **Identity:** `POST /identity/get` → `{accounts:[{owners:[{names, emails, phone_numbers}]}]}` (honors `options.account_ids`).
+- **Accounts list:** `POST /accounts/get` (honors `options.account_ids`).
 - **Item management:** `POST /item/get`, `POST /item/remove`.
 
 Items, accounts, and transactions are **stateful** — a seed item with two accounts
@@ -51,10 +51,10 @@ emits events via `events_emit` so you can test your handler wiring.
 |--------|-------|---------|-------------|
 | POST | `/link/token/create` | `link.star#on_create_link_token` | Create link token |
 | POST | `/item/public_token/exchange` | `item.star#on_exchange_public_token` | Exchange public → access token |
-| POST | `/accounts/balance/get` | `accounts.star#on_get_balances` | Account balances |
-| POST | `/accounts/get` | `accounts.star#on_get_accounts` | Account list |
-| POST | `/transactions/sync` | `transactions.star#on_sync` | Cursor-based sync |
-| POST | `/identity/get` | `identity.star#on_get_identity` | Identity/owner info |
+| POST | `/accounts/balance/get` | `accounts.star#on_get_balances` | Account balances (`options.account_ids` filter) |
+| POST | `/accounts/get` | `accounts.star#on_get_accounts` | Account list (`options.account_ids` filter) |
+| POST | `/transactions/sync` | `transactions.star#on_sync` | Cursor-based sync (`count` cap) |
+| POST | `/identity/get` | `identity.star#on_get_identity` | Identity/owner info (`options.account_ids` filter) |
 | POST | `/item/get` | `item.star#on_get_item` | Item details |
 | POST | `/item/remove` | `item.star#on_remove_item` | Remove item |
 

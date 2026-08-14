@@ -65,6 +65,7 @@ def on_list_runs(req):
             continue
         result.append(_run_view(r))
 
+    result = _apply_run_filters(req, result)
     page, next_link = _list_page(req, result)
     return respond(200, {
         "total_count": len(result),
@@ -72,6 +73,32 @@ def on_list_runs(req):
     }, _gh_link_headers(next_link))
 
 # --- helpers ---
+
+# _apply_run_filters maps the real GitHub list-workflow-runs query params
+# (branch, event, status) onto query_select, applied after repo scoping and
+# before paging. status matches either the run status or its conclusion,
+# like the real API's check-run status/conclusion filtering; branch filters
+# head_branch and event filters the trigger event. Runs stay in the real
+# API's default created-desc order (stable here since seeded/created runs
+# share synthetic timestamps).
+def _apply_run_filters(req, docs):
+    status = _get_query(req, "status", "")
+    if status != "":
+        kept = []
+        for r in docs:
+            if r.get("status", "") == status or r.get("conclusion", None) == status:
+                kept.append(r)
+        docs = kept
+
+    f = []
+    branch = _get_query(req, "branch", "")
+    if branch != "":
+        f.append(["head_branch", "=", branch])
+    event = _get_query(req, "event", "")
+    if event != "":
+        f.append(["event", "=", event])
+
+    return query_select(docs, f, "created_at", "desc")
 
 def _run_view(r):
     return {

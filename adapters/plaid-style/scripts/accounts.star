@@ -28,6 +28,7 @@ def on_get_balances(req):
         })
 
     accounts = _item_accounts(item_id)
+    accounts = _filter_account_ids(body, accounts)
 
     return respond(200, {
         "accounts": accounts,
@@ -60,6 +61,7 @@ def on_get_accounts(req):
         })
 
     accounts = _item_accounts(item_id)
+    accounts = _filter_account_ids(body, accounts)
 
     return respond(200, {
         "accounts": accounts,

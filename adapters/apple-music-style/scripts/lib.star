@@ -248,3 +248,15 @@ def _default_albums():
             },
         },
     ]
+
+# --- query-param helpers ---
+
+# _get_query reads a query param, returning "" when absent (never None).
+def _get_query(req, key):
+    q = req.get("query")
+    if q == None:
+        return ""
+    v = q.get(key, "")
+    if v == None:
+        return ""
+    return v

@@ -29,6 +29,7 @@ def on_list_pulls(req):
             continue
         result.append(_pull_view(p))
 
+    result = _apply_pull_filters(req, result)
     page, next_link = _list_page(req, result)
     return respond(200, page, _gh_link_headers(next_link))
 
@@ -104,6 +105,40 @@ def on_list_reviews(req):
     return respond(200, page, _gh_link_headers(next_link))
 
 # --- helpers ---
+
+# _apply_pull_filters maps the real GitHub PR-list query params onto
+# query_select, applied after repo scoping and before paging like the real
+# API. state defaults to "open" (GitHub's default — the simulator
+# previously returned the unfiltered superset). head accepts "user:branch"
+# or "branch" (matching on the branch part, like GitHub's head ref filter).
+# sort supports created (default) / updated (popularity and long-running
+# fall back to created — no comment/approval-age data is stored);
+# direction defaults to desc.
+def _apply_pull_filters(req, docs):
+    f = []
+    state = _get_query(req, "state", "open")
+    if state != "all":
+        f.append(["state", "=", state])
+
+    head = _get_query(req, "head", "")
+    if head != "":
+        branch = head
+        colon = head.find(":")
+        if colon >= 0:
+            branch = head[colon + 1:]
+        f.append(["head.ref", "=", branch])
+
+    base = _get_query(req, "base", "")
+    if base != "":
+        f.append(["base.ref", "=", base])
+
+    sort = _get_query(req, "sort", "created")
+    order_by = "created_at"
+    if sort == "updated":
+        order_by = "updated_at"
+    direction = _get_query(req, "direction", "desc")
+
+    return query_select(docs, f, order_by, direction)
 
 def _pull_view(p):
     return {

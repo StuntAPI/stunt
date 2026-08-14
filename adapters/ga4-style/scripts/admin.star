@@ -50,7 +50,14 @@ def on_list_properties(req):
         pc = store_collection("properties")
         docs = pc.list()
 
+    # The real Admin API filter syntax is `filter=parent:accounts/<id>`;
+    # strip the `parent:` field selector so the value matches the stored
+    # parent resource name.
     filt = req["query"].get("filter", "")
+    if filt == None:
+        filt = ""
+    if len(filt) > 7 and filt[:7] == "parent:":
+        filt = filt[7:]
 
     properties = []
     for d in docs:

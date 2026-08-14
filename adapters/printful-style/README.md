@@ -31,7 +31,7 @@ visible when subsequently fetched, within the same `stunt up` session.
 | GET | `/v2/store/products/{product_id}` | `products.star#on_get_product` | Retrieve a product |
 | POST | `/orders` | `orders.star#on_create_v1_order` | Create an order (v1, result-wrapped) |
 | GET | `/orders/{order_id}` | `orders.star#on_get_v1_order` | Retrieve an order (v1) |
-| GET | `/v2/store/orders` | `orders.star#on_list_orders` | List store orders (v2) |
+| GET | `/v2/store/orders` | `orders.star#on_list_orders` | List store orders (v2; honors `status` csv filter, `limit`/`offset` paging) |
 | POST | `/v2/store/orders` | `orders.star#on_create_order` | Create an order (v2) |
 | POST | `/v2/store/orders/{order_id}` | `orders.star#on_update_order` | Update an order (v2) |
 | POST | `/v2/shipping/rates` | `shipping.star#on_shipping_rates` | Shipping-rate quotes |

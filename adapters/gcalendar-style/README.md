@@ -28,12 +28,12 @@ process.
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| GET | `/calendar/v3/calendars/{calendarId}/events` | List events (params: `timeMin`, `timeMax`, `maxResults`, `singleEvents`, `orderBy`). |
+| GET | `/calendar/v3/calendars/{calendarId}/events` | List events (params: `q`, `iCalUID`, `timeMin`, `timeMax`, `showDeleted`, `maxResults`, `pageToken`, `singleEvents`, `orderBy=startTime`). |
 | POST | `/calendar/v3/calendars/{calendarId}/events` | Create event (`{summary, start, end, attendees, recurrence}`). |
 | GET | `/calendar/v3/calendars/{calendarId}/events/{eventId}` | Get event. |
 | PATCH | `/calendar/v3/calendars/{calendarId}/events/{eventId}` | Patch event. |
 | DELETE | `/calendar/v3/calendars/{calendarId}/events/{eventId}` | Delete event (204). |
-| GET | `/calendar/v3/calendars/{calendarId}/events/{eventId}/instances` | Expand recurring event instances. |
+| GET | `/calendar/v3/calendars/{calendarId}/events/{eventId}/instances` | Expand recurring event instances (params: `timeMin`, `timeMax`, `maxResults`, `pageToken`). |
 | POST | `/calendar/v3/calendars/{calendarId}/events/quickAdd?text=` | Natural-language quick add. |
 | POST | `/calendar/v3/calendars/{calendarId}/events/import` | Import event (preserves iCalUID). |
 
@@ -50,5 +50,10 @@ process.
   expanded into individual instances when listed with `singleEvents=true` or via
   the `/instances` endpoint. DAILY and WEEKLY frequencies are supported.
 - **timeMin/timeMax filtering**: ISO8601 string comparison on `start.dateTime`.
+- **List filtering**: `q` matches summary/description/location
+  (case-insensitive), `iCalUID` filters by UID equality, `showDeleted=true`
+  includes cancelled events, and `orderBy=startTime` sorts ascending (requires
+  `singleEvents=true`, `400` otherwise — like the real API). Filtering runs
+  before pagination.
 - A default calendar (`mock-user@gmail.com`) with a seeded event is created on
   first access.
