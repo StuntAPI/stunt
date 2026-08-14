@@ -6,6 +6,33 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.28.0] — 2026-08-14
+
+### Adapters
+
+- **Real list-filter/query params across 37 adapters.** The sweep's largest
+  gap class — filter params accepted but silently ignored, returning the
+  unfiltered superset — is closed: ~210 documented provider params (status
+  and date windows, `q`/`$filter`/`sysparm_query`/selector bodies, `fields`
+  projections, cursors) now filter, sort, and project via the `query_select`
+  builtin before paging, envelope unchanged. Highlights: gmail
+  (`q`/`labelIds`/`includeSpamTrash` default-false), gcalendar (overlap-window
+  `timeMin`/`timeMax` on end/start respectively, `showDeleted`, `orderBy`
+  with the real `singleEvents` 400), ga4 (body-driven
+  `dimensionFilter`/`metricFilter` trees, `orderBys`, validation 400s),
+  netsuite (the documented operator vocabulary incl. `ANY_OF`/`BETWEEN`/date
+  ops and OR groups), servicenow (case-insensitive `sysparm_query` with
+  anchored operator parsing and 400 on invalid queries), stripe (10 params
+  plus newest-first default ordering and `parameter_invalid_integer` 400s),
+  apple-searchads (OR-semantics multi-value selectors, reports conditions),
+  psd2 (required `bookingStatus`/`dateFrom` 400s per Berlin Group), zuora
+  (case-insensitive `filter[]`), powerplatform (`$filter`/`$orderby` with
+  pre-`$skip` `@odata.count`), google-admin (14 params), github (13 params),
+  thegraph (`where:` suffix operators incl. corrected `_in`/`_not_in`), and
+  22 more. Stripe payouts are now scoped to the `Stripe-Account` header with
+  the internal key stripped from responses and webhooks. hn-style unchanged
+  (the real API takes no query params).
+
 ## [0.27.0] — 2026-08-14
 
 ### Added
