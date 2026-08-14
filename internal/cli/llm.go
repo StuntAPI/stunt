@@ -100,15 +100,16 @@ Builtins:
   store_kv_set(ns,k,v); store_kv_get(ns,k); n=store_kv_incr(ns,k); store_kv_delete(ns,k)
   b = store_blob("up"); b.put(name,bytes,ctype); b.get(name); b.stat(name); b.list(); b.append(...); b.delete(name)
   page, next = paginate(items, limit, cursor)  # cursor-based list paging; limit None/<=0 = all; next is None when done
+  parts, err = parse_multipart(content_type, raw_body)  # multipart/form-data; each part {name, filename, content_type, data}
   tok = identity_mint(subject, scopes=[...]); sub = identity_validate(token); identity_has_scope(token,scope)
   events_register(url); events_emit(event_type, payload?, headers?)   # headers: optional dict set on the webhook POST
   events_target()                            # the service's registered webhook URL (for URL-in-MAC schemes: Twilio, Square)
   events_body(type, payload?)               # EXACT on-wire JSON body events_emit will POST — MAC this for signing
-  crypto.hmac_sha256/sha1(key, data, encoding?)  # MAC → hex (default) or "base64"; also sha256, base64_encode/decode, base64url_encode
+  crypto.hmac_sha256/sha1(key, data, encoding?)  # MAC → hex (default) or "base64"; also sha256, base64_encode/decode, base64url_encode/decode
   crypto.ecdsa_sign_p256/verify(priv/pub_pem, data, sig, encoding="hex")  # ES256 raw r‖s
   crypto.rsa_sign/verify(priv/pub_pem, data, sig, encoding="hex")         # RS256 PKCS#1 v1.5
   crypto.ed25519_sign/verify(priv/pub_pem, data, sig, encoding="hex")     # Ed25519 over raw message
-  crypto.rsa_public_jwk(pub_pem) → {kty,n,e}                              # for serving JWKS
+  crypto.rsa_public_jwk(pub_pem) → {kty,n,e}; crypto.ec_public_jwk(pub_pem) → {kty,crv,x,y}  # for serving JWKS
   clock.now_unix() / clock.now_rfc3339()     # wall clock (injectable; for replay-window signatures like Stripe t=)
   # sign a webhook: body=events_body(t,p); sig=crypto.hmac_sha256(secret, body); events_emit(t,p,{"X-Sig": sig})
   # issue a verifiable JWT: hdr=crypto.base64url_encode(alg_rs256_kid); pl=crypto.base64url_encode(claims);

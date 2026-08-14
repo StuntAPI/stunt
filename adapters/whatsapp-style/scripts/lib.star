@@ -148,8 +148,8 @@ def _media_view(m):
         "messaging_product": "whatsapp",
         "url": m.get("url", ""),
         "mime_type": m.get("mime_type", ""),
-        "sha256": "synthetic_sha256_hash",
-        "file_size": 0,
+        "sha256": m.get("sha256", "synthetic_sha256_hash"),
+        "file_size": m.get("file_size", 0),
         "created_at": m.get("created_at", _now()),
     }
 

@@ -53,6 +53,8 @@ import (
 	"database/sql"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"strconv"
 	"strings"
 	"time"
@@ -101,6 +103,9 @@ func BuildAllBuiltins(opts BuiltinOptions) sk.StringDict {
 		dict[k] = v
 	}
 	for k, v := range buildListBuiltins() {
+		dict[k] = v
+	}
+	for k, v := range buildMultipartBuiltins() {
 		dict[k] = v
 	}
 	return dict
@@ -201,6 +206,71 @@ func buildListBuiltins() sk.StringDict {
 				next = sk.String(strconv.Itoa(end))
 			}
 			return sk.Tuple{sk.NewList(all[start:end]), next}, nil
+		}),
+	}
+}
+
+// buildMultipartBuiltins registers the multipart/form-data parsing builtin.
+// It is pure, like paginate.
+//
+//	parse_multipart(content_type, body) -> (parts, err)
+//
+// content_type is the full request header value (boundary included). Each part
+// is {name, filename, content_type, data}; filename/content_type are None when
+// the part omits them, and data carries the raw bytes (Starlark strings are
+// byte strings, so binary parts round-trip via store_blob). err is None on
+// success or a short description, letting the handler answer 400 instead of
+// surfacing a 500.
+func buildMultipartBuiltins() sk.StringDict {
+	return sk.StringDict{
+		"parse_multipart": sk.NewBuiltin("parse_multipart", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			var contentType, body string
+			if err := sk.UnpackArgs("parse_multipart", args, kwargs, "content_type", &contentType, "body", &body); err != nil {
+				return nil, err
+			}
+
+			_, params, err := mime.ParseMediaType(contentType)
+			if err != nil {
+				return sk.Tuple{sk.None, sk.String("parse_multipart: bad content-type: " + err.Error())}, nil
+			}
+			boundary := params["boundary"]
+			if boundary == "" {
+				return sk.Tuple{sk.None, sk.String("parse_multipart: no boundary parameter")}, nil
+			}
+
+			mr := multipart.NewReader(strings.NewReader(body), boundary)
+			var parts []sk.Value
+			for {
+				// NextRawPart, not NextPart: a Content-Transfer-Encoding
+				// header must not silently transform the part bytes.
+				p, err := mr.NextRawPart()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					return sk.Tuple{sk.None, sk.String("parse_multipart: " + err.Error())}, nil
+				}
+				data, err := io.ReadAll(p)
+				if err != nil {
+					return sk.Tuple{sk.None, sk.String("parse_multipart: " + err.Error())}, nil
+				}
+
+				dict := sk.NewDict(4)
+				_ = dict.SetKey(sk.String("name"), sk.String(p.FormName()))
+				var filename sk.Value = sk.None
+				if p.FileName() != "" {
+					filename = sk.String(p.FileName())
+				}
+				_ = dict.SetKey(sk.String("filename"), filename)
+				var partCT sk.Value = sk.None
+				if ct := p.Header.Get("Content-Type"); ct != "" {
+					partCT = sk.String(ct)
+				}
+				_ = dict.SetKey(sk.String("content_type"), partCT)
+				_ = dict.SetKey(sk.String("data"), sk.String(data))
+				parts = append(parts, dict)
+			}
+			return sk.Tuple{sk.NewList(parts), sk.None}, nil
 		}),
 	}
 }

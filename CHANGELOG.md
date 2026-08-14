@@ -6,6 +6,27 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **`parse_multipart(content_type, body)` builtin** — decodes
+  `multipart/form-data` requests inside handlers, returning
+  `(parts, err)` with each part as `{name, filename, content_type, data}`
+  (raw bytes; binary parts round-trip through `store_blob` exactly). Unblocks
+  document/file-upload endpoints (Onfido/Jumio document scans, WhatsApp media,
+  Cloudflare Worker deploys, Drive multipart uploads, Pinata pinning) that
+  previously had to fall back to JSON shims. First wired in `whatsapp-style`,
+  whose media upload now accepts the real Cloud API shape and whose media
+  metadata reports the upload's real `sha256`/`file_size` with a local
+  content-download endpoint (`GET /v21.0/{media_id}/content`) for byte-exact
+  retrieval.
+- **`crypto.ec_public_jwk(pub_pem)`** — the EC P-256 public key's JWK params
+  `{kty, crv, x, y}` (base64url, fixed 32-byte coords), the ES256 counterpart
+  to `rsa_public_jwk` for serving JWKS the way Sign in with Apple, APNs, and
+  Apple Search Ads do.
+- **`crypto.base64url_decode(s)`** — decodes (unpadded) base64url, tolerating
+  padding; the inverse of `base64url_encode` for reading JWT segments.
+
+
 ## [0.25.0] — 2026-08-14
 
 ### Documentation

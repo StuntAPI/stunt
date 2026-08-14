@@ -22,8 +22,13 @@ A faithful behavioral mock of Meta's WhatsApp Business Cloud API surface:
 - **Message status:** `GET /v21.0/{message_id}` → `{message_status, ...}`.
 - **Phone number:** `GET /v21.0/{phone_number_id}` → registration status.
   `POST /v21.0/{phone_number_id}/register` → `{success: true}`.
-- **Media:** `POST /v21.0/{phone_number_id}/media` (upload) → `{id}`.
-  `GET /v21.0/{media_id}` → media metadata.
+- **Media:** `POST /v21.0/{phone_number_id}/media` (upload, real Cloud API shape:
+  `multipart/form-data` with a `file` part — bytes are stored and the metadata's
+  `sha256`/`file_size` reflect the actual upload; a JSON body still works for
+  metadata-only tests) → `{id}`.
+  `GET /v21.0/{media_id}` → media metadata (its `url` points at the local
+  content endpoint). `GET /v21.0/{media_id}/content` → the stored bytes at the
+  original mime type, byte-exact.
 - **Templates:** `GET /v21.0/{waba_id}/message_templates` (list,
   cursor-paginated via `limit`/`after`).
   `POST /v21.0/{waba_id}/message_templates` (create → status **PENDING**).
@@ -106,7 +111,8 @@ When more pages remain, the response includes a `paging` envelope:
 |--------|-------|---------|-------------|
 | POST | `/v21.0/{phone_number_id}/messages` | `messages.star#on_send_message` | Send text/template message (+ signed webhook event) |
 | POST | `/v21.0/{phone_number_id}/register` | `phonenumber.star#on_register` | Register phone number |
-| POST | `/v21.0/{phone_number_id}/media` | `media.star#on_upload_media` | Upload media |
+| POST | `/v21.0/{phone_number_id}/media` | `media.star#on_upload_media` | Upload media (multipart/form-data) |
+| GET | `/v21.0/{media_id}/content` | `media.star#on_download_media` | Download stored media bytes |
 | GET | `/v21.0/{waba_id}/message_templates` | `templates.star#on_list_templates` | List templates (cursor-paginated: `limit`/`after`) |
 | POST | `/v21.0/{waba_id}/message_templates` | `templates.star#on_create_template` | Create template (PENDING) |
 | GET | `/v21.0/{resource_id}` | `resource.star#on_get_resource` | Message status / phone / media |
