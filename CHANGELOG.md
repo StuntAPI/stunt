@@ -6,6 +6,25 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.30.0] — 2026-08-14
+
+### Adapters
+
+- **Real token validation (401 + expiry) across 34 adapters.** Protected
+  routes resolve the presented credential against the adapter's token store
+  and enforce expiry via the engine clock — the invalid/expired-token 401
+  paths that auth-handling code exists to exercise are finally testable.
+  Where minting didn't record expiry, tokens now store `expires_at` at the
+  provider's real TTL (Google 3599, GitHub installation 3600, LinkedIn 60d,
+  Discord 7d, …). Static tokens used by existing tests are seeded insert-once
+  (runtime-computed far-future expiry, race-safe get-then-insert), so
+  validation enforces without breaking them; OAuth-minted flows keep working
+  end-to-end; google and entra-id already validated and gained only the
+  expiry half. ~20 adapter tests gained a bogus-token → 401 negative case.
+  apple-music registers its developer JWT in a token registry (forged
+  ES256-header JWTs now 401); photos/youtube enforce the advertised 3599 TTL;
+  instagram/threads 401s carry Meta's `type: OAuthException` + `fbtrace_id`.
+
 ## [0.29.0] — 2026-08-14
 
 ### Adapters
