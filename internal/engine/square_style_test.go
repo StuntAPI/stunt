@@ -70,6 +70,18 @@ func TestSquareStyleAdapter(t *testing.T) {
 		t.Fatalf("no-auth create payment -> %d, want 401", status)
 	}
 
+	// ===== 401 with a token that was never minted =====
+
+	_, status = sqPostJSON(t, base+"/v2/payments", "EAAA_never_minted_token", squareVersion, map[string]any{
+		"source_id":       "cnon:card-nonce-ok",
+		"idempotency_key": "idem-bogus-token",
+		"amount_money":    map[string]any{"amount": 1000, "currency": "USD"},
+		"location_id":     "LH3A4XKVS0RZR",
+	})
+	if status != 401 {
+		t.Fatalf("unminted token -> %d, want 401", status)
+	}
+
 	// ===== OAuth token =====
 
 	body, status := sqPostForm(t, base+"/oauth2/token", "grant_type=authorization_code&code=sq0cgp-code123&client_id=sq0idp-test&client_secret=shpss-test")

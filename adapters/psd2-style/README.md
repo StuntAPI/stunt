@@ -88,7 +88,12 @@ started → psuAuthenticated → finalised
 - **TPP-level**: OAuth2 client-credentials bearer token for consent management
 - **Account access**: bearer token + valid consent (consent must have `consentStatus: "valid"`)
 
-Missing the bearer token returns `401` with a `tppMessages` error.
+Bearer tokens are validated: the token must be one minted by
+`POST /v1/oauth/token` (stored in the `access_tokens` collection with an
+`expires_at` unix timestamp, TTL `3600`s matching the response `expires_in`)
+and unexpired. A missing, unknown or expired token returns `401` with a
+`tppMessages` error (`TOKEN_INVALID` for missing/unknown, `TOKEN_EXPIRED`
+for expired).
 
 ## Endpoints
 

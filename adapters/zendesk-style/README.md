@@ -58,8 +58,10 @@ Zendesk uses Basic auth with the format `email@example.com/token:api_token`:
 Authorization: Basic <base64("user@example.com/token:your_api_token")>
 ```
 
-Alternatively, a Bearer token is accepted. This mock accepts any non-empty Basic or
-Bearer credential.
+Alternatively, a Bearer token is accepted. This mock validates the credential against
+its credential store: the seeded mock Basic credential
+`admin@example.com/token:test-secret` is accepted without expiry. Any other, unknown,
+or expired credential returns the 401 envelope (`error:"InvalidCredentials"`).
 
 ## Cursor pagination
 

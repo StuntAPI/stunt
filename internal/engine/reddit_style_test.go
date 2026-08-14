@@ -278,6 +278,16 @@ func TestRedditStyleAdapter(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("submit with seed token -> status %d, want 200; body %s", status, body)
 	}
+
+	// ===== Unknown bearer token on submit → 401 USER_REQUIRED =====
+
+	body, status = redditPostFormBearerUA(t, base+"/api/submit", "rdtok_not-a-real-token", userAgent, url.Values{
+		"sr":    {"test"},
+		"title": {"Should not be accepted"},
+	})
+	if status != 401 {
+		t.Fatalf("submit with unknown token -> status %d, want 401; body %s", status, body)
+	}
 }
 
 // === Helpers ===

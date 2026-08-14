@@ -18,7 +18,8 @@ launch-publish pipeline that the reference client adapter uses:
   `{data: {postCreate: {post: {id}, errors: []}}}`.
 - **post query:** queries a post by id (supports the metrics adapter's
   `post(id){votesCount}` shape).
-- **Bearer auth:** requests without `Authorization: Bearer <token>` get `401`.
+- **Bearer auth:** requests without `Authorization: Bearer <token>` — or with
+  an unknown/expired token — get `401`.
 
 This is **not a full GraphQL engine** — the single `/v2/api/graphql.json`
 endpoint pattern-matches the operation name in the query string and returns
@@ -46,10 +47,20 @@ KV is used for the monotonic `post_seq` counter.
 
 ## Auth
 
-All requests must include `Authorization: Bearer <token>`. Requests without a
-valid bearer token receive `401` with a GraphQL errors array. This mirrors how
-the reference client adapter stores `accessToken` in sealed credentials and sends it as
-a bearer token.
+All requests must include `Authorization: Bearer <token>`, and the token must
+be known to the adapter's credential store (KV namespace `producthunt`, keys
+`tok:<token>` holding the expiry as unix seconds). Requests without a bearer
+token, with an unknown token, or with an expired token receive `401` with a
+GraphQL errors array:
+
+```json
+{"errors": [{"message": "You need to sign in or sign up before continuing."}]}
+```
+
+One well-known static test token is seeded on first request with a far-future
+expiry so existing clients keep working: `mock-token-1`. Any other token is
+rejected. This mirrors how the reference client adapter stores `accessToken`
+in sealed credentials and sends it as a bearer token.
 
 ## Usage
 

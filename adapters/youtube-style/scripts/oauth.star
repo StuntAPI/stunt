@@ -42,6 +42,7 @@ def _issue_tokens(user):
     for k in user:
         u[k] = user[k]
     u["id"] = access
+    u["expires_at"] = clock.now_unix() + 3599
     tc.insert(u)
 
     rc = store_collection("refresh_tokens")

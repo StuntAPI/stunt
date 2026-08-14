@@ -110,6 +110,13 @@ func TestMicrosoftGraphStyleAdapter(t *testing.T) {
 		t.Fatalf("error.message = %v, want string", errObj["message"])
 	}
 
+	// ===== GET /v1.0/me with an unknown (never-minted) token → 401 =====
+
+	body, status = graphGet(t, base+"/v1.0/me", "graph-bogus-token")
+	if status != 401 {
+		t.Fatalf("/me with unknown token -> status %d, want 401; body %s", status, body)
+	}
+
 	// ===== GET /v1.0/me/messages → seeded inbox messages =====
 
 	body, status = graphGet(t, base+"/v1.0/me/messages", token)

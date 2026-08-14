@@ -38,6 +38,7 @@ def _issue_tokens(member):
 
     tc = store_collection("tokens")
     member["id"] = access
+    member["expires_at"] = clock.now_unix() + 60 * 24 * 3600
     tc.insert(member)
 
     rc = store_collection("refresh_tokens")

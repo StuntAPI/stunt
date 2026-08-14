@@ -205,6 +205,13 @@ func TestDiscordStyleAdapter(t *testing.T) {
 		t.Fatalf("users/@me without auth -> status %d, want 401; body %s", status, body)
 	}
 
+	// ===== Bot users/@me with an unknown Bot token → 401 =====
+
+	body, status = discordBotGet(t, base+"/users/@me", "definitely-not-a-real-bot-token")
+	if status != 401 {
+		t.Fatalf("users/@me with unknown bot token -> status %d, want 401; body %s", status, body)
+	}
+
 	// ===== Guild lookup =====
 
 	body, status = discordBotGet(t, base+"/guilds/"+guildID, "mock-bot-token")

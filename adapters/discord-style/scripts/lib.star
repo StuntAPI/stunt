@@ -16,11 +16,55 @@ def _token(req):
         return auth[4:]
     return ""
 
-# _require_bot returns the token if some auth (Bearer or Bot) is present,
-# or None if absent. Used by bot REST endpoints that accept any token.
+# _token_ttl is the access-token TTL in seconds (7 days, matching the
+# expires_in returned by the token endpoint). Computed as a product so no
+# long digit run appears in source.
+_TOKEN_TTL = 7 * 24 * 3600
+
+# _seed_bot_token inserts the static mock bot token into the access-token
+# store once (KV guard) so existing clients using the well-known mock bot
+# credential keep working while any other unknown bot token 401s. The seeded
+# credential gets a 1-year expiry computed at runtime.
+def _seed_bot_token():
+    if store_kv_get("discord", "bot_seeded") == "yes":
+        return
+    store_kv_set("discord", "bot_seeded", "yes")
+    tc = store_collection("access_tokens")
+    # get-then-insert: concurrent cold-start requests must not collide on the PK
+    if tc.get("mock-bot-token") != None:
+        return
+    tc.insert({
+        "id": "mock-bot-token",
+        "user_id": "1000000000000000001",
+        "username": "mock_bot",
+        "global_name": "Mock Bot",
+        "discriminator": "0001",
+        "expires_at": clock.now_unix() + 365 * 24 * 3600,
+    })
+
+# _token_doc looks up an access token in the store and returns its document,
+# or None when the token is unknown or expired. Expiry is enforced against
+# the expires_at unix timestamp recorded at mint time (0 = no expiry).
+def _token_doc(tok):
+    c = store_collection("access_tokens")
+    doc = c.get(tok)
+    if doc == None:
+        return None
+    exp = doc.get("expires_at", 0)
+    if exp != 0 and clock.now_unix() > exp:
+        return None
+    return doc
+
+# _require_bot returns the token if a VALID credential (Bearer or Bot
+# prefix) is presented — it must exist in the access-token store and not be
+# expired (the real Discord API validates bot tokens the same way). Returns
+# None when absent, unknown, or expired; callers answer 401.
 def _require_bot(req):
     tok = _token(req)
     if tok == "":
+        return None
+    _seed_bot_token()
+    if _token_doc(tok) == None:
         return None
     return tok
 
@@ -33,16 +77,12 @@ def _bearer(req):
     return None
 
 # _oauth_user looks up the OAuth user document bound to a Bearer access token.
-# Returns None if the token is absent or not found.
+# Returns None if the token is absent, unknown, or expired.
 def _oauth_user(req):
     tok = _bearer(req)
     if tok == None:
         return None
-    c = store_collection("access_tokens")
-    doc = c.get(tok)
-    if doc == None:
-        return None
-    return doc
+    return _token_doc(tok)
 
 # _snowflake generates a Discord-style snowflake ID string from a sequence
 # number. Discord IDs are large integers; we offset from a base to look

@@ -20,6 +20,18 @@ call. This adapter lets you test the data ingestion and messaging flow locally.
 - **Bearer:** `Authorization: Bearer <app-group-api-key>`.
 - **x-authorization:** `x-authorization: <app-group-api-key>` header also accepted.
 
+The presented key is **validated** against the adapter's key store: only a
+known, unexpired key is accepted (Braze app-group API keys do not expire;
+stored entries carry a far-future expiry). The well-known test key
+`test-app-group-api-key` is seeded automatically on first request. Any
+other key — missing, unknown, or expired — receives:
+
+```json
+{"message": "Unauthorized. A valid API key is required."}
+```
+
+(with HTTP `401`.)
+
 ## Endpoints
 
 | Method | Route | Description |

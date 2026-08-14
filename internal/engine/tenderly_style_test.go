@@ -104,6 +104,13 @@ func TestTenderlyStyleAdapter(t *testing.T) {
 		t.Fatalf("no auth -> status %d, want 401", status)
 	}
 
+	// ===== 401 with an unknown (bogus) bearer token =====
+
+	_, status = tenderlyGet(t, base+"/api/v1/networks", "bogus-token-tenderly")
+	if status != 401 {
+		t.Fatalf("bogus token networks -> status %d, want 401", status)
+	}
+
 	// ===== Simulate bundle =====
 
 	bundleURL := base + "/api/v1/account/myacct/project/myproject/simulate-bundle"

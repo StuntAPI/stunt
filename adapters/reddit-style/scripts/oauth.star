@@ -69,7 +69,7 @@ def _mint_access():
     seq = store_kv_incr("reddit", "access_seq")
     token = "rdtok_" + str(seq)
     tc = store_collection("tokens")
-    tc.insert({"id": token})
+    tc.insert({"id": token, "expires_at": clock.now_unix() + 3600})
     return token
 
 def _mint_refresh():

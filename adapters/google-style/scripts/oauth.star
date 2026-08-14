@@ -42,6 +42,9 @@ def _issue_tokens(user):
     for k in user:
         u[k] = user[k]
     u["id"] = access
+    # Google access tokens expire after ~1h; store the expiry so
+    # _user_for_token can reject stale tokens with 401.
+    u["expires_at"] = clock.now_unix() + 3599
     tc.insert(u)
 
     rc = store_collection("refresh_tokens")
@@ -146,6 +149,7 @@ def _issue_tokens_keep_refresh(user, refresh):
     for k in user:
         u[k] = user[k]
     u["id"] = access
+    u["expires_at"] = clock.now_unix() + 3599
     tc.insert(u)
 
     return {

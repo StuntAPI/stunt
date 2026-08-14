@@ -248,6 +248,20 @@ func TestHubspotStyleAdapter(t *testing.T) {
 		t.Fatalf("error category = %v, want string", errResp["category"])
 	}
 
+	// ===== bogus bearer token → 401 =====
+
+	_, status = hsAuthGet(t, base+"/crm/v3/objects/contacts", "pat-bogus-token")
+	if status != 401 {
+		t.Fatalf("bogus-token contacts -> %d, want 401", status)
+	}
+
+	// ===== bogus hapikey → 401 =====
+
+	_, status = hsNoAuthGet(t, base+"/crm/v3/objects/contacts?hapikey=bogus-hapikey")
+	if status != 401 {
+		t.Fatalf("bogus-hapikey contacts -> %d, want 401", status)
+	}
+
 	// ===== hapikey query param also works =====
 
 	body, status = hsNoAuthGet(t, base+"/crm/v3/objects/contacts?hapikey=mock-hapikey")

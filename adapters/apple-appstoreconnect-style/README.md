@@ -14,7 +14,7 @@ A faithful structural mock of Apple's App Store Connect REST API — the surface
 that causes the most pain for iOS/macOS developers: JWT/private-key auth,
 JSON:API conventions, and app/version/build management.
 
-- **JWT auth:** `Authorization: Bearer <jwt>` — validated structurally (see below).
+- **JWT auth:** `Authorization: Bearer <jwt>` — validated structurally AND against the token registry (see below).
 - **Apps CRUD:** `GET /v1/apps`, `GET /v1/apps/{id}`, `POST /v1/apps`.
 - **App relationships:** versions, builds, prices.
 - **Users:** `GET /v1/users`.
@@ -42,16 +42,27 @@ Any unmatched route returns `404` (JSON:API error shape).
 
 ## JWT validation
 
-This adapter performs **structural validation** of the JWT bearer token:
+This adapter validates the JWT bearer token in two passes:
 
-1. The `Authorization: Bearer <jwt>` header must be present.
-2. The JWT must have 3 dot-separated segments (`header.payload.signature`).
-3. The JOSE header (segment 0) is **base64url-decoded** and checked to contain
-   `ES256` (the `alg` claim) and `kid` (the key ID).
+1. **Structural:** the `Authorization: Bearer <jwt>` header must be present,
+   the JWT must have 3 dot-separated segments (`header.payload.signature`),
+   and the JOSE header (segment 0, base64url-decoded) must contain `ES256`
+   (the `alg` claim) and `kid` (the key ID).
+2. **Registry:** the exact JWT string must be registered in the adapter's KV
+   token registry with an unexpired entry. A well-formed but unregistered
+   JWT — or one whose registry expiry has passed — is rejected.
+
+On failure the adapter returns App Store Connect's JSON:API 401 envelope:
+`{"errors":[{"status":"401","code":"NOT_AUTHORIZED","title":"Authentication
+credentials are missing or invalid.","detail":"Provide a valid JWT bearer
+token signed with ES256."}]}`.
+
+A well-known static JWT (ES256 header, `kid":"TESTKEY123"`) is registered on
+first use with a far-future expiry, so token-static clients keep working.
 
 **Signature crypto is NOT verified.** Real ECDSA signature verification is the
-documented stretch goal. The adapter accepts any well-structured ES256 JWT —
-it does not validate against a real Apple public key.
+documented stretch goal. The adapter does not validate against a real Apple
+public key.
 
 Real App Store Connect JWTs are signed ES256 with header
 `{alg:"ES256",kid:<keyId>,typ:"JWT"}` and payload

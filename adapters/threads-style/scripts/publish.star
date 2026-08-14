@@ -5,15 +5,15 @@
 # POST /v1.0/{user_id}/threads_publish?creation_id=<container_id>  (Bearer; no body)
 #     -> 201 { id: "m_<seq>" }   (published media)
 #
-# Token-PRESENCE policy: any Bearer header is accepted; the value is NOT
-# validated (Threads has no author-URN-matching semantics to exercise).
+# Token-VALIDATION policy: the Bearer must be a known, unexpired token
+# minted by the OAuth flow (unknown/expired -> 401 code 190).
 
 # Shared helper (_bearer_present) is preloaded from scripts/lib.star.
 
 # on_create handles step 1: create a media container.
 def on_create(req):
     if not _bearer_present(req):
-        return respond(401, {"error": {"message": "Missing or invalid access token", "code": 190}})
+        return respond(401, {"error": {"message": "Missing or invalid access token", "type": "OAuthException", "code": 190, "fbtrace_id": "synthetic_fbtrace_id_190"}})
 
     user_id = req["params"].get("id", "")
 
@@ -41,7 +41,7 @@ def on_create(req):
 # on_publish handles step 2: publish a container.
 def on_publish(req):
     if not _bearer_present(req):
-        return respond(401, {"error": {"message": "Missing or invalid access token", "code": 190}})
+        return respond(401, {"error": {"message": "Missing or invalid access token", "type": "OAuthException", "code": 190, "fbtrace_id": "synthetic_fbtrace_id_190"}})
 
     user_id = req["params"].get("id", "")
     creation_id = req["query"].get("creation_id", "")

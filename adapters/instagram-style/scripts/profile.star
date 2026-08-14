@@ -1,9 +1,9 @@
-# Profile handler — GET /v21.0/me (Bearer presence required).
+# Profile handler — GET /v21.0/me (valid Bearer required).
 #
 # Returns the IG profile bound to the bearer token (matching the OAuth flow),
 # with standard Graph API fields: id, username, followers_count, media_count.
-# The token value is validated against the tokens collection — if the token
-# is known, we return that user's profile; if not, a default mock profile.
+# The token value is validated against the tokens collection (must be known
+# and unexpired); otherwise 401 with the Graph error envelope (code 190).
 #
 # Shared helper (_bearer_present) is preloaded from scripts/lib.star.
 
@@ -17,7 +17,7 @@ def _bearer(req):
 # on_profile returns the mock Instagram profile for the current token.
 def on_profile(req):
     if not _bearer_present(req):
-        return respond(401, {"error": {"message": "Missing or invalid access token", "code": 190}})
+        return respond(401, {"error": {"message": "Missing or invalid access token", "type": "OAuthException", "code": 190, "fbtrace_id": "synthetic_fbtrace_id_190"}})
 
     token = _bearer(req)
     tc = store_collection("tokens")

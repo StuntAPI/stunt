@@ -5,6 +5,33 @@
 # they were builtins.
 
 # Zendesk auth: Basic auth (email/token:secret) or Bearer token.
+#
+# Credentials are VALIDATED against the KV store (namespace "zendesk", key
+# "auth:<full Authorization header value>"). The value is the expiry as a
+# unix-seconds string, or "never" for non-expiring credentials (the seeded
+# static test credential).
+
+# _seed_auth inserts the static mock credentials once so existing callers
+# keep working while unknown credentials get a 401. Guarded by a KV flag.
+def _seed_auth():
+    if store_kv_get("zendesk", "auth_seeded") == "yes":
+        return
+    store_kv_set("zendesk", "auth_seeded", "yes")
+    store_kv_set("zendesk", "auth:Basic YWRtaW5AZXhhbXBsZS5jb20vdG9rZW46dGVzdC1zZWNyZXQ=", "never")
+
+# _credential_ok reports whether the Authorization header value is a known,
+# unexpired credential.
+def _credential_ok(auth):
+    if auth == "" or auth == None:
+        return False
+    val = store_kv_get("zendesk", "auth:" + auth)
+    if val == None:
+        return False
+    if val == "never":
+        return True
+    if clock.now_unix() > _to_int(val):
+        return False
+    return True
 
 # _auth_header returns the Authorization header value (or "" if absent).
 def _auth_header(req):
@@ -23,10 +50,14 @@ def _is_bearer(req):
     auth = _auth_header(req)
     return auth.startswith("Bearer ")
 
-# _require_auth checks for Basic or Bearer auth. Returns (True, None) on
-# success, or (False, 401 error response) on failure.
+# _require_auth checks for Basic or Bearer auth and validates the credential
+# against the store. Returns (True, None) on success, or (False, 401 error
+# response) on failure (missing, unknown, or expired credential).
 def _require_auth(req):
-    if _is_basic(req) or _is_bearer(req):
+    _seed_auth()
+    if not (_is_basic(req) or _is_bearer(req)):
+        return False, _zd_unauth()
+    if _credential_ok(_auth_header(req)):
         return True, None
     return False, _zd_unauth()
 

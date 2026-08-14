@@ -29,7 +29,7 @@ endpoints:
     method: POST
     handler: scripts/anthropic.star#on_messages
 
-# Auth scheme metadata (mock: accept any non-empty key).
+# Auth scheme metadata (Bearer for OpenAI, x-api-key for Anthropic).
 identity:
   token_scheme: bearer
 

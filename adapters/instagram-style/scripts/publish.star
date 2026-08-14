@@ -8,15 +8,15 @@
 #     -> 200 { data: [...] }  (?fields= projects each media object; see
 #        _apply_media_fields)
 #
-# Token-PRESENCE policy: any Bearer header is accepted; the value is NOT
-# validated.
+# Token-VALIDATION policy: the Bearer must be a known, unexpired token
+# minted by the OAuth flow (unknown/expired -> 401 code 190).
 
 # Shared helper (_bearer_present) is preloaded from scripts/lib.star.
 
 # on_create handles step 1: create a media container.
 def on_create(req):
     if not _bearer_present(req):
-        return respond(401, {"error": {"message": "Missing or invalid access token", "code": 190}})
+        return respond(401, {"error": {"message": "Missing or invalid access token", "type": "OAuthException", "code": 190, "fbtrace_id": "synthetic_fbtrace_id_190"}})
 
     user_id = req["params"].get("ig_user_id", "")
 
@@ -52,7 +52,7 @@ def on_create(req):
 # on_publish handles step 2: publish a media container.
 def on_publish(req):
     if not _bearer_present(req):
-        return respond(401, {"error": {"message": "Missing or invalid access token", "code": 190}})
+        return respond(401, {"error": {"message": "Missing or invalid access token", "type": "OAuthException", "code": 190, "fbtrace_id": "synthetic_fbtrace_id_190"}})
 
     user_id = req["params"].get("ig_user_id", "")
     creation_id = req["query"].get("creation_id", "")
@@ -81,7 +81,7 @@ def on_publish(req):
 # on_list_media lists published media for an IG user.
 def on_list_media(req):
     if not _bearer_present(req):
-        return respond(401, {"error": {"message": "Missing or invalid access token", "code": 190}})
+        return respond(401, {"error": {"message": "Missing or invalid access token", "type": "OAuthException", "code": 190, "fbtrace_id": "synthetic_fbtrace_id_190"}})
 
     user_id = req["params"].get("ig_user_id", "")
 

@@ -17,8 +17,9 @@ def _bearer(req):
         return auth[7:]
     return ""
 
-# _require_auth validates the bearer token. Returns None if authorized, or
-# an error-response dict if not.
+# _require_auth validates the bearer token: it must have been minted via
+# POST /v1/oauth2/token (stored in the access_tokens collection) and be
+# unexpired. Returns None if authorized, or an error-response dict if not.
 def _require_auth(req):
     token = _bearer(req)
     if token == "":
@@ -27,6 +28,13 @@ def _require_auth(req):
     doc = c.get(token)
     if doc == None:
         return _pp_err_simple(401, "AUTHENTICATION_FAILURE", "Access token does not exist.")
+    expires_at = doc.get("expires_at", 0)
+    if expires_at == None:
+        expires_at = 0
+    if type(expires_at) == "float":
+        expires_at = int(expires_at)
+    if expires_at > 0 and clock.now_unix() > expires_at:
+        return _pp_err_simple(401, "AUTHENTICATION_FAILURE", "Access token expired.")
     return None
 
 # _pp_err returns a PayPal-style error response.

@@ -45,8 +45,11 @@ Zuora supports two authentication schemes:
 2. **Legacy (apiAccessKeyId/apiSecretAccessKey):** Pass `apiAccessKeyId` and
    `apiSecretAccessKey` as either request body fields or HTTP headers.
 
-This mock accepts either scheme. The legacy scheme uses non-standard credential fields
-instead of the usual Authorization header — a well-known Zuora-specific pain point.
+This mock validates either scheme against its credential store: the seeded mock
+credentials `Bearer zuora-bearer-token` and the legacy pair
+`zuora-access-key`/`zuora-secret-key` are accepted without expiry. Any other,
+unknown, or expired credential returns the 401 envelope below
+(`success:false`, `reasons:[{code:"90000010", ...}]`).
 
 ## Zuora response envelope
 

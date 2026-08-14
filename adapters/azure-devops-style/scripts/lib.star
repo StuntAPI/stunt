@@ -1,9 +1,9 @@
 # Shared library for azure-devops-style adapter scripts.
 
-# _check_auth validates Azure DevOps PAT auth. Accepts either:
+# _check_auth extracts the Azure DevOps PAT credential. Accepts either:
 #   Authorization: Basic <base64(PAT:)>  (PAT as username, empty password)
 #   Authorization: Bearer <PAT>
-# Returns the token string if valid, or None if missing.
+# Returns the presented credential string if present, or None if missing.
 def _check_auth(req):
     auth = req["headers"].get("Authorization", "")
     if auth[:6] == "Basic ":
@@ -12,20 +12,48 @@ def _check_auth(req):
         return auth[7:]
     return None
 
-# _require_auth returns (token, None) if auth is present, or
-# (None, error_response) if missing.
+# _auth_fault returns the Azure DevOps 401 envelope for a missing, unknown,
+# or expired PAT.
+def _auth_fault():
+    return respond(401, {
+        "$id": "1",
+        "innerException": None,
+        "message": "Access Denied: The Personal Access Token used has expired, is invalid, or does not have the necessary permissions.",
+        "typeName": "Microsoft.TeamFoundation.Framework.Server.UnauthorizedRequestException",
+        "typeKey": "UnauthorizedRequestException",
+        "errorCode": 0,
+        "eventId": 3000,
+    })
+
+# _seed_known_pats inserts (once, guarded by a KV flag) the static mock PATs
+# used by engine tests into the "pats" collection. Azure DevOps has no token
+# minting endpoint in this sim (PATs are created in the portal UI), so this
+# bootstrap stands in for "a PAT the org previously issued". Both wire forms
+# of the same PAT are stored: the raw PAT (Bearer) and its base64(PAT:)
+# encoding (Basic). Far-future expiry; unknown PATs still 401.
+def _seed_known_pats():
+    if store_kv_get("azure-devops", "pats_seeded") == "yes":
+        return
+    store_kv_set("azure-devops", "pats_seeded", "yes")
+    pc = store_collection("pats")
+    far = clock.now_unix() + 3600*24*365
+    pc.insert({"id": "testPAT", "expires_at": far})
+    pc.insert({"id": "dGVzdFBBVDo=", "expires_at": far})
+
+# _require_auth returns (token, None) if the presented PAT is known to the
+# store and not expired, or (None, error_response) if missing/unknown/expired.
 def _require_auth(req):
     token = _check_auth(req)
     if token == None:
-        return None, respond(401, {
-            "$id": "1",
-            "innerException": None,
-            "message": "Access Denied: The Personal Access Token used has expired, is invalid, or does not have the necessary permissions.",
-            "typeName": "Microsoft.TeamFoundation.Framework.Server.UnauthorizedRequestException",
-            "typeKey": "UnauthorizedRequestException",
-            "errorCode": 0,
-            "eventId": 3000,
-        })
+        return None, _auth_fault()
+    _seed_known_pats()
+    pc = store_collection("pats")
+    doc = pc.get(token)
+    if doc == None:
+        return None, _auth_fault()
+    exp = doc.get("expires_at", 0)
+    if exp != None and exp != 0 and clock.now_unix() > exp:
+        return None, _auth_fault()
     return token, None
 
 # _to_int parses a decimal string to int.

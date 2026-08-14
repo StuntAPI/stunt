@@ -33,6 +33,16 @@ A stunt adapter simulating the **Google Analytics GA4 Data API + Admin API**, fo
 - Deterministic metrics: `sessions`, `activeUsers`, `screenPageViews`.
 - Unknown dimension/metric names (in `dimensions`, `metrics`, filter `fieldName`s, or `orderBys`) return `400 INVALID_ARGUMENT` like the real Data API.
 
+## Auth
+
+All endpoints require `Authorization: Bearer <token>`. Tokens are **validated
+against the `tokens` collection** (like the google-style OAuth2 simulator):
+unknown tokens — and tokens whose stored `expires_at` has passed — get the
+Google 401 envelope
+(`{"error":{"code":401,"message":"API key not valid. Please pass a valid API key.","status":"UNAUTHENTICATED"}}`).
+A static convenience token, `ya29.mock-token`, is seeded on first use with a
+far-future expiry for quick local testing.
+
 ## Usage
 
 ```bash

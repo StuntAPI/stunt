@@ -268,6 +268,14 @@ func TestZendeskStyleAdapter(t *testing.T) {
 	if _, ok := errResp["description"].(string); !ok {
 		t.Fatalf("description = %v, want string", errResp["description"])
 	}
+
+	// ===== bogus Basic credential → 401 =====
+
+	bogusBasic := "Basic " + base64.StdEncoding.EncodeToString([]byte("admin@example.com/token:wrong-secret"))
+	_, status = zdAuthGet(t, base+"/api/v2/tickets", bogusBasic)
+	if status != 401 {
+		t.Fatalf("bogus-credential tickets -> %d, want 401", status)
+	}
 }
 
 // === Zendesk test helpers ===

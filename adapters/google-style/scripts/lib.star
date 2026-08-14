@@ -14,7 +14,9 @@ def _bearer(req):
     return ""
 
 # _user_for_token looks up the user document bound to a Bearer token.
-# Returns None if the token is absent or not found in the store.
+# Returns None if the token is absent, not found in the store, or expired.
+# Minted token docs carry an `expires_at` unix timestamp (Google access
+# tokens live ~3600s); a doc without `expires_at` (or 0) never expires.
 def _user_for_token(req):
     token = _bearer(req)
     if token == "":
@@ -22,6 +24,9 @@ def _user_for_token(req):
     c = store_collection("tokens")
     doc = c.get(token)
     if doc == None:
+        return None
+    exp = doc.get("expires_at", 0)
+    if exp != None and exp > 0 and clock.now_unix() > exp:
         return None
     return doc
 

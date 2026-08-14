@@ -64,6 +64,13 @@ func TestAppleSearchadsStyleAdapter(t *testing.T) {
 		t.Fatalf("no auth -> status %d, want 401", status)
 	}
 
+	// ===== 401 with an unknown (never minted/seeded) bearer token =====
+
+	_, status = searchadsPost(t, base+"/api/v4/campaigns/find", "totally-bogus-token", map[string]any{})
+	if status != 401 {
+		t.Fatalf("bogus token -> status %d, want 401", status)
+	}
+
 	// ===== campaigns/find → list with pagination =====
 
 	body, status := searchadsPost(t, base+"/api/v4/campaigns/find", token, map[string]any{

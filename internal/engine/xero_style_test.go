@@ -65,6 +65,13 @@ func TestXeroStyleAdapter(t *testing.T) {
 		t.Fatalf("no-auth contacts -> %d, want 401", status)
 	}
 
+	// ===== 401 with an unknown (bogus) bearer token =====
+
+	_, status = xeroGet(t, base+"/connections", "Bearer bogus-xero-token", "")
+	if status != 401 {
+		t.Fatalf("bogus token connections -> %d, want 401", status)
+	}
+
 	// ===== connections → tenant list =====
 
 	body, status := xeroGet(t, base+"/connections", "Bearer xero-token", "")

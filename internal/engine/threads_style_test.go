@@ -321,12 +321,12 @@ func TestThreadsStyleAdapter(t *testing.T) {
 		t.Fatalf("wrong user data length = %d, want 0", len(wrongData))
 	}
 
-	// ===== Token-PRESENCE policy: any bearer works =====
+	// ===== Token-VALIDATION policy: unknown bearer → 401 =====
 
-	// A garbage token should still get 200 on /v1.0/me (presence, not validation).
+	// A garbage token must be rejected on /v1.0/me (validation, not presence).
 	body, status = getAuth(t, base+"/v1.0/me", "totally-fake-token")
-	if status != 200 {
-		t.Fatalf("fake token -> status %d, want 200 (presence policy); body %s", status, body)
+	if status != 401 {
+		t.Fatalf("fake token -> status %d, want 401 (validation policy); body %s", status, body)
 	}
 
 	// No bearer at all → 401 on publish route.

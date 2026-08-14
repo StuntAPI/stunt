@@ -6,6 +6,33 @@
 
 # Zuora auth: Bearer token (OAuth) OR legacy apiAccessKeyId/apiSecretAccessKey
 # (passed as body fields or headers).
+#
+# Credentials are VALIDATED against the KV store (namespace "zuora"):
+#   "tok:<bearer token>"       -> expiry (unix-seconds string) or "never"
+#   "legacy:<apiAccessKeyId>"  -> the expected apiSecretAccessKey
+# The seeded static test credentials never expire.
+
+# _seed_auth inserts the static mock credentials once so existing callers
+# keep working while unknown credentials get a 401. Guarded by a KV flag.
+def _seed_auth():
+    if store_kv_get("zuora", "auth_seeded") == "yes":
+        return
+    store_kv_set("zuora", "auth_seeded", "yes")
+    store_kv_set("zuora", "tok:zuora-bearer-token", "never")
+    store_kv_set("zuora", "legacy:zuora-access-key", "zuora-secret-key")
+
+# _bearer_ok reports whether the Bearer token is known and unexpired.
+def _bearer_ok(tok):
+    if tok == "" or tok == None:
+        return False
+    val = store_kv_get("zuora", "tok:" + tok)
+    if val == None:
+        return False
+    if val == "never":
+        return True
+    if clock.now_unix() > _to_int(val):
+        return False
+    return True
 
 # _bearer extracts the Bearer token from the Authorization header.
 def _bearer(req):
@@ -16,36 +43,51 @@ def _bearer(req):
         return auth[7:]
     return ""
 
-# _has_legacy_auth checks for Zuora legacy auth: apiAccessKeyId + apiSecretAccessKey
-# in either the request body or custom headers. Note: Go canonicalizes header
-# names (e.g. apiAccessKeyId -> Apiaccesskeyid).
-def _has_legacy_auth(req):
+# _legacy_creds extracts the (apiAccessKeyId, apiSecretAccessKey) pair from
+# either the request body fields or custom headers. Note: Go canonicalizes
+# header names (e.g. apiAccessKeyId -> Apiaccesskeyid).
+def _legacy_creds(req):
     # Check body fields.
     body = req.get("body")
     if body != None:
-        if body.get("apiAccessKeyId", "") != "":
+        key = body.get("apiAccessKeyId", "")
+        if key != "" and key != None:
             secret = body.get("apiSecretAccessKey", "")
             if secret != "" and secret != None:
-                return True
+                return key, secret
     # Check headers (Go canonicalizes header names).
     headers = req.get("headers", {})
     if headers != None:
+        key = ""
+        secret = ""
         for k in headers:
             kl = _lower(k)
             if kl == "apiaccesskeyid":
-                if headers.get(k, "") != "":
-                    for sk in headers:
-                        if _lower(sk) == "apisecretaccesskey":
-                            if headers.get(sk, "") != "":
-                                return True
-    return False
+                key = headers.get(k, "")
+            elif kl == "apisecretaccesskey":
+                secret = headers.get(k, "")
+        if key != "" and secret != "":
+            return key, secret
+    return "", ""
 
-# _require_auth checks for Bearer or legacy Zuora auth. Returns (True, None)
-# on success, or (False, error response) on failure.
+# _legacy_ok reports whether the legacy key/secret pair matches the store.
+def _legacy_ok(key, secret):
+    if key == "" or secret == "":
+        return False
+    want = store_kv_get("zuora", "legacy:" + key)
+    if want == None:
+        return False
+    return want == secret
+
+# _require_auth checks for Bearer or legacy Zuora auth and validates the
+# credential against the store. Returns (True, None) on success, or (False,
+# error response) on failure (missing, unknown, or expired credential).
 def _require_auth(req):
-    if _bearer(req) != "":
+    _seed_auth()
+    if _bearer_ok(_bearer(req)):
         return True, None
-    if _has_legacy_auth(req):
+    key, secret = _legacy_creds(req)
+    if _legacy_ok(key, secret):
         return True, None
     return False, _zuora_unauth()
 

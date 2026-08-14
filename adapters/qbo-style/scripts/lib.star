@@ -19,7 +19,10 @@ def _bearer(req):
     return ""
 
 # _require_token validates the bearer token and returns the token doc, or an
-# error response if invalid/expired.
+# error response if invalid/expired. Tokens minted by the OAuth flow carry an
+# expires_at unix timestamp (QBO access tokens live ~1h, matching the
+# expires_in:3600 advertised at mint); an expired token 401s with the same
+# Fault envelope as an unknown one.
 def _require_token(req):
     token = _bearer(req)
     if token == "":
@@ -27,6 +30,9 @@ def _require_token(req):
     c = store_collection("access_tokens")
     doc = c.get(token)
     if doc == None:
+        return None, _auth_fault()
+    exp = doc.get("expires_at", 0)
+    if exp != None and exp != 0 and clock.now_unix() > exp:
         return None, _auth_fault()
     return doc, None
 

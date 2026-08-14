@@ -66,6 +66,13 @@ func TestPSD2StyleAdapter(t *testing.T) {
 		t.Fatalf("no-auth get accounts -> %d, want 401", status)
 	}
 
+	// ===== 401 with an unknown (bogus) bearer token =====
+
+	_, status = psd2Get(t, base+"/v1/accounts", "psd2-bogus-token")
+	if status != 401 {
+		t.Fatalf("bogus token get accounts -> %d, want 401", status)
+	}
+
 	// ===== OAuth2 client-credentials token =====
 
 	body, status := psd2PostJSON(t, base+"/v1/oauth/token", "", map[string]any{

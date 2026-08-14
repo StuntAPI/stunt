@@ -185,6 +185,13 @@ func TestGA4StyleAdapter(t *testing.T) {
 	if status != 401 {
 		t.Fatalf("accounts without token -> status %d, want 401; body %s", status, body)
 	}
+
+	// ===== 401 with an unknown (never minted/seeded) bearer =====
+
+	body, status = ga4GetAuth(t, base+"/v1admin/accounts", "ya29.not-a-real-token")
+	if status != 401 {
+		t.Fatalf("accounts with bogus token -> status %d, want 401; body %s", status, body)
+	}
 }
 
 // === Helpers ===

@@ -34,11 +34,43 @@ def _tenant_id(req):
             return headers[k]
     return ""
 
+# _require_auth validates the Bearer token against the KV store (ns "xero",
+# key "token_<tok>" → unix-seconds expiry). Unknown or expired tokens get
+# the same 401 envelope as a missing token.
+
+# _TOKEN_TTL is the far-future lifetime given to seeded static test tokens
+# (computed at runtime — never a hardcoded epoch).
+_TOKEN_TTL = 10 * 365 * 24 * 3600
+
+# _seed_tokens inserts-once the static bearer tokens engine tests use, so
+# presence-only auth could be upgraded to real validation without breaking
+# them. Guarded by a KV flag.
+def _seed_tokens():
+    if store_kv_get("xero", "token_seeded") == "yes":
+        return
+    store_kv_set("xero", "token_seeded", "yes")
+    expiry = clock.now_unix() + _TOKEN_TTL
+    store_kv_set("xero", "token_xero-token", str(expiry))
+
+# _token_expiry returns the stored expiry (unix seconds int) for a token,
+# or 0 when the token is unknown.
+def _token_expiry(token):
+    raw = store_kv_get("xero", "token_" + token)
+    if raw == None or raw == "":
+        return 0
+    return _to_int(raw)
+
 # _require_auth validates the Bearer token. Returns None if authorized,
 # or an error-response dict if not.
 def _require_auth(req):
     token = _bearer(req)
     if token == "":
+        return _xero_err(401, "Unauthorized", "TokenExpired", "The access token has expired or is invalid")
+    _seed_tokens()
+    expiry = _token_expiry(token)
+    if expiry <= 0:
+        return _xero_err(401, "Unauthorized", "TokenExpired", "The access token has expired or is invalid")
+    if clock.now_unix() > expiry:
         return _xero_err(401, "Unauthorized", "TokenExpired", "The access token has expired or is invalid")
     return None
 

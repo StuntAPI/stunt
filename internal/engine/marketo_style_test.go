@@ -278,6 +278,13 @@ func TestMarketoStyleAdapter(t *testing.T) {
 		t.Fatalf("error message = %v, want string", err0["message"])
 	}
 
+	// ===== bogus token → 401 =====
+
+	_, status = marketoAuthGet(t, base+"/rest/v1/leads", "synthetic_token_bogus")
+	if status != 401 {
+		t.Fatalf("bogus-token leads -> %d, want 401", status)
+	}
+
 	// ===== access_token query param also works =====
 
 	body, status = marketoNoAuthGet(t, base+"/rest/v1/campaigns?access_token="+accessToken)

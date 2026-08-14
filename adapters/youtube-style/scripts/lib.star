@@ -14,7 +14,8 @@ def _bearer(req):
     return ""
 
 # _user_for_token looks up the user document bound to a Bearer token.
-# Returns None if the token is absent or not found in the store.
+# Returns None if the token is absent, unknown, or expired. Docs with a
+# missing/zero expires_at never expire (backwards compatible).
 def _user_for_token(req):
     token = _bearer(req)
     if token == "":
@@ -22,6 +23,10 @@ def _user_for_token(req):
     c = store_collection("tokens")
     doc = c.get(token)
     if doc == None:
+        return None
+    # expires_at round-trips as float from JSON; int/float compare natively
+    exp = doc.get("expires_at", 0)
+    if exp != None and exp > 0 and clock.now_unix() > exp:
         return None
     return doc
 

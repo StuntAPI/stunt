@@ -88,9 +88,19 @@ schemas/
 
 ## Auth
 
-The adapter declares `identity.token_scheme: bearer` as metadata. Auth is **not
-enforced** — any (or no) `Authorization` header is accepted. This is intentional
-for local testing convenience.
+The adapter declares `identity.token_scheme: bearer` as metadata.
+
+When an `Authorization: Bearer <token>` header IS sent, the token is now
+**validated**: it must be registered in the KV store (`token_<token>` →
+unix-seconds expiry) and unexpired. An unknown token returns `401` with
+Dropbox's error envelope `{"error_summary": "invalid_access_token/..",
+"error": {".tag": "invalid_access_token"}}` (an expired one returns the
+`expired_access_token` variant). The static mock token `sl.test_token_mock`
+is seeded automatically on first use with a far-future expiry.
+
+Requests with NO `Authorization` header are still accepted — this preserves
+the mock's original no-auth convenience for local testing (the shared
+engine test helpers do not send one).
 
 ## Usage
 

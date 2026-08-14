@@ -52,9 +52,21 @@ Any unmatched route returns `404`.
 
 ## Auth
 
-- **OpenAI endpoints:** `Authorization: Bearer <key>` — any non-empty key is accepted.
-- **Anthropic endpoints:** `x-api-key: <key>` header (plus `anthropic-version`) — any
-  non-empty key is accepted.
+- **OpenAI endpoints:** `Authorization: Bearer <key>`.
+- **Anthropic endpoints:** `x-api-key: <key>` header (plus `anthropic-version`).
+
+Keys are **validated** against the adapter's key store: only a known,
+unexpired key is accepted (OpenAI/Anthropic API keys do not expire; stored
+entries carry a far-future expiry). The well-known test key `sk-test-key`
+is seeded automatically on first request so existing clients keep working.
+Any other key — missing, unknown, or expired — receives a `401` with the
+same error envelope as the missing-key case, e.g.:
+
+```json
+{"error": {"message": "Invalid API key provided.", "type": "authentication_error"}}
+```
+
+(Anthropic wraps this in `{"type":"error","error":{...}}`.)
 
 ## Usage
 

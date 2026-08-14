@@ -60,6 +60,12 @@ LinkedIn's Arctic SDK. The `POST /oauth/v2/accessToken` endpoint accepts
 `application/x-www-form-urlencoded` bodies with `grant_type`, `client_id`,
 `client_secret`, `redirect_uri`, and `code`/`refresh_token`.
 
+API routes require a **valid Bearer token**: it must have been minted by the
+token endpoint (stored in the `tokens` collection with a 60-day `expires_at`).
+A missing, unknown, or expired token returns
+`401 {"status": 401, "code": "AUTHORIZED", "message": "..."}` — LinkedIn's
+service error envelope.
+
 ## Usage
 
 Point a `stunt.yaml` service at this directory:

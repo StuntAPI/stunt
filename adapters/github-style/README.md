@@ -13,8 +13,8 @@ A stunt adapter for simulating a **GitHub App REST + GraphQL API** (X-GitHub-Api
 A faithful behavioral mock of GitHub's App API surface:
 
 - **Auth:** `Authorization: Bearer <app-jwt>` or `Authorization: Bearer <ghs_token>`
-  (installation access token) or `Authorization: token <ghp_token>` (PAT). Missing
-  auth → 401 with `{message, documentation_url}` envelope.
+  (installation access token) or `Authorization: token <ghp_token>` (PAT). Missing,
+  unknown, or expired credentials → 401 with `{message, documentation_url}` envelope.
 - **App metadata:** `GET /app`, `GET /app/installations`, `GET /installation`.
 - **Installation token exchange:** `POST /app/installations/{id}/access_tokens`
   with an app JWT → `{token:"ghs_...", expires_at, permissions, repository_selection}`.
@@ -42,8 +42,28 @@ GitHub Apps use a two-step auth dance:
    used as `Authorization: Bearer ghs_...` for all repo-scoped API calls.
 3. **PAT** — `ghp_...` prefix. Used as `Authorization: token ghp_...`.
 
-This adapter accepts any non-empty Bearer or token header (the real flow validates
-the JWT signature; for local testing any token is accepted).
+This adapter validates credentials against its credential store (KV namespace
+`github`, keys `tok:<token>` / `kind:<token>`):
+
+- Installation tokens minted by `POST /app/installations/{id}/access_tokens` are
+  registered at mint time with GitHub's real **1-hour TTL**; after that they 401.
+- The app-JWT endpoints (`/app`, `/app/installations`, the token exchange itself)
+  additionally require the credential's kind to be `jwt` — a `ghs_` or `ghp_`
+  token is rejected there, matching GitHub.
+- Two well-known static test credentials are seeded on first request with a
+  far-future expiry so existing clients keep working:
+  - `mock-app-jwt-token` (app JWT)
+  - `ghp_pat_token_mock` (PAT)
+
+Missing, unknown, or expired credentials get `401` with the GitHub error
+envelope:
+
+```json
+{"message": "Requires authentication", "documentation_url": "https://docs.github.com/rest"}
+```
+
+(The JWT signature itself is not cryptographically verified — the real flow
+validates an RS256 signature; for local testing the token store is the check.)
 
 ## Webhook signature scheme
 

@@ -13,8 +13,12 @@ A stunt adapter for simulating a **WhatsApp Business Cloud API (Meta)** (version
 
 A faithful behavioral mock of Meta's WhatsApp Business Cloud API surface:
 
-- **Auth:** `Authorization: Bearer <access_token>`. Missing token → 401 with
-  Meta's `{error:{message, type, code, fbtrace_id}}` envelope.
+- **Auth:** `Authorization: Bearer <access_token>` — the token is **validated**
+  against the adapter's token store (only known, unexpired tokens pass). The
+  well-known test token `EAAG_test_token_mock` is seeded automatically on first
+  request. Missing/unknown/expired token → 401 with Meta's
+  `{error:{message:"Invalid OAuth access token", type:"OAuthException", code:190,
+  fbtrace_id}}` envelope.
 - **Send messages:** `POST /v21.0/{phone_number_id}/messages` with
   `{messaging_product:"whatsapp", to, type, ...}` →
   `{messaging_product, contacts:[{input, wa_id}], messages:[{id:"wamid...."}]}`.

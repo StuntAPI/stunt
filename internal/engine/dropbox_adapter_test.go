@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -307,6 +308,25 @@ func TestDropboxStyleAdapter(t *testing.T) {
 	}
 	if _, ok := account["name"].(map[string]any); !ok {
 		t.Fatalf("account.name = %v, want a dict", account["name"])
+	}
+
+	// ===== 401 with an unknown (bogus) bearer token =====
+	// (No Authorization header is still accepted — see the adapter README.)
+
+	badReq, err := http.NewRequest("POST", base+"/2/users/get_current_account", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	badReq.Header.Set("Content-Type", "application/json")
+	badReq.Header.Set("Authorization", "Bearer bogus-dropbox-token")
+	badResp, err := http.DefaultClient.Do(badReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	badBody, _ := io.ReadAll(badResp.Body)
+	badResp.Body.Close()
+	if badResp.StatusCode != 401 {
+		t.Fatalf("POST get_current_account with bogus token -> status %d, want 401; body %s", badResp.StatusCode, badBody)
 	}
 
 	// ===== Catch-all 404 =====

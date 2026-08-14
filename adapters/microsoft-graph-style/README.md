@@ -187,9 +187,15 @@ notification whose `clientState` does not match your expected secret.
 
 All endpoints require `Authorization: Bearer <token>`, except
 `PUT /v1.0/_upload/{session}` — real upload session URLs are
-pre-authenticated, so the sim matches. The token value is not validated —
-only presence is checked. A missing header returns `401` with a Graph error
-envelope (`{error:{code, message}}`).
+pre-authenticated, so the sim matches. Tokens are validated against the
+`tokens` store collection (this adapter models only the Graph data plane;
+the `entra-id-style` adapter is the minting identity platform). A missing,
+unknown, or expired token returns `401` with a Graph error envelope
+(`{error:{code: "InvalidAuthenticationToken", message}}`).
+
+A static mock token `mock-bearer-token` is seeded into the store on first
+use (far-future expiry) so out-of-the-box requests work without running the
+identity-platform flow.
 
 ## Usage
 

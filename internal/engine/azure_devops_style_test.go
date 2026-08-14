@@ -67,6 +67,13 @@ func TestAzureDevOpsStyleAdapter(t *testing.T) {
 		t.Fatalf("projects without auth -> status %d, want 401; body %s", status, body)
 	}
 
+	// ===== 401 with an unknown (never-issued) PAT =====
+
+	body, status = adoGet(t, base+"/myorg/_apis/projects", "Bearer bogusPAT")
+	if status != 401 {
+		t.Fatalf("projects with unknown PAT -> status %d, want 401; body %s", status, body)
+	}
+
 	// ===== List projects =====
 
 	body, status = adoGet(t, base+"/myorg/_apis/projects", patBasic)

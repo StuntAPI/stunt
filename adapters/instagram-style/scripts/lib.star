@@ -5,13 +5,31 @@
 # they were builtins — without Starlark's load() (which stunt does not
 # support). See internal/starlark/vm.go LoadWithLib.
 
-# _bearer_present checks whether an Authorization: Bearer header is present.
-# The token value is NOT validated (token-PRESENCE policy for Instagram).
-def _bearer_present(req):
+# _bearer extracts the token from an "Authorization: Bearer <t>" header.
+# Returns "" if the header is absent or not a Bearer header.
+def _bearer(req):
     auth = req["headers"].get("Authorization", "")
     if auth[:7] == "Bearer ":
-        return True
-    return False
+        return auth[7:]
+    return ""
+
+# _bearer_present checks whether the request carries a VALID Bearer token:
+# the token must have been minted by the adapter's OAuth flow (present in
+# the "tokens" collection) and must not be past its expires_at timestamp.
+# Returns True only then; missing/unknown/expired tokens return False and
+# callers answer 401 with the Graph error envelope (code 190).
+def _bearer_present(req):
+    tok = _bearer(req)
+    if tok == "":
+        return False
+    tc = store_collection("tokens")
+    doc = tc.get(tok)
+    if doc == None:
+        return False
+    exp = doc.get("expires_at", 0)
+    if exp != 0 and clock.now_unix() > exp:
+        return False
+    return True
 
 # === Pagination ===
 

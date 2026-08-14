@@ -77,10 +77,39 @@ def _check_bearer(req):
         return None
     return token
 
-# _require_auth checks for a valid Bearer header. Returns True/False.
+# _seed_tokens inserts-once the static bearer tokens engine tests use, so
+# presence-only auth could be upgraded to real validation without breaking
+# them. Guarded by a KV flag; tokens get a far-future expiry computed at
+# runtime (never a hardcoded epoch — adapter lint rejects long digit runs).
+_TEST_TOKEN_TTL = 10 * 365 * 24 * 3600
+
+def _seed_tokens():
+    if store_kv_get("searchads", "tok_seeded") == "yes":
+        return
+    store_kv_set("searchads", "tok_seeded", "yes")
+    expiry = clock.now_unix() + _TEST_TOKEN_TTL
+    store_kv_set("searchads", "tok_test-bearer-token-searchads", str(expiry))
+
+# _token_expiry returns the stored expiry (unix seconds int) for a bearer
+# token, or 0 when the token is unknown.
+def _token_expiry(tok):
+    raw = store_kv_get("searchads", "tok_" + tok)
+    if raw == None or raw == "":
+        return 0
+    return _asa_to_int(raw)
+
+# _require_auth checks for a Bearer header whose token is registered in the
+# KV store (seeded test tokens above, or tokens minted by a future OAuth
+# flow) and unexpired. Returns True/False.
 def _require_auth(req):
     tok = _check_bearer(req)
     if tok == None:
+        return False
+    _seed_tokens()
+    expiry = _token_expiry(tok)
+    if expiry <= 0:
+        return False
+    if clock.now_unix() > expiry:
         return False
     return True
 

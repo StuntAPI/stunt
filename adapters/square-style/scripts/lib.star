@@ -30,11 +30,23 @@ def _square_version(req):
     return headers.get("Square-Version", "")
 
 # _require_auth validates the bearer token AND Square-Version header.
-# Returns None if authorized, or an error-response dict if not.
+# The token must exist in the access_tokens collection (minted via
+# POST /oauth2/token) and be unexpired. Returns None if authorized, or an
+# error-response dict if not.
 def _require_auth(req):
     token = _bearer(req)
     if token == "":
         return _sq_err(401, "UNAUTHORIZED", "ACCESS_TOKEN_EXPIRED", "Missing or invalid Authorization header")
+    doc = store_collection("access_tokens").get(token)
+    if doc == None:
+        return _sq_err(401, "AUTHENTICATION_FAILURE", "ACCESS_TOKEN_EXPIRED", "Access token not found or expired")
+    expires_at = doc.get("expires_at", 0)
+    if expires_at == None:
+        expires_at = 0
+    if type(expires_at) == "float":
+        expires_at = int(expires_at)
+    if expires_at > 0 and clock.now_unix() > expires_at:
+        return _sq_err(401, "AUTHENTICATION_FAILURE", "ACCESS_TOKEN_EXPIRED", "Access token expired")
     return None
 
 # _require_version validates the Square-Version header is present.

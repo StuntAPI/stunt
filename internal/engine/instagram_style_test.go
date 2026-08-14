@@ -273,11 +273,11 @@ func TestInstagramStyleAdapter(t *testing.T) {
 		t.Fatalf("media[0] id = %v, want %v", firstMedia["id"], mediaID)
 	}
 
-	// ===== Token-PRESENCE policy: any bearer works =====
+	// ===== Token-VALIDATION policy: unknown bearer → 401 =====
 
 	body, status = getAuth(t, base+"/v21.0/me", "totally-fake-token")
-	if status != 200 {
-		t.Fatalf("fake token -> status %d, want 200 (presence policy); body %s", status, body)
+	if status != 401 {
+		t.Fatalf("fake token -> status %d, want 401 (validation policy); body %s", status, body)
 	}
 
 	// ===== No bearer at all → 401 =====

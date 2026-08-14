@@ -96,6 +96,7 @@ def _issue_token_pair(realm_id):
     ac.insert({
         "id": access,
         "realm_id": realm_id,
+        "expires_at": clock.now_unix() + 3600,
     })
 
     rc = store_collection("refresh_tokens")

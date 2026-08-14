@@ -20,13 +20,18 @@ def on_token(req):
     n = store_kv_incr("square", "token_seq")
     access_token = "EAAA" + str(5000000000 + n) + "_mock_access_token"
 
-    # Store the token for validation.
+    # Store the token for validation, with a 30-day TTL enforced by
+    # _require_auth (expiry computed at runtime — never a hardcoded epoch).
+    expires_at = clock.now_unix() + 30 * 24 * 3600
     tc = store_collection("access_tokens")
-    tc.insert({"id": access_token})
+    tc.insert({
+        "id": access_token,
+        "expires_at": expires_at,
+    })
 
     return respond(200, {
         "access_token": access_token,
         "token_type": "Bearer",
-        "expires_at": "2025-12-31T23:59:59Z",
+        "expires_at": clock.unix_to_rfc3339(expires_at),
         "merchant_id": "ML" + str(6000000000 + n),
     })

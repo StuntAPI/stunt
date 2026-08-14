@@ -62,8 +62,17 @@ SendGrid uses **Bearer token** authentication with API keys in the format
 Authorization: Bearer SG.xxxxxxxxxxxxx.xxxxxxxxxxxxx
 ```
 
-This adapter **validates** that a Bearer token is present and non-empty.
-Requests without a valid Bearer token receive a `401` error.
+This adapter **validates** the Bearer token against its token store. A
+request is authorized only when the presented key is a known, unexpired key
+(real SendGrid API keys do not expire; stored entries carry a far-future
+expiry). The well-known test key `SG.testkey.testsecret` is seeded
+automatically on first request so existing clients keep working. Any other
+key — missing, unknown, or expired — receives a `401` with SendGrid's error
+envelope:
+
+```json
+{"errors": [{"message": "The provided authorization grant is invalid, expired, or revoked.", "field": null, "help": null}]}
+```
 
 ### Example
 

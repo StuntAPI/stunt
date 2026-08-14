@@ -54,6 +54,11 @@ Square requires two headers for every API call:
 2. `Square-Version: 2024-08-21` — the dated API version
 
 Missing either results in an error (401 for missing token, 400 for missing version).
+Access tokens are validated: the token must have been minted by
+`POST /oauth2/token` (stored in the `access_tokens` collection with a 30-day
+expiry). An unknown or expired token returns `401` with Square's error
+envelope `{"errors": [{"category": "AUTHENTICATION_FAILURE", "code":
+"ACCESS_TOKEN_EXPIRED", ...}]}`.
 
 ## Endpoints
 

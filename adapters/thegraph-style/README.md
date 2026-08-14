@@ -84,3 +84,19 @@ services:
 ```
 
 Then `stunt up` and point your GraphQL client at the served address.
+
+## Auth
+
+The Graph's hosted-service subgraph endpoints (the `/subgraphs/id/<id>` shape
+this adapter models) are public, so requests **without** an `Authorization`
+header are served anonymously. When an `Authorization: Bearer <key>` header
+**is** presented (the Graph gateway's API-key model), the key must be known to
+the adapter's credential store (KV namespace `graph`, keys `tok:<key>` holding
+the expiry as unix seconds); unknown or expired keys get `401`:
+
+```json
+{"errors": [{"message": "valid API key expected"}]}
+```
+
+One well-known static test API key is seeded on first request with a
+far-future expiry: `mock-graph-api-key`.

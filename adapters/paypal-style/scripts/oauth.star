@@ -24,13 +24,20 @@ def on_token(req):
     n = store_kv_incr("paypal", "token_seq")
     access_token = "A21AAL" + str(n) + "_mock_access_token"
 
+    # Store the token with the advertised TTL (9h, real PayPal's client-
+    # credentials default) so _require_auth can reject expired tokens.
+    # Expiry computed at runtime — never a hardcoded epoch.
+    expires_in = 9 * 3600
     c = store_collection("access_tokens")
-    c.insert({"id": access_token})
+    c.insert({
+        "id": access_token,
+        "expires_at": clock.now_unix() + expires_in,
+    })
 
     return respond(200, {
         "access_token": access_token,
         "token_type": "Bearer",
-        "expires_in": 32400,
+        "expires_in": expires_in,
         "scope": "https://uri.paypal.com/services/payments/realtimepayment",
         "app_id": "APP-80W284485P519543T",
         "nonce": "nonce-" + str(n),

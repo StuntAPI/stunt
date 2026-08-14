@@ -158,6 +158,16 @@ func TestSendGridStyleAdapter(t *testing.T) {
 		t.Fatalf("list without auth: missing errors; body %s", body)
 	}
 
+	// ===== 401 with an unknown (bogus) Bearer token =====
+
+	body, status = sgGet(t, base+"/v3/messages", "Bearer SG.bogus.wrongkey")
+	if status != 401 {
+		t.Fatalf("list messages with bogus token -> status %d, want 401; body %s", status, body)
+	}
+	if !strings.Contains(body, "errors") {
+		t.Fatalf("bogus token: missing errors envelope; body %s", body)
+	}
+
 	// ===== 401 when sending without Bearer =====
 
 	resp = sgPostJSON(t, base+"/v3/mail/send", "", map[string]any{

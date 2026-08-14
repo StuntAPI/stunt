@@ -249,6 +249,24 @@ func TestTheGraphStyleAdapter(t *testing.T) {
 	if dataC["tokens"] == nil {
 		t.Fatal("combined query missing tokens")
 	}
+
+	// ===== Auth: anonymous stays public; an unknown API key → 401 =====
+
+	reqBad, err := http.NewRequest("POST", base+"/subgraphs/id/5zvR82QoaXYxfyKOCH8Qfl6pUCWd7YFXq56Y3ZSDXx2W", bytes.NewReader([]byte(`{"query":"{pools(first:1){id}}"}`)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reqBad.Header.Set("Content-Type", "application/json")
+	reqBad.Header.Set("Authorization", "Bearer bogus-graph-key")
+	respBad, err := http.DefaultClient.Do(reqBad)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer respBad.Body.Close()
+	badBody, _ := io.ReadAll(respBad.Body)
+	if respBad.StatusCode != 401 {
+		t.Fatalf("bogus API key -> status %d, want 401; body %s", respBad.StatusCode, badBody)
+	}
 }
 
 // TestTheGraphStyleWhereInFilters covers where-clause list filters:

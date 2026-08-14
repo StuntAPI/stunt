@@ -44,6 +44,9 @@ GET /identity/oauth/token?grant_type=client_credentials&client_id=ID&client_secr
 
 Tokens expire every hour (the token-churn pain). This mock mints synthetic tokens that
 are accepted via the `Authorization: Bearer` header or the `?access_token=` query param.
+Minted tokens are stored with a 3600-second expiry and validated on every request:
+a missing, unknown, or expired token returns **401** with the Marketo envelope
+(`success:false`, `errors:[{code:"601", message:...}]`).
 
 ## Marketo response envelope
 
