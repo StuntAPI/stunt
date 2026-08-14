@@ -27,8 +27,18 @@ A stunt adapter simulating the **Google Admin SDK Directory API**, for local tes
 | GET | `/admin/directory/v1/groups` | List groups. |
 | POST | `/admin/directory/v1/groups` | Create a group (stateful). |
 | GET | `/admin/directory/v1/groups/{groupKey}` | Get group by email or id. |
+| DELETE | `/admin/directory/v1/groups/{groupKey}` | Delete group (204 on success). |
 | GET | `/admin/directory/v1/groups/{groupKey}/members` | List group members. |
 | POST | `/admin/directory/v1/groups/{groupKey}/members` | Add a member to a group. |
+| DELETE | `/admin/directory/v1/groups/{groupKey}/members/{memberKey}` | Remove a member (by id or email; 204 on success). |
+
+### Pagination
+
+All list endpoints (`users`, `groups`, `members`, `tokens`) honor the Directory API's `maxResults` and `pageToken` query params and return `nextPageToken` when more items remain. Omitting `maxResults` (or passing `<= 0`) returns everything in one page.
+
+### Seeded data
+
+The directory self-seeds on first use: three users (`admin@`, `alice@`, `bob@mock-domain.com` — Bob is suspended) and two groups (`engineering@`, `all-staff@mock-domain.com`) with four members. Creating a user or group with an email that already exists returns a Google-style `409` duplicate error.
 
 ## Key shapes
 

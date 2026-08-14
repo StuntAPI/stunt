@@ -16,6 +16,9 @@ publish pipeline that the reference client adapter uses:
 - **createSession:** `POST /xrpc/com.atproto.server.createSession` — mints an
   opaque `accessJwt` + `refreshJwt` for an `{identifier, password}` pair, plus
   the `did`, `handle`, and `email`.
+- **refreshSession:** `POST /xrpc/com.atproto.server.refreshSession` — send the
+  `refreshJwt` as the Bearer token to get a fresh access/refresh pair. The old
+  session is rotated out (the previous accessJwt and refreshJwt stop working).
 - **createRecord:** `POST /xrpc/com.atproto.repo.createRecord` (Bearer) — creates
   a record in the authenticated repo; returns `{uri, cid}` where
   `uri = at://<did>/<collection>/<rkey>`.
@@ -36,6 +39,7 @@ are visible in subsequent requests within the same `stunt up` session.
 | Method | Route | Handler | Description |
 |--------|-------|---------|-------------|
 | POST | `/xrpc/com.atproto.server.createSession` | `session.star#on_create_session` | Mint session (accessJwt + did) |
+| POST | `/xrpc/com.atproto.server.refreshSession` | `session.star#on_refresh_session` | Rotate session (refreshJwt as Bearer) |
 | POST | `/xrpc/com.atproto.repo.createRecord` | `records.star#on_create_record` | Create record (Bearer) |
 | POST | `/xrpc/com.atproto.repo.deleteRecord` | `records.star#on_delete_record` | Delete record (Bearer) |
 | GET | `/xrpc/com.atproto.identity.resolveHandle` | `identity.star#on_resolve_handle` | Handle → DID |
@@ -51,7 +55,8 @@ Any unmatched route returns `404`.
 | `sessions` | accessJwt → {did, handle, refresh} binding |
 | `posts` | Created records (uri, cid, repo, collection, rkey, record) |
 
-KV is used for monotonic sequence counters (`account_seq`, `rkey_seq`).
+KV is used for monotonic sequence counters (`account_seq`, `rkey_seq`,
+`search_seed`).
 
 ## Auth
 
@@ -59,6 +64,11 @@ KV is used for monotonic sequence counters (`account_seq`, `rkey_seq`).
 calls must send `Authorization: Bearer <accessJwt>`. The token's DID must match
 the request's `repo` field — mirroring how the reference client adapter creates a session
 first, then passes `repo: session.did` to `createRecord`.
+
+To refresh an expiring access token, call `refreshSession` with the `refreshJwt`
+as the Bearer token; it returns a new `{accessJwt, refreshJwt}` pair and
+invalidates the old pair. An invalid or missing refresh token returns
+`401 InvalidToken`.
 
 ## Usage
 

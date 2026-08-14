@@ -21,7 +21,7 @@ encoding) so you can test your integration locally without that delay.
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| GET | `/gmail/v1/users/{userId}/messages` | List messages (params: `q`, `maxResults`, `labelIds`). |
+| GET | `/gmail/v1/users/{userId}/messages` | List messages (params: `q`, `maxResults`, `pageToken`, `labelIds`). |
 | GET | `/gmail/v1/users/{userId}/messages/{messageId}` | Get message (`format=full\|metadata\|raw`). |
 | POST | `/gmail/v1/users/{userId}/messages/send` | Send message (`{raw: "<base64url rfc822>"}`). |
 | POST | `/gmail/v1/users/{userId}/messages` | Insert message. |
@@ -29,6 +29,7 @@ encoding) so you can test your integration locally without that delay.
 | POST | `/gmail/v1/users/{userId}/messages/{messageId}/trash` | Trash message. |
 | POST | `/gmail/v1/users/{userId}/messages/batchModify` | Batch modify labels. |
 | GET | `/gmail/v1/users/{userId}/messages/{messageId}/attachments/{attachmentId}` | Get attachment. |
+| DELETE | `/gmail/v1/users/{userId}/messages/{messageId}` | Immediately and permanently delete message → `204`. |
 
 ### Labels (Bearer required)
 
@@ -36,22 +37,25 @@ encoding) so you can test your integration locally without that delay.
 |--------|-------|-------------|
 | GET | `/gmail/v1/users/{userId}/labels` | List labels (system + user). |
 | POST | `/gmail/v1/users/{userId}/labels` | Create label. |
+| DELETE | `/gmail/v1/users/{userId}/labels/{id}` | Delete user label → `204`. System labels return `400`. |
 
 ### Drafts & Threads (Bearer required)
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| GET | `/gmail/v1/users/{userId}/drafts` | List drafts. |
+| GET | `/gmail/v1/users/{userId}/drafts` | List drafts (params: `maxResults`, `pageToken`). |
 | POST | `/gmail/v1/users/{userId}/drafts` | Create draft. |
+| DELETE | `/gmail/v1/users/{userId}/drafts/{id}` | Immediately and permanently delete draft → `204`. |
 | GET | `/gmail/v1/users/{userId}/threads/{threadId}` | Get thread (all messages in thread). |
 
 ## Key shapes
 
-- Message list: `{messages:[{id, threadId}], resultSizeEstimate}`.
+- Message list: `{messages:[{id, threadId}], resultSizeEstimate, nextPageToken?}`.
 - Message (full): `{id, threadId, labelIds:["INBOX"], snippet, payload:{headers:[{name, value}], mimeType, parts:[...]}, sizeEstimate, internalDate}`.
 - Message (raw): `{id, threadId, labelIds, raw: "<base64url rfc822>"}`.
 - Send response: `{id, threadId, labelIds:["SENT"]}`.
 - Labels: `{labels:[{id, name, type, color}]}`.
+- Draft list: `{drafts:[{id, message:{id, threadId}}], resultSizeEstimate, nextPageToken?}`.
 
 ## Data model fidelity
 
@@ -63,8 +67,17 @@ encoding) so you can test your integration locally without that delay.
   the signin-with-apple adapter.
 - **Send → list round-trip**: a message sent via POST appears in the
   subsequent messages list and is retrievable with full headers via GET.
+- **Pagination**: the messages and drafts list endpoints support Gmail-style
+  cursor pagination — pass `maxResults` (omit or `0` for all items) and
+  `pageToken` from a prior response's `nextPageToken`, which is present only
+  when more pages remain. The labels list is not paginated.
+- **Query filtering**: `q` does a case-insensitive substring match against
+  the snippet and the Subject header; `labelIds` filters by label membership.
+  Filtering is applied before pagination.
 - **Labels**: 11 built-in system labels (INBOX, SENT, DRAFT, etc.) seeded on
-  first access. User labels can be created.
+  first access. User labels can be created (creating an existing name is
+  idempotent — it returns the existing label). System labels cannot be
+  deleted (`400`); user labels delete permanently (`204`).
 - **Restricted scopes**: the real Gmail API requires restricted-scope OAuth2
   consent verification (multi-week process). This mock documents that pain
   and mints tokens instantly.

@@ -16,13 +16,25 @@ unblock ERP integrations during local development:
 - **Record CRUD:** `GET/POST /services/rest/record/v1/customer`, `GET/PATCH/DELETE
   .../customer/{id}` — and the same pattern for `salesOrder`, `invoice`, `item`,
   `employee`, `vendor`.
+- **Idempotent creates:** POSTs carrying an `externalId` are deduped — see
+  [Idempotent creates (externalId upsert)](#idempotent-creates-externalid-upsert).
 - **SuiteQL:** `POST /services/rest/query/v1/suiteql` with body `{"q":"SELECT *
-  FROM customer"}` — pattern-matches the FROM table and returns seeded rows.
+  FROM customer"}` — pattern-matches the FROM table and returns the (stateful)
+  rows for that table; other clauses (`WHERE`, `ORDER BY`, ...) are ignored.
 - **Metadata catalog:** `GET /services/rest/record/v1/metadata-catalog` — the list
   of supported record types (the "NetSuite metadata pain").
 
 Records are **stateful**: a customer created via POST appears in the GET list and
 in SuiteQL results.
+
+## Idempotent creates (externalId upsert)
+
+NetSuite dedupes writes by `externalId`, and so does this adapter. If a POST to a
+record collection includes a non-empty `externalId` that already exists in that
+record type's collection, no duplicate is created: the adapter responds
+`204 No Content` with the **existing** record's `Location` header. A new record
+(and a fresh internal ID) is only generated when the `externalId` is absent or
+not yet seen.
 
 ## Authentication
 
@@ -58,7 +70,8 @@ secrets. Full HMAC validation is the stretch goal.
 Authorization: NLAuth realm=ACCT123, email=admin@example.com, password=secret
 ```
 
-Both schemes are accepted. Requests without authentication return **401** with
+Both schemes are accepted, as is a plain `Authorization: Bearer <token>` header
+(also structurally). Requests without authentication return **401** with
 NetSuite's distinctive `o:`-prefixed error envelope.
 
 ## Error shape
@@ -85,7 +98,7 @@ NetSuite uses a distinctive error envelope with `o:` prefixed keys:
 | Method | Route | Description |
 |--------|-------|-------------|
 | GET | `/services/rest/record/v1/customer` | List customers (paginated) |
-| POST | `/services/rest/record/v1/customer` | Create customer |
+| POST | `/services/rest/record/v1/customer` | Create customer (`204` + `Location`; dedupes by `externalId`) |
 | GET | `/services/rest/record/v1/customer/{id}` | Retrieve customer |
 | PATCH | `/services/rest/record/v1/customer/{id}` | Update customer |
 | DELETE | `/services/rest/record/v1/customer/{id}` | Delete customer |
@@ -109,4 +122,14 @@ NetSuite uses a distinctive error envelope with `o:` prefixed keys:
 }
 ```
 
-Pagination via `?offset=0&limit=50`.
+Pagination via `?offset=0&limit=50` (defaults: `offset=0`, `limit=50`). When
+another page exists the response sets `hasMore: true` and appends a
+`{"rel": "next", "href": ...}` link with the next `offset`/`limit`.
+
+## Write response shape
+
+Successful `POST` (create), `PATCH` (update), and `DELETE` return `204 No
+Content`; creates and `externalId` dedupe hits carry the record's URL in the
+`Location` header. Unknown record types return `404` with
+`o:errorCode: RCRD_TYPE_DSNT_EXIST`; unknown record IDs return `404` with
+`RCRD_DSNT_EXIST`.

@@ -14,7 +14,8 @@ A faithful behavioral mock of the Threads REST + OAuth2 surface, ported from
 a production Threads client. It covers the full publish /
 analytics / engagement pipeline:
 
-- **OAuth2 (Meta):** authorize redirect, access-token exchange (single-use code).
+- **OAuth2 (Meta):** authorize redirect, access-token exchange (single-use code),
+  and `refresh_token` grant (single-use, rotating refresh tokens).
 - **Profile:** `GET /v1.0/me`.
 - **Publish (two-step):** create a media container, then publish it.
 - **Insights:** per-media metrics (views, likes, replies, reposts).
@@ -29,7 +30,7 @@ session.
 | Method | Route | Handler | Description |
 |--------|-------|---------|-------------|
 | GET | `/oauth/authorize` | `oauth.star#on_authorize` | 302 redirect with code + state |
-| POST | `/oauth/access_token` | `oauth.star#on_access_token` | Token exchange (auth code, single-use) |
+| POST | `/oauth/access_token` | `oauth.star#on_access_token` | Token exchange (auth code, single-use) or refresh grant |
 | GET | `/v1.0/me` | `profile.star#on_profile` | Profile (Bearer presence) |
 | GET | `/v1.0/{id}/insights` | `insights.star#on_insights` | Per-media metrics (4 metrics) |
 | POST | `/v1.0/{id}/threads_publish` | `publish.star#on_publish` | Publish container → media (step 2) |
@@ -48,7 +49,8 @@ Any unmatched route returns `404`.
 | `media` | Published media (id → {user_id, container_id, text, ts}) |
 
 KV is used for monotonic sequence counters (`user_seq`, `container_seq`,
-`media_seq`, `code_seq`, `token_seq`).
+`media_seq`, `code_seq`, `token_seq`, `refresh_seq`) and for the
+`refresh_<token>` → user bindings used by the refresh grant.
 
 ## Token policy
 
@@ -58,6 +60,22 @@ token value. Threads' publish flow has no author-URN-matching semantics to
 exercise, so token validation adds no test value. The OAuth routes DO mint
 real tokens (stored in the `tokens` collection) for the round-trip test, but
 the API routes ignore them.
+
+## Refresh grant
+
+`POST /oauth/access_token` with `grant_type=refresh_token` accepts a
+previously issued `refresh_token` (minted by the auth-code exchange):
+
+- **Single-use:** the `refresh_<token>` KV binding is deleted on use, so
+  replaying a refresh token returns `400 invalid_grant`.
+- **Rotating:** the binding is re-issued under a new `mock_refresh_<seq>`
+  for the same `user_id`. Note the response body does **not** include the
+  new refresh token (only the auth-code response carries one), matching the
+  mock's minimal surface.
+
+Both the auth-code exchange and the refresh grant return
+`{ access_token, token_type: "bearer", expires_in: 5184000, user_id }`; the
+auth-code response additionally carries the initial `refresh_token`.
 
 ## Publish flow (two-step)
 

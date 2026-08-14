@@ -24,8 +24,9 @@ content → run flow locally.
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| GET | `/v1/projects` | List projects. |
+| GET | `/v1/projects` | List projects (supports `pageSize`/`pageToken`; response includes `nextPageToken` when more pages remain). |
 | POST | `/v1/projects` | Create a project (`{title, parentId}`). |
+| DELETE | `/v1/projects/{scriptId}` | Delete a project (404 if not found; empty body on success, like the real API). |
 | GET | `/v1/projects/{scriptId}/content` | Get script content (files with source). |
 | POST | `/v1/projects/{scriptId}/content` | Update script content. |
 | POST | `/v1/projects/{scriptId}/deployments` | Create a deployment. |
@@ -39,6 +40,10 @@ content → run flow locally.
 
 ## Data model
 
-Projects and content are **stateful**. A default project with a `Code.gs`
-file is seeded. Content updates persist and are reflected in subsequent GETs.
-The `:run` endpoint simulates function execution for known patterns.
+Projects and content are **stateful**. A default project with a `Code`
+(`SERVER_JS`) file containing a `helloWorld()` function is seeded. Content
+updates persist and are reflected in subsequent GETs, and deleting a project
+removes it (its content goes with it). The `:run` endpoint simulates function
+execution for known patterns (functions whose names contain `hello`/`greet`,
+`add` with 2+ parameters, or `status`; anything else echoes the parameters
+back).

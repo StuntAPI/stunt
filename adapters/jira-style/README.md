@@ -20,7 +20,8 @@ tracking and project management integrations during local development:
 - **JQL Search:** `GET /rest/api/3/search?jql=project=TEST` → `{startAt, maxResults, total,
   issues:[...]}`. Pattern-matches `project=KEY` and `status=NAME` — no real JQL engine.
 - **Issue CRUD:** `POST /rest/api/3/issue` (create, 201), `GET /rest/api/3/issue/{key}`
-  (retrieve), `PUT /rest/api/3/issue/{key}` (update, 204).
+  (retrieve), `PUT /rest/api/3/issue/{key}` (update, 204), `DELETE /rest/api/3/issue/{key}`
+  (delete, 204).
 - **Transitions:** `GET /rest/api/3/issue/{key}/transitions` → available transitions;
   `POST .../transitions` → do transition (204). Standard workflow: To Do → In Progress →
   Done → Reopened.
@@ -46,6 +47,7 @@ Jira Cloud accepts both `Authorization: Basic <base64(email:api_token)>` and
 | POST | `/rest/api/3/issue` | `issue.star#on_create_issue` | Create issue |
 | GET | `/rest/api/3/issue/{key}` | `issue.star#on_get_issue` | Get issue |
 | PUT | `/rest/api/3/issue/{key}` | `issue.star#on_update_issue` | Update issue |
+| DELETE | `/rest/api/3/issue/{key}` | `issue.star#on_delete_issue` | Delete issue (204) |
 | GET | `/rest/api/3/issue/{key}/transitions` | `issue.star#on_list_transitions` | List transitions |
 | POST | `/rest/api/3/issue/{key}/transitions` | `issue.star#on_do_transition` | Do transition |
 | POST | `/rest/api/3/issue/{key}/comment` | `issue.star#on_add_comment` | Add comment |

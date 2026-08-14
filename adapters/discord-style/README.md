@@ -19,9 +19,15 @@ during local development:
 - **Application/user resolution:** `GET /oauth2/@me` (Bearer).
 - **Bot user:** `GET /users/@me` → `{id, username, bot:true}`.
 - **Guild + channels:** `GET /guilds/{id}`, `GET /guilds/{id}/channels`.
-- **Send message:** `POST /channels/{id}/messages` (JSON `{content, embeds?}`).
-- **List messages:** `GET /channels/{id}/messages?limit=N` (bare array).
+- **Send message:** `POST /channels/{id}/messages` (JSON `{content, embeds?, tts?}`).
+- **List messages:** `GET /channels/{id}/messages?limit=N&after=<cursor>` (bare
+  array, newest first, cursor-paginated).
 - **Reactions:** `POST /channels/{id}/messages/{msg}/reactions/{emoji}/@me` → 204.
+- **Interactions webhook:** `POST /interactions` — Ed25519-verified slash-command
+  endpoint (ping → type 1 PONG, otherwise a type 5 deferred ack; bad/missing
+  signature → 401).
+- **WebSocket Gateway:** `ws /gateway` — HELLO (op 10) → IDENTIFY (op 2) →
+  READY (op 0) → a synthetic `MESSAGE_CREATE` dispatch.
 
 Messages are **stateful**: a message sent via POST appears in the GET list for the
 same channel, enabling customer-chat round-trip testing locally.
@@ -37,10 +43,55 @@ same channel, enabling customer-chat round-trip testing locally.
 | GET | `/guilds/{guild_id}` | `bot.star#on_guild` | Guild object |
 | GET | `/guilds/{guild_id}/channels` | `bot.star#on_guild_channels` | Channel list |
 | POST | `/channels/{channel_id}/messages` | `messages.star#on_send_message` | Send a message |
-| GET | `/channels/{channel_id}/messages` | `messages.star#on_list_messages` | List messages (stateful) |
+| GET | `/channels/{channel_id}/messages` | `messages.star#on_list_messages` | List messages (stateful, paginated) |
 | POST | `/channels/.../reactions/{emoji}/@me` | `messages.star#on_react` | Add reaction → 204 |
+| POST | `/interactions` | `interactions.star#on_interactions` | Signed slash-command webhook (Ed25519) |
+| WS | `/gateway` | `gateway.star#on_connect` | Gateway: HELLO → IDENTIFY → READY → dispatch |
 
 Any unmatched route returns `404`.
+
+## Pagination
+
+Bare-array list endpoints support **cursor pagination** via the `limit` and
+`after` query params (`after` is the opaque cursor token from a prior call):
+
+- `GET /channels/{id}/messages` — pages newest-first with a default page size of
+  50 (matching Discord's default).
+- `GET /guilds/{id}/channels` — paging is opt-in: a missing or zero `limit`
+  returns the whole list.
+
+When a further page exists, the response carries a Discord-style
+`Link: <https://discord.com/api/v10<path>?after=<cursor>>; rel="next"` header;
+round-trip the `after` token from that URL as a query param.
+
+## Signed interactions & webhook deliveries
+
+Both directions use Discord's Ed25519 signature scheme — the signature is
+`ed25519(timestamp + raw_body)` in hex, carried in the
+`X-Signature-Ed25519` + `X-Signature-Timestamp` headers:
+
+- **Inbound** `POST /interactions` is verified against the adapter's public key
+  (`_ED25519_PUBLIC_KEY` in `scripts/lib.star`) before being acknowledged; a
+  missing or invalid signature returns `401`.
+- **Outbound**, `POST /channels/{id}/messages` emits an Ed25519-signed
+  `MESSAGE_CREATE` event (fire-and-forget) to any registered webhook receiver,
+  signed with the adapter's private key over the same `timestamp + body`
+  formula. Verify deliveries against the same public key.
+
+See the signed-webhook roster in [`../README.md`](../README.md) for the
+adapter-by-adapter list of schemes, headers, and mock keys.
+
+## WebSocket Gateway
+
+Connect to `ws /gateway` to exercise a gateway client (e.g. discordgo's
+websocket session) locally. The lifecycle is:
+
+1. Server sends **HELLO** (op 10) with `heartbeat_interval: 4500`.
+2. Client sends **IDENTIFY** (op 2) — validated leniently (any frame accepted).
+3. Server sends **READY** (op 0, `t: READY`) with the mock bot user,
+   `session_id: "stunt-session-1"`, and a `resume_gateway_url`.
+4. Server dispatches a synthetic **MESSAGE_CREATE** (op 0, `s: 1`) so the client
+   immediately receives an event.
 
 ## Backing stores
 

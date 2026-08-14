@@ -63,13 +63,16 @@ against real Adyen credentials.
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| POST | `/v68/payments` | Create a payment |
+| POST | `/v68/payments` | Create a payment (honours `Idempotency-Key`) |
 | GET | `/v68/payments?reference=` | Look up a payment by merchant reference |
+| GET | `/v68/payments?pageSize=&cursor=` | List payments (cursor-paginated) |
 | POST | `/v68/payments/{paymentPspReference}/captures` | Capture a payment |
 | POST | `/v68/payments/{paymentPspReference}/refunds` | Refund a payment |
 | POST | `/v68/payments/{paymentPspReference}/reversals` | Reverse a payment |
 | POST | `/v68/payments/{paymentPspReference}/cancels` | Cancel a payment |
-| POST | `/v68/notifications/test` | Receive notification (accept + HMAC doc) |
+| POST | `/v68/notifications/test` | Receive notification (202 `[accepted]` + HMAC doc) |
+
+Any unmatched route returns a 404 with an Adyen-shaped error body.
 
 ## Deterministic test outcomes
 
@@ -89,6 +92,40 @@ Authorised → Refunded    (refund)
 Authorised → Reversed    (reversal)
 Authorised → Cancelled   (cancel)
 ```
+
+Each successful authorisation emits an `AUTHORISATION` event, and each
+modification emits `CAPTURE`, `REFUND`, `REVERSAL` or `CANCEL_OR_REFUND`. If
+the adapter service is configured with a `webhook_url`, these are delivered
+there (see the repo README's events/webhook roster in
+[../../README.md](../../README.md)).
+
+## Idempotency
+
+`POST /v68/payments` honours Adyen's `Idempotency-Key` header: a repeat call
+with the same key replays the original response (same status, same
+`pspReference`) instead of creating a second payment. The cache entry is
+scoped to method + path + collection + key, so the same key on a different
+route does not collide. Omit the header to create a new payment every time.
+
+## Pagination
+
+`GET /v68/payments` without a `reference` returns a cursor-paginated list:
+
+| Query param | Description |
+|-------------|-------------|
+| `pageSize` | Page size (default `10`) |
+| `cursor` | Opaque token from a prior call's `nextCursor`; omit/empty for the first page |
+
+```json
+{
+  "paymentData": [
+    { "pspReference": "8814000000000001", "resultCode": "Authorised", "reference": "order-001" }
+  ],
+  "nextCursor": "…"
+}
+```
+
+`nextCursor` is omitted when there are no further pages.
 
 ## HMAC notification signatures
 
@@ -168,6 +205,11 @@ func verifyHMAC(hmacKey string, item map[string]any) string {
   "errorType": "validation"
 }
 ```
+
+A missing `X-API-Key` returns `401` (`errorType: "security"`); unknown routes
+return the same shape with `status: 404`. Posted notification items are also
+stored (keyed by `pspReference-eventCode`) so tests can verify what was
+received.
 
 ## Disclaimer
 
