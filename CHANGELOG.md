@@ -6,6 +6,21 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-08-14
+
+### Adapters
+
+- **OAuth2 refresh_token grant.** x-articles-style, threads-style,
+  salesforce-style, and bluesky-style now issue a refresh_token they honor
+  (and rotate on use), so the 401→refresh→retry loop is testable. (google,
+  linkedin, qbo, reddit, aws-cognito already supported refresh.)
+  - x-articles: `refresh_token` grant added (was `unsupported_grant_type`).
+  - threads: auth-code now returns a `refresh_token`; refresh grant added.
+  - salesforce: `_issue_token` mints + returns a `refresh_token`; the refresh
+    branch now validates it.
+  - bluesky: new `POST /xrpc/com.atproto.server.refreshSession` — the minted
+    `refreshJwt` is now usable.
+
 ## [0.17.0] — 2026-08-14
 
 ### Adapters
