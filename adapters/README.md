@@ -272,6 +272,7 @@ Every handler receives a `req` argument with:
 | `req.path` | `str` | Request path (e.g. `/v1/charges/ch_123`) |
 | `req.headers` | `dict[str, str]` | Request headers (case-insensitive lookups; `req.headers.get("authorization")` finds `Authorization`). `req` also supports dict access (`req["method"]`, `req.get("query")`) |
 | `req.body` | `dict` | Parsed JSON body (empty dict if no body) |
+| `req.raw_body` | `str` | The verbatim request body bytes (as a string). Use it for non-JSON / binary content (e.g. an S3 object upload) where the parsed `body` map is meaningless — store it via `store_blob` so it round-trips byte-exact |
 | `req.params` | `dict[str, str]` | Path parameters extracted from route (e.g. `{id}` → `{"id": "..."}`) |
 | `req.query` | `dict[str, str]` | Query parameters (first value of each key) |
 
