@@ -66,9 +66,10 @@ def on_send_message(req):
     stored["channel_id"] = channel_id
     mc.insert(stored)
 
-    # Emit a MESSAGE_CREATE-style webhook event if any webhooks are
-    # registered (fire-and-forget; no failure if unregistered).
-    events_emit("MESSAGE_CREATE", msg)
+    # Emit a signed MESSAGE_CREATE webhook event if any webhooks are registered
+    # (fire-and-forget; no failure if unregistered). Ed25519-signed so a
+    # receiver verifies against the adapter's public key.
+    _signed_emit("MESSAGE_CREATE", msg)
 
     return respond(200, msg)
 
