@@ -152,3 +152,31 @@ def _next_link(req, next_cursor):
         return None
     path = req.get("path", "")
     return "<https://discord.com/api/v10" + path + "?after=" + next_cursor + '>; rel="next"'
+_ED25519_PRIVATE_KEY = """-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEIIdyw4XtKxfyuq1NMNaugUDCxnsuTTcv2rFQxI/KUXIu
+-----END PRIVATE KEY-----"""
+_ED25519_PUBLIC_KEY = """-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAd1aLcpV+BVWYqhQNBbGDsKGJ1jmRGQlBDtMr+3zfEz4=
+-----END PUBLIC KEY-----"""
+_ED25519_KID = "discord-stunt-mock-public-key"
+
+# _signed_emit signs the Ed25519-verified delivery: the signature is
+# ed25519(timestamp + body) and the headers are X-Signature-Ed25519 (hex) +
+# X-Signature-Timestamp, mirroring Discord's interaction-signature scheme so a
+# receiver verifies the delivery against the public key (_ED25519_PUBLIC_KEY).
+def _signed_emit(event_type, payload):
+    ts = str(clock.now_unix())
+    body = events_body(event_type, payload)
+    sig = crypto.ed25519_sign(_ED25519_PRIVATE_KEY, ts + body, encoding="hex")
+    events_emit(event_type, payload, {"X-Signature-Ed25519": sig, "X-Signature-Timestamp": ts})
+
+# _synthetic_message builds a minimal Discord message for gateway dispatch.
+def _synthetic_message():
+    seq = store_kv_incr("discord", "gw_msg_seq")
+    return {
+        "id": _snowflake(seq),
+        "channel_id": "1000000000000000000",
+        "author": {"id": "2000000000000000000", "username": "stunt-user", "bot": False},
+        "content": "Hello from the stunt gateway!",
+        "timestamp": "2024-01-01T00:00:00.000+00:00",
+    }

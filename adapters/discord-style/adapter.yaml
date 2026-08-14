@@ -53,6 +53,16 @@ endpoints:
     method: POST
     handler: scripts/messages.star#on_react
 
+  # --- Interactions (slash-command webhook; Ed25519-verified inbound) ---
+  - route: /interactions
+    method: POST
+    handler: scripts/interactions.star#on_interactions
+
+# --- WebSocket Gateway ---
+ws:
+  - route: /gateway
+    handler: scripts/gateway.star#on_connect
+
 # Backing stores — collections for stateful data.
 resources:
   - name: oauth_codes

@@ -245,6 +245,7 @@ events_emit("push", payload, {"X-Hub-Signature-256": "sha256=" + sig, "X-GitHub-
 | whatsapp-style | yes | `X-Hub-Signature-256` (Meta) | `whatsapp_stunt_mock_app_secret_2026` | hex |
 | square-style | yes | `X-Square-HmacSha256-Signature` (URL+body) | `sq0sip_stunt_mock_signature_key_2026` | base64 |
 | twilio-style | yes | `X-Twilio-Signature` (SHA-1, URL+body) | `twilio_auth_token` | base64 |
+| discord-style | yes | `X-Signature-Ed25519` + `X-Signature-Timestamp` (Ed25519 over ts+body) | Ed25519 keypair in adapter (`_ED25519_PUBLIC_KEY`); verify deliveries/interactions against it | hex |
 | adyen-style | deferred | — | — | — |
 | braintree-style | deferred | — | — | — |
 
