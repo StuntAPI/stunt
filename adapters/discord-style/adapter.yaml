@@ -53,7 +53,7 @@ endpoints:
     method: POST
     handler: scripts/messages.star#on_react
 
-  # --- Interactions (slash-command webhook; Ed25519-verified inbound) ---
+  # --- Interactions (slash-command webhook; inbound, signature-verified) ---
   - route: /interactions
     method: POST
     handler: scripts/interactions.star#on_interactions

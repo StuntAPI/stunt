@@ -9,7 +9,7 @@
 
 def on_connect(ws):
     # 1. HELLO.
-    ws.send({"op": 10, "d": {"heartbeat_interval": 41250, "_trace": ["stunt-gateway"]}})
+    ws.send({"op": 10, "d": {"heartbeat_interval": 4500, "_trace": ["stunt-gateway"]}})
 
     # 2. Await IDENTIFY (op 2). Accept any frame; reject a missing one.
     ident = ws.recv()
