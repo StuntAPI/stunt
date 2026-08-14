@@ -234,8 +234,11 @@ def on_delete_member(req):
 # query_select clauses, applied before paging like the real API:
 #   domain    -> group email domain suffix
 #   userKey   -> only groups the given user (member email or member id) is in
-#   query     -> the documented forms "email=<exact>" and "name:<substring>"
-#                (name matching is case-insensitive, like Directory queries)
+#   query     -> the documented search forms, space-separated and AND'ed:
+#                "email=<exact>", "email:<prefix>*", "name=<exact>",
+#                "name:<prefix>*", "memberKey=<member email or id>".
+#                Text matching is case-insensitive, like Directory queries;
+#                unrecognized forms are silently ignored, like Directory.
 #   orderBy   -> email
 #   sortOrder -> ASCENDING (default) | DESCENDING
 def _apply_group_filters(req, groups):
@@ -247,29 +250,12 @@ def _apply_group_filters(req, groups):
 
     user_key = _query_get(req, "userKey", "")
     if user_key != "":
-        group_emails = []
-        mc = store_collection("members")
-        for d in mc.list():
-            if d.get("email", "") == user_key or d["id"] == user_key:
-                group_emails.append(d.get("groupKey", ""))
-        f.append(["email", "in", group_emails])
+        f.append(["email", "in", _groups_of_member(user_key)])
 
     query = _query_get(req, "query", "")
     if query != "":
-        low = query.lower()
-        if low[:6] == "email=":
-            term = query[6:].strip()
-            if term != "":
-                f.append(["email", "=", term])
-        elif low[:5] == "name:":
-            term = query[5:].strip()
-            if term != "":
-                kept = []
-                tl = term.lower()
-                for g in groups:
-                    if str(g.get("name", "")).lower().find(tl) >= 0:
-                        kept.append(g)
-                groups = kept
+        for part in _split_query_clauses(query):
+            groups = _apply_group_query_clause(part, groups, f)
 
     flt = None
     if len(f) > 0:
@@ -284,6 +270,105 @@ def _apply_group_filters(req, groups):
         order_dir = "desc"
 
     return query_select(groups, flt, order_by, order_dir)
+
+# _split_query_clauses splits a groups search query on spaces, ignoring
+# spaces inside single-quoted values (the documented form for values with
+# spaces, e.g. name='All Staff').
+def _split_query_clauses(q):
+    parts = []
+    cur = ""
+    inq = False
+    for i in range(len(q)):
+        ch = q[i]
+        if ch == "'":
+            inq = not inq
+            cur = cur + ch
+        elif ch == " " and not inq:
+            if cur != "":
+                parts.append(cur)
+                cur = ""
+        else:
+            cur = cur + ch
+    if cur != "":
+        parts.append(cur)
+    return parts
+
+# _unquote strips one pair of surrounding single quotes, if present.
+def _unquote(term):
+    if len(term) >= 2 and term[0] == "'" and term[len(term) - 1] == "'":
+        return term[1:len(term) - 1]
+    return term
+
+# _groups_of_member returns the emails of the groups containing the given
+# member (by member email or member id).
+def _groups_of_member(member):
+    group_emails = []
+    mc = store_collection("members")
+    for d in mc.list():
+        if d.get("email", "") == member or d.get("id", "") == member:
+            group_emails.append(d.get("groupKey", ""))
+    return group_emails
+
+# _apply_group_query_clause applies one space-separated query clause to the
+# groups list. Exact/prefix forms narrow `groups` manually (Directory text
+# matching is case-insensitive); memberKey= defers to an email "in" clause in
+# f. Unknown forms are ignored, like the real Directory API.
+def _apply_group_query_clause(part, groups, f):
+    part = part.strip()
+    if part == "":
+        return groups
+    low = part.lower()
+    if low[:6] == "email=":
+        term = _unquote(part[6:].strip())
+        if term != "":
+            f.append(["email", "=", term])
+    elif low[:6] == "email:":
+        term = part[6:].strip()
+        if len(term) > 1 and term[len(term) - 1] == "*":
+            groups = _ci_startswith(groups, "email", _unquote(term[:len(term) - 1]))
+    elif low[:5] == "name=":
+        term = _unquote(part[5:].strip())
+        if term != "":
+            groups = _ci_exact(groups, "name", term)
+    elif low[:5] == "name:":
+        term = part[5:].strip()
+        if len(term) > 1 and term[len(term) - 1] == "*":
+            groups = _ci_startswith(groups, "name", _unquote(term[:len(term) - 1]))
+        elif term != "":
+            # Bare name: keeps the pre-existing case-insensitive substring
+            # behavior for clients that relied on it.
+            tl = _unquote(term).lower()
+            kept = []
+            for g in groups:
+                if str(g.get("name", "")).lower().find(tl) >= 0:
+                    kept.append(g)
+            groups = kept
+    elif low[:10] == "memberkey=":
+        term = _unquote(part[10:].strip())
+        if term != "":
+            f.append(["email", "in", _groups_of_member(term)])
+    return groups
+
+# _ci_startswith keeps only the dicts whose field starts with prefix,
+# case-insensitively.
+def _ci_startswith(items, field, prefix):
+    pl = prefix.lower()
+    out = []
+    for it in items:
+        v = it.get(field, None)
+        if v != None and str(v).lower()[:len(pl)] == pl:
+            out.append(it)
+    return out
+
+# _ci_exact keeps only the dicts whose field equals term, case-insensitively.
+def _ci_exact(items, field, term):
+    tl = term.lower()
+    out = []
+    for it in items:
+        v = it.get(field, None)
+        if v != None and str(v).lower() == tl:
+            out.append(it)
+    return out
 
 # _apply_member_filters maps the real Directory members.list roles param to a
 # query_select clause, applied before paging like the real API:

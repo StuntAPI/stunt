@@ -109,8 +109,13 @@ def on_list_refunds(req):
     if err != None:
         return err
 
+    bad = _created_check(req)
+    if bad != None:
+        return bad
+
     docs = store_collection("refunds").list()
     docs = _apply_refund_filters(req, docs)
+    docs = _newest_first(docs)
 
     page, has_more, e = _list_page(req, docs, "refund")
     if e != None:

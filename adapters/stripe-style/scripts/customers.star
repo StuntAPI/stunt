@@ -47,9 +47,14 @@ def on_list_customers(req):
     if err != None:
         return err
 
+    bad = _created_check(req)
+    if bad != None:
+        return bad
+
     c = store_collection("customers")
     docs = c.list()
     docs = _apply_customer_filters(req, docs)
+    docs = _newest_first(docs)
     page, has_more, err = _list_page(req, docs, "customer")
     if err != None:
         return err

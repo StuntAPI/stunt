@@ -106,6 +106,43 @@ def _created_filters(req, f):
     if v > 0:
         f.append(["created", "<=", v])
 
+# _created_check validates the `created` / `created[gt|gte|lt|lte]` filter
+# params. Real Stripe rejects a non-numeric value with a 400
+# parameter_invalid_integer error; previously _to_int silently parsed the
+# numeric prefix and ignored the rest. Returns None when all set params are
+# numeric, or a 400 error response the caller must return.
+def _created_check(req):
+    for key in ["created", "created[gt]", "created[gte]", "created[lt]", "created[lte]"]:
+        v = _get_query(req, key)
+        if v == "":
+            continue
+        ok = True
+        for i in range(len(v)):
+            ch = v[i]
+            if ch < "0" or ch > "9":
+                ok = False
+                break
+        if not ok:
+            return respond(400, {"error": {"code": "parameter_invalid_integer", "message": "Invalid integer: " + v, "param": key, "type": "invalid_request_error"}})
+    return None
+
+# _newest_first returns docs in reverse insertion order. Store lists are
+# oldest-first, but Stripe list endpoints return objects "sorted by creation
+# date, with the most recent appearing first" (charges, customers,
+# payment intents, refunds, payouts, transfers). Apply before _list_page so
+# both the default page and the starting_after offset lookup operate on
+# newest-first order. Stored `created` values are a constant fixture
+# timestamp, so sorting on `created` cannot reorder anything; reversing
+# insertion order (ids are monotonically increasing) yields creation-date
+# descending exactly.
+def _newest_first(docs):
+    out = []
+    i = len(docs) - 1
+    while i >= 0:
+        out.append(docs[i])
+        i = i - 1
+    return out
+
 # _stripe_account extracts the Stripe-Account header used by Stripe Connect
 # to scope requests to a connected account. Returns None if absent.
 def _stripe_account(req):

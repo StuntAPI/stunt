@@ -396,12 +396,16 @@ def _apply_event_filters(req, items):
     if ical_uid != None and ical_uid != "":
         f.append(["iCalUID", "=", ical_uid])
 
+    # Overlap-window semantics: timeMin is an exclusive lower bound on an
+    # event's END time; timeMax is an exclusive upper bound on its START
+    # time. Events missing the compared dateTime (missing fields match only
+    # !=) do not match the corresponding bound.
     time_min = req["query"].get("timeMin", "")
     if time_min != None and time_min != "":
-        f.append(["start.dateTime", ">=", time_min])
+        f.append(["end.dateTime", ">", time_min])
     time_max = req["query"].get("timeMax", "")
     if time_max != None and time_max != "":
-        f.append(["start.dateTime", "<=", time_max])
+        f.append(["start.dateTime", "<", time_max])
 
     order_by = req["query"].get("orderBy", "")
     if order_by == None:
@@ -418,7 +422,9 @@ def _apply_event_filters(req, items):
         needle = q.lower()
         filtered = []
         for e in items:
-            hay = e.get("summary", "") + "\n" + e.get("description", "") + "\n" + e.get("location", "")
+            # (x.get(k) or "") — a key present with a null value returns
+            # None from .get, and None + str would fail the request.
+            hay = (e.get("summary") or "") + "\n" + (e.get("description") or "") + "\n" + (e.get("location") or "")
             if needle in hay.lower():
                 filtered.append(e)
         items = filtered
@@ -428,13 +434,16 @@ def _apply_event_filters(req, items):
 # _apply_instance_filters applies the real instances timeMin/timeMax params
 # (ISO8601 strings compare lexicographically) before paging.
 def _apply_instance_filters(req, items):
+    # Same overlap-window semantics as events.list: timeMin bounds the
+    # instance END (exclusive), timeMax bounds the instance START
+    # (exclusive).
     f = []
     time_min = req["query"].get("timeMin", "")
     if time_min != None and time_min != "":
-        f.append(["start.dateTime", ">=", time_min])
+        f.append(["end.dateTime", ">", time_min])
     time_max = req["query"].get("timeMax", "")
     if time_max != None and time_max != "":
-        f.append(["start.dateTime", "<=", time_max])
+        f.append(["start.dateTime", "<", time_max])
     if len(f) > 0:
         return query_select(items, f)
     return items

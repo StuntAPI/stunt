@@ -49,7 +49,7 @@ process.
 - **Recurring events**: `recurrence:["RRULE:FREQ=DAILY;COUNT=3"]` is stored and
   expanded into individual instances when listed with `singleEvents=true` or via
   the `/instances` endpoint. DAILY and WEEKLY frequencies are supported.
-- **timeMin/timeMax filtering**: ISO8601 string comparison on `start.dateTime`.
+- **timeMin/timeMax filtering**: overlap-window semantics — `timeMin` is an exclusive lower bound on the event's `end.dateTime`, `timeMax` is an exclusive upper bound on the event's `start.dateTime` (ISO8601 string comparison).
 - **List filtering**: `q` matches summary/description/location
   (case-insensitive), `iCalUID` filters by UID equality, `showDeleted=true`
   includes cancelled events, and `orderBy=startTime` sorts ascending (requires

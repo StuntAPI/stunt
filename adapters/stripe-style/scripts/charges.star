@@ -65,9 +65,14 @@ def on_list_charges(req):
     if err != None:
         return err
 
+    bad = _created_check(req)
+    if bad != None:
+        return bad
+
     c = store_collection("charges")
     docs = c.list()
     docs = _apply_charge_filters(req, docs)
+    docs = _newest_first(docs)
     page, has_more, err = _list_page(req, docs, "charge")
     if err != None:
         return err

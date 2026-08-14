@@ -97,8 +97,13 @@ def on_list_payment_intents(req):
     if err != None:
         return err
 
+    bad = _created_check(req)
+    if bad != None:
+        return bad
+
     docs = store_collection("payment_intents").list()
     docs = _apply_payment_intent_filters(req, docs)
+    docs = _newest_first(docs)
 
     page, has_more, e = _list_page(req, docs, "payment_intent")
     if e != None:

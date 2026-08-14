@@ -314,6 +314,8 @@ The connected account's balance is debited by the payout amount.
 
 Any unmatched route returns `404 {"error":"resource_not_found"}`.
 
+List endpoints Stripe documents as newest-first (`charges`, `customers`, `payment_intents`, `refunds`, `payouts`, `transfers`) return the most recently created objects first, like the real API. A non-numeric `created` / `created[gt|gte|lt|lte]` filter value returns Stripe's `400 parameter_invalid_integer` error.
+
 ## Backing stores
 
 | Collection | Seed fixture | Purpose |

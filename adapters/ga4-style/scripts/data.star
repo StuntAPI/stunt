@@ -72,6 +72,10 @@ def _run_report(req):
     if body == None:
         body = {}
 
+    bad = _validate_request(body)
+    if bad != None:
+        return bad
+
     dimensions = _extract_dimension_names(body.get("dimensions", []))
     metrics = _extract_metric_names(body.get("metrics", []))
     limit = _body_int(body, "limit", 10000)
@@ -125,6 +129,10 @@ def _run_realtime_report(req):
     if body == None:
         body = {}
 
+    bad = _validate_request(body)
+    if bad != None:
+        return bad
+
     dimensions = _extract_dimension_names(body.get("dimensions", []))
     metrics = _extract_metric_names(body.get("metrics", []))
     limit = _body_int(body, "limit", 10000)
@@ -161,6 +169,82 @@ def _run_realtime_report(req):
     })
 
 # --- helpers ---
+
+# _invalid_argument returns the GA4 400 status envelope for a bad request.
+def _invalid_argument(msg):
+    return respond(400, {
+        "error": {
+            "code": 400,
+            "message": msg,
+            "status": "INVALID_ARGUMENT",
+        },
+    })
+
+# _validate_request 400s like the real Data API on unknown dimension/metric
+# names in dimensions, metrics, dimensionFilter/metricFilter fieldNames, and
+# orderBys. Returns the error response or None.
+def _validate_request(body):
+    for d in _extract_dimension_names(body.get("dimensions", [])):
+        if d not in _VALID_DIMENSIONS:
+            return _invalid_argument("Unknown dimension name: " + d)
+    for m in _extract_metric_names(body.get("metrics", [])):
+        if m not in _VALID_METRICS:
+            return _invalid_argument("Unknown metric name: " + m)
+
+    err = _validate_filter(body.get("dimensionFilter", None), _VALID_DIMENSIONS)
+    if err != None:
+        return err
+    err = _validate_filter(body.get("metricFilter", None), _VALID_METRICS)
+    if err != None:
+        return err
+
+    obs = body.get("orderBys", [])
+    if obs == None:
+        obs = []
+    for ob in obs:
+        d = ob.get("dimension", None)
+        if d != None:
+            name = d.get("dimensionName", "")
+            if name != "" and name not in _VALID_DIMENSIONS:
+                return _invalid_argument("Unknown dimension name: " + name)
+            continue
+        m = ob.get("metric", None)
+        if m != None:
+            name = m.get("metricName", "")
+            if name != "" and name not in _VALID_METRICS:
+                return _invalid_argument("Unknown metric name: " + name)
+    return None
+
+# _validate_filter walks a (possibly nested) FilterExpression with an
+# explicit stack (no recursion in starlark-go) and 400s on an unknown leaf
+# fieldName. Returns the error response or None.
+def _validate_filter(expr, valid_names):
+    if expr == None:
+        return None
+    stack = [expr]
+    while len(stack) > 0:
+        e = stack.pop()
+        if e == None:
+            continue
+        leaf = e.get("filter", None)
+        if leaf != None:
+            field = leaf.get("fieldName", "")
+            if field != "" and field not in valid_names:
+                return _invalid_argument("Unknown field name: " + field)
+            continue
+        sub = e.get("andGroup", None)
+        if sub == None:
+            sub = e.get("orGroup", None)
+        if sub != None:
+            exprs = sub.get("expressions", [])
+            if exprs != None:
+                for x in exprs:
+                    stack.append(x)
+            continue
+        sub = e.get("notExpression", None)
+        if sub != None:
+            stack.append(sub)
+    return None
 
 # _extract_dimension_names pulls the "name" field from each dimension spec.
 def _extract_dimension_names(dims):
@@ -386,6 +470,16 @@ def _leaf_matches(leaf, rows, n):
     field = leaf.get("fieldName", "")
     if field == "":
         return _all_bools(n, True)
+    sf = leaf.get("stringFilter", None)
+    if sf != None:
+        cs = sf.get("caseSensitive", False)
+        if cs == None:
+            cs = False
+        if cs == False:
+            # GA4 stringFilter defaults to case-insensitive; query_select's
+            # string ops are case-sensitive, so compare lowercased sides in
+            # a manual scan.
+            return _ci_string_bools(sf, field, rows, n)
     f = _leaf_triples(leaf, field)
     if len(f) == 0:
         return _all_bools(n, True)
@@ -398,6 +492,33 @@ def _leaf_matches(leaf, rows, n):
         if j < len(selected) and rows[i] == selected[j]:
             bools[i] = True
             j = j + 1
+    return bools
+
+# _ci_string_bools evaluates a case-INsensitive stringFilter against the row
+# dicts: both the row value and the filter value are lowercased before the
+# matchType comparison (EXACT is the default matchType).
+def _ci_string_bools(sf, field, rows, n):
+    value = sf.get("value", "")
+    if value == None:
+        value = ""
+    needle = value.lower()
+    match_type = sf.get("matchType", "EXACT")
+    bools = []
+    for i in range(n):
+        rv = rows[i].get(field, "")
+        if rv == None:
+            rv = ""
+        hay = rv.lower()
+        ok = False
+        if match_type == "CONTAINS":
+            ok = needle in hay
+        elif match_type == "STARTS_WITH":
+            ok = hay.startswith(needle)
+        elif match_type == "ENDS_WITH":
+            ok = hay.endswith(needle)
+        else:
+            ok = hay == needle
+        bools.append(ok)
     return bools
 
 # _leaf_triples maps a GA4 Filter to query_select [field, op, value] triples.

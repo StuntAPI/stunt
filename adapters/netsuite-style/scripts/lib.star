@@ -231,12 +231,13 @@ def _get_body(req):
 
 # _paginate returns a NetSuite-style list response:
 #   {items:[...], count, hasMore, links:[{rel, href}]}
-# NetSuite uses offset/limit query params (default limit=50).
+# NetSuite uses offset/limit query params (default limit=1000, the real
+# collection paging default).
 def _paginate(req, docs, record_type):
     query = req.get("query")
     if query == None:
         query = {}
-    limit = _parse_int(query.get("limit", "50"), 50)
+    limit = _parse_int(query.get("limit", "1000"), 1000)
     offset = _parse_int(query.get("offset", "0"), 0)
 
     total = len(docs)
@@ -290,160 +291,461 @@ def _parse_int(s, default_val):
 # List query params (NetSuite REST `q` and `orderBy`)
 # ====================================================================
 #
-# NetSuite record list endpoints accept, alongside limit/offset:
+# NetSuite record list endpoints accept, alongside limit/offset, the
+# documented "Record Collection Filtering" syntax:
 #   q=<field> <op> <value>
-# with ops EQ/NE/GT/LT/GE/LE (or = != > < >= <=), LIKE ('%'/_ wildcards),
-# IS, IN ('a','b') and BETWEEN 'a' AND 'b'; values are single-quoted for
-# strings or bare for numbers/booleans; and
+# with operators (case-insensitive words):
+#   IS / IS_NOT                    exact match (case-sensitive)
+#   CONTAIN / CONTAIN_NOT          substring
+#   START_WITH / START_WITH_NOT    prefix
+#   END_WITH / END_WITH_NOT        suffix
+#   GREATER / GREATER_OR_EQUAL / LESS / LESS_OR_EQUAL
+#   ANY_OF [v1,v2]                 set membership
+#   BETWEEN [lo,hi] (or BETWEEN lo AND hi)
+#   AFTER / BEFORE / ON / ON_OR_AFTER / ON_OR_BEFORE (dates, ISO strings)
+#   EMPTY / NOT_EMPTY
+# Conditions are joined with AND, and OR is supported between AND groups
+# (top level). Values are single- or double-quoted strings (quotes optional
+# for single tokens); bare numbers/true/false/null are typed. The symbolic
+# operators = != > < >= <= <> and the word aliases EQ NE GT LT GE LE LIKE
+# IN BETWEEN are also accepted (undocumented aliases for pre-existing
+# callers). An unparseable `q` returns 400 INVALID_SEARCH_PARAMETER rather
+# than silently unfiltered results. Also:
 #   orderBy=<field>[ DESC|ASC]
 # Both are applied before paging.
 
 # _ns_apply_list_filters applies `q` and `orderBy` to a list of docs (call
-# before _paginate).
+# before _paginate). Returns [docs, None] on success or [None, error_resp]
+# when the `q` expression cannot be parsed.
 def _ns_apply_list_filters(req, docs):
     query = req.get("query")
     if query == None:
         query = {}
-    triples = _ns_q_triples(query.get("q", ""))
-    triples = _ns_coerce(triples, docs)
+    groups = _ns_q_parse(query.get("q", ""))
+    if groups == None:
+        return None, _netsuite_error(400, "An error occurred while searching records.",
+            "INVALID_SEARCH_PARAMETER",
+            "The q parameter is not a valid filter expression.")
+    out = docs
+    if len(groups) > 0:
+        out = []
+        for d in docs:
+            if _ns_doc_matches(d, groups):
+                out.append(d)
     order_by, order_dir = _ns_order_parts(query.get("orderBy", ""))
-    if len(triples) == 0 and order_by == "":
-        return docs
-    filt = None
-    if len(triples) > 0:
-        filt = triples
-    return query_select(docs, filt, order_by, order_dir, None, None, None)
+    if order_by == "":
+        return out, None
+    return query_select(out, None, order_by, order_dir, None, None, None), None
 
-# _ns_coerce retypes filter values against the stored field type so bare
-# numerics match string-typed fields (ids are stored as strings) and quoted
-# numerics match numeric fields (`total` is stored as a number).
-def _ns_coerce(triples, docs):
-    for t in triples:
-        ft = _ns_field_type(docs, t[0])
-        if ft == None:
-            continue
-        if t[1] == "in":
-            vals = t[2]
-            out = []
-            for v in vals:
-                out.append(_ns_coerce_value(v, ft))
-            t[2] = out
-        elif t[1] == "=" or t[1] == "!=":
-            t[2] = _ns_coerce_value(t[2], ft)
-    return triples
+# _ns_doc_matches reports whether a doc satisfies any OR-group, where every
+# condition in a group (AND'ed) must match.
+def _ns_doc_matches(doc, groups):
+    for g in groups:
+        ok = True
+        for c in g:
+            if not _ns_cond_match(doc, c):
+                ok = False
+                break
+        if ok:
+            return True
+    return False
 
-# _ns_field_type returns the type of a field from the first doc that has it.
-def _ns_field_type(docs, field):
-    for d in docs:
-        if field in d:
-            return type(d[field])
+# _ns_cond_match applies one parsed condition [field, op, value] to a doc.
+# Internal ops: = != isnot > >= < <= contains notcontains startswith notsw
+# endswith notew like in empty notempty. Matching is case-sensitive (per
+# NetSuite docs for IS; substring ops are kept case-sensitive too).
+def _ns_cond_match(doc, cond):
+    field = cond[0]
+    op = cond[1]
+    want = cond[2]
+    if op == "empty":
+        if field not in doc:
+            return True
+        v = doc[field]
+        return v == None or v == ""
+    if op == "notempty":
+        if field not in doc:
+            return False
+        v = doc[field]
+        return v != None and v != ""
+    has = field in doc
+    v = None
+    if has:
+        v = doc[field]
+    if op == "=":
+        if want == None:
+            return not has or v == None
+        return has and v != None and _ns_eq(v, want)
+    if op == "!=" or op == "isnot":
+        if want == None:
+            return has and v != None
+        return not (has and v != None and _ns_eq(v, want))
+    if not has or v == None:
+        return False
+    if op == ">":
+        return _ns_cmp(v, want) > 0
+    if op == ">=":
+        return _ns_cmp(v, want) >= 0
+    if op == "<":
+        return _ns_cmp(v, want) < 0
+    if op == "<=":
+        return _ns_cmp(v, want) <= 0
+    if op == "contains":
+        return _ns_strok(v) and _contains(v, want)
+    if op == "notcontains":
+        return not (_ns_strok(v) and _contains(v, want))
+    if op == "startswith":
+        return _ns_strok(v) and _ns_startswith(v, want)
+    if op == "notsw":
+        return not (_ns_strok(v) and _ns_startswith(v, want))
+    if op == "endswith":
+        return _ns_strok(v) and _ns_endswith(v, want)
+    if op == "notew":
+        return not (_ns_strok(v) and _ns_endswith(v, want))
+    if op == "like":
+        return _ns_strok(v) and _ns_like(v, want)
+    if op == "in":
+        for x in want:
+            if _ns_eq(v, x):
+                return True
+        return False
+    return False
+
+# _ns_strok reports whether v is a string (substring ops need strings).
+def _ns_strok(v):
+    return type(v) == type("")
+
+# _ns_eq compares v (stored) with want (parsed literal) for exact equality,
+# coercing across the string/number boundary either way so bare numerics
+# match string-typed fields (ids are stored as strings) and quoted numerics
+# match numeric fields (`total` is stored as a number).
+def _ns_eq(v, want):
+    if type(v) == type(""):
+        w = want
+        if type(w) == type(0):
+            w = _int_to_str(w)
+        elif type(w) == type(1.0):
+            w = str(w)
+        return v == w
+    if type(want) == type(""):
+        wv = _ns_try_num(want)
+        if wv != None:
+            return v == wv
+        return False
+    return v == want
+
+# _ns_cmp compares two values for the ordering ops: numerically when both
+# sides are numeric (numbers or numeric strings), else lexicographically
+# (ISO date strings compare correctly). Returns -1/0/1.
+def _ns_cmp(a, b):
+    an = _ns_try_num(a)
+    bn = _ns_try_num(b)
+    if an != None and bn != None:
+        if an < bn:
+            return -1
+        if an > bn:
+            return 1
+        return 0
+    sa = str(a)
+    sb = str(b)
+    if sa < sb:
+        return -1
+    if sa > sb:
+        return 1
+    return 0
+
+# _ns_try_num returns v as a number when v is a number or a numeric string,
+# else None.
+def _ns_try_num(v):
+    if type(v) == type(0) or type(v) == type(1.0):
+        return v
+    if type(v) != type(""):
+        return None
+    if _ns_is_int(v):
+        return _ns_int(v)
+    if _ns_is_float(v):
+        return _ns_float(v)
     return None
 
-# _ns_coerce_value converts v to match the stored field type where the
-# conversion is unambiguous.
-def _ns_coerce_value(v, ft):
-    if v == None:
-        return v
-    if ft == type(0) or ft == type(1.0):
-        if type(v) == type(""):
-            if _ns_is_int(v):
-                return _ns_int(v)
-            if _ns_is_float(v):
-                return _ns_float(v)
-        return v
-    if ft == type(""):
-        if type(v) == type(0):
-            return _int_to_str(v)
-        return v
-    return v
+def _ns_startswith(s, prefix):
+    return len(s) >= len(prefix) and s[:len(prefix)] == prefix
 
-# _ns_q_triples parses the `q` param into query_select triples (a list,
-# possibly empty when no supported condition is present).
-def _ns_q_triples(q):
+def _ns_endswith(s, suffix):
+    return len(s) >= len(suffix) and s[len(s) - len(suffix):] == suffix
+
+# _ns_like matches s against a SQL LIKE pattern ('%' = any run, '_' = any
+# single char); the whole pattern must match (case-sensitive).
+def _ns_like(s, pat):
+    si = 0
+    pi = 0
+    star = -1
+    sback = 0
+    while si < len(s):
+        if pi < len(pat) and (pat[pi] == "_" or pat[pi] == s[si]):
+            si = si + 1
+            pi = pi + 1
+        elif pi < len(pat) and pat[pi] == "%":
+            star = pi
+            sback = si
+            pi = pi + 1
+        elif star >= 0:
+            sback = sback + 1
+            si = sback
+            pi = star + 1
+        else:
+            return False
+    while pi < len(pat) and pat[pi] == "%":
+        pi = pi + 1
+    return pi == len(pat)
+
+# _ns_q_parse parses the `q` param into a list of OR-groups (each a list of
+# condition triples). Returns [] for an empty q, or None on a parse error
+# (including parentheses, which are documented but unsupported here).
+def _ns_q_parse(q):
     if q == None:
         return []
     q = _trim(q)
     if q == "":
         return []
-    # OR is not supported; leave unfiltered rather than mis-filter.
-    if _contains(_lower(q), " or "):
-        return []
-    sp = _index(q, " ")
-    if sp < 0:
-        return []
-    field = _trim(q[:sp])
-    rest = _trim(q[sp + 1:])
-    if field == "" or rest == "":
-        return []
-
-    op = ""
-    valpart = ""
-    two = rest[0:2]
-    if two == ">=" or two == "<=" or two == "!=" or two == "<>":
-        op = two
-        valpart = _trim(rest[2:])
-    elif rest[0] == "=" or rest[0] == ">" or rest[0] == "<":
-        op = rest[0]
-        valpart = _trim(rest[1:])
-    else:
-        sp2 = _index(rest, " ")
-        if sp2 < 0:
-            return []
-        word = _lower(_trim(rest[:sp2]))
-        valpart = _trim(rest[sp2 + 1:])
-        if word == "eq" or word == "is":
-            op = "="
-        elif word == "ne":
-            op = "!="
-        elif word == "gt":
-            op = ">"
-        elif word == "lt":
-            op = "<"
-        elif word == "ge":
-            op = ">="
-        elif word == "le":
-            op = "<="
-        elif word == "like":
-            op = "like"
-        elif word == "in":
-            op = "in"
-        elif word == "between":
-            return _ns_between(field, valpart)
+    toks = _ns_tokens(q)
+    if toks == None:
+        return None
+    groups = []
+    cur = []
+    i = 0
+    n = len(toks)
+    while i < n:
+        kind = toks[i][0]
+        if kind == "paren":
+            return None
+        if kind == "word" and (_lower(toks[i][1]) == "and" or _lower(toks[i][1]) == "or"):
+            return None
+        conds, i = _ns_parse_cond(toks, i)
+        if conds == None:
+            return None
+        for c in conds:
+            cur.append(c)
+        if i >= n:
+            groups.append(cur)
+            return groups
+        kind = toks[i][0]
+        low = _lower(toks[i][1])
+        if kind == "word" and low == "and":
+            i = i + 1
+        elif kind == "word" and low == "or":
+            groups.append(cur)
+            cur = []
+            i = i + 1
         else:
-            return []
+            return None
+    if len(cur) > 0:
+        groups.append(cur)
+    return groups
 
-    if op == "<>":
-        op = "!="
-    if op == "":
-        return []
+# _ns_tokens lexes a q expression into [kind, text] tokens where kind is
+# "word", "qstr" (quoted string), "op" (symbolic operator), "list"
+# ([bracket] contents) or "paren". Returns None on unterminated quotes or
+# bracket lists.
+def _ns_tokens(q):
+    toks = []
+    i = 0
+    n = len(q)
+    while i < n:
+        ch = q[i]
+        if ch == " " or ch == "\t":
+            i = i + 1
+        elif ch == "'" or ch == '"':
+            quote = ch
+            i = i + 1
+            s = ""
+            closed = False
+            while i < n:
+                if q[i] == quote:
+                    closed = True
+                    i = i + 1
+                    break
+                s = s + q[i]
+                i = i + 1
+            if not closed:
+                return None
+            toks.append(["qstr", s])
+        elif ch == "(" or ch == ")" or ch == ",":
+            toks.append(["paren", ch])
+            i = i + 1
+        elif ch == "[":
+            j = i + 1
+            s = ""
+            while j < n and q[j] != "]":
+                s = s + q[j]
+                j = j + 1
+            if j >= n:
+                return None
+            toks.append(["list", s])
+            i = j + 1
+        elif ch == ">" or ch == "<" or ch == "=" or ch == "!":
+            two = q[i:i + 2]
+            if two == ">=" or two == "<=" or two == "!=" or two == "<>":
+                toks.append(["op", two])
+                i = i + 2
+            else:
+                toks.append(["op", ch])
+                i = i + 1
+        else:
+            j = i
+            while j < n:
+                c = q[j]
+                if c == " " or c == "\t" or c == "(" or c == ")" or c == "[" or c == "]" or c == "," or c == "'" or c == '"' or c == ">" or c == "<" or c == "=" or c == "!":
+                    break
+                j = j + 1
+            if j == i:
+                # Unhandled special character (e.g. ']' outside a list).
+                return None
+            toks.append(["word", q[i:j]])
+            i = j
+    return toks
+
+# _ns_parse_cond parses one "<field> <op> <value>" condition (BETWEEN
+# produces two conditions). Returns [conds, next_i] or [None, i].
+def _ns_parse_cond(toks, i):
+    n = len(toks)
+    if i >= n:
+        return None, i
+    kind = toks[i][0]
+    if kind != "word" and kind != "qstr":
+        return None, i
+    field = toks[i][1]
+    i = i + 1
+    if i >= n:
+        return None, i
+    kind = toks[i][0]
+    text = toks[i][1]
+    op = ""
+    if kind == "op":
+        i = i + 1
+        if text == "=":
+            op = "="
+        elif text == "!=" or text == "<>":
+            op = "!="
+        elif text == ">":
+            op = ">"
+        elif text == "<":
+            op = "<"
+        elif text == ">=":
+            op = ">="
+        elif text == "<=":
+            op = "<="
+        else:
+            return None, i
+    elif kind == "word":
+        w = _lower(text)
+        i = i + 1
+        if w == "is" or w == "eq":
+            op = "="
+        elif w == "is_not" or w == "ne":
+            op = "isnot"
+        elif w == "contain":
+            op = "contains"
+        elif w == "contain_not":
+            op = "notcontains"
+        elif w == "start_with":
+            op = "startswith"
+        elif w == "start_with_not":
+            op = "notsw"
+        elif w == "end_with" or w == "endwith":
+            op = "endswith"
+        elif w == "end_with_not" or w == "endwith_not":
+            op = "notew"
+        elif w == "greater" or w == "gt":
+            op = ">"
+        elif w == "greater_or_equal" or w == "ge":
+            op = ">="
+        elif w == "less" or w == "lt":
+            op = "<"
+        elif w == "less_or_equal" or w == "le":
+            op = "<="
+        elif w == "after":
+            op = ">"
+        elif w == "before":
+            op = "<"
+        elif w == "on":
+            op = "="
+        elif w == "on_or_after":
+            op = ">="
+        elif w == "on_or_before":
+            op = "<="
+        elif w == "like":
+            op = "like"
+        elif w == "any_of" or w == "in":
+            op = "in"
+        elif w == "empty":
+            return [[field, "empty", None]], i
+        elif w == "not_empty":
+            return [[field, "notempty", None]], i
+        elif w == "between":
+            return _ns_parse_between(field, toks, i)
+        else:
+            return None, i
+    else:
+        return None, i
+
+    if i >= n:
+        return None, i
+    kind = toks[i][0]
+    text = toks[i][1]
     if op == "in":
-        vals = _ns_in_list(valpart)
+        if kind != "list":
+            return None, i
+        vals = []
+        for part in _split(text, ","):
+            part = _trim(part)
+            if part != "":
+                vals.append(_ns_value(part))
         if len(vals) == 0:
-            return []
-        return [[field, "in", vals]]
-    return [[field, op, _ns_value(valpart)]]
+            return None, i
+        return [[field, "in", vals]], i + 1
+    if op == "contains" or op == "notcontains" or op == "startswith" or op == "notsw" or op == "endswith" or op == "notew" or op == "like":
+        # Substring/pattern ops compare the raw token text as a string.
+        if kind == "qstr" or kind == "word":
+            return [[field, op, text]], i + 1
+        return None, i
+    if kind == "qstr":
+        return [[field, op, text]], i + 1
+    if kind == "word":
+        return [[field, op, _ns_value(text)]], i + 1
+    return None, i
 
-# _ns_between parses "BETWEEN 'a' AND 'b'" into >= and <= triples.
-def _ns_between(field, valpart):
-    low = _lower(valpart)
-    i = _index(low, " and ")
-    if i < 0:
-        return []
-    lo = _ns_value(_trim(valpart[:i]))
-    hi = _ns_value(_trim(valpart[i + 5:]))
-    return [[field, ">=", lo], [field, "<=", hi]]
+# _ns_parse_between parses "BETWEEN [lo,hi]" (documented) or
+# "BETWEEN lo AND hi" (legacy alias) into >= and <= conditions.
+def _ns_parse_between(field, toks, i):
+    n = len(toks)
+    if i >= n:
+        return None, i
+    if toks[i][0] == "list":
+        parts = _split(toks[i][1], ",")
+        if len(parts) != 2:
+            return None, i
+        lo = _ns_value(_trim(parts[0]))
+        hi = _ns_value(_trim(parts[1]))
+        return [[field, ">=", lo], [field, "<=", hi]], i + 1
+    ok, lo, i2 = _ns_value_tok(toks, i)
+    if not ok or i2 >= n:
+        return None, i
+    if toks[i2][0] != "word" or _lower(toks[i2][1]) != "and":
+        return None, i
+    ok2, hi, i3 = _ns_value_tok(toks, i2 + 1)
+    if not ok2:
+        return None, i
+    return [[field, ">=", lo], [field, "<=", hi]], i3
 
-# _ns_in_list parses "('a','b',3)" into a list of typed values.
-def _ns_in_list(raw):
-    raw = _trim(raw)
-    if len(raw) >= 2 and raw[0] == "(" and raw[len(raw) - 1] == ")":
-        raw = raw[1:len(raw) - 1]
-    vals = []
-    for part in _split(raw, ","):
-        part = _trim(part)
-        if part != "":
-            vals.append(_ns_value(part))
-    return vals
+# _ns_value_tok reads one typed value token. Returns [ok, value, next_i].
+def _ns_value_tok(toks, i):
+    if i >= len(toks):
+        return False, None, i
+    kind = toks[i][0]
+    text = toks[i][1]
+    if kind == "qstr" or kind == "word":
+        return True, _ns_value(text), i + 1
+    return False, None, i
 
 # _ns_value types a q literal: single-quoted values stay strings, bare
 # true/false become bools, bare numerics become numbers (fixtures store

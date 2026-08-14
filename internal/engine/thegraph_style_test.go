@@ -251,6 +251,115 @@ func TestTheGraphStyleAdapter(t *testing.T) {
 	}
 }
 
+// TestTheGraphStyleWhereInFilters covers where-clause list filters:
+// token0_not_in: [...] must EXCLUDE the listed token, and token0_in: [...]
+// must match only the listed token (regression: _not_in used to be inverted
+// into a positive in filter, and list _in kept its suffix on the field name).
+func TestTheGraphStyleWhereInFilters(t *testing.T) {
+	adapterDir := filepath.Join("..", "..", "adapters", "thegraph-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateDir := t.TempDir()
+	manifestPath := filepath.Join(stateDir, "stunt.yaml")
+
+	m := &manifest.Manifest{
+		Path:    manifestPath,
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"graph": {Adapter: absAdapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["graph"]
+	endpoint := "/subgraphs/id/5zvR82QoaXYxfyKOCH8Qfl6pUCWd7YFXq56Y3ZSDXx2W"
+
+	// USDC is token0 of two seeded pools; WBTC of one.
+	usdc := "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+	wbtcPool := "0x11b815efb8f581194ae79006d24e0d814b7697f6"
+
+	// ===== token0_not_in: [USDC] → only the WBTC pool =====
+
+	notInQuery := `{
+  pools(first: 10, where: { token0_not_in: ["` + usdc + `"] }) {
+    id
+  }
+}`
+	body, status := graphQL(t, base, endpoint, notInQuery)
+	if status != 200 {
+		t.Fatalf("not_in query -> status %d, want 200; body %s", status, body)
+	}
+	var resp map[string]any
+	json.Unmarshal([]byte(body), &resp)
+	if resp["errors"] != nil {
+		t.Fatalf("not_in query errors: %v", resp["errors"])
+	}
+	pools := resp["data"].(map[string]any)["pools"].([]any)
+	if len(pools) != 1 {
+		t.Fatalf("not_in pools = %v, want exactly the WBTC pool", pools)
+	}
+	if got := pools[0].(map[string]any)["id"]; got != wbtcPool {
+		t.Fatalf("not_in pool id = %v, want %s", got, wbtcPool)
+	}
+
+	// ===== token0_in: [USDC] → the two USDC pools, not the WBTC pool =====
+
+	inQuery := `{
+  pools(first: 10, where: { token0_in: ["` + usdc + `"] }) {
+    id
+  }
+}`
+	body, status = graphQL(t, base, endpoint, inQuery)
+	if status != 200 {
+		t.Fatalf("in query -> status %d, want 200; body %s", status, body)
+	}
+	var resp2 map[string]any
+	json.Unmarshal([]byte(body), &resp2)
+	pools2 := resp2["data"].(map[string]any)["pools"].([]any)
+	if len(pools2) != 2 {
+		t.Fatalf("in pools = %v, want the two USDC pools", pools2)
+	}
+	for _, p := range pools2 {
+		if got := p.(map[string]any)["id"]; got == wbtcPool {
+			t.Fatalf("in pools contained the WBTC pool %v; want only USDC pools", pools2)
+		}
+	}
+
+	// ===== scalar token0_not: WBTC → the two USDC pools =====
+
+	notQuery := `{
+  pools(first: 10, where: { token0_not: "0x2260fac5e5542a773aa44fbcfedf7c193bc2b5f0" }) {
+    id
+  }
+}`
+	body, status = graphQL(t, base, endpoint, notQuery)
+	if status != 200 {
+		t.Fatalf("not query -> status %d, want 200; body %s", status, body)
+	}
+	var resp3 map[string]any
+	json.Unmarshal([]byte(body), &resp3)
+	pools3 := resp3["data"].(map[string]any)["pools"].([]any)
+	if len(pools3) != 2 {
+		t.Fatalf("not pools = %v, want the two USDC pools", pools3)
+	}
+}
+
 // === helpers ===
 
 func graphQL(t *testing.T, base, path, query string) (string, int) {

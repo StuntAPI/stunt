@@ -68,6 +68,8 @@ Requests without auth return `401`.
 | GET | `/v2/definitions/nexuses` | List nexus (`$filter`, `$orderBy`, `$top`/`$skip` paging) |
 | GET | `/v2/definitions/taxcodes` | List tax codes (`$filter`, `$orderBy`, `$top`/`$skip` paging) |
 
+`$filter` literals are typed like OData: unquoted all-digit values compare as integers (e.g. `id eq 1001` against nexus ids) and bare `true`/`false` as booleans (e.g. `hasNexus eq true`); single-quoted values always compare as strings.
+
 ## Tax calculation model
 
 The effective rate is deterministically split into jurisdiction components:

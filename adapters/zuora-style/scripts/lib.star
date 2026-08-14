@@ -102,22 +102,27 @@ def _list_page(req, items):
 # --- Zuora list query params (filter[] / sort[] / fields[]) ---
 
 # _apply_zuora_filters applies the Zuora `filter[]` and `sort[]` query params
-# to a list of response dicts via query_select, BEFORE paging (like the real
-# API). Field names match the returned object's fields (e.g. accountNumber,
-# currency, status, balance).
-#   filter[] syntax: field.OPERATOR:value — operators EQ NE GT GE LT LE SW IN
-#   (case-insensitive; IN takes a [a,b,c] list). Only the first filter[]
-#   value reaches the handler (stunt keeps the first value of repeated
-#   query params), so one condition per request.
+# to a list of response dicts, BEFORE paging (like the real API). Field names
+# match the returned object's fields (e.g. accountNumber, currency, status,
+# balance).
+#   filter[] syntax: field.OPERATOR:value — operators EQ NE GT GE LT LE SW IN.
+#   Per Zuora docs, EQ/NE/IN/SW match case-INSENSITIVELY (exact and
+#   case-insensitive), so these are evaluated with a manual scan that
+#   lowercases both sides. `field.EQ:null` matches records where the field
+#   is null or missing; `field.NE:null` matches records where it is set.
+#   GT/GE/LT/LE compare numerically when both sides are numeric, else
+#   lexicographically (case-insensitive).
+#   Only the first filter[] value reaches the handler (stunt keeps the first
+#   value of repeated query params), so one condition per request.
 #   sort[] syntax: field.ORDER (ASC or DESC), one field per request.
 # Unparseable conditions are ignored (mock-friendly).
 def _apply_zuora_filters(req, items):
-    f = []
+    filtered = items
     expr = _get_query(req, "filter[]", "")
     if expr != "":
         clause = _parse_zuora_filter(expr)
         if clause != None:
-            f.append(clause)
+            filtered = _zuora_filter_items(items, clause)
 
     order_by = ""
     order_dir = ""
@@ -128,9 +133,139 @@ def _apply_zuora_filters(req, items):
             order_by = sort_expr[:dot]
             order_dir = _lower(sort_expr[dot + 1:])
 
-    if len(f) == 0 and order_by == "":
-        return items
-    return query_select(items, f, order_by, order_dir, None, None, None)
+    if order_by == "":
+        return filtered
+    return query_select(filtered, None, order_by, order_dir, None, None, None)
+
+# _zuora_filter_items keeps the items matching one parsed filter clause
+# ([field, op, value] with internal ops eq ne gt ge lt le sw in).
+def _zuora_filter_items(items, clause):
+    field = clause[0]
+    op = clause[1]
+    want = clause[2]
+    out = []
+    for it in items:
+        if _zuora_match(it, field, op, want):
+            out.append(it)
+    return out
+
+# _zuora_match applies one filter clause to an item. EQ/NE/IN/SW are
+# case-insensitive (Zuora documents exact, case-insensitive matching).
+def _zuora_match(it, field, op, want):
+    has = field in it
+    v = None
+    if has:
+        v = it[field]
+    if op == "eq":
+        if _zuora_is_null(want):
+            return not has or v == None
+        return has and v != None and _zuora_ci_eq(v, want)
+    if op == "ne":
+        if _zuora_is_null(want):
+            return has and v != None
+        return not (has and v != None and _zuora_ci_eq(v, want))
+    if op == "sw":
+        return has and v != None and _lower(str(v)).startswith(_lower(str(want)))
+    if op == "in":
+        if not has or v == None:
+            return False
+        for x in want:
+            if _zuora_ci_eq(v, x):
+                return True
+        return False
+    if not has or v == None:
+        return False
+    if op == "gt":
+        return _zuora_cmp(v, want) > 0
+    if op == "ge":
+        return _zuora_cmp(v, want) >= 0
+    if op == "lt":
+        return _zuora_cmp(v, want) < 0
+    if op == "le":
+        return _zuora_cmp(v, want) <= 0
+    return False
+
+# _zuora_is_null reports whether a parsed filter value is the null literal
+# (case-insensitive "null").
+def _zuora_is_null(want):
+    return type(want) == type("") and _lower(want) == "null"
+
+# _zuora_ci_eq compares two values case-insensitively, numerically when both
+# sides are numeric (numbers or numeric strings).
+def _zuora_ci_eq(v, want):
+    vn = _zuora_try_num(v)
+    wn = _zuora_try_num(want)
+    if vn != None and wn != None:
+        return vn == wn
+    return _lower(str(v)) == _lower(str(want))
+
+# _zuora_cmp compares two values for the ordering ops: numerically when both
+# sides are numeric, else lexicographically (case-insensitive). Returns
+# -1/0/1.
+def _zuora_cmp(v, want):
+    vn = _zuora_try_num(v)
+    wn = _zuora_try_num(want)
+    if vn != None and wn != None:
+        if vn < wn:
+            return -1
+        if vn > wn:
+            return 1
+        return 0
+    a = _lower(str(v))
+    b = _lower(str(want))
+    if a < b:
+        return -1
+    if a > b:
+        return 1
+    return 0
+
+# _zuora_try_num returns v as a number when v is a number or a numeric
+# string, else None.
+def _zuora_try_num(v):
+    if type(v) == type(0) or type(v) == type(1.0):
+        return v
+    if type(v) != type(""):
+        return None
+    t = _trim(v)
+    if t == "":
+        return None
+    neg = False
+    if t[0] == "-":
+        neg = True
+        t = t[1:]
+    if t == "":
+        return None
+    dot = -1
+    digits = ""
+    for i in range(len(t)):
+        ch = t[i]
+        if ch == ".":
+            if dot >= 0:
+                return None
+            dot = i
+        elif ch >= "0" and ch <= "9":
+            digits = digits + ch
+        else:
+            return None
+    if digits == "":
+        return None
+    whole = 0
+    for i in range(len(digits)):
+        whole = whole * 10 + (ord(digits[i]) - 48)
+    out = None
+    if dot < 0:
+        out = whole
+    else:
+        frac_len = len(t) - dot - 1
+        scale = 1.0
+        j = 0
+        while j < frac_len:
+            scale = scale * 10.0
+            j = j + 1
+        out = whole / scale
+    if neg:
+        return -out
+    return out
 
 # _apply_zuora_fields projects a paged result to the Zuora `fields[]` query
 # param (comma-separated field list), applied AFTER paging.
@@ -148,8 +283,10 @@ def _apply_zuora_fields(req, items):
     return query_select(items, None, None, "", None, None, fields)
 
 # _parse_zuora_filter parses one "field.OPERATOR:value" expression into a
-# query_select triple, or None when unparseable. SW maps to startswith
-# (case-sensitive here; the real API matches prefixes case-insensitively).
+# clause [field, op, value] (internal ops eq ne gt ge lt le sw in — matched
+# case-insensitively by _zuora_match), or None when unparseable. The value
+# stays a string (or a list of strings for IN); "null" is handled at match
+# time as the null literal.
 def _parse_zuora_filter(expr):
     expr = _trim(expr)
     if expr == "":
@@ -161,21 +298,15 @@ def _parse_zuora_filter(expr):
     field = _trim(expr[:dot])
     op = _lower(expr[dot + 1:colon])
     val = _trim(expr[colon + 1:])
-    if field == "" or val == "":
+    if field == "":
         return None
-    ops = {
-        "eq": "=",
-        "ne": "!=",
-        "gt": ">",
-        "ge": ">=",
-        "lt": "<",
-        "le": "<=",
-        "sw": "startswith",
-    }
-    mapped = ops.get(op)
-    if mapped != None:
-        return [field, mapped, val]
+    if op == "eq" or op == "ne" or op == "gt" or op == "ge" or op == "lt" or op == "le" or op == "sw":
+        if val == "":
+            return None
+        return [field, op, val]
     if op == "in":
+        if val == "":
+            return None
         vals = _parse_value_list(val)
         if len(vals) == 0:
             return None

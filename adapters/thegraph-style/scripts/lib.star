@@ -221,8 +221,10 @@ def _extract_where_block(query, entity):
 # _parse_where parses a where block ("feeTier: \"3000\", txCount_gt: 100")
 # into query_select [field, op, value] triples. Supported field suffixes map
 # to query_select ops: _gt _gte _lt _lte _not _in (list or single value),
-# _contains, _starts_with, _ends_with. Unquoted values are treated as
-# strings (stored entity fields are strings).
+# _contains, _starts_with, _ends_with. A list value under _not_in (or _not)
+# is tagged with the synthetic op "not_in", which _apply_graph_args resolves
+# via a manual exclusion pass (query_select has no not-in op). Unquoted
+# values are treated as strings (stored entity fields are strings).
 def _parse_where(block, entity):
     filters = []
     i = 0
@@ -305,8 +307,20 @@ def _parse_where(block, entity):
             op = "endswith"
 
         if is_list:
-            op = "in"
-        elif _ends_with(field, "_in"):
+            # A list value under _not_in (or _not) means "exclude these".
+            # query_select has no not-in op, so mark it and let
+            # _apply_graph_args run a manual exclusion pass.
+            if op == "!=":
+                op = "not_in"
+            else:
+                op = "in"
+                # Positive list filters are written as field_in: [...] —
+                # strip the suffix (mirrors the scalar _in branch below,
+                # which this branch otherwise shadows). _not_in was already
+                # handled above, so do not re-strip it.
+                if _ends_with(field, "_in") and not _ends_with(field, "_not_in"):
+                    f = field[:len(field) - 3]
+        elif _ends_with(field, "_in") and not _ends_with(field, "_not_in"):
             f = field[:len(field) - 3]
             op = "in"
             value = [value]
@@ -318,6 +332,22 @@ def _parse_where(block, entity):
         filters.append([f, op, value])
     return filters
 
+# _exclude_in removes docs whose field value equals any entry in values.
+# Docs missing the field are kept (a missing value is not in the list).
+def _exclude_in(docs, field, values):
+    out = []
+    for d in docs:
+        v = d.get(field, None)
+        excluded = False
+        if v != None:
+            for j in range(len(values)):
+                if _str(v) == _str(values[j]):
+                    excluded = True
+                    break
+        if not excluded:
+            out.append(d)
+    return out
+
 # _apply_graph_args applies the entity collection-level GraphQL args
 # (where/orderBy/orderDirection/first/skip) to a raw stored-entity list via
 # query_select, before per-field projection. Mirrors the real Graph node
@@ -325,6 +355,15 @@ def _parse_where(block, entity):
 # (e.g. "pools(first:5, orderBy:volumeUSD)") as extracted by the caller.
 def _apply_graph_args(query, entity, docs, header):
     where = _parse_where(_extract_where_block(query, entity), entity)
+
+    # query_select has no not-in op: apply _not_in exclusions manually
+    # BEFORE query_select so filter-then-sort-then-slice ordering holds.
+    select_filters = []
+    for i in range(len(where)):
+        if where[i][1] == "not_in":
+            docs = _exclude_in(docs, where[i][0], where[i][2])
+        else:
+            select_filters.append(where[i])
 
     order_by = _extract_arg_str(header, "orderBy")
     order_dir = _extract_arg_str(header, "orderDirection")
@@ -340,4 +379,4 @@ def _apply_graph_args(query, entity, docs, header):
     if skip <= 0:
         skip = None
 
-    return query_select(docs, where if len(where) > 0 else None, order_by, order_dir, first, skip, None)
+    return query_select(docs, select_filters if len(select_filters) > 0 else None, order_by, order_dir, first, skip, None)

@@ -31,6 +31,7 @@ A stunt adapter simulating the **Google Analytics GA4 Data API + Admin API**, fo
 - Report response: `{dimensionHeaders, metricHeaders, rows:[{dimensionValues, metricValues}], rowCount, metadata}`.
 - Deterministic dimensions: `date`, `country`, `deviceCategory`.
 - Deterministic metrics: `sessions`, `activeUsers`, `screenPageViews`.
+- Unknown dimension/metric names (in `dimensions`, `metrics`, filter `fieldName`s, or `orderBys`) return `400 INVALID_ARGUMENT` like the real Data API.
 
 ## Usage
 

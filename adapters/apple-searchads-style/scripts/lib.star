@@ -179,15 +179,11 @@ def _asa_num_str(v):
         return str(v)
     return v
 
-# _asa_triples translates one selector condition {field, operator, values}
-# into query_select [path, op, value] triples. numeric=True converts
-# digit-string values to ints (numeric id fields); amount=True stringifies
-# numbers (money amounts stored as strings). Unknown operators are ignored.
-def _asa_triples(path, operator, values, numeric, amount):
-    out = []
-    if path == None or operator == None or type(operator) != "string":
-        return out
-    op = operator.upper()
+# _asa_coerce_values normalizes a condition's values list. numeric=True
+# converts digit-string values to ints (numeric id fields); amount=True
+# stringifies numbers (money amounts stored as strings). None values are
+# dropped. A non-list value is treated as a single value.
+def _asa_coerce_values(values, numeric, amount):
     if values == None:
         values = []
     if type(values) != "list":
@@ -202,15 +198,74 @@ def _asa_triples(path, operator, values, numeric, amount):
             vals.append(_asa_num_str(v))
         else:
             vals.append(v)
+    return vals
+
+# _asa_get_path returns the value at a dotted path ("a.b") in row, or None
+# when the path is absent.
+def _asa_get_path(row, path):
+    cur = row
+    for part in path.split("."):
+        if type(cur) != "dict":
+            return None
+        cur = cur.get(part, None)
+        if cur == None:
+            return None
+    return cur
+
+# _asa_notin_exclude implements NOT-IN (multi-value NOT_EQUALS) as a manual
+# exclusion pass — query_select has no not-in op and its != triples are
+# AND'ed per value, which would wrongly match rows missing the field.
+# Rows whose value at path equals any of vals (or that lack the field) are
+# dropped.
+def _asa_notin_exclude(rows, path, vals):
+    out = []
+    for r in rows:
+        v = _asa_get_path(r, path)
+        if v == None:
+            continue
+        hit = False
+        for x in vals:
+            if x == v:
+                hit = True
+                break
+        if not hit:
+            out.append(r)
+    return out
+
+# _asa_path_in reports whether path appears in the paths list.
+def _asa_path_in(path, paths):
+    for p in paths:
+        if p == path:
+            return True
+    return False
+
+# _asa_triples translates one selector condition {field, operator, values}
+# into query_select [path, op, value] triples. numeric=True converts
+# digit-string values to ints (numeric id fields); amount=True stringifies
+# numbers (money amounts stored as strings). Unknown operators are ignored.
+#
+# Values within one condition are OR'd alternatives (real ASA semantics), so
+# multi-value EQUALS becomes a single "in" clause — NOT one "=" per value,
+# which query_select would AND together into an always-false filter.
+# Multi-value NOT_EQUALS (NOT IN) cannot be expressed as a triple; callers
+# must handle it via _asa_notin_exclude (see _asa_apply_conditions).
+def _asa_triples(path, operator, values, numeric, amount):
+    out = []
+    if path == None or operator == None or type(operator) != "string":
+        return out
+    op = operator.upper()
+    vals = _asa_coerce_values(values, numeric, amount)
     if len(vals) == 0:
         return out
 
     if op == "EQUALS":
-        for v in vals:
-            out.append([path, "=", v])
+        if len(vals) == 1:
+            out.append([path, "=", vals[0]])
+        else:
+            out.append([path, "in", vals])
     elif op == "NOT_EQUALS":
-        for v in vals:
-            out.append([path, "!=", v])
+        if len(vals) == 1:
+            out.append([path, "!=", vals[0]])
     elif op == "IN":
         out.append([path, "in", vals])
     elif op == "CONTAINS" or op == "CONTAINS_ALL":
@@ -227,6 +282,40 @@ def _asa_triples(path, operator, values, numeric, amount):
         for v in vals:
             out.append([path, "<" if op == "LESS_THAN" else "<=", v])
     return out
+
+# _asa_apply_conditions applies a selector conditions list to rows the way
+# the real find/report endpoints do: each condition {field, operator, values}
+# is AND'ed, with values inside one condition as OR'd alternatives.
+# field_map maps a condition field name to a (possibly dotted) response path,
+# or None to skip the condition. numeric_paths / amount_paths list paths whose
+# values are numeric ids / money-amount strings.
+def _asa_apply_conditions(rows, conditions, field_map, numeric_paths, amount_paths):
+    if conditions == None or type(conditions) != "list":
+        return rows
+    f = []
+    for cond in conditions:
+        if cond == None or type(cond) != "dict":
+            continue
+        path = field_map(cond.get("field", ""))
+        if path == None:
+            continue
+        numeric = _asa_path_in(path, numeric_paths)
+        amount = _asa_path_in(path, amount_paths)
+        operator = cond.get("operator", None)
+        op = ""
+        if operator != None and type(operator) == "string":
+            op = operator.upper()
+        if op == "NOT_EQUALS":
+            vals = _asa_coerce_values(cond.get("values", None), numeric, amount)
+            if len(vals) > 1:
+                # NOT IN: manual exclusion pass, no query_select triple.
+                rows = _asa_notin_exclude(rows, path, vals)
+                continue
+        for t in _asa_triples(path, operator, cond.get("values", None), numeric, amount):
+            f.append(t)
+    if len(f) > 0:
+        rows = query_select(rows, f, None, "", None, None, None)
+    return rows
 
 # _asa_apply_order applies a selector orderBy list to items via query_select,
 # applying keys in reverse so the stable sort yields multi-key order.

@@ -104,6 +104,12 @@ synthetic records. Supports `SELECT <fields> FROM <Object> [WHERE Id = 'value']`
 | POST | `/v1/transactions/billing/preview` | `billing.star#on_preview_billing` | Preview billing |
 | POST | `/v1/action/query` | `query.star#on_query` | ZOQL query |
 
+Note on list filtering: `filter[]` matching is exact and case-insensitive (as
+Zuora documents), and `field.EQ:null` matches null/missing fields — but the
+underlying engine keeps only one value per query key, so **only a single
+`filter[]` condition is applied per request**; multiple `filter[]` params
+cannot be ANDed.
+
 ## Backing stores
 
 | Collection | Purpose |

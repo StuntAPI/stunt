@@ -219,8 +219,10 @@ def _get_body(req):
 #   sysparm_query=state=2^priority=1
 #   sysparm_query=active=true^ORDERBYDESCpriority
 #
-# Operators mapped to query_select clauses (pattern-matching, not a full
-# engine; multi-char operators are matched first):
+# Operators mapped to query_select clauses (structural parsing — the FIRST
+# operator keyword found scanning from the field name wins; keywords are
+# matched anchored at a single position so a value like IN_PROGRESS after
+# "state=" can no longer shadow the real operator):
 #   field=value          → =      exact match
 #   field!=value         → !=     not equal
 #   field>value etc.     → > >= < <=   (numeric strings compare numerically)
@@ -234,16 +236,25 @@ def _get_body(req):
 # Boolean literals ("true"/"false") are converted to real booleans so they
 # compare against boolean fields (e.g. active) — query_select cross-type
 # equality is false, so a raw string would never match a bool field.
+#
+# Real Table API string matching (=, !=, LIKE, STARTSWITH, ENDSWITH) is
+# case-INsensitive; since query_select string ops are case-sensitive, those
+# clauses are pre-filtered manually with both sides lowered.
+#
+# A clause that does not parse is rejected with 400, like the real Table API.
 
 # _snow_clauses parses an encoded query string into a list of
 # [field, op, value] triples for query_select, plus (order_by, order_dir)
-# from any ORDERBY / ORDERBYDESC directives.
+# from any ORDERBY / ORDERBYDESC directives. Returns
+# (triples, order_by, order_dir, bad_clause); bad_clause is "" on success or
+# the first clause that failed to parse (caller answers 400).
 def _snow_clauses(q):
     triples = []
     order_by = ""
     order_dir = "asc"
+    bad = ""
     if q == None or q == "":
-        return triples, order_by, order_dir
+        return triples, order_by, order_dir, bad
     for clause in _split(q, "^"):
         clause = _trim(clause)
         if clause == "":
@@ -257,39 +268,57 @@ def _snow_clauses(q):
             order_dir = "asc"
             continue
         parsed = _parse_clause(clause)
-        if parsed != None:
-            triples.append(parsed)
-    return triples, order_by, order_dir
+        if parsed == None:
+            bad = clause
+            break
+        triples.append(parsed)
+    return triples, order_by, order_dir, bad
 
-# _SNOW_OPS maps encoded-query operators to query_select ops, in the order
-# they must be probed (multi-char ops before their prefixes).
+# _SNOW_OPS maps encoded-query operator keywords to query_select ops. The
+# keywords are probed ANCHORED at a single position, longest first, so ">="
+# wins over ">" at the same position. Because the scan below takes the first
+# anchored keyword between the field name and the value, a value such as
+# IN_PROGRESS (state=IN_PROGRESS) or an operator substring inside a field
+# name can no longer mis-parse.
 _SNOW_OPS = [
-    [">=", ">="],
-    ["<=", "<="],
-    ["!=", "!="],
-    [">", ">"],
-    ["<", "<"],
     ["STARTSWITH", "startswith"],
     ["ENDSWITH", "endswith"],
+    ["NOT LIKE", ""],
+    ["NOT IN", ""],
     ["LIKE", "contains"],
     ["IN", "in"],
+    ["!=", "!="],
+    [">=", ">="],
+    ["<=", "<="],
+    [">", ">"],
+    ["<", "<"],
     ["=", "="],
 ]
 
 # _parse_clause parses a single clause like "field=value" or "fieldLIKEvalue"
-# into a query_select [field, op, value] triple, or None if unparseable.
+# into a query_select [field, op, value] triple. Scans left to right from the
+# field name; the first position where an operator keyword matches anchored
+# is the operator. Returns None if no operator (or an empty field/value) is
+# found, or when the clause uses an operator this adapter does not support
+# ("NOT LIKE" / "NOT IN" probe before their prefixes so such clauses are
+# rejected instead of mis-parsed as a LIKE/IN on a bogus field name).
 def _parse_clause(clause):
-    for pair in _SNOW_OPS:
-        idx = _index(clause, pair[0])
-        if idx > 0:
-            field = _trim(clause[:idx])
-            raw = clause[idx + len(pair[0]):]
-            if pair[1] == "in":
-                vals = []
-                for v in _split(raw, ","):
-                    vals.append(_snow_val(_trim(v)))
-                return [field, "in", vals]
-            return [field, pair[1], _snow_val(raw)]
+    for i in range(1, len(clause)):
+        for pair in _SNOW_OPS:
+            kw = pair[0]
+            if clause[i:i + len(kw)] == kw:
+                if pair[1] == "":
+                    return None
+                field = _trim(clause[:i])
+                raw = clause[i + len(kw):]
+                if field == "" or raw == "":
+                    return None
+                if pair[1] == "in":
+                    vals = []
+                    for v in _split(raw, ","):
+                        vals.append(_snow_val(_trim(v)))
+                    return [field, "in", vals]
+                return [field, pair[1], _snow_val(raw)]
     return None
 
 # _snow_val converts an encoded-query literal to the type query_select
@@ -301,6 +330,82 @@ def _snow_val(raw):
     if raw == "false":
         return False
     return raw
+
+# ====================================================================
+# Case-insensitive string filtering
+# ====================================================================
+#
+# Real ServiceNow =, !=, LIKE, STARTSWITH and ENDSWITH match string values
+# case-INsensitively. query_select's string ops are case-sensitive, so those
+# clauses are evaluated here with both sides lowered; everything else
+# (numeric ranges, IN, boolean =) is left to query_select.
+
+def _snow_matches_ci(doc, triple):
+    field = triple[0]
+    op = triple[1]
+    want = triple[2]
+    actual = doc.get(field, None)
+    if actual == None:
+        # Missing field matches only != (same as query_select).
+        return op == "!="
+    if type(want) != "string":
+        # Boolean literals compare exactly; cross-type equality is false.
+        if op == "=":
+            return actual == want
+        if op == "!=":
+            return actual != want
+        return False
+    if type(actual) != "string":
+        # Strict typing: a string literal never equals a non-string field.
+        if op == "=":
+            return False
+        if op == "!=":
+            return True
+        return False
+    a = _lower(actual)
+    w = _lower(want)
+    if op == "=":
+        return a == w
+    if op == "!=":
+        return a != w
+    if op == "contains":
+        return _contains(a, w)
+    if op == "startswith":
+        return a[:len(w)] == w
+    if op == "endswith":
+        if len(w) > len(a):
+            return False
+        return a[len(a) - len(w):] == w
+    return False
+
+# _snow_filter_ci keeps only the docs matching every case-insensitive triple.
+def _snow_filter_ci(docs, triples):
+    out = []
+    for d in docs:
+        keep = True
+        for t in triples:
+            if not _snow_matches_ci(d, t):
+                keep = False
+                break
+        if keep:
+            out.append(d)
+    return out
+
+# _snow_split_triples partitions parsed triples into (ci, rest): the string
+# ops that need case-insensitive evaluation, and everything left for
+# query_select.
+def _snow_split_triples(triples):
+    ci = []
+    rest = []
+    for t in triples:
+        op = t[1]
+        if op == "contains" or op == "startswith" or op == "endswith":
+            ci.append(t)
+        elif (op == "=" or op == "!=") and type(t[2]) == "string":
+            ci.append(t)
+        else:
+            rest.append(t)
+    return ci, rest
 
 # _csv_list parses a comma-separated query param (e.g. sysparm_fields) into
 # a list, or None when absent/empty.
@@ -344,10 +449,16 @@ def _list_response(req, docs):
     if query == None:
         query = {}
 
-    triples, order_by, order_dir = _snow_clauses(query.get("sysparm_query", ""))
+    triples, order_by, order_dir, bad = _snow_clauses(query.get("sysparm_query", ""))
+    if bad != "":
+        return _snow_error(400, "Invalid query", "Invalid clause in sysparm_query: " + bad)
+
+    ci, rest = _snow_split_triples(triples)
+    if len(ci) > 0:
+        docs = _snow_filter_ci(docs, ci)
     flt = None
-    if len(triples) > 0:
-        flt = triples
+    if len(rest) > 0:
+        flt = rest
     fields = _csv_list(query.get("sysparm_fields", ""))
     docs = query_select(docs, flt, order_by, order_dir, None, None, fields)
 

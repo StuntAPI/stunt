@@ -203,7 +203,7 @@ def on_list_tokens(req):
 #   query     -> case-insensitive substring match; supports the documented
 #                forms "email:<term>", "name:<term>", "orgUnitPath=<path>",
 #                "isSuspended=true|false" and a bare term (matched against
-#                the primary email)
+#                givenName, familyName, or the primary email)
 #   orderBy   -> email | familyName | givenName (name.* is a dotted path)
 #   sortOrder -> ASCENDING (default) | DESCENDING
 def _apply_user_filters(req, users):
@@ -238,7 +238,25 @@ def _apply_user_filters(req, users):
             elif term == "false":
                 f.append(["suspended", "=", False])
         else:
-            users = _ci_contains(users, "primaryEmail", query)
+            # Bare term matches givenName OR familyName OR primaryEmail,
+            # case-insensitively, like the real Directory search.
+            ql = query.lower()
+            kept = []
+            for u in users:
+                hit = False
+                if str(u.get("primaryEmail", "")).lower().find(ql) >= 0:
+                    hit = True
+                if not hit:
+                    gn = _dig_path(u, "name.givenName")
+                    if gn != None and str(gn).lower().find(ql) >= 0:
+                        hit = True
+                if not hit:
+                    fn = _dig_path(u, "name.familyName")
+                    if fn != None and str(fn).lower().find(ql) >= 0:
+                        hit = True
+                if hit:
+                    kept.append(u)
+            users = kept
 
     flt = None
     if len(f) > 0:

@@ -40,8 +40,8 @@ All list endpoints (`users`, `groups`, `members`, `tokens`) honor the Directory 
 
 Applied before paging, like the real API:
 
-- `GET /admin/directory/v1/users` honors `domain`, `query` (bare terms plus the documented `email:`, `name:`, `orgUnitPath=`, `isSuspended=true|false` forms), `orderBy` (`email`, `familyName`, `givenName`) and `sortOrder` (`ASCENDING`/`DESCENDING`).
-- `GET /admin/directory/v1/groups` honors `domain`, `userKey` (only groups the given user belongs to), `query` (the documented `email=`/`name:` forms), `orderBy=email` and `sortOrder`.
+- `GET /admin/directory/v1/users` honors `domain`, `query` (bare terms — matched case-insensitively against `givenName`, `familyName` or the primary email — plus the documented `email:`, `name:`, `orgUnitPath=`, `isSuspended=true|false` forms), `orderBy` (`email`, `familyName`, `givenName`) and `sortOrder` (`ASCENDING`/`DESCENDING`).
+- `GET /admin/directory/v1/groups` honors `domain`, `userKey` (only groups the given user belongs to), `query` (the documented `email=<exact>`, `email:<prefix>*`, `name=<exact>`, `name:<prefix>*`, `memberKey=<member email or id>` forms, space-separated and AND'ed; text matching is case-insensitive and unrecognized forms are silently ignored), `orderBy=email` and `sortOrder`.
 - `GET /admin/directory/v1/groups/{groupKey}/members` honors `roles` (comma-separated `OWNER`/`MANAGER`/`MEMBER` filter).
 
 ### Seeded data

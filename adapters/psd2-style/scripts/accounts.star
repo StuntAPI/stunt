@@ -167,12 +167,18 @@ def on_get_transactions(req):
         else:
             booked.append(tx)
 
-    # Real NextGenPSD2 transaction-report params, applied after account
-    # scoping: bookingStatus (booked/pending/both, default both) selects
-    # which lists are populated; dateFrom/dateTo bound the bookingDate.
-    booking_status = _get_query(req).get("bookingStatus", "")
+    # Berlin Group marks bookingStatus and dateFrom as REQUIRED for the
+    # transaction report; dateTo stays optional.
+    q = _get_query(req)
+    booking_status = q.get("bookingStatus", "")
     if booking_status == None or booking_status == "":
-        booking_status = "both"
+        return _psd2_err(400, "ERROR", "PARAMETER_MISSING-BOOKINGSTATUS", "bookingStatus is required")
+    date_from = q.get("dateFrom", "")
+    if date_from == None or date_from == "":
+        return _psd2_err(400, "ERROR", "PARAMETER_MISSING-DATEFROM", "dateFrom is required")
+
+    # bookingStatus (booked/pending/both) selects which lists are populated;
+    # dateFrom/dateTo bound the bookingDate.
     if booking_status == "booked":
         pending = []
     elif booking_status == "pending":

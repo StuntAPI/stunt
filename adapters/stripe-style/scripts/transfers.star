@@ -86,12 +86,17 @@ def on_list_transfers(req):
     if err != None:
         return err
 
+    bad = _created_check(req)
+    if bad != None:
+        return bad
+
     c = store_collection("transfers")
     docs = c.list()
 
     # Real transfer-list params (destination, created exact/range), applied
     # before paging. transfer_group is not stored, so it is not honored.
     docs = _apply_transfer_filters(req, docs)
+    docs = _newest_first(docs)
 
     page, has_more, err = _list_page(req, docs, "transfer")
     if err != None:

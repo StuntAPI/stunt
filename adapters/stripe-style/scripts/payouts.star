@@ -11,6 +11,12 @@
 # arrival_date/created are stored as ints, so the string params are converted.
 def _apply_payout_filters(req, docs):
     f = []
+
+    # Real Stripe scopes payouts to the Stripe-Account header when present.
+    acct = _stripe_account(req)
+    if acct != None:
+        f.append(["_account", "=", acct])
+
     dest = _get_query(req, "destination")
     if dest != "":
         f.append(["destination", "=", dest])
@@ -38,6 +44,15 @@ def _apply_payout_filters(req, docs):
     if len(f) == 0:
         return docs
     return query_select(docs, f)
+
+# _payout_view strips the internal _account scoping key from the public
+# shape (it exists for list filtering only).
+def _payout_view(p):
+    out = {}
+    for k in p:
+        if k != "_account":
+            out[k] = p[k]
+    return out
 
 # POST /v1/payouts — create a payout from a connected account's balance.
 def on_create_payout(req):
@@ -82,9 +97,9 @@ def on_create_payout(req):
     c.insert(doc)
 
     # Emit webhook event (fire-and-forget).
-    _signed_emit("payout.created", doc)
+    _signed_emit("payout.created", _payout_view(doc))
 
-    return respond(201, doc)
+    return respond(201, _payout_view(doc))
 
 # GET /v1/payouts — list all payouts (optionally ?destination=).
 def on_list_payouts(req):
@@ -92,12 +107,18 @@ def on_list_payouts(req):
     if err != None:
         return err
 
+    bad = _created_check(req)
+    if bad != None:
+        return bad
+
     c = store_collection("payouts")
     docs = c.list()
 
     # Real payout-list params (destination, status, arrival_date, created),
     # applied before paging.
     docs = _apply_payout_filters(req, docs)
+    docs = _newest_first(docs)
+    docs = [_payout_view(p) for p in docs]
 
     page, has_more, err = _list_page(req, docs, "payout")
     if err != None:

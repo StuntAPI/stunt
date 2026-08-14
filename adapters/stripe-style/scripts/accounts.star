@@ -95,6 +95,10 @@ def on_list_accounts(req):
     if err != None:
         return err
 
+    bad = _created_check(req)
+    if bad != None:
+        return bad
+
     c = store_collection("connect_accounts")
     docs = c.list()
     docs = _apply_account_filters(req, docs)

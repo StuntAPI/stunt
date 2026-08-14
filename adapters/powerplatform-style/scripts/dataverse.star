@@ -45,11 +45,13 @@ def on_list_accounts(req):
     # $filter, $orderby, $skip (paging uses $top/$skipToken).
     docs = _apply_odata_filters(req, docs)
     docs = _apply_odata_orderby(req, docs)
+
+    # $count=true reports entities matching the filter, ignoring $skip/$top.
+    total = len(docs)
+
     skip = _to_int(_get_query(req, "$skip", ""))
     if skip > 0:
         docs = docs[skip:]
-
-    total = len(docs)
     page, next_link = _list_page(req, docs, base_path)
 
     q = req.get("query")

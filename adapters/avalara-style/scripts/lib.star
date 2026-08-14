@@ -275,7 +275,9 @@ def _list_page(req, docs, base_path):
 # BEFORE `$top`/`$skip` paging (like the real API).
 #   $filter: "field op value" clauses joined by " and " (lowercase); ops are
 #   eq ne gt ge lt le (case-insensitive); values may be single-quoted
-#   ('CA') or bare. Field names match the returned objects' fields.
+#   ('CA') or bare. Unquoted all-digit values compare as ints and bare
+#   true/false as bools (OData literals are typed). Field names match the
+#   returned objects' fields.
 #   $orderBy: "field" or "field desc" (asc is the default).
 # Unsupported syntax is ignored (mock-friendly).
 def _apply_odata_filters(req, items):
@@ -321,10 +323,36 @@ def _parse_odata_clause(clause):
         idx = lc.find(needle)
         if idx > 0:
             field = clause[:idx].strip()
-            val = _strip_quotes(clause[idx + len(needle):].strip())
+            raw = clause[idx + len(needle):].strip()
+            val = _strip_quotes(raw)
             if field != "" and val != "":
+                if raw == val:
+                    # Unquoted literal. OData values are typed, and
+                    # query_select's = is strictly typed: a string "1001"
+                    # never matches an int field (nexus ids), and "true"/
+                    # "false" never match a bool (hasNexus). Convert
+                    # all-digit literals to int and bare true/false to bool;
+                    # ordering ops coerce numeric strings anyway, but
+                    # converting keeps them exact.
+                    if _all_digits(val):
+                        return [field, pair[1], _to_int(val)]
+                    lv = val.lower()
+                    if lv == "true":
+                        return [field, pair[1], True]
+                    if lv == "false":
+                        return [field, pair[1], False]
                 return [field, pair[1], val]
     return None
+
+# _all_digits reports whether s is non-empty and all decimal digits.
+def _all_digits(s):
+    if s == "":
+        return False
+    for i in range(len(s)):
+        ch = s[i]
+        if ch < "0" or ch > "9":
+            return False
+    return True
 
 # _strip_quotes removes one pair of surrounding single or double quotes.
 def _strip_quotes(val):

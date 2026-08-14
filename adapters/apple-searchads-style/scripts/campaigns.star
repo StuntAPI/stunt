@@ -200,22 +200,13 @@ def _campaign_order_field(field):
 def _apply_campaign_selector(body, rows):
     sel = _asa_selector(body)
 
-    conditions = sel.get("conditions", [])
-    if conditions == None:
-        conditions = []
-    f = []
-    for cond in conditions:
-        if cond == None or type(cond) != "dict":
-            continue
-        path = _campaign_cond_field(cond.get("field", ""))
-        if path == None:
-            continue
-        numeric = path == "campaignId"
-        amount = path == "budgetAmount.amount" or path == "dailyBudgetAmount.amount"
-        for t in _asa_triples(path, cond.get("operator", None), cond.get("values", []), numeric, amount):
-            f.append(t)
-
-    rows = query_select(rows, f if len(f) > 0 else None, None, "", None, None, None)
+    rows = _asa_apply_conditions(
+        rows,
+        sel.get("conditions", None),
+        _campaign_cond_field,
+        ["campaignId"],
+        ["budgetAmount.amount", "dailyBudgetAmount.amount"],
+    )
 
     rows = _asa_apply_order(rows, sel.get("orderBy", None), _campaign_order_field)
 
