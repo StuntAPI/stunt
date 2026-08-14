@@ -436,3 +436,114 @@ func sfAuthDelete(t *testing.T, rawurl, token string) (string, int) {
 	b, _ := io.ReadAll(resp.Body)
 	return string(b), resp.StatusCode
 }
+
+// TestSalesforceStyleSOQL exercises the general SOQL engine: WHERE with
+// comparators (=, >, >=), IN, LIKE, AND/OR, plus ORDER BY + LIMIT/OFFSET.
+// All queries are scoped to the test's own accounts (Name LIKE 'Zq%') so the
+// seeded fixture doesn't affect counts.
+func TestSalesforceStyleSOQL(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "salesforce-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"salesforce": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["salesforce"]
+
+	tb, status := sfPostForm(t, base+"/services/oauth2/token", url.Values{
+		"grant_type": {"password"}, "client_id": {"test-consumer-key"},
+		"client_secret": {"test-consumer-secret"}, "username": {"test@example.com"}, "password": {"testpassword"},
+	})
+	if status != 200 {
+		t.Fatalf("token -> %d; body %s", status, tb)
+	}
+	var tok map[string]any
+	json.Unmarshal([]byte(tb), &tok)
+	accessToken, _ := tok["access_token"].(string)
+
+	soql := func(q string) []string {
+		b, st := sfAuthGet(t, base+"/services/data/v60.0/query/?q="+url.QueryEscape(q), accessToken)
+		if st != 200 {
+			t.Fatalf("SOQL %q -> %d; body %s", q, st, b)
+		}
+		var r map[string]any
+		json.Unmarshal([]byte(b), &r)
+		recs, _ := r["records"].([]any)
+		out := []string{}
+		for _, rec := range recs {
+			out = append(out, rec.(map[string]any)["Name"].(string))
+		}
+		return out
+	}
+
+	accts := []map[string]any{
+		{"Name": "ZqAcme", "Industry": "Tech", "AnnualRevenue": 1000000},
+		{"Name": "ZqGlobex", "Industry": "Tech", "AnnualRevenue": 5000000},
+		{"Name": "ZqInitech", "Industry": "Retail", "AnnualRevenue": 500000},
+		{"Name": "ZqHooli", "Industry": "Tech", "AnnualRevenue": 10000000},
+		{"Name": "ZqPiedPiper", "Industry": "Retail", "AnnualRevenue": 200000},
+	}
+	for _, a := range accts {
+		if b, st := sfAuthPostJSON(t, base+"/services/data/v60.0/sobjects/Account", accessToken, a); st != 201 {
+			t.Fatalf("create %v -> %d; body %s", a["Name"], st, b)
+		}
+	}
+
+	must := func(got []string, want []string, q string) {
+		t.Helper()
+		if len(got) != len(want) {
+			t.Fatalf("SOQL %q -> %v, want %v", q, got, want)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Fatalf("SOQL %q -> %v, want %v", q, got, want)
+			}
+		}
+	}
+
+	// = comparator + AND + LIKE scoping.
+	got := soql("SELECT Name FROM Account WHERE Name LIKE 'Zq%' AND Industry = 'Tech'")
+	must(got, []string{"ZqAcme", "ZqGlobex", "ZqHooli"}, "Tech AND like")
+
+	// Numeric > comparator.
+	got = soql("SELECT Name FROM Account WHERE Name LIKE 'Zq%' AND AnnualRevenue > 1000000")
+	must(got, []string{"ZqGlobex", "ZqHooli"}, "revenue>1M")
+
+	// IN.
+	got = soql("SELECT Name FROM Account WHERE Name LIKE 'Zq%' AND Industry IN ('Retail')")
+	must(got, []string{"ZqInitech", "ZqPiedPiper"}, "IN Retail")
+
+	// AND with >= (numeric) — Acme (1M) excluded, Globex+Hooli included.
+	got = soql("SELECT Name FROM Account WHERE Name LIKE 'Zq%' AND Industry = 'Tech' AND AnnualRevenue >= 5000000")
+	must(got, []string{"ZqGlobex", "ZqHooli"}, "Tech AND revenue>=5M")
+
+	// OR.
+	got = soql("SELECT Name FROM Account WHERE Name = 'ZqHooli' OR Name = 'ZqPiedPiper'")
+	must(got, []string{"ZqHooli", "ZqPiedPiper"}, "OR")
+
+	// ORDER BY DESC + LIMIT.
+	got = soql("SELECT Name FROM Account WHERE Name LIKE 'Zq%' ORDER BY AnnualRevenue DESC LIMIT 2")
+	must(got, []string{"ZqHooli", "ZqGlobex"}, "order desc limit")
+
+	// ORDER BY ASC + LIMIT + OFFSET.
+	got = soql("SELECT Name FROM Account WHERE Name LIKE 'Zq%' ORDER BY Name LIMIT 2 OFFSET 1")
+	must(got, []string{"ZqGlobex", "ZqHooli"}, "order name limit offset")
+}

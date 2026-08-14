@@ -23,7 +23,7 @@ def on_query(req):
     if soql == "":
         return _sf_error(400, "Missing query parameter 'q'", "INVALID_QUERY")
 
-    entity, fields, where_id = _parse_soql(soql)
+    entity, fields, where, order_field, order_dir, limit, offset = _parse_soql(soql)
     if entity == "":
         return _sf_error(400, "Malformed query: could not determine FROM entity", "INVALID_QUERY")
 
@@ -33,18 +33,42 @@ def on_query(req):
 
     docs = col.list()
 
-    # If WHERE Id = '...' was specified, filter to that single record.
-    if where_id != "":
-        filtered = []
-        for d in docs:
-            if d.get("Id") == where_id:
-                filtered.append(d)
-        docs = filtered
+    # WHERE (comparators, IN, LIKE, AND/OR).
+    if where != "":
+        docs = [d for d in docs if _soql_eval(where, d)]
 
-    # Build records with projected fields + attributes block.
-    records = []
-    for d in docs:
-        records.append(_project(d, fields, entity))
+    # ORDER BY (decorate-sort-undecorate so a missing value sorts first; the
+    # index tiebreaker avoids comparing dicts).
+    if order_field != "":
+        pairs = []
+        idx = 0
+        for d in docs:
+            kv = _soql_field(d, order_field)
+            if kv == None:
+                kv = ""
+            pairs.append((kv, idx, d))
+            idx = idx + 1
+        pairs = sorted(pairs)
+        docs = []
+        n = len(pairs)
+        if order_dir == "desc":
+            i = n - 1
+            while i >= 0:
+                docs.append(pairs[i][2])
+                i = i - 1
+        else:
+            for p in pairs:
+                docs.append(p[2])
+
+    # OFFSET then LIMIT.
+    if offset > 0 and offset < len(docs):
+        docs = docs[offset:]
+    elif offset >= len(docs):
+        docs = []
+    if limit > 0:
+        docs = docs[:limit]
+
+    records = [_project(d, fields, entity) for d in docs]
 
     return respond(200, {
         "totalSize": len(records),
