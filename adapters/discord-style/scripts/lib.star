@@ -30,6 +30,9 @@ def _seed_bot_token():
         return
     store_kv_set("discord", "bot_seeded", "yes")
     tc = store_collection("access_tokens")
+    # get-then-insert: concurrent cold-start requests must not collide on the PK
+    if tc.get("mock-bot-token") != None:
+        return
     tc.insert({
         "id": "mock-bot-token",
         "user_id": "1000000000000000001",

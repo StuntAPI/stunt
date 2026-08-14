@@ -27,7 +27,7 @@ def _fnv1a(s):
 # on_insights returns per-media metrics for a published media item.
 def on_insights(req):
     if not _bearer_present(req):
-        return respond(401, {"error": {"message": "Missing or invalid access token", "code": 190}})
+        return respond(401, {"error": {"message": "Missing or invalid access token", "type": "OAuthException", "code": 190, "fbtrace_id": "synthetic_fbtrace_id_190"}})
 
     media_id = req["params"].get("id", "")
 

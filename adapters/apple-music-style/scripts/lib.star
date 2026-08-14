@@ -62,9 +62,27 @@ def _jose_header(token):
 def _contains(s, substr):
     return s.find(substr) >= 0
 
+# Well-known developer JWT, seeded once into the KV registry so the
+# deterministic test credential keeps working while any other forged
+# ES256-header JWT is rejected with 401.
+_TEST_JWT_HEADER = "{\"alg\":\"ES256\",\"kid\":\"TESTKEY123\",\"typ\":\"JWT\"}"
+_TEST_JWT_PAYLOAD = "{\"iss\":\"TEAMID123\",\"iat\":1700000000,\"exp\":1900000000}"
+
+def _test_jwt():
+    return (crypto.base64url_encode(_TEST_JWT_HEADER) + "." +
+            crypto.base64url_encode(_TEST_JWT_PAYLOAD) + ".c3ludGhldGljLXNpZ25hdHVyZQ")
+
+def _seed_jwt_registry():
+    if store_kv_get("applemusic", "jwt_seeded") == "yes":
+        return
+    store_kv_set("applemusic", "jwt_seeded", "yes")
+    far = str(clock.now_unix() + 365 * 24 * 3600)
+    store_kv_set("applemusic", "tok:" + _test_jwt(), far)
+
 # _check_jwt_bearer validates the Authorization: Bearer <jwt> header.
 # Returns the token string if valid, or None if missing/malformed.
-# Structural validation: 3 segments, JOSE header contains ES256.
+# Structural validation: 3 segments, JOSE header contains ES256; the exact
+# token must also be registered (known developer token, unexpired).
 def _check_jwt_bearer(req):
     auth = req["headers"].get("Authorization", "")
     if auth[:7] != "Bearer ":
@@ -77,6 +95,10 @@ def _check_jwt_bearer(req):
     if header == "":
         return None
     if not _contains(header, "ES256"):
+        return None
+    _seed_jwt_registry()
+    exp = store_kv_get("applemusic", "tok:" + token)
+    if exp == None or clock.now_unix() > _to_int(exp):
         return None
     return token
 

@@ -34,10 +34,12 @@ def _seed_known_tokens():
         return
     store_kv_set("graph", "tokens_seeded", "yes")
     tc = store_collection("tokens")
-    tc.insert({
-        "id": "mock-bearer-token",
-        "expires_at": clock.now_unix() + 3600*24*365,
-    })
+    # get-then-insert: concurrent cold-start requests must not collide on the PK
+    if tc.get("mock-bearer-token") == None:
+        tc.insert({
+            "id": "mock-bearer-token",
+            "expires_at": clock.now_unix() + 3600*24*365,
+        })
 
 # _require_bearer returns None if the request carries a Bearer token that is
 # known to the store and not expired, or a 401 response otherwise (missing

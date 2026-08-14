@@ -11,7 +11,7 @@
 # on_engagement returns the user's published media with synthetic replies.
 def on_engagement(req):
     if not _bearer_present(req):
-        return respond(401, {"error": {"message": "Missing or invalid access token", "code": 190}})
+        return respond(401, {"error": {"message": "Missing or invalid access token", "type": "OAuthException", "code": 190, "fbtrace_id": "synthetic_fbtrace_id_190"}})
 
     user_id = req["params"].get("id", "")
 

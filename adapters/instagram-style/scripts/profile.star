@@ -17,7 +17,7 @@ def _bearer(req):
 # on_profile returns the mock Instagram profile for the current token.
 def on_profile(req):
     if not _bearer_present(req):
-        return respond(401, {"error": {"message": "Missing or invalid access token", "code": 190}})
+        return respond(401, {"error": {"message": "Missing or invalid access token", "type": "OAuthException", "code": 190, "fbtrace_id": "synthetic_fbtrace_id_190"}})
 
     token = _bearer(req)
     tc = store_collection("tokens")
