@@ -481,3 +481,125 @@ func TestWhatsAppStyleMultipartMedia(t *testing.T) {
 		t.Errorf("downloaded bytes differ: %q", dl)
 	}
 }
+
+// TestWhatsAppStyleMediaValidation pins the upload fidelity fixes: the
+// generic octet-stream part Content-Type must not mask the real type, a
+// missing messaging_product field must 400 with the Meta #100 code, and the
+// legacy JSON path must still honor its type field.
+func TestWhatsAppStyleMediaValidation(t *testing.T) {
+	adapterDir := filepath.Join("..", "..", "adapters", "whatsapp-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"whatsapp": {Adapter: absAdapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["whatsapp"]
+	const phoneID = "100000000000001"
+	const token = "EAAG_test_token_mock"
+
+	upload := func(fields map[string]string, filename string, fileBytes []byte) (map[string]any, int, string) {
+		var buf bytes.Buffer
+		mw := multipart.NewWriter(&buf)
+		for k, v := range fields {
+			_ = mw.WriteField(k, v)
+		}
+		if filename != "" {
+			fw, _ := mw.CreateFormFile("file", filename)
+			_, _ = fw.Write(fileBytes)
+		}
+		_ = mw.Close()
+		req, _ := http.NewRequest("POST", base+"/v21.0/"+phoneID+"/media", &buf)
+		req.Header.Set("Content-Type", mw.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+token)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		var out map[string]any
+		_ = json.Unmarshal(b, &out)
+		return out, resp.StatusCode, string(b)
+	}
+
+	// Missing messaging_product -> 400 with Meta #100.
+	_, status, body := upload(map[string]string{"type": "image/png"}, "a.png", []byte("x"))
+	if status != 400 {
+		t.Fatalf("upload without messaging_product -> %d, want 400; %s", status, body)
+	}
+	var errObj map[string]any
+	if err := json.Unmarshal([]byte(body), &errObj); err != nil {
+		t.Fatal(err)
+	}
+	errMeta := errObj["error"].(map[string]any)
+	if code := int(errMeta["code"].(float64)); code != 100 {
+		t.Errorf("error code = %d, want 100", code)
+	}
+
+	// CreateFormFile stamps octet-stream; the .png extension must win over it
+	// and over a category-only type field.
+	up, status, body := upload(map[string]string{
+		"messaging_product": "whatsapp",
+		"type":              "image",
+	}, "promo.png", []byte("pngbytes"))
+	if status != 200 {
+		t.Fatalf("upload -> %d; %s", status, body)
+	}
+	mediaID := up["id"].(string)
+	metaBody, status := waGet(t, base+"/v21.0/"+mediaID, token)
+	if status != 200 {
+		t.Fatalf("GET media -> %d; %s", status, metaBody)
+	}
+	var meta map[string]any
+	_ = json.Unmarshal([]byte(metaBody), &meta)
+	if got, _ := meta["mime_type"].(string); got != "image/png" {
+		t.Errorf("mime_type = %q, want image/png (extension must beat octet-stream)", got)
+	}
+	dl, status := waGet(t, base+"/v21.0/"+mediaID+"/content", token)
+	if status != 200 || dl != "pngbytes" {
+		t.Errorf("content = %q (status %d), want byte-exact pngbytes", dl, status)
+	}
+
+	// Legacy JSON path honors its type field.
+	body, status = waPost(t, base+"/v21.0/"+phoneID+"/media", token, map[string]any{
+		"messaging_product": "whatsapp",
+		"type":              "video/mp4",
+	})
+	if status != 200 {
+		t.Fatalf("legacy JSON upload -> %d; %s", status, body)
+	}
+	var legacy map[string]any
+	_ = json.Unmarshal([]byte(body), &legacy)
+	legacyMeta, status := waGet(t, base+"/v21.0/"+legacy["id"].(string), token)
+	if status != 200 {
+		t.Fatalf("GET legacy media -> %d; %s", status, legacyMeta)
+	}
+	var legacyObj map[string]any
+	_ = json.Unmarshal([]byte(legacyMeta), &legacyObj)
+	if got, _ := legacyObj["mime_type"].(string); got != "video/mp4" {
+		t.Errorf("legacy mime_type = %q, want video/mp4", got)
+	}
+}

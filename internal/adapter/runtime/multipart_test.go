@@ -71,8 +71,11 @@ func TestParseMultipartFieldsAndFile(t *testing.T) {
 		t.Fatalf("err = %v, want None", merr)
 	}
 	l, ok := parts.(*sk.List)
-	if !ok || l.Len() != 2 {
-		t.Fatalf("parts = %s (len %d), want 2", parts.String(), l.Len())
+	if !ok {
+		t.Fatalf("parts = %s, want list", parts.String())
+	}
+	if l.Len() != 2 {
+		t.Fatalf("parts = %s, want 2 parts", parts.String())
 	}
 
 	field := l.Index(0)

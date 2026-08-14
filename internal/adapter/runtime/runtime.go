@@ -241,7 +241,9 @@ func buildMultipartBuiltins() sk.StringDict {
 			mr := multipart.NewReader(strings.NewReader(body), boundary)
 			var parts []sk.Value
 			for {
-				p, err := mr.NextPart()
+				// NextRawPart, not NextPart: a Content-Transfer-Encoding
+				// header must not silently transform the part bytes.
+				p, err := mr.NextRawPart()
 				if err == io.EOF {
 					break
 				}
