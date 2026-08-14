@@ -456,3 +456,74 @@ def _index(haystack, needle):
         if match:
             return i
     return -1
+
+# ============================================================================
+# OUTBOUND WEBHOOKS (signed X-Zuora-Signature)
+# ============================================================================
+# Zuora callout notifications deliver the event as key/value fields (real
+# callouts are form-encoded; stunt delivers the same fields as a JSON body
+# inside the engine's {"type", "payload"} envelope). Signature header:
+#
+#   X-Zuora-Signature: hex(HMAC-SHA256(secret, raw_body))
+#
+# where raw_body is the exact JSON bytes of the delivery (events_body output —
+# never a re-serialized copy). The secret is per-hook: the `secret` field
+# captured at POST /v1/webhooks, falling back to the shared mock secret when
+# the hook (or a config.webhook_url target with no REST registration) has none.
+#
+# Verification in Go:
+#   mac := hmac.New(sha256.New, []byte(secret))
+#   mac.Write(rawBody)
+#   expected := hex.EncodeToString(mac.Sum(nil))
+#   if !hmac.Equal([]byte(expected), []byte(r.Header.Get("X-Zuora-Signature"))) {
+#       return 401 // invalid signature
+#   }
+
+# Mock signing secret for webhooks registered without an explicit secret.
+# Public + low-entropy: local stunt only.
+_WEBHOOK_SECRET = "zuora_stunt_mock_webhook_secret_2026"
+
+# _callout builds a Zuora callout-style payload: the shared notification
+# fields plus the merged object fields for the event.
+def _callout(category, event_category, obj_type, obj_id, fields):
+    p = {
+        "Category": category,
+        "EventCategory": event_category,
+        "ObjectType": obj_type,
+        "ObjectId": obj_id,
+        "Description": event_category + ": " + obj_type + " " + obj_id,
+    }
+    for k in fields:
+        p[k] = fields[k]
+    return p
+
+# _signed_emit MACs the exact on-wire body and delivers with
+# X-Zuora-Signature. The hook's per-registration secret wins; the shared mock
+# secret is the fallback.
+def _signed_emit(event_type, payload, secret):
+    if secret == None or secret == "":
+        secret = _WEBHOOK_SECRET
+    body = events_body(event_type, payload)
+    sig = crypto.hmac_sha256(secret, body)
+    events_emit(event_type, payload, {"X-Zuora-Signature": sig})
+
+# _emit_if_subscribed delivers a signed callout when a registered hook
+# subscribes to event_type (empty event_types list or "*" subscribes to all),
+# signing with that hook's secret. No-op when nothing is registered.
+def _emit_if_subscribed(event_type, payload):
+    hc = store_collection("webhooks")
+    hooks = hc.list()
+    if len(hooks) == 0:
+        return
+    # events_register re-points delivery to the LATEST hook; sign with that
+    # hook's secret, not the oldest matching one.
+    target = events_target()
+    for h in hooks:
+        if target != None and h.get("url", "") != target:
+            continue
+        types = h.get("event_types", [])
+        if types == None:
+            types = []
+        if len(types) == 0 or event_type in types or "*" in types:
+            _signed_emit(event_type, payload, h.get("secret", ""))
+            return

@@ -64,6 +64,17 @@ endpoints:
     method: POST
     handler: scripts/issue.star#on_add_comment
 
+  # --- webhooks (dynamic webhook registration) ---
+  - route: /rest/api/3/webhook
+    method: POST
+    handler: scripts/webhook.star#on_register_webhook
+  - route: /rest/api/3/webhook
+    method: GET
+    handler: scripts/webhook.star#on_get_webhooks
+  - route: /rest/api/3/webhook
+    method: DELETE
+    handler: scripts/webhook.star#on_delete_webhook
+
 # Backing stores — collections for stateful data.
 resources:
   - name: issues
@@ -75,6 +86,8 @@ resources:
   - name: comments
     kind: collection
   - name: transitions
+    kind: collection
+  - name: webhooks
     kind: collection
 
 # Auth scheme: Basic (email:api_token) or Bearer (PAT).

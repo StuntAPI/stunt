@@ -3,7 +3,9 @@
 # GET  /v1.0/me/events  → list events (OData)
 # POST /v1.0/me/events  → create an event (STATEFUL)
 #
-# Events are STATEFUL: a created event appears in the list.
+# Events are STATEFUL: a created event appears in the list. Create/update/
+# delete deliver an (unsigned, clientState-echoing) change notification to
+# subscriptions on resource "me/events".
 
 # on_list_events returns calendar events for the current user.
 # GET /v1.0/me/events (Bearer)
@@ -36,6 +38,9 @@ def on_delete_event(req):
         return _err("EventNotFound", 404, "Event '" + event_id + "' not found.")
 
     ec.delete(event_id)
+
+    # Notify subscriptions on me/events (fire-and-forget).
+    _notify_subscriptions("deleted", "me/events", "#Microsoft.Graph.Event", event_id)
     return respond(204)
 
 # on_update_event updates a calendar event by id (PATCH).
@@ -58,6 +63,9 @@ def on_update_event(req):
         if body.get(k) != None:
             doc[k] = body[k]
     ec.update(event_id, doc)
+
+    # Notify subscriptions on me/events (fire-and-forget).
+    _notify_subscriptions("updated", "me/events", "#Microsoft.Graph.Event", event_id)
 
     entity = _event_entity(doc)
     entity["@odata.context"] = "https://graph.microsoft.com/v1.0/$metadata#users('me')/events/$entity"
@@ -96,6 +104,9 @@ def on_create_event(req):
 
     ec = store_collection("events")
     ec.insert(doc)
+
+    # Notify subscriptions on me/events (fire-and-forget).
+    _notify_subscriptions("created", "me/events", "#Microsoft.Graph.Event", event_id)
 
     entity = _event_entity(doc)
     entity["@odata.context"] = "https://graph.microsoft.com/v1.0/$metadata#users('me')/events/$entity"

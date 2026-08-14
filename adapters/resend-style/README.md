@@ -19,9 +19,10 @@ account or hitting the network.
 - **Retrieve:** `GET /emails/{id}` returns the stored email (useful for test
   assertions that an email was sent).
 - **List:** `GET /emails` returns all sent emails.
-- **Webhook events:** when a `webhook_url` is configured in the service config,
-  sending an email emits `email.sent` and `email.delivered` events (mirroring how
-  stripe-style emits events).
+- **Webhooks:** register an endpoint with `POST /webhooks`
+  (`{endpoint, events}`); every send then emits **Svix-signed**
+  `email.sent` and `email.delivered` events to it — see
+  [Webhooks](#webhooks) below.
 
 State persists in a SQLite-backed collection, so emails sent in one request are
 retrievable in subsequent requests within the same `stunt up` session.
@@ -33,6 +34,9 @@ retrievable in subsequent requests within the same `stunt up` session.
 | POST | `/emails` | `emails.star#on_send_email` | Send an email → `{id}` |
 | GET | `/emails/{id}` | `emails.star#on_get_email` | Retrieve a stored email |
 | GET | `/emails` | `emails.star#on_list_emails` | List all sent emails |
+| POST | `/webhooks` | `webhooks.star#on_create_webhook` | Register a webhook endpoint |
+| GET | `/webhooks` | `webhooks.star#on_list_webhooks` | List registered webhooks |
+| DELETE | `/webhooks/{id}` | `webhooks.star#on_delete_webhook` | Delete a webhook endpoint |
 
 Any unmatched route returns `404`.
 
@@ -41,6 +45,7 @@ Any unmatched route returns `404`.
 | Collection | Purpose |
 |------------|---------|
 | `emails` | Sent email records (id, from, to, subject, html, text, ...) |
+| `webhooks` | Registered webhook endpoints (url, events, per-hook secret) |
 
 KV is used for the monotonic `email_seq` counter (generates ids like `re_1`,
 `re_2`, ...).
@@ -60,14 +65,46 @@ services:
     adapter: ./adapters/resend-style
 ```
 
-To receive webhook events, add a `webhook_url` to the service config:
+To receive webhook events, register a webhook endpoint:
 
-```yaml
-services:
-  resend:
-    adapter: ./adapters/resend-style
-    config:
-      webhook_url: http://localhost:9090/webhook
+```bash
+curl -X POST "http://localhost:PORT/webhooks" \
+  -H "Authorization: Bearer re_dev_key" \
+  -H "Content-Type: application/json" \
+  -d '{"endpoint": "http://localhost:9090/webhook", "events": ["email.sent", "email.delivered"]}'
+# → {"id": "wh_1", "url": "http://localhost:9090/webhook", "events": [...], "created_at": "..."}
 ```
 
-Then `stunt up` and make requests to the served address.
+Every `POST /emails` then delivers the events to that endpoint.
+
+## Webhooks
+
+Resend delivers webhooks through **Svix**. This adapter reproduces the real
+scheme: each delivery is signed and carries three headers:
+
+```
+svix-id:         msg_stunt_1
+svix-timestamp:  1739000000
+svix-signature:  v1,<base64(HMAC-SHA256(secret, svix-id + "." + svix-timestamp + "." + raw_body))>
+```
+
+- **Events emitted:** `email.sent`, `email.delivered` (per registered
+  webhook that subscribes to the type; an empty `events` list subscribes to
+  everything).
+- **Payload shape:** Resend's envelope `{type, created_at, data: {id, object,
+  to, from, subject, created_at}}` wrapped in stunt's standard
+  `{"type": ..., "payload": {...}}` delivery envelope.
+- **Signing secret:** the fixed synthetic default
+  `whsec_stunt_resend_mock_signing_key` (Resend's `whsec_` prefix), or the
+  per-hook `secret` supplied in the `POST /webhooks` body if present —
+  deliveries then sign with THAT secret, matching Resend's one-secret-per-
+  endpoint model.
+
+Verification in Go:
+
+```go
+mac := hmac.New(sha256.New, []byte(secret))
+mac.Write([]byte(svixID + "." + svixTimestamp + "." + string(rawBody)))
+expected := "v1," + base64.StdEncoding.EncodeToString(mac.Sum(nil))
+if expected != r.Header.Get("svix-signature") { return 401 }
+```

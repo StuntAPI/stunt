@@ -90,6 +90,14 @@ def on_create_workitem(req):
     wc = store_collection("workitems")
     wc.insert(new_wi)
 
+    # Emit service-hook event (workitem.created) if a subscription exists.
+    title = fields.get("System.Title", "")
+    _emit_service_hook(
+        "workitem.created",
+        "Work item " + wi_id_str + " created: " + title,
+        _workitem_resource(new_wi),
+    )
+
     return respond(200, _workitem_resource(new_wi))
 
 # _workitem_resource builds the API response shape for a work item.

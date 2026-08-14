@@ -103,6 +103,54 @@ synthetic records. Supports `SELECT <fields> FROM <Object> [WHERE Id = 'value']`
 | POST | `/v1/payment-methods/credit-cards` | `billing.star#on_create_payment_method` | Create payment method |
 | POST | `/v1/transactions/billing/preview` | `billing.star#on_preview_billing` | Preview billing |
 | POST | `/v1/action/query` | `query.star#on_query` | ZOQL query |
+| POST | `/v1/webhooks` | `webhooks.star#on_create_webhook` | Register webhook subscription (`{url, event_types, secret}`) |
+| GET | `/v1/webhooks` | `webhooks.star#on_list_webhooks` | List webhook subscriptions |
+| DELETE | `/v1/webhooks/{id}` | `webhooks.star#on_delete_webhook` | Delete webhook subscription |
+
+## Webhooks (callout notifications)
+
+Real Zuora callouts are configured in the Notifications UI (no public REST
+registration endpoint), so the simulator exposes its own registration:
+
+```bash
+curl -X POST http://localhost:8080/v1/webhooks \
+  -H "Authorization: Bearer your-token" \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "http://localhost:9090/zuora/callout",
+        "event_types": ["SubscriptionActivated", "SubscriptionCancelled"],
+        "secret": "my-hook-secret" }'
+```
+
+An empty `event_types` list (or `"*"` in it) subscribes to every event.
+
+### Signature
+
+Every delivery is signed:
+
+```
+X-Zuora-Signature: hex(HMAC-SHA256(secret, raw_body))
+```
+
+- `secret` is the per-hook secret captured at registration; hooks registered
+  without one (and targets wired via `config.webhook_url` in `stunt.yaml`)
+  use the shared mock secret `zuora_stunt_mock_webhook_secret_2026`
+  (public + low-entropy, local stunt only).
+- `raw_body` is the exact JSON bytes of the delivery — MAC the body verbatim,
+  never a re-serialized copy.
+
+### Payload + emitted events
+
+Real callouts POST the event as form-encoded key/value fields; stunt delivers
+the same fields as a JSON body (inside the engine's `{"type", "payload"}`
+envelope): `Category`, `EventCategory`, `ObjectType`, `ObjectId`,
+`Description`, plus the object's own fields.
+
+| Event | Emitted when |
+|-------|--------------|
+| `AccountCreated` | `POST /v1/accounts` |
+| `SubscriptionActivated` | `POST /v1/subscriptions` (subscriptions are Active on creation in this simulator) |
+| `SubscriptionUpdated` | `PUT /v1/subscriptions/{key}` |
+| `SubscriptionCancelled` | `POST /v1/subscriptions/{key}/cancel` |
 
 Note on list filtering: `filter[]` matching is exact and case-insensitive (as
 Zuora documents), and `field.EQ:null` matches null/missing fields — but the
@@ -120,6 +168,7 @@ cannot be ANDed.
 | `invoices` | Invoice records (seeded) |
 | `payments` | Payment records |
 | `payment_methods` | Payment method records |
+| `webhooks` | Webhook subscriptions (`{id, url, event_types, secret, status}`) |
 
 ## Usage
 

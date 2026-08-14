@@ -5,11 +5,12 @@
 # GET  /emails/{id} (Bearer) -> the stored email document
 # GET  /emails (Bearer) -> {data: [...]}
 #
-# On send, emits email.sent + email.delivered webhook events (if a
-# webhook_url is configured in the service config).
+# On send, emits email.sent + email.delivered webhook events signed with
+# Resend's Svix scheme (svix-id / svix-timestamp / svix-signature) to the
+# URL registered via POST /webhooks. See scripts/lib.star.
 #
-# Shared helpers (_bearer, _require_auth, _next_email_id) are preloaded
-# from scripts/lib.star.
+# Shared helpers (_bearer, _require_auth, _next_email_id, _emit_if_subscribed)
+# are preloaded from scripts/lib.star.
 
 # on_send_email creates an email record and returns its id.
 def on_send_email(req):
@@ -42,9 +43,10 @@ def on_send_email(req):
     c = store_collection("emails")
     c.insert(doc)
 
-    # Emit webhook events (fire-and-forget: errors do not break sending).
-    events_emit("email.sent", _event_payload(email_id, doc))
-    events_emit("email.delivered", _event_payload(email_id, doc))
+    # Emit signed webhook events (fire-and-forget: errors do not break
+    # sending). Payloads mirror Resend's {type, created_at, data} envelope.
+    _emit_if_subscribed("email.sent", _event_payload("email.sent", email_id, doc))
+    _emit_if_subscribed("email.delivered", _event_payload("email.delivered", email_id, doc))
 
     return respond(200, {"id": email_id})
 
@@ -96,12 +98,19 @@ def _normalize_recipients(to):
         return [to]
     return to
 
-# _event_payload builds the webhook event payload for an email.
-def _event_payload(email_id, doc):
+# _event_payload builds the Resend webhook payload for an email:
+# {type, created_at, data:{id, object, to, from, subject, created_at}} —
+# the shape Resend POSTs for email.sent / email.delivered.
+def _event_payload(event_type, email_id, doc):
     return {
-        "email_id": email_id,
-        "from": doc["from"],
-        "to": doc["to"],
-        "subject": doc["subject"],
-        "created_at": doc["created_at"],
+        "type": event_type,
+        "created_at": clock.now_rfc3339(),
+        "data": {
+            "id": email_id,
+            "object": "email",
+            "to": doc["to"],
+            "from": doc["from"],
+            "subject": doc["subject"],
+            "created_at": doc["created_at"],
+        },
     }

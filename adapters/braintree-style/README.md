@@ -78,22 +78,63 @@ across endpoints. This makes client retry/idempotency logic testable.
 | POST | `/merchants/{id}/transactions/{id}/refund` | Refund |
 | POST | `/merchants/{id}/payment_methods` | Vault payment method |
 | POST | `/merchants/{id}/client_token` | Generate client token |
-| POST | `/webhooks` | Inbound webhook |
+| POST | `/webhooks` | Register webhook (`{url, kinds}`) or inbound notification verification (`{bt_signature, bt_payload}`) |
 
 ## Webhooks
 
-`POST /webhooks` accepts an inbound Braintree webhook notification:
+### Registration
 
-```
-bt_signature: "public_key|signature_hex"
-bt_payload:   base64-encoded payload
+Real Braintree webhooks are configured in the Control Panel (no public REST
+registration endpoint), so the simulator exposes registration on the webhook
+path itself:
+
+```bash
+curl -X POST http://localhost:8080/webhooks \
+  -H "Authorization: Bearer your-token" \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "http://localhost:9090/braintree/webhook", "kinds": ["transaction_settled", "refund_opened"] }'
 ```
 
-The real scheme verifies `signature_hex = hex(HMAC-SHA256(private_key, bt_payload))`.
-This simulator checks presence only: any non-empty `bt_signature` + `bt_payload`
-pair returns `200`; a missing field returns `400`. Outbound *signed* webhook
-deliveries are not implemented for this adapter — see the signature roster in
-[`../README.md`](../README.md) for the providers that do sign deliveries.
+Registering stores the hook `{id, url, kinds}` and immediately delivers a
+signed `check` notification (the kind Braintree uses to verify a webhook
+URL). An empty `kinds` list subscribes to everything.
+
+### Outbound signature (bt_signature / bt_payload)
+
+Real Braintree delivers notifications as a form-encoded POST with two fields;
+the engine POSTs JSON, so stunt delivers the same values as a JSON body and
+duplicates them as headers:
+
+| Where | Field | Value |
+|-------|-------|-------|
+| body + header | `bt_signature` | `"<public_key>\|<hex(HMAC-SHA1(private_key, bt_payload))>"` |
+| body + header | `bt_payload` | base64-encoded notification payload |
+| header | `bt-hash` | the hex HMAC-SHA1 over `bt_payload` |
+| header | `bt-kind` | the notification kind |
+
+The notification payload (base64'd into `bt_payload`) is
+`{timestamp, kind, subject}`. Mock keys — configure your verifier with these
+exact strings (public + low-entropy, local stunt only):
+
+- public key: `stunt_mock_public_key_2026`
+- private key: `stunt_mock_private_key_2026`
+
+### Emitted kinds
+
+| Kind | Emitted when |
+|------|--------------|
+| `check` | Webhook registered |
+| `transaction_settled` | `POST /merchants/{id}/transactions` (type `sale`) or GraphQL `chargePaymentMethod`/`chargeCreditCard` — the simulator settles immediately |
+| `refund_opened` | REST refund or GraphQL `refundTransaction` |
+
+(`authorizePaymentMethod` emits nothing — real Braintree has no webhook kind
+for a bare authorization.)
+
+### Inbound verification
+
+`POST /webhooks` with `{bt_signature, bt_payload}` still behaves as the
+inbound verification endpoint: any non-empty pair returns `200`, a missing
+field returns `400`.
 
 ## Response shapes
 

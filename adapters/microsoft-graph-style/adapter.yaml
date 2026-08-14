@@ -26,6 +26,21 @@ endpoints:
     method: GET
     handler: scripts/me.star#on_me
 
+  # --- Webhook subscriptions (change notifications) ---
+  # Literal routes declared before parameterized ones.
+  - route: /v1.0/subscriptions
+    method: POST
+    handler: scripts/subscriptions.star#on_create_subscription
+  - route: /v1.0/subscriptions
+    method: GET
+    handler: scripts/subscriptions.star#on_list_subscriptions
+  - route: /v1.0/subscriptions/{id}
+    method: GET
+    handler: scripts/subscriptions.star#on_get_subscription
+  - route: /v1.0/subscriptions/{id}
+    method: DELETE
+    handler: scripts/subscriptions.star#on_delete_subscription
+
   # --- Users ---
   - route: /v1.0/users
     method: GET
@@ -163,6 +178,8 @@ resources:
   - name: files
     kind: collection
   - name: sessions
+    kind: collection
+  - name: subscriptions
     kind: collection
 
 # Auth scheme metadata (mock: any Bearer token accepted; presence checked).

@@ -53,11 +53,22 @@ def on_refund(req):
     rc = store_collection("refunds")
     rc.insert(refund_doc)
 
-    # Emit webhook event.
-    events_emit("PAYMENT.CAPTURE.REFUNDED", {
-        "event_type": "PAYMENT.CAPTURE.REFUNDED",
-        "resource_type": "refund",
-        "resource": {"id": refund_id, "status": "COMPLETED"},
-    })
+    # Emit webhook event (real PayPal event name + envelope).
+    _emit_event(
+        "PAYMENT.CAPTURE.REFUNDED",
+        "refund",
+        "Payment refunded for " + value + " " + currency,
+        {
+            "id": refund_id,
+            "status": "COMPLETED",
+            "amount": {"currency_code": currency, "value": value},
+            "create_time": refund_doc.get("create_time", ""),
+            "links": [{
+                "href": "https://api.stunt.test/v2/payments/captures/" + capture_id,
+                "rel": "up",
+                "method": "GET",
+            }],
+        },
+    )
 
     return respond(201, refund_doc)

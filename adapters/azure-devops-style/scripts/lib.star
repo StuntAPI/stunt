@@ -143,3 +143,49 @@ def _find_project(name):
         if p.get("name") == name:
             return p
     return None
+
+# ============================================================================
+# AZURE DEVOPS SERVICE HOOK DELIVERY (DOCUMENTATION)
+# ============================================================================
+# Service hooks (generic "webHooks" consumer) POST an event envelope like:
+#
+#   {
+#     "subscriptionId": "...", "notificationId": 1, "id": "...",
+#     "eventType": "workitem.created", "publisherId": "tfs",
+#     "message": {"text": "..."}, "detailedMessage": {"text": "..."},
+#     "resource": {...}, "resourceVersion": "1.0", "createdDate": "..."
+#   }
+#
+# Azure DevOps signs NOTHING — deliveries are UNSIGNED BY DESIGN. Secure the
+# receiving endpoint via the subscription's basic auth / bearer / custom
+# headers configuration. stunt does NOT invent a signature. _emit_service_hook
+# delivers only when a subscription for that eventType exists.
+def _emit_service_hook(event_type, message_text, resource):
+    sc = store_collection("subscriptions")
+    for s in sc.list():
+        if s.get("eventType", "") == event_type:
+            payload = {
+                "subscriptionId": s.get("id", ""),
+                "notificationId": store_kv_incr("azure-devops", "notif_seq") + 1,
+                "id": _next_notification_id(),
+                "eventType": event_type,
+                "publisherId": "tfs",
+                "scope": "all",
+                "message": {"text": message_text, "html": message_text, "markdown": message_text},
+                "detailedMessage": {"text": message_text, "html": message_text, "markdown": message_text},
+                "resource": resource,
+                "resourceVersion": "1.0",
+                "createdDate": "2024-01-01T00:00:00.000Z",
+            }
+            events_emit(event_type, payload)
+            return
+
+# _next_subscription_id returns a synthetic subscription GUID.
+def _next_subscription_id():
+    n = store_kv_incr("azure-devops", "sub_seq") + 1
+    return "aaaa000" + str(n) + "-bbbb-cccc-dddd-eeeeffff0000"
+
+# _next_notification_id returns a synthetic notification GUID.
+def _next_notification_id():
+    n = store_kv_incr("azure-devops", "notif_guid_seq") + 1
+    return "ffff000" + str(n) + "-bbbb-cccc-dddd-eeeeaaaa0000"

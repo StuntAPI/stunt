@@ -143,6 +143,9 @@ def on_send_mail(req):
     mc = store_collection("messages")
     mc.insert(doc)
 
+    # Notify subscriptions on me/messages (fire-and-forget).
+    _notify_subscriptions("created", "me/messages", "#Microsoft.Graph.Message", msg_id)
+
     # sendMail returns 202 Accepted with no body.
     return respond(202)
 

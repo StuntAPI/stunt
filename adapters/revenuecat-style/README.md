@@ -33,6 +33,51 @@ request are visible in subsequent requests within the same `stunt up` session.
 | GET | `/v1/subscribers/{app_user_id}` | `subscribers.star#on_get_subscriber` | Get subscriber state |
 | POST | `/v1/subscribers/{app_user_id}` | `subscribers.star#on_post_subscriber` | Create/update subscriber |
 | POST | `/v1/receipts` | `receipts.star#on_post_receipt` | Validate receipt → grant entitlement |
+| POST | `/v1/webhooks` | `webhooks.star#on_create_webhook` | Register webhook (`{url, events}`) — delivers a `TEST` event |
+| GET | `/v1/webhooks` | `webhooks.star#on_list_webhooks` | List webhooks |
+
+## Webhooks
+
+Real RevenueCat v1 webhooks POST to a URL configured in the dashboard; there
+is no REST registration endpoint. The simulator exposes its own:
+
+```bash
+curl -X POST http://localhost:8080/v1/webhooks \
+  -H "Authorization: Bearer sk_local" \
+  -H "Content-Type: application/json" \
+  -d '{ "url": "http://localhost:9090/rc/webhook", "events": ["INITIAL_PURCHASE"] }'
+```
+
+**Signature: unsigned by design.** RevenueCat's v1 webhooks carry no
+signature — the documented guidance is to validate the `app_user_id` after
+receipt via `GET /v1/subscribers/{app_user_id}`. (RevenueCat's newer v2
+webhooks are Ed25519-signed, but this adapter simulates the v1 surface.)
+
+### Payload + emitted events
+
+The delivery body carries the real v1 envelope inside the engine's
+`{"type", "payload"}` wrapper:
+
+```json
+{
+  "api_version": "1.0",
+  "event": {
+    "type": "INITIAL_PURCHASE",
+    "app_user_id": "user-123",
+    "product_id": "premium",
+    "entitlement_id": "pro",
+    "store": "app_store",
+    "period_type": "NORMAL",
+    "purchased_at_ms": 1723680000000,
+    "expiration_at_ms": 1726272000000
+  }
+}
+```
+
+| Event type | Emitted when |
+|------------|--------------|
+| `TEST` | Webhook registered |
+| `INITIAL_PURCHASE` | `POST /v1/receipts` grants an entitlement |
 
 Any unmatched route returns `404`.
 
@@ -63,6 +108,7 @@ All endpoints return the canonical RevenueCat subscriber envelope:
 |------------|---------|
 | `subscribers` | Subscriber docs keyed by app_user_id (entitlements, subscriptions, non_subscriptions) |
 | `entitlements` | Entitlement definitions (reserved for product→entitlement mapping) |
+| `webhooks` | Webhook subscriptions (`{id, url, events, created_at}`) |
 
 ## Auth
 

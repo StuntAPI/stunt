@@ -40,11 +40,19 @@ endpoints:
     method: POST
     handler: scripts/reactions.star#on_add_reaction
 
+  # --- Events API configuration (local analog of the app dashboard's
+  #     Request URL setting — the Web API has no real endpoint for it) ---
+  - route: /api/apps.events.url
+    method: POST
+    handler: scripts/events.star#on_set_events_url
+
 # Backing stores — collections for stateful data.
 resources:
   - name: channels
     kind: collection
   - name: messages
+    kind: collection
+  - name: webhooks
     kind: collection
 
 # Auth scheme metadata: Bearer token (xoxb-...).

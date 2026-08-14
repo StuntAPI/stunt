@@ -61,6 +61,9 @@ def on_create_issue(req):
     c = store_collection("issues")
     c.insert(doc)
 
+    # Emit webhook event if subscribed (jira:issue_created).
+    _emit_webhook("jira:issue_created", _issue_event("jira:issue_created", doc))
+
     return respond(201, {
         "id": issue_id,
         "key": issue_key,
@@ -116,6 +119,9 @@ def on_update_issue(req):
 
     c = store_collection("issues")
     c.update(doc.get("id", ""), merged_doc)
+
+    # Emit webhook event if subscribed (jira:issue_updated).
+    _emit_webhook("jira:issue_updated", _issue_event("jira:issue_updated", merged_doc))
 
     return respond(204)
 
@@ -182,6 +188,9 @@ def on_do_transition(req):
     c = store_collection("issues")
     c.update(doc.get("id", ""), merged_doc)
 
+    # A transition is an issue update for webhook purposes.
+    _emit_webhook("jira:issue_updated", _issue_event("jira:issue_updated", merged_doc))
+
     return respond(204)
 
 def on_add_comment(req):
@@ -214,6 +223,18 @@ def on_add_comment(req):
 
     cc = store_collection("comments")
     cc.insert(comment_doc)
+
+    # Emit webhook event if subscribed (comment_created).
+    _emit_webhook("comment_created", {
+        "timestamp": clock.now_unix() * 1000,
+        "webhookEvent": "comment_created",
+        "comment": comment_doc,
+        "issue": {
+            "id": doc.get("id", ""),
+            "key": doc.get("key", ""),
+            "fields": doc.get("fields", {}),
+        },
+    })
 
     return respond(201, comment_doc)
 

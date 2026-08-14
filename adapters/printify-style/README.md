@@ -23,6 +23,10 @@ a commerce client uses:
   (`POST /v1/orders.json`); retrieve a single order for status/tracking polling
   (`GET /v1/shops/{shop_id}/orders/{order_id}`); list and send orders.
   Multiple forms share handlers.
+- **Webhooks:** shop webhook subscriptions
+  (`GET`/`POST /v1/shops/{shop_id}/webhooks.json`,
+  `GET`/`DELETE /v1/shops/{shop_id}/webhooks/{webhook_id}`) with signed
+  deliveries (see [Webhooks](#webhooks)).
 
 State persists in SQLite-backed collections, so a product/order created in one
 request is visible in subsequent requests within the same `stunt up` session.
@@ -43,6 +47,10 @@ request is visible in subsequent requests within the same `stunt up` session.
 | GET | `/v1/orders.json` | `orders.star#on_list_orders` | List orders |
 | POST | `/v1/orders.json` | `orders.star#on_create_order` | Create an order (legacy form) |
 | POST | `/v1/orders/{order_id}/send.json` | `orders.star#on_send_order` | Send an order to fulfillment |
+| GET | `/v1/shops/{shop_id}/webhooks.json` | `webhooks.star#on_list_webhooks` | List shop webhooks |
+| POST | `/v1/shops/{shop_id}/webhooks.json` | `webhooks.star#on_create_webhook` | Register a webhook (per-hook `secret`) |
+| GET | `/v1/shops/{shop_id}/webhooks/{webhook_id}` | `webhooks.star#on_get_webhook` | Retrieve a webhook |
+| DELETE | `/v1/shops/{shop_id}/webhooks/{webhook_id}` | `webhooks.star#on_delete_webhook` | Delete a webhook |
 
 Any unmatched route returns `404`.
 
@@ -52,6 +60,57 @@ Any unmatched route returns `404`.
 |------------|---------|
 | `products` | Shop product records |
 | `orders` | Order records |
+| `webhooks` | Webhook subscriptions (url, topic, per-hook secret) |
+
+## Webhooks
+
+Register a webhook with a per-hook secret:
+
+```http
+POST /v1/shops/123/webhooks.json
+Authorization: Bearer <dev key>
+
+{"url": "http://localhost:9090/hooks", "topic": "order:created", "secret": "my-hook-secret"}
+```
+
+Deliveries are made only for topics a registered hook subscribes to, and each
+delivery is signed with **that hook's** secret (Printify's model — there is no
+global signing secret; hooks registered without a `secret` fall back to the
+built-in mock secret `stunt_mock_potify_webhook_secret`).
+
+**Event types:** `order:created`, `order:send:fulfilled`, `shipment:sent`,
+`product:created`, `product:updated`, `product:deleted`.
+
+**Payload envelope** (Printify shape; `topic` splits into `resource` + `action`):
+
+```json
+{
+  "id": "12",
+  "shop_id": 123,
+  "resource": "order",
+  "action": "created",
+  "created_at": 1720000000,
+  "data": { "...the full order/product/shipment document...": "" }
+}
+```
+
+**Signature header:**
+
+```
+X-Potify-Signature: <hex(HMAC-SHA256(webhook_secret, raw_body))>
+```
+
+The MAC is computed over the exact bytes POSTed to your endpoint, so verifying
+against the raw request body works:
+
+```go
+mac := hmac.New(sha256.New, []byte(webhookSecret))
+mac.Write(rawBody)
+expected := hex.EncodeToString(mac.Sum(nil))
+if !hmac.Equal([]byte(expected), []byte(r.Header.Get("X-Potify-Signature"))) {
+    return 401
+}
+```
 
 ## Auth
 

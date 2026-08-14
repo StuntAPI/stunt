@@ -110,6 +110,91 @@ def _synth_total(line_items):
         total = 20
     return total
 
+# ============================================================================
+# WEBHOOK SIGNATURE SCHEME (DOCUMENTATION)
+# ============================================================================
+# Printify signs every webhook delivery with the SECRET configured on the
+# webhook subscription itself (per-hook secret, supplied at registration via
+# POST /v1/shops/{shop_id}/webhooks.json).
+#
+# Header:
+#   X-Potify-Signature: <hex(HMAC-SHA256(webhook_secret, raw_body))>
+#
+# Verification in Go:
+#   mac := hmac.New(sha256.New, []byte(webhookSecret))
+#   mac.Write(rawBody)
+#   expected := hex.EncodeToString(mac.Sum(nil))
+#   if !hmac.Equal([]byte(expected), []byte(r.Header.Get("X-Potify-Signature"))) {
+#       return 401 // invalid signature
+#   }
+#
+# Webhook payload envelope (Printify shape):
+#   {"id": "<event id>", "shop_id": ..., "resource": "order",
+#    "action": "created", "created_at": <unix ts>, "data": {...resource...}}
+# The topic maps to resource ("order") + action ("created") by splitting the
+# event type on the first ":" — e.g. "order:created", "shipment:sent",
+# "product:updated".
+# ============================================================================
+
+# Default mock signing secret, used when a webhook was registered without a
+# secret of its own. Public + low-entropy: local stunt only — never reuse
+# outside the simulator.
+_DEFAULT_WEBHOOK_SECRET = "stunt_mock_potify_webhook_secret"
+
+# _hook_secret returns the per-hook secret registered for event_type (the
+# Printify model: each webhook subscription carries its own secret). Falls
+# back to the shared mock secret when the hook has none.
+def _hook_secret(event_type):
+    wc = store_collection("webhooks")
+    for w in wc.list():
+        if w.get("topic", "") == event_type:
+            s = w.get("secret", "")
+            if s != "":
+                return s
+    return _DEFAULT_WEBHOOK_SECRET
+
+# _signed_emit MACs the exact on-wire body and delivers with
+# X-Potify-Signature (Printify's scheme): bare hex HMAC-SHA256 of the body
+# keyed by the webhook secret. The same (event_type, payload) feeds
+# events_body (signing input) and events_emit (delivery) so the signature
+# verifies against the bytes the sink receives.
+def _signed_emit(event_type, payload):
+    body = events_body(event_type, payload)
+    sig = crypto.hmac_sha256(_hook_secret(event_type), body)
+    events_emit(event_type, payload, {"X-Potify-Signature": sig})
+
+# _webhook_payload builds the Printify webhook envelope for an event.
+# data is the resource document (order/product/shipment) the event describes.
+def _webhook_payload(event_type, shop_id, data):
+    colon = event_type.find(":")
+    resource = event_type
+    action = "updated"
+    if colon >= 0:
+        resource = event_type[:colon]
+        action = event_type[colon + 1:]
+    return {
+        "id": str(store_kv_incr("printify", "webhook_event_seq")),
+        "shop_id": shop_id,
+        "resource": resource,
+        "action": action,
+        "created_at": clock.now_unix(),
+        "data": data,
+    }
+
+# _emit_if_subscribed delivers a signed webhook only when a hook registered
+# for this topic exists (Printify does not deliver unsubscribed topics).
+def _emit_if_subscribed(event_type, shop_id, data):
+    wc = store_collection("webhooks")
+    # events_register re-points delivery to the LATEST hook; sign with that
+    # hook's secret, not the oldest matching one.
+    target = events_target()
+    for w in wc.list():
+        if target != None and w.get("url", "") != target:
+            continue
+        if w.get("topic", "") == event_type:
+            _signed_emit(event_type, _webhook_payload(event_type, shop_id, data))
+            return
+
 # _new_order builds a synthetic Printify-style order document from a create
 # request body. Accepts either the top-level "shipping_address" key (the real
 # /v1/shops/{shop_id}/orders.json shape) or "address_to", and always includes

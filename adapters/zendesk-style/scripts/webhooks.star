@@ -1,14 +1,17 @@
 # Webhook handlers — Zendesk webhooks with HMAC-SHA256 signature.
 #
-# GET  /api/v2/webhooks   -> list webhooks
-# POST /api/v2/webhooks   -> create webhook
+# GET    /api/v2/webhooks     -> list webhooks
+# POST   /api/v2/webhooks     -> create webhook (registers the delivery URL)
+# DELETE /api/v2/webhooks/{id}-> delete webhook (204)
 #
 # Zendesk webhooks are signed with:
-#   X-Zendesk-Webhook-Signature = base64(HMAC-SHA256(webhook_secret, body))
-#   X-Zendesk-Webhook-Timestamp = unix timestamp
+#   X-Zendesk-Webhook-Signature           = base64(HMAC-SHA256(secret, TIMESTAMP + BODY))
+#   X-Zendesk-Webhook-Signature-Timestamp = unix timestamp
 #
-# This mock does not implement outbound webhook delivery verification;
-# the signing scheme is documented for reference.
+# The secret is per-webhook: real Zendesk auto-generates one (revealed in Admin
+# Center); the simulator accepts "signing_secret" in the create payload and
+# stores it on the webhook doc — later deliveries are MACed with THAT secret.
+# See scripts/lib.star for the full documentation + Go verification snippet.
 
 # Shared helpers from lib.star.
 
@@ -56,6 +59,10 @@ def on_create_webhook(req):
     if endpoint == None:
         endpoint = ""
 
+    subscriptions = webhook.get("subscriptions", [])
+    if subscriptions == None:
+        subscriptions = []
+
     webhook_id = _next_id("webhook")
 
     doc = {
@@ -64,12 +71,24 @@ def on_create_webhook(req):
         "endpoint": endpoint,
         "status": "active",
         "method": webhook.get("method", "POST"),
+        "signing_secret": webhook.get("signing_secret", ""),
+        "subscriptions": subscriptions,
     }
 
     col = store_collection("webhooks")
     col.insert(doc)
 
-    return respond(201, {"webhook": doc})
+    # Register the delivery URL with the events emitter.
+    if endpoint != "":
+        events_register(endpoint)
+
+    # Real Zendesk never returns the signing secret on create; mask it here
+    # (retrieve it from the stored doc / your create payload).
+    view = {}
+    for k in doc:
+        view[k] = doc[k]
+    view["signing_secret"] = "********"
+    return respond(201, {"webhook": view})
 
 def on_delete_webhook(req):
     ok, err = _require_auth(req)

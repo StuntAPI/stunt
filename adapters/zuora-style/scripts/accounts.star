@@ -87,6 +87,20 @@ def on_create_account(req):
     col = store_collection("accounts")
     col.insert(doc)
 
+    # Webhook callout: AccountCreated.
+    _emit_if_subscribed("AccountCreated", _callout(
+        "Account",
+        "AccountCreated",
+        "Account",
+        account_id,
+        {
+            "AccountNumber": account_number,
+            "Name": doc.get("name", ""),
+            "Status": doc.get("status", "Draft"),
+            "Currency": doc.get("currency", "USD"),
+        },
+    ))
+
     return respond(200, {
         "success": True,
         "accountId": account_id,

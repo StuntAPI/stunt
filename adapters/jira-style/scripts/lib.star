@@ -67,6 +67,46 @@ def _next_comment_id():
     n = store_kv_incr("jira", "comment_seq")
     return str(10000 + n)
 
+# ============================================================================
+# JIRA WEBHOOK DELIVERY (DOCUMENTATION)
+# ============================================================================
+# Jira Cloud webhooks (registered via POST /rest/api/3/webhook) are
+# UNSIGNED BY DESIGN: Atlassian documents no HMAC/signature header for
+# webhook deliveries. The payload envelope is:
+#
+#   {"timestamp": <ms>, "webhookEvent": "jira:issue_created", "issue": {...}}
+#
+# (comment events add a "comment" object). Secure the receiving endpoint via a
+# secret token in the URL or basic auth on the target — stunt does NOT invent
+# a signature. _emit_webhook delivers only when a registered hook subscribes
+# to the event type (a hook with an empty events list receives everything).
+def _emit_webhook(event_type, payload):
+    wc = store_collection("webhooks")
+    for w in wc.list():
+        events = w.get("events", [])
+        if events == None:
+            events = []
+        if len(events) == 0 or event_type in events:
+            events_emit(event_type, payload)
+            return
+
+# _issue_event builds Jira's webhook payload envelope for issue-scoped events.
+def _issue_event(event_type, doc):
+    return {
+        "timestamp": clock.now_unix() * 1000,
+        "webhookEvent": event_type,
+        "issue": {
+            "id": doc.get("id", ""),
+            "key": doc.get("key", ""),
+            "fields": doc.get("fields", {}),
+        },
+    }
+
+# _next_webhook_id returns a monotonically-increasing webhook registration ID.
+def _next_webhook_id():
+    n = store_kv_incr("jira", "webhook_seq")
+    return str(10000 + n)
+
 # _project_from_key extracts the project key from an issue key like "TEST-1".
 def _project_from_key(issue_key):
     parts = _split(issue_key, "-")

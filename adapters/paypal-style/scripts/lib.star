@@ -117,3 +117,43 @@ def _store_idempotency(req, path, order_id):
     if rid == "":
         return
     store_kv_set("paypal", "idem_" + path + "_" + rid, order_id)
+
+# ============================================================================
+# OUTBOUND WEBHOOKS (PayPal webhook event envelope, UNSIGNED BY DESIGN)
+# ============================================================================
+# Real PayPal signs webhook deliveries with a certificate-based scheme
+# (PayPal-Transmission-Sig / PayPal-Cert-Url / PayPal-Transmission-Id...),
+# verified by calling POST /v1/notifications/verify-webhook-signature against
+# the PayPal API with the transmitted headers + webhook ID — not by a shared
+# HMAC the receiver can compute itself. The local simulator therefore emits
+# UNSIGNED deliveries with the real event envelope, and exposes the verify
+# endpoint (always SUCCESS) so client verification flows can be exercised.
+#
+# Envelope (delivered inside the engine's {"type", "payload"} wrapper):
+#   { "id": "WH-N", "event_version": "1.0", "create_time": "...",
+#     "resource_type": "capture", "event_type": "PAYMENT.CAPTURE.COMPLETED",
+#     "summary": "...", "resource": {...}, "links": [...] }
+
+# _webhook_event_id generates a PayPal-style webhook event id (WH-...).
+def _webhook_event_id():
+    n = store_kv_incr("paypal", "webhook_event_seq")
+    return "WH-" + str(n) + "-STUNT-SIM"
+
+# _emit_event delivers one PayPal webhook notification with the full real
+# envelope (unsigned — see the scheme note above).
+def _emit_event(event_type, resource_type, summary, resource):
+    event = {
+        "id": _webhook_event_id(),
+        "event_version": "1.0",
+        "create_time": clock.now_rfc3339(),
+        "resource_type": resource_type,
+        "event_type": event_type,
+        "summary": summary,
+        "resource": resource,
+        "links": [{
+            "href": "https://api.stunt.test/v1/notifications/webhooks-events/" + event_type,
+            "rel": "self",
+            "method": "GET",
+        }],
+    }
+    events_emit(event_type, event)

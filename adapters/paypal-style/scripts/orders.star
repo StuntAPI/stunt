@@ -109,11 +109,27 @@ def on_capture_order(req):
     doc["status"] = "COMPLETED"
     c.update(order_id, doc)
 
-    # Emit webhook event.
-    events_emit("PAYMENT.CAPTURE.COMPLETED", {
-        "event_type": "PAYMENT.CAPTURE.COMPLETED",
-        "resource_type": "capture",
-        "resource": {"id": doc["id"], "status": "COMPLETED"},
+    # Emit webhook events (real PayPal event names + envelope).
+    for pu in purchase_units:
+        captures_arr = pu.get("payments", {}).get("captures", [])
+        for cap in captures_arr:
+            _emit_event(
+                "PAYMENT.CAPTURE.COMPLETED",
+                "capture",
+                "Payment completed for " + cap.get("amount", {}).get("value", "0.00") + " " + cap.get("amount", {}).get("currency_code", "USD"),
+                {
+                    "id": cap.get("id", ""),
+                    "status": "COMPLETED",
+                    "amount": cap.get("amount", {}),
+                    "create_time": cap.get("create_time", ""),
+                    "final_capture": True,
+                },
+            )
+    _emit_event("CHECKOUT.ORDER.COMPLETED", "checkout-order", "Order " + order_id + " completed", {
+        "id": order_id,
+        "status": "COMPLETED",
+        "intent": doc.get("intent", "CAPTURE"),
+        "purchase_units": purchase_units,
     })
 
     return respond(201, _order_public(doc))
@@ -156,5 +172,27 @@ def on_authorize_order(req):
 
     doc["status"] = "COMPLETED"
     c.update(order_id, doc)
+
+    # Emit webhook events (real PayPal event names + envelope).
+    for pu in purchase_units:
+        auths_arr = pu.get("payments", {}).get("authorizations", [])
+        for auth in auths_arr:
+            _emit_event(
+                "PAYMENT.AUTHORIZATION.CREATED",
+                "authorization",
+                "Payment authorization " + auth.get("id", "") + " created",
+                {
+                    "id": auth.get("id", ""),
+                    "status": "CREATED",
+                    "amount": auth.get("amount", {}),
+                    "create_time": auth.get("create_time", ""),
+                },
+            )
+    _emit_event("CHECKOUT.ORDER.COMPLETED", "checkout-order", "Order " + order_id + " completed", {
+        "id": order_id,
+        "status": "COMPLETED",
+        "intent": doc.get("intent", "CAPTURE"),
+        "purchase_units": purchase_units,
+    })
 
     return respond(201, _order_public(doc))

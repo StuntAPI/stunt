@@ -39,8 +39,28 @@ endpoints:
     method: POST
     handler: scripts/enhanced.star#on_get_names
 
+  # --- Webhooks (Helius webhooks API; deliveries are unsigned, with the
+  # hook's authHeader sent as Authorization) ---
+  - route: /v0/webhooks
+    method: POST
+    handler: scripts/webhooks.star#on_create_webhook
+  - route: /v0/webhooks
+    method: GET
+    handler: scripts/webhooks.star#on_list_webhooks
+  - route: /v0/webhooks/{webhookId}
+    method: GET
+    handler: scripts/webhooks.star#on_get_webhook
+  - route: /v0/webhooks/{webhookId}
+    method: PUT
+    handler: scripts/webhooks.star#on_edit_webhook
+  - route: /v0/webhooks/{webhookId}
+    method: DELETE
+    handler: scripts/webhooks.star#on_delete_webhook
+
 # Backing stores.
-resources: []
+resources:
+  - name: webhooks
+    kind: collection
 
 # Auth scheme metadata (api-key query param).
 identity:

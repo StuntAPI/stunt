@@ -90,3 +90,54 @@ def _hex_addr(n):
         s = s + base58[v % 58]
         v = v // 58
     return s
+
+# ============================================================================
+# WEBHOOKS (Helius webhooks API model) — UNSIGNED BY DESIGN
+# ============================================================================
+# Real Helius does NOT HMAC-sign webhook deliveries. Verification is via the
+# per-webhook `authHeader` configured at registration: Helius sends it as the
+# Authorization header on every delivery. There is no signature header and no
+# body MAC — do not invent one in client code.
+#
+# Payload: real Helius batches an ARRAY of enhanced parsed transactions
+# (same shape as the Enhanced Transactions API); stunt's events engine takes
+# dict payloads only, so each delivery carries ONE such object — the parsed
+# transaction, e.g.
+#   { "signature": ..., "type": "TRANSFER", "source": "SYSTEM_PROGRAM",
+#     "fee": 5000, "feePayer": ..., "nativeTransfers": [...], "events": {} }
+
+# _webhook_emit delivers a parsed transaction to the registered webhook that
+# subscribes to its transaction type (a hook with transactionTypes ["ANY"]
+# subscribes to everything). Only fires when at least one webhook is
+# registered via POST /v0/webhooks. Adds the hook's authHeader as the
+# Authorization header when configured.
+#
+# NOTE: real Helius batches deliveries as a JSON ARRAY of parsed
+# transactions. stunt's events engine only accepts a dict payload (a list
+# would silently deliver an empty body), so each delivery here carries ONE
+# parsed-transaction object; treat each received payload as one array
+# element.
+def _webhook_emit(tx):
+    hooks = store_collection("webhooks").list()
+    if len(hooks) == 0:
+        return
+    target = events_target()
+    tx_type = tx.get("type", "")
+    for h in hooks:
+        url = h.get("webhookURL", "")
+        if target != None and url != "" and url != target:
+            continue
+        types = h.get("transactionTypes", [])
+        if types != None and len(types) > 0 and "ANY" not in types and tx_type not in types:
+            continue
+        headers = None
+        auth = h.get("authHeader", "")
+        if auth != None and auth != "":
+            headers = {"Authorization": auth}
+        events_emit(tx_type, tx, headers)
+        return
+
+# _slot returns a synthetic slot number (kept above 25 million to look like a
+# recent Solana slot) without long digit literals.
+def _slot(n):
+    return 5000 * 5000 + n

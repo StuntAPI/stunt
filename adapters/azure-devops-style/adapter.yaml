@@ -51,6 +51,11 @@ endpoints:
     method: POST
     handler: scripts/workitems.star#on_create_workitem
 
+  # --- Service hooks (webhook subscriptions) ---
+  - route: /{org}/_apis/hooks/subscriptions
+    method: POST
+    handler: scripts/hooks.star#on_create_subscription
+
 # Backing stores — collections for stateful data.
 resources:
   - name: projects
@@ -58,6 +63,8 @@ resources:
   - name: repos
     kind: collection
   - name: workitems
+    kind: collection
+  - name: subscriptions
     kind: collection
 
 # Auth scheme metadata.

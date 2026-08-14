@@ -205,6 +205,68 @@ def _apply_odata(entities, query, base_url):
         envelope["@odata.nextLink"] = _odata_link(base_url, top, next_cursor)
     return respond(200, envelope)
 
+# --- Change notifications (webhook subscriptions) -------------------------
+#
+# Microsoft Graph has NO webhook signature: notification payloads are not
+# HMAC-signed. The documented verification mechanism is the OPTIONAL
+# `clientState` value supplied at subscription creation and echoed verbatim
+# in every notification — receivers must compare it against their expected
+# secret and drop mismatches. stunt reproduces this model (unsigned-by-design)
+# and additionally simulates the subscription validation handshake (see
+# scripts/subscriptions.star).
+#
+# Notification envelope (Graph shape):
+#   {"value": [{
+#      "subscriptionId": "...",
+#      "changeType": "created" | "updated" | "deleted",
+#      "clientState": "<echoed from subscription>",
+#      "subscriptionExpirationDateTime": "...",
+#      "resource": "me/events",
+#      "resourceData": {"@odata.type": "#Microsoft.Graph.Event",
+#                       "@odata.id": "me/events/evt-000001",
+#                       "id": "evt-000001"},
+#      "tenantId": "..."
+#   }]}
+
+# _normalize_resource strips a leading "/" so "me/events" and "/me/events"
+# match the same subscription.
+def _normalize_resource(r):
+    if r == None:
+        return ""
+    if len(r) > 0 and r[0] == "/":
+        return r[1:]
+    return r
+
+# _notify_subscriptions delivers a change notification for (resource,
+# change_type) to the first subscription created for that exact resource whose
+# changeType list includes the change. Graph does not deliver to
+# non-matching subscriptions. odata_type is the "#Microsoft.Graph.X" type and
+# resource_id the changed entity's id.
+def _notify_subscriptions(change_type, resource, odata_type, resource_id):
+    sc = store_collection("subscriptions")
+    normalized = _normalize_resource(resource)
+    for s in sc.list():
+        if _normalize_resource(s.get("resource", "")) != normalized:
+            continue
+        types = _split_commas(s.get("changeType", ""))
+        if change_type not in types:
+            continue
+        notification = {
+            "subscriptionId": s.get("id", ""),
+            "changeType": change_type,
+            "clientState": s.get("clientState", ""),
+            "subscriptionExpirationDateTime": s.get("expirationDateTime", ""),
+            "resource": normalized,
+            "resourceData": {
+                "@odata.type": odata_type,
+                "@odata.id": normalized + "/" + resource_id,
+                "id": resource_id,
+            },
+            "tenantId": s.get("tenantId", "mock-tenant"),
+        }
+        events_emit("changeNotification", {"value": [notification]})
+        return
+
 # --- OneDrive driveItem helpers (shared by drive.star and drive_upload.star) ---
 
 _DRIVE_ID = "b!mock-drive-id-0001"

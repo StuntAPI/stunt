@@ -55,4 +55,13 @@ def on_add_reaction(req):
     found["reactions"] = reactions
     mc.update(found["id"], found)
 
+    # Deliver a signed Events API reaction_added event (fire-and-forget).
+    _emit_if_subscribed("reaction_added", {
+        "type": "reaction_added",
+        "user": USER_ID,
+        "reaction": name,
+        "item": {"type": "message", "channel": channel, "ts": timestamp},
+        "event_ts": timestamp,
+    })
+
     return respond(200, {"ok": True})

@@ -100,6 +100,12 @@ def _gql_charge(req, body, status):
     c = store_collection("transactions")
     c.insert(doc)
 
+    # Webhook: a charge settles immediately in the simulator -> the real
+    # Braintree settlement kind. (authorizePaymentMethod has no real webhook
+    # kind — authorization alone triggers no notification — so none is sent.)
+    if status == "submitted_for_settlement":
+        _emit_if_subscribed("transaction_settled", {"transaction": _txn_public(doc)})
+
     # The GraphQL field name depends on the mutation; we use chargePaymentMethod.
     key = "chargePaymentMethod"
     if _contains(body.get("query", ""), "chargeCreditCard"):
@@ -149,6 +155,8 @@ def _gql_refund(req, body):
         "createdAt": "2024-06-15T12:30:00.000Z",
     }
     c.insert(refund_doc)
+
+    _emit_if_subscribed("refund_opened", {"transaction": _txn_public(refund_doc)})
 
     return respond(200, {
         "data": {

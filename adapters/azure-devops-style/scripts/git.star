@@ -67,7 +67,7 @@ def on_push(req):
     repo_id = req["params"]["repoId"]
     push_id = store_kv_incr("azure-devops", "push_seq") + 1
 
-    return respond(200, {
+    push_resource = {
         "pushId": push_id,
         "repository": {
             "id": repo_id,
@@ -87,7 +87,12 @@ def on_push(req):
         "refUpdates": body.get("refUpdates", []),
         "status": "succeeded",
         "url": "https://dev.azure.com/mock-org/_apis/git/repositories/" + repo_id + "/pushes/" + str(push_id),
-    })
+    }
+
+    # Emit service-hook event (git.push) if a subscription exists.
+    _emit_service_hook("git.push", "Push " + str(push_id) + " to MyFirstProject", push_resource)
+
+    return respond(200, push_resource)
 
 # _repo_resource builds the API response shape for a repo.
 def _repo_resource(r):

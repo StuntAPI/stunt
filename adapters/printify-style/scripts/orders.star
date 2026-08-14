@@ -3,9 +3,9 @@
 # GET  /v1/orders.json                     (Bearer) -> {data, total, ...}
 # POST /v1/orders.json                     (Bearer; JSON {line_items, shipping_method, address_to})
 #      -> 200 order object with status "pending"
-#      emits "order:created" webhook
+#      emits signed "order:created" webhook (X-Potify-Signature)
 # POST /v1/orders/{order_id}/send.json     (Bearer) -> 200 order object with status "fulfilled"
-#      emits "order:send:fulfilled" + "shipment:sent" webhooks
+#      emits signed "order:send:fulfilled" + "shipment:sent" webhooks
 #
 # Shared helpers (_bearer, _require_auth, _to_int, _order_id)
 # are preloaded from scripts/lib.star.
@@ -35,8 +35,9 @@ def on_list_orders(req):
 
 # on_create_order creates a new fulfillment order.
 # Serves both POST /v1/orders.json and the shop-scoped real Printify route
-# POST /v1/shops/{shop_id}/orders.json (shop_id is captured but not needed —
-# state is global to the sim). The response includes total_price + currency.
+# POST /v1/shops/{shop_id}/orders.json (shop_id is captured for the webhook
+# envelope; state is global to the sim). The response includes total_price +
+# currency.
 def on_create_order(req):
     err = _require_auth(req)
     if err != None:
@@ -47,15 +48,16 @@ def on_create_order(req):
         body = {}
 
     order = _new_order(body)
+    shop_id = req["params"].get("shop_id", "")
+    if shop_id != "":
+        order["shop_id"] = _to_int(shop_id)
 
     c = store_collection("orders")
     c.insert(order)
 
-    # Emit webhook (fire-and-forget).
-    events_emit("order:created", {
-        "order_id": order["id"],
-        "status": order["status"],
-    })
+    # Emit signed webhook (fire-and-forget; only if a hook subscribes to the
+    # topic). Payload uses Printify's webhook envelope.
+    _emit_if_subscribed("order:created", order.get("shop_id", ""), order)
 
     return respond(200, order)
 
@@ -90,12 +92,11 @@ def on_send_order(req):
     doc["updated_at"] = 1700001000 + seq
     c.update(order_id, doc)
 
-    # Emit webhooks (fire-and-forget).
-    events_emit("order:send:fulfilled", {
-        "order_id": order_id,
-        "status": "fulfilled",
-    })
-    events_emit("shipment:sent", {
+    # Emit signed webhooks (fire-and-forget; each only if a hook subscribes
+    # to the topic). Payloads use Printify's webhook envelope.
+    shop_id = doc.get("shop_id", "")
+    _emit_if_subscribed("order:send:fulfilled", shop_id, doc)
+    _emit_if_subscribed("shipment:sent", shop_id, {
         "order_id": order_id,
         "status": "shipped",
         "carrier": "Mock Carrier",

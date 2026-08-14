@@ -73,6 +73,9 @@ def on_create_pull(req):
     pc = store_collection("pulls")
     pc.insert(pull)
 
+    # Emit webhook event if subscribed (action "opened" per GitHub's payload).
+    _emit_if_subscribed(repo_key, "pull_request", _gh_event_payload(repo_key, "opened", "pull_request", _pull_view(pull)))
+
     return respond(201, _pull_view(pull))
 
 # on_list_reviews returns reviews for a PR.

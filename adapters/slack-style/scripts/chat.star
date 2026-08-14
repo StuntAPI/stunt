@@ -51,6 +51,10 @@ def on_post_message(req):
     mc = store_collection("messages")
     mc.insert(stored)
 
+    # Deliver a signed Events API message event to the registered Request URL
+    # (fire-and-forget; no delivery when no Request URL is registered).
+    _emit_if_subscribed("message", message)
+
     return _ok({
         "channel": channel,
         "ts": ts,

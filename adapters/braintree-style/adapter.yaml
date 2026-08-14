@@ -51,6 +51,8 @@ resources:
     kind: collection
   - name: customers
     kind: collection
+  - name: webhooks
+    kind: collection
 
 # Catch-all: any unmatched route returns a 404.
 rules:

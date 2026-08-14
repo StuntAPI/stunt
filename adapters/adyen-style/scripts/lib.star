@@ -178,3 +178,110 @@ def _idempotent_remember(req, ns, status, rid):
     if _idempotency_key(req) == "":
         return
     store_kv_set("adyen", "idem_" + _idempotency_scope(req, ns), str(status) + ":" + rid)
+
+# ============================================================================
+# WEBHOOK NOTIFICATIONS (Adyen standard notification model)
+# ============================================================================
+# Adyen does NOT sign the raw HTTP body. Each NotificationRequestItem carries
+# additionalData.hmacSignature = base64(HMAC-SHA256(hmac_key, signing_string))
+# where signing_string is the colon-joined escaped values of:
+#   pspReference:originalReference:merchantAccountCode:merchantReference:
+#   amount.value:amount.currency:eventCode:success
+# (escape "\" -> "\\" first, then ":" -> "\:"; originalReference is empty for
+# non-modification events). See README.md for a Go verification snippet.
+
+# Default mock HMAC key. Configure your Adyen webhook receiver with this exact
+# string to verify stunt's deliveries. A per-hook "hmacKey" registered via
+# POST /v68/webhooks overrides it for that webhook. Public + low-entropy:
+# local stunt only — never reuse outside the simulator.
+_WEBHOOK_HMAC_KEY = "adyen_stunt_mock_hmac_B7dQ"
+
+# _adyen_escape escapes a signing-string value per Adyen's HMAC scheme:
+# backslash first, then colon (so an escaped colon is not re-escaped).
+def _adyen_escape(s):
+    if s == None:
+        return ""
+    return s.replace("\\", "\\\\").replace(":", "\\:")
+
+# _signing_string builds the data-to-sign from a NotificationRequestItem's
+# fields. Returns the escaped colon-joined string (NOT base64 — the HMAC is
+# taken over these plain bytes).
+def _signing_string(nri):
+    amount = nri.get("amount", {})
+    if amount == None:
+        amount = {}
+    value = amount.get("value", 0)
+    if value == None:
+        value = 0
+    # JSON round-trips decode integers as Starlark floats; Adyen amounts are
+    # integer minor units, so render an integral float without a ".0" suffix.
+    if type(value) == "float" and value == int(value):
+        value = int(value)
+    currency = amount.get("currency", "")
+    if currency == None:
+        currency = ""
+    fields = [
+        nri.get("pspReference", ""),
+        nri.get("originalReference", ""),
+        nri.get("merchantAccountCode", ""),
+        nri.get("merchantReference", ""),
+        str(value),
+        currency,
+        nri.get("eventCode", ""),
+        nri.get("success", "false"),
+    ]
+    out = []
+    for f in fields:
+        out.append(_adyen_escape(f))
+    return ":".join(out)
+
+# _signed_emit delivers event_code as an Adyen standard notification:
+# the real envelope {"live":"false","notificationItems":[{...}]} with the
+# hmacSignature embedded in the item's additionalData. Only webhooks
+# registered via POST /v68/webhooks that subscribe to event_code receive
+# the delivery (a hook with no "events" filter subscribes to everything),
+# signed with that hook's own hmacKey (falling back to _WEBHOOK_HMAC_KEY).
+def _signed_emit(event_code, nri):
+    hooks = store_collection("webhooks").list()
+    if len(hooks) == 0:
+        return
+    target = events_target()
+    for h in hooks:
+        url = h.get("url", "")
+        if target != None and url != "" and url != target:
+            continue
+        events = h.get("events", [])
+        if events != None and len(events) > 0 and event_code not in events:
+            continue
+        _deliver_notification(event_code, nri, h.get("hmacKey", ""))
+        return
+
+# _deliver_notification signs the item and POSTs the notification envelope.
+def _deliver_notification(event_code, nri, hmac_key):
+    if hmac_key == None or hmac_key == "":
+        hmac_key = _WEBHOOK_HMAC_KEY
+    sig = crypto.hmac_sha256(hmac_key, _signing_string(nri), "base64")
+
+    additional = nri.get("additionalData", {})
+    if additional == None:
+        additional = {}
+    out_additional = {"hmacSignature": sig}
+    for k in additional:
+        out_additional[k] = additional[k]
+
+    item = {
+        "pspReference": nri.get("pspReference", ""),
+        "originalReference": nri.get("originalReference", ""),
+        "merchantAccountCode": nri.get("merchantAccountCode", ""),
+        "merchantReference": nri.get("merchantReference", ""),
+        "amount": nri.get("amount", {}),
+        "eventCode": nri.get("eventCode", event_code),
+        "eventDate": nri.get("eventDate", clock.now_rfc3339()),
+        "success": nri.get("success", "false"),
+        "additionalData": out_additional,
+    }
+    envelope = {
+        "live": "false",
+        "notificationItems": [{"NotificationRequestItem": item}],
+    }
+    events_emit(event_code, envelope)

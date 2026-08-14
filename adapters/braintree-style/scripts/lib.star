@@ -154,3 +154,75 @@ def _idempotent_remember(req, ns, status, rid):
     if _idempotency_key(req) == "":
         return
     store_kv_set("braintree", "idem_" + _idempotency_scope(req, ns), str(status) + ":" + rid)
+
+# ============================================================================
+# OUTBOUND WEBHOOKS (signed, Braintree bt_signature/bt_payload shape)
+# ============================================================================
+# Real Braintree delivers webhook notifications as a form-encoded POST with
+# exactly two fields:
+#   bt_signature: "<public_key>|<hex(HMAC-SHA1(private_key, bt_payload))>"
+#   bt_payload:   base64-encoded notification payload (XML on the real wire)
+#
+# The notification payload itself is {kind, timestamp, subject}; `kind` is the
+# event name (subscription_charged_successfully, refund_opened, check, ...).
+#
+# The stunt engine POSTs JSON, not form data, so each delivery carries the
+# same two values as a JSON body — and duplicates them as headers so
+# header-based receivers also work:
+#   body:   {"bt_signature": "<key>|<sig>", "bt_payload": "<base64>"}
+#   header: bt_signature: "<key>|<sig>"
+#           bt-hash:      <sig>   (hex HMAC-SHA1 over bt_payload)
+#           bt-kind:      <kind>
+#
+# Verification in Go (the real algorithm):
+#   parts := strings.SplitN(r.PostFormValue("bt_signature"), "|", 2)
+#   mac := hmac.New(sha1.New, []byte(privateKey))
+#   mac.Write([]byte(r.PostFormValue("bt_payload")))
+#   if !hmac.Equal([]byte(hex.EncodeToString(mac.Sum(nil))), []byte(parts[1])) {
+#       return 400 // invalid signature
+#   }
+#   notification, err := gateway.WebhookNotification.Parse(btSignature, btPayload)
+#
+# Synthetic keypair (public + low-entropy: local stunt only — never reuse
+# outside the simulator). Real Braintree uses the merchant's API keypair,
+# configured in the Control Panel.
+_WEBHOOK_PUBLIC_KEY = "stunt_mock_public_key_2026"
+_WEBHOOK_PRIVATE_KEY = "stunt_mock_private_key_2026"
+
+# _bt_notification builds the Braintree notification payload (the real wire
+# format is XML with the same three elements: timestamp, kind, subject).
+def _bt_notification(kind, subject):
+    return {
+        "timestamp": clock.now_rfc3339(),
+        "kind": kind,
+        "subject": subject,
+    }
+
+# _bt_signed_emit signs + delivers one Braintree webhook notification. The
+# MAC covers the base64 payload string (bt_payload) — exactly what the real
+# scheme signs — not the outer JSON body the engine delivers.
+def _bt_signed_emit(kind, subject):
+    notification = _bt_notification(kind, subject)
+    b64 = crypto.base64_encode(events_body(kind, notification))
+    sig = crypto.hmac_sha1(_WEBHOOK_PRIVATE_KEY, b64)
+    bt_signature = _WEBHOOK_PUBLIC_KEY + "|" + sig
+    events_emit(kind, {
+        "bt_signature": bt_signature,
+        "bt_payload": b64,
+    }, {
+        "bt_signature": bt_signature,
+        "bt-hash": sig,
+        "bt-kind": kind,
+    })
+
+# _emit_if_subscribed delivers a signed notification only if a registered
+# hook subscribes to the kind (an empty kinds list subscribes to all).
+def _emit_if_subscribed(kind, subject):
+    hc = store_collection("webhooks")
+    for h in hc.list():
+        kinds = h.get("kinds", [])
+        if kinds == None:
+            kinds = []
+        if len(kinds) == 0 or kind in kinds or "*" in kinds:
+            _bt_signed_emit(kind, subject)
+            return

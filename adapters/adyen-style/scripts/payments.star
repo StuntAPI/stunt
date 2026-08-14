@@ -70,14 +70,19 @@ def on_create_payment(req):
     c = store_collection("payments")
     c.insert(doc)
 
-    # Emit notification event for successful authorisation.
-    if result_code == "Authorised":
-        events_emit("AUTHORISATION", {
+    # Emit notification event: AUTHORISATION with success "true" for
+    # authorisations and "false" for refusals (real Adyen notifies both).
+    # Received (3DS pending) does not notify until completion.
+    if result_code == "Authorised" or result_code == "Refused":
+        success = "true"
+        if result_code == "Refused":
+            success = "false"
+        _signed_emit("AUTHORISATION", {
             "eventCode": "AUTHORISATION",
             "pspReference": psp_ref,
             "merchantAccountCode": merchant_account,
             "merchantReference": reference,
-            "success": "true",
+            "success": success,
             "amount": amount,
         })
 
@@ -205,11 +210,13 @@ def _do_modification(req, mod_type, prefix):
         "reversal": "REVERSAL",
         "cancel": "CANCEL_OR_REFUND",
     }
-    events_emit(event_codes.get(mod_type, mod_type.upper()), {
-        "eventCode": event_codes.get(mod_type, mod_type.upper()),
+    event_code = event_codes.get(mod_type, mod_type.upper())
+    _signed_emit(event_code, {
+        "eventCode": event_code,
         "pspReference": mod_psp,
         "originalReference": payment_psp,
         "merchantAccountCode": merchant_account,
+        "merchantReference": reference,
         "success": "true",
         "amount": amount,
     })

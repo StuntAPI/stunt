@@ -19,6 +19,9 @@ local integration testing without a real Slack workspace:
 - **List channels:** `GET /api/conversations.list` → `{ok:true, channels:[...]}`.
 - **Channel history:** `GET /api/conversations.history?channel=C...` → `{ok:true, messages:[...]}`.
 - **Add reaction:** `POST /api/reactions.add` (`{channel, timestamp, name}`).
+- **Events API config:** `POST /api/apps.events.url` (`{url, signing_secret?, events?}`) —
+  sets the Request URL and immediately delivers the `url_verification`
+  handshake (see [Webhooks](#webhooks)).
 
 Messages are **stateful**: a message posted via `chat.postMessage` appears in
 `conversations.history` for the same channel, enabling round-trip testing locally.
@@ -53,30 +56,59 @@ curl -X POST http://localhost:PORT/api/auth.test
 
 ## Webhooks
 
-When a message is posted, the adapter emits a `message` webhook event
-(fire-and-forget) to any registered webhook sink.
+Real Slack has no Web API endpoint for configuring the Events API — the
+Request URL and Signing Secret are set in the app dashboard. This adapter
+exposes a local analog:
 
-### Real Slack webhook signing (documented for reference)
+```bash
+curl -X POST "http://localhost:PORT/api/apps.events.url" \
+  -H "Authorization: Bearer xoxb-test-token" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "http://localhost:9090/slack/events", "events": ["message"]}'
+# → {ok:true, url: ..., events: [...]}
+```
 
-The real Slack Events API signs webhook requests with two headers:
+On registration the adapter immediately delivers Slack's
+`url_verification` handshake to the URL (a POST with
+`{type:"url_verification", token, challenge}` — echo the challenge with a 200,
+or at least return 2xx). If a `signing_secret` is supplied it becomes the
+per-app signing secret for all deliveries; otherwise the fixed synthetic
+default `stunt_mock_slack_signing_secret_2026` is used.
 
-- **`X-Slack-Signature`**: `v0=<hex HMAC-SHA256>`, where the HMAC is computed
-  over the string `v0:<timestamp>:<raw_body>` using the Signing Secret as the
-  key. The output is hex-encoded (not base64).
-- **`X-Slack-Request-Timestamp`**: Unix epoch seconds (used to prevent replay
-  attacks).
+### Events emitted
 
-Verification steps (on the receiver):
-1. Concatenate `v0:<X-Slack-Request-Timestamp>:<raw request body>`.
-2. Compute `HMAC-SHA256(key=signing_secret, msg=concatenated_string)`.
-3. Compare the hex digest against the value in `X-Slack-Signature` (without
-   the `v0=` prefix).
+Every delivery is a signed Events API `event_callback` envelope (wrapped in
+stunt's standard `{"type": ..., "payload": {...}}` delivery envelope):
 
-This stunt adapter validates **inbound** Bearer auth (above) and emits webhook
-events via the standard stunt events envelope. The outbound signing scheme is
-documented here for reference; it is **not** applied to the synthetic webhook
-payload because the events primitive sends a fixed JSON envelope without
-custom headers.
+| Inner event | Emitted when |
+|-------------|--------------|
+| `message` | `POST /api/chat.postMessage` |
+| `channel_created` | `POST /api/conversations.create` |
+| `reaction_added` | `POST /api/reactions.add` |
+| `url_verification` | `POST /api/apps.events.url` (handshake, not an `event_callback`) |
+
+The `events` list at registration subscribes to inner event types (an empty
+list subscribes to everything).
+
+### Signature scheme
+
+Slack signs every Events API delivery with HMAC-SHA256 over
+`"v0:" + timestamp + ":" + raw_body` and carries two headers:
+
+- **`X-Slack-Signature`**: `v0=<hex(HMAC-SHA256(signing_secret, signed))>`
+  (hex, not base64)
+- **`X-Slack-Request-Timestamp`**: Unix epoch seconds (replay window)
+
+This adapter **signs every delivery** with exactly this scheme. Verification
+in Go:
+
+```go
+ts := r.Header.Get("X-Slack-Request-Timestamp")
+mac := hmac.New(sha256.New, []byte(signingSecret))
+mac.Write([]byte("v0:" + ts + ":" + string(rawBody)))
+expected := "v0=" + hex.EncodeToString(mac.Sum(nil))
+if expected != r.Header.Get("X-Slack-Signature") { return 401 }
+```
 
 ## Endpoints
 
@@ -88,6 +120,7 @@ custom headers.
 | GET | `/api/conversations.list` | `conversations.star#on_list_conversations` | List all channels |
 | GET | `/api/conversations.history` | `conversations.star#on_conversation_history` | Channel message history (stateful) |
 | POST | `/api/reactions.add` | `reactions.star#on_add_reaction` | Add a reaction to a message |
+| POST | `/api/apps.events.url` | `events.star#on_set_events_url` | Set the Events API Request URL (local analog of the dashboard setting) |
 
 Any unmatched route returns `404 {"ok":false,"error":"not_found"}`.
 
@@ -97,6 +130,7 @@ Any unmatched route returns `404 {"ok":false,"error":"not_found"}`.
 |------------|---------|
 | `channels` | Channel records (seeded with `#general`) |
 | `messages` | Stateful message records (per channel) |
+| `webhooks` | Registered Events API Request URLs (+ per-app signing secret) |
 
 KV is used for monotonic sequence counters (`ts_seq`, `channel_seq`) and a
 `seeded` flag.
@@ -114,11 +148,12 @@ adapter.yaml                    Manifest: endpoints, resources, rules, identity
 DISCLAIMER                      Not affiliated / synthetic-only notice
 README.md                       This file
 scripts/
-  lib.star                      Shared helpers (Bearer auth, timestamps, seed)
+  lib.star                      Shared helpers (Bearer auth, timestamps, seed, webhook signing)
   auth.star                     auth.test endpoint
   chat.star                     chat.postMessage (stateful)
   conversations.star            conversations: create, list, history
   reactions.star                reactions.add
+  events.star                   apps.events.url (Events API Request URL config)
 ```
 
 ## Usage

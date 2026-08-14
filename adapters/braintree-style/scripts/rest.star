@@ -39,6 +39,12 @@ def on_create_transaction(req):
     c.insert(doc)
 
     _idempotent_remember(req, "transactions", 200, txn_id)
+
+    # Webhook: the simulator settles sales immediately, so a sale create maps
+    # to Braintree's transaction_settled kind.
+    if doc.get("type", "sale") == "sale":
+        _emit_if_subscribed("transaction_settled", {"transaction": _txn_public(doc)})
+
     return respond(200, {"transaction": _txn_public(doc)})
 
 # on_get_transaction retrieves a REST transaction by ID.
@@ -87,6 +93,8 @@ def on_refund_transaction(req):
         "createdAt": "2024-06-15T12:30:00.000Z",
     }
     c.insert(refund_doc)
+
+    _emit_if_subscribed("refund_opened", {"transaction": _txn_public(refund_doc)})
 
     return respond(200, {"transaction": _txn_public(refund_doc)})
 

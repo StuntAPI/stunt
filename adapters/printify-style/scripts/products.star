@@ -3,10 +3,12 @@
 # GET    /v1/shops/{shop_id}/products.json         (Bearer) -> {data, total, page, limit}
 # POST   /v1/shops/{shop_id}/products.json         (Bearer; JSON {title, blueprint_id, print_provider_id, variants, print_areas})
 #        -> 200 product object
+#        emits signed "product:created" webhook (X-Potify-Signature)
 # GET    /v1/shops/{shop_id}/products/{id}.json    (Bearer) -> product object
 # PUT    /v1/shops/{shop_id}/products/{id}.json    (Bearer; JSON partial update) -> product object
-#        emits "product.updated" webhook
+#        emits signed "product:updated" webhook (X-Potify-Signature)
 # DELETE /v1/shops/{shop_id}/products/{id}.json    (Bearer) -> {id, status: "deleted"}
+#        emits signed "product:deleted" webhook (X-Potify-Signature)
 #
 # Shared helpers (_bearer, _require_auth, _to_int, _pad4, _product_id)
 # are preloaded from scripts/lib.star.
@@ -82,6 +84,10 @@ def on_create_product(req):
     c = store_collection("products")
     c.insert(product)
 
+    # Emit signed webhook (fire-and-forget; only if a hook subscribes to the
+    # topic).
+    _emit_if_subscribed("product:created", shop_id, product)
+
     return respond(200, product)
 
 # on_get_product retrieves a single product by id.
@@ -121,12 +127,9 @@ def on_update_product(req):
     doc["updated_at"] = 1700001000 + seq
     c.update(product_id, doc)
 
-    # Emit webhook (fire-and-forget).
-    events_emit("product.updated", {
-        "product_id": product_id,
-        "shop_id": doc.get("shop_id"),
-        "title": doc.get("title"),
-    })
+    # Emit signed webhook (fire-and-forget; only if a hook subscribes to the
+    # topic). Payload uses Printify's webhook envelope.
+    _emit_if_subscribed("product:updated", doc.get("shop_id", ""), doc)
 
     return respond(200, doc)
 
@@ -143,6 +146,15 @@ def on_delete_product(req):
         return respond(404, {"status": 404, "message": "product not found"})
 
     c.delete(product_id)
+
+    # Emit signed webhook (fire-and-forget; only if a hook subscribes to the
+    # topic).
+    _emit_if_subscribed("product:deleted", doc.get("shop_id", ""), {
+        "id": product_id,
+        "shop_id": doc.get("shop_id"),
+        "title": doc.get("title"),
+    })
+
     return respond(200, {
         "id": product_id,
         "status": "deleted",

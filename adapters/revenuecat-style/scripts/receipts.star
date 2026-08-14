@@ -39,6 +39,22 @@ def on_post_receipt(req):
     entitlement_id = _entitlement_for_product(product_id)
     _grant_entitlement(app_user_id, entitlement_id, product_id)
 
+    # Webhook: INITIAL_PURCHASE — the real RevenueCat event fired when a
+    # receipt validation grants a new purchase (delivered unsigned, like the
+    # real v1 webhooks; see scripts/lib.star).
+    now_ms = clock.now_unix() * 1000
+    _emit_event({
+        "type": "INITIAL_PURCHASE",
+        "app_user_id": app_user_id,
+        "original_app_user_id": app_user_id,
+        "product_id": product_id,
+        "entitlement_id": entitlement_id,
+        "store": "app_store",
+        "period_type": "NORMAL",
+        "purchased_at_ms": now_ms,
+        "expiration_at_ms": now_ms + 1000 * 60 * 60 * 24 * 30,
+    })
+
     doc = _get_or_create_subscriber(app_user_id)
     return _subscriber_response(doc)
 
