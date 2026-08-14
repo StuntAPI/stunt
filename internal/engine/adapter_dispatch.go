@@ -253,8 +253,11 @@ func (st *serviceState) getOrLoadVM(scriptPath string) (*starlark.VM, error) {
 
 // --- route matching ---
 
-// matchRoute matches a path against a route pattern. The pattern may contain
-// {param} segments which match exactly one path segment and capture its value.
+// matchRoute matches a path against a route pattern. A pattern segment that is
+// exactly {param} matches any single path segment and captures it. A segment
+// with an embedded {param} (e.g. accounts({id}), the OData key-in-parens form)
+// matches a path segment carrying the literal prefix and suffix and captures
+// the middle. All other segments match literally.
 // Returns the captured params and true on match, or nil/false on mismatch.
 //
 // Examples:
@@ -262,6 +265,7 @@ func (st *serviceState) getOrLoadVM(scriptPath string) (*starlark.VM, error) {
 //	/charges               matches /charges
 //	/charges/{id}          matches /charges/abc123 (params={id:abc123})
 //	/charges/{id}/refund   matches /charges/abc123/refund
+//	/accounts({id})        matches /accounts(abc123) (params={id:abc123})
 func matchRoute(pattern, path string) (map[string]string, bool) {
 	patSegs := splitPathSegments(pattern)
 	pathSegs := splitPathSegments(path)
@@ -270,14 +274,40 @@ func matchRoute(pattern, path string) (map[string]string, bool) {
 	}
 	params := map[string]string{}
 	for i, ps := range patSegs {
-		if len(ps) >= 2 && ps[0] == '{' && ps[len(ps)-1] == '}' {
-			name := ps[1 : len(ps)-1]
-			params[name] = pathSegs[i]
-		} else if ps != pathSegs[i] {
+		if !matchSegment(ps, pathSegs[i], params) {
 			return nil, false
 		}
 	}
 	return params, true
+}
+
+// matchSegment matches one path segment against a pattern segment, capturing
+// any param into params.
+func matchSegment(pat, pathSeg string, params map[string]string) bool {
+	// Whole-segment {name}: capture the entire segment.
+	if len(pat) >= 2 && pat[0] == '{' && pat[len(pat)-1] == '}' {
+		params[pat[1:len(pat)-1]] = pathSeg
+		return true
+	}
+	// No placeholder: literal match.
+	if !strings.Contains(pat, "{") {
+		return pat == pathSeg
+	}
+	// Embedded single {name} within a literal segment (e.g. accounts({id})).
+	// A segment with multiple placeholders is treated literally (no match here).
+	open := strings.Index(pat, "{")
+	closeIdx := strings.LastIndex(pat, "}")
+	if open < 0 || closeIdx < 0 || closeIdx < open || strings.Count(pat, "{") != 1 {
+		return pat == pathSeg
+	}
+	prefix := pat[:open]
+	name := pat[open+1 : closeIdx]
+	suffix := pat[closeIdx+1:]
+	if !strings.HasPrefix(pathSeg, prefix) || !strings.HasSuffix(pathSeg, suffix) || len(pathSeg) < len(prefix)+len(suffix) {
+		return false
+	}
+	params[name] = pathSeg[len(prefix) : len(pathSeg)-len(suffix)]
+	return true
 }
 
 // splitPathSegments splits a path on '/', trimming leading/trailing slashes.

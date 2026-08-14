@@ -30,6 +30,18 @@ endpoints:
   - route: /v2/environments/{env}/api/data/v9.2/accounts
     method: GET
     handler: scripts/dataverse.star#on_list_accounts
+  - route: /v2/environments/{env}/api/data/v9.2/accounts
+    method: POST
+    handler: scripts/dataverse.star#on_create_account
+  - route: /v2/environments/{env}/api/data/v9.2/accounts({accountid})
+    method: GET
+    handler: scripts/dataverse.star#on_retrieve_account
+  - route: /v2/environments/{env}/api/data/v9.2/accounts({accountid})
+    method: PATCH
+    handler: scripts/dataverse.star#on_update_account
+  - route: /v2/environments/{env}/api/data/v9.2/accounts({accountid})
+    method: DELETE
+    handler: scripts/dataverse.star#on_delete_account
 
   # --- Flows (literal 5th segment) ---
   - route: /v2/environments/{env}/flows
@@ -44,6 +56,8 @@ resources:
   - name: environments
     kind: collection
   - name: flows
+    kind: collection
+  - name: dataverse_accounts
     kind: collection
 
 # Auth scheme metadata.

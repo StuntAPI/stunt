@@ -23,6 +23,13 @@ func TestMatchRoute(t *testing.T) {
 		{"trailing slash ignored", "/charges/", "/charges", true, nil},
 		{"root match", "/", "/", true, nil},
 		{"different lengths", "/charges", "/charges/abc", false, nil},
+		// Embedded {param} (OData key-in-parens).
+		{"odata key in parens", "/accounts({id})", "/accounts(abc123)", true, map[string]string{"id": "abc123"}},
+		{"odata key nested path", "/api/data/v9.2/accounts({accountid})", "/api/data/v9.2/accounts(00000000-0000-0000-0000-000000000001)", true, map[string]string{"accountid": "00000000-0000-0000-0000-000000000001"}},
+		{"odata key not a list", "/accounts({id})", "/accounts", false, nil},
+		{"list not a key", "/accounts", "/accounts(abc)", false, nil},
+		{"embedded param prefix only", "/pre{id}", "/preXYZ", true, map[string]string{"id": "XYZ"}},
+		{"embedded param mismatch suffix", "/accounts({id})", "/accounts[abc]", false, nil},
 	}
 
 	for _, c := range cases {
