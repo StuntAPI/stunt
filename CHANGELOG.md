@@ -6,6 +6,20 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.24.0] — 2026-08-14
+
+### Adapters
+
+- **discord-style: WebSocket Gateway + Ed25519-signed interactions.** The
+  dominant bot pattern — event-driven over the Gateway plus signed interactions
+  — was entirely absent:
+  - **WebSocket Gateway** (`ws /gateway`): sends HELLO, awaits IDENTIFY, sends
+    READY, then dispatches a synthetic `MESSAGE_CREATE`.
+  - **Ed25519-signed outbound**: `MESSAGE_CREATE` deliveries signed with Ed25519
+    over timestamp+body (`X-Signature-Ed25519` + `X-Signature-Timestamp`).
+  - **Inbound `POST /interactions`**: verifies the Ed25519 signature
+    (ts+raw_body); valid → 200 (PONG/deferred), invalid → 401.
+
 ## [0.23.0] — 2026-08-14
 
 ### Starlark handler API
