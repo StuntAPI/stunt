@@ -6,6 +6,22 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-08-14
+
+### Adapters
+
+- **stripe-style: PaymentIntents, PaymentMethods, first-class Refunds.** Adds
+  Stripe's canonical modern payment objects (Charges-for-direct-use is
+  deprecated) so the common integration path is testable:
+  - **PaymentIntents** — create/retrieve/list + confirm + capture with the real
+    state machine (`requires_payment_method` → `succeeded` [automatic] /
+    `requires_capture` → capture → `succeeded`); `confirm: true` at create.
+  - **PaymentMethods** — create/retrieve/attach/detach/list (synthetic card).
+  - **Refunds** — first-class `/v1/refunds`: full or partial over a
+    `payment_intent` or `charge`, `reason`; decrements `amount_received`.
+  - Signed webhook events on transitions (`payment_intent.*`, `refund.created`,
+    `charge.refunded`); paginated lists with `?customer=` / `?payment_intent=`.
+
 ## [0.13.0] — 2026-08-14
 
 ### Adapters
