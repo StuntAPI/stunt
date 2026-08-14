@@ -25,6 +25,12 @@ endpoints:
   - route: /api/v1/account/{account}/project/{project}/simulate-bundle
     method: POST
     handler: scripts/simulate.star#on_simulate_bundle
+  - route: /api/v1/account/{account}/project/{project}/simulations
+    method: GET
+    handler: scripts/simulate.star#on_list_simulations
+  - route: /api/v1/account/{account}/project/{project}/simulations/{id}
+    method: GET
+    handler: scripts/simulate.star#on_retrieve_simulation
 
   # --- Networks (literal route, must be before parameterized) ---
   - route: /api/v1/networks

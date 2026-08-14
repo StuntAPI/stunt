@@ -52,12 +52,42 @@ def _build_simulation_result(body, account, project):
 
     sim_id = _gen_sim_id()
 
+    # Revert detection: an explicit body flag, or the Error(string) selector
+    # (0x08c379a0) in the calldata prefix — the canonical "revert with reason".
+    will_revert = False
+    revert_reason = ""
+    if body.get("revert", False) == True:
+        will_revert = True
+        revert_reason = body.get("revert_reason", "execution reverted")
+    elif input_len >= 10 and input_data[:10] == "0x08c379a0":
+        will_revert = True
+        revert_reason = "execution reverted"
+
+    status = not will_revert
+    output = _abi_error_string(revert_reason) if will_revert else "0x"
+
+    # Value-transfer artifacts (success only): a balance override + a Transfer
+    # event log, so a value-moving trace is non-empty.
+    balance_overrides = {}
+    logs = []
+    if status and value_int > 0:
+        balance_overrides = {from_addr: "-" + str(value_int), to_addr: "+" + str(value_int)}
+        logs = [{
+            "address": to_addr,
+            "topics": [
+                "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+                _topic_addr(from_addr),
+                _topic_addr(to_addr),
+            ],
+            "data": "0x" + _hex_pad(value_int, 64),
+        }]
+
     return {
         "transaction": {
             "hash": "0x" + _hex_pad(_to_int_or_float(sim_id), 64),
             "block_number": block_number,
             "block_hash": "0x" + _hex_pad(_to_int_or_float(block_number) + 100, 64),
-            "status": True,
+            "status": status,
             "gas_used": gas_used,
             "from": from_addr,
             "to": to_addr,
@@ -65,8 +95,10 @@ def _build_simulation_result(body, account, project):
             "gas_price": gas_price,
             "nonce": 0,
             "input": input_data,
+            "output": output,
+            "revert_reason": revert_reason if will_revert else None,
         },
-        "balanceOverrides": {},
+        "balanceOverrides": balance_overrides,
         "accessList": [],
         "sim_call_trace": {
             "type": "CALL",
@@ -75,14 +107,45 @@ def _build_simulation_result(body, account, project):
             "gas": "0x" + _hex_pad(gas, 0),
             "gasUsed": "0x" + _hex_pad(gas_used, 0),
             "input": input_data,
-            "output": "0x",
+            "output": output,
             "value": "0x" + _hex_pad(value_int, 0),
-            "status": True,
+            "status": status,
+            "error": revert_reason if will_revert else None,
             "calls": [],
         },
+        "logs": logs,
         "simulationId": sim_id,
         "network": network_id,
     }
+
+# _str_to_hex returns the lowercase hex of each byte of s (ASCII).
+def _str_to_hex(s):
+    hexchars = "0123456789abcdef"
+    out = ""
+    for i in range(len(s)):
+        code = ord(s[i])
+        out = out + hexchars[code // 16] + hexchars[code % 16]
+    return out
+
+# _topic_addr formats an address as a 32-byte left-padded topic (64 hex chars).
+def _topic_addr(addr):
+    a = addr
+    if a[:2] == "0x":
+        a = a[2:]
+    while len(a) < 64:
+        a = "0" + a
+    return "0x" + a
+
+# _abi_error_string ABI-encodes an Error(string) revert output for a reason:
+# selector 0x08c379a0 + offset(0x20) + length + data padded to 32 bytes.
+def _abi_error_string(reason):
+    selector = "08c379a0"
+    offset = "0000000000000000000000000000000000000000000000000000000000000020"
+    length = _hex_pad(len(reason), 64)
+    data = _str_to_hex(reason)
+    while len(data) < 64:
+        data = data + "0"
+    return "0x" + selector + offset + length + data
 
 # _gen_sim_id generates a sequential simulation ID.
 def _gen_sim_id():

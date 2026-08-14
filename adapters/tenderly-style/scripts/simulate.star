@@ -62,3 +62,28 @@ def on_simulate_bundle(req):
         "simulation_results": results,
         "bundle_id": "bundle_" + results[0]["simulationId"],
     })
+
+# GET .../simulations → list stored simulations for this account.
+def on_list_simulations(req):
+    if not _require_auth(req):
+        return respond(401, _err("unauthorized", "Missing or invalid API key"))
+
+    account = req["params"]["account"]
+    sc = store_collection("simulations")
+    out = []
+    for doc in sc.list():
+        if doc.get("account") == account:
+            out.append(doc.get("result", doc))
+    return respond(200, {"simulations": out})
+
+# GET .../simulations/{id} → retrieve a stored simulation by id.
+def on_retrieve_simulation(req):
+    if not _require_auth(req):
+        return respond(401, _err("unauthorized", "Missing or invalid API key"))
+
+    id = req["params"]["id"]
+    sc = store_collection("simulations")
+    doc = sc.get(id)
+    if doc == None:
+        return respond(404, _err("not_found", "simulation " + id + " not found"))
+    return respond(200, doc.get("result", doc))
