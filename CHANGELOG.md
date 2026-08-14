@@ -6,6 +6,18 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-08-14
+
+### Adapters
+
+- **stripe-style: Idempotency-Key on payment writes.** A write carrying the
+  `Idempotency-Key` header now replays the original response verbatim (scoped by
+  method+path+collection+key so a reused key never collides across endpoints;
+  only 2xx responses are cached). Retrofitted on payment_intents
+  create/confirm/capture, charges create, and refunds create — so retry/
+  idempotency logic is testable against the flagship adapter. (square-style
+  already had its own; adyen/braintree/netsuite follow the same pattern.)
+
 ## [0.14.0] — 2026-08-14
 
 ### Adapters
