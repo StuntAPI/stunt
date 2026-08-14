@@ -6,6 +6,19 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-08-14
+
+### Adapters
+
+- **tenderly-style: revert/failure path + execution artifacts.** The simulator's
+  core "will this tx revert, and why?" was unreachable (every result hardcoded
+  `status=true`, empty trace). Now reachable two ways — an explicit
+  `{"revert": true, "revert_reason"}` body flag, or calldata beginning with the
+  `Error(string)` selector `0x08c379a0` — producing `status: false`, a
+  `revert_reason`, and an ABI-encoded revert output. Value transfers synthesize
+  a Transfer event log + balance overrides. Stored simulations are retrievable
+  via `GET .../simulations/{id}` and listable via `GET .../simulations`.
+
 ## [0.16.0] — 2026-08-14
 
 ### Adapters
