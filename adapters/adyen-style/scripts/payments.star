@@ -15,6 +15,10 @@ def on_create_payment(req):
     if err != None:
         return err
 
+    cached = _idempotent_lookup(req, "payments")
+    if cached != None:
+        return respond(cached["status"], _payment_public(cached["doc"]))
+
     body = req["body"]
     if body == None:
         body = {}
@@ -77,6 +81,7 @@ def on_create_payment(req):
             "amount": amount,
         })
 
+    _idempotent_remember(req, "payments", 200, psp_ref)
     return respond(200, _payment_public(doc))
 
 # on_list_payments looks up payments by reference query param.

@@ -122,3 +122,35 @@ def _contains(haystack, needle):
         if haystack[i:i + len(needle)] == needle:
             return True
     return False
+
+# --- Idempotency (Idempotency-Key header on transaction create) ---
+def _idempotency_key(req):
+    h = req.get("headers")
+    if h == None:
+        return ""
+    k = h.get("Idempotency-Key", "")
+    if k == None:
+        return ""
+    return k
+
+def _idempotency_scope(req, ns):
+    return req["method"] + "|" + req["path"] + "|" + ns + "|" + _idempotency_key(req)
+
+def _idempotent_lookup(req, ns):
+    if _idempotency_key(req) == "":
+        return None
+    raw = store_kv_get("braintree", "idem_" + _idempotency_scope(req, ns))
+    if raw == None or raw == "":
+        return None
+    sep = raw.find(":")
+    if sep < 0:
+        return None
+    doc = store_collection(ns).get(raw[sep + 1:])
+    if doc == None:
+        return None
+    return {"status": int(raw[:sep]), "doc": doc}
+
+def _idempotent_remember(req, ns, status, rid):
+    if _idempotency_key(req) == "":
+        return
+    store_kv_set("braintree", "idem_" + _idempotency_scope(req, ns), str(status) + ":" + rid)
