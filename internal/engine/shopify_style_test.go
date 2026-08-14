@@ -705,6 +705,17 @@ func TestShopifyStyleOrderFilters(t *testing.T) {
 	if got := len(listOrders("?status=any&financial_status=pending")); got != 0 {
 		t.Fatalf("financial_status=pending -> %d orders, want 0", got)
 	}
+
+	// fulfillment_status null-semantics: unfulfilled/unshipped/null match the
+	// seeded order (no fulfillment); any applies no filter.
+	for _, v := range []string{"unfulfilled", "unshipped", "null", "any"} {
+		if got := len(listOrders("?status=any&fulfillment_status=" + v)); got != 1 {
+			t.Fatalf("fulfillment_status=%s -> %d orders, want 1", v, got)
+		}
+	}
+	if got := len(listOrders("?status=any&fulfillment_status=fulfilled")); got != 0 {
+		t.Fatalf("fulfillment_status=fulfilled -> %d orders, want 0", got)
+	}
 	if got := len(listOrders("?status=any&since_id=" + id)); got != 0 {
 		t.Fatalf("since_id -> %d orders, want 0", got)
 	}

@@ -207,3 +207,34 @@ func TestQuerySelectErrors(t *testing.T) {
 		t.Error("non-triple filter: want error")
 	}
 }
+
+func TestQuerySelectOrderingMixedTypes(t *testing.T) {
+	// Numeric field vs numeric string compares numerically (query params
+	// arrive as strings); a non-numeric string against a number is simply
+	// non-matching rather than lexicographic garbage.
+	l := callQuery(t, orders, triples([]any{"amount", ">", "100"}), nil)
+	eqIDs(t, ids(l), "o2", "o4")
+	l = callQuery(t, orders, triples([]any{"amount", "<=", "100"}), nil)
+	eqIDs(t, ids(l), "o1", "o3")
+	l = callQuery(t, orders, triples([]any{"amount", ">", "zero"}), nil)
+	eqIDs(t, ids(l))
+}
+
+func TestQuerySelectSnowflakeIntPrecision(t *testing.T) {
+	// 2^53+1 vs 2^53 must not collide through float64.
+	big1 := doc("id", "a", "n", sk.MakeInt64(1<<53+1))
+	big2 := doc("id", "b", "n", sk.MakeInt64(1<<53))
+	items := sk.NewList([]sk.Value{big1, big2})
+	l := callQuery(t, items, triples([]any{"n", "=", sk.MakeInt64(1<<53 + 1)}), nil)
+	eqIDs(t, ids(l), "a")
+	l = callQuery(t, items, triples([]any{"n", ">", sk.MakeInt64(1 << 53)}), nil)
+	eqIDs(t, ids(l), "a")
+}
+
+func TestQuerySelectLikeIsRuneBased(t *testing.T) {
+	acc := sk.NewList([]sk.Value{doc("id", "x1", "name", "é")})
+	l := callQuery(t, acc, triples([]any{"name", "like", "_"}), nil)
+	eqIDs(t, ids(l), "x1")
+	l = callQuery(t, acc, triples([]any{"name", "like", "__"}), nil)
+	eqIDs(t, ids(l))
+}

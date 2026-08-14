@@ -2,7 +2,9 @@ package runtime
 
 import (
 	"fmt"
+	"math/big"
 	"sort"
+	"strconv"
 	"strings"
 
 	sk "go.starlark.net/starlark"
@@ -109,7 +111,7 @@ func buildQueryBuiltins() sk.StringDict {
 
 			// Sort.
 			if orderBy != "" {
-				desc := orderDir == "desc"
+				desc := strings.EqualFold(orderDir, "desc")
 				var sortErr error
 				sort.SliceStable(items, func(i, j int) bool {
 					a, aok := fieldByPath(items[i], orderBy)
@@ -140,7 +142,10 @@ func buildQueryBuiltins() sk.StringDict {
 				if !ok {
 					return nil, fmt.Errorf("query_select: offset must be an int, got %s", offsetVal.Type())
 				}
-				n, _ := off.Int64()
+				n, ok := off.Int64()
+				if !ok {
+					return nil, fmt.Errorf("query_select: offset out of int range")
+				}
 				start = int(n)
 				if start < 0 {
 					start = 0
@@ -155,7 +160,10 @@ func buildQueryBuiltins() sk.StringDict {
 				if !ok {
 					return nil, fmt.Errorf("query_select: limit must be an int, got %s", limitVal.Type())
 				}
-				n, _ := lim.Int64()
+				n, ok := lim.Int64()
+				if !ok {
+					return nil, fmt.Errorf("query_select: limit out of int range")
+				}
 				if n < 0 {
 					n = 0
 				}
@@ -248,9 +256,9 @@ func evalClause(item sk.Value, field, op string, want sk.Value) (bool, error) {
 		}
 		return !eq, nil
 	case ">", ">=", "<", "<=":
-		c, err := compareValues(have, want)
-		if err != nil {
-			return false, err
+		c, comparable := compareTyped(have, want)
+		if !comparable {
+			return false, nil
 		}
 		switch op {
 		case ">":
@@ -297,10 +305,16 @@ func listContains(list, want sk.Value) bool {
 	return false
 }
 
-// equals compares two scalar values. Numbers compare numerically across
-// int/float; strings/bools compare same-type; anything else falls back to
-// string equality of their string forms.
+// equals compares two scalar values. Int vs Int compares exactly (big.Int —
+// snowflake-scale ids must not collide through float64); int/float mix
+// numerically; other equal types structurally; cross-type is false (a string
+// query param never equals a numeric field — adapters convert).
 func equals(a, b sk.Value) (bool, error) {
+	if ai, aok := a.(sk.Int); aok {
+		if bi, bok := b.(sk.Int); bok {
+			return ai.BigInt().Cmp(bi.BigInt()) == 0, nil
+		}
+	}
 	if an, aok := numeric(a); aok {
 		if bn, bok := numeric(b); bok {
 			return an == bn, nil
@@ -317,28 +331,57 @@ func equals(a, b sk.Value) (bool, error) {
 	return false, nil
 }
 
-// compareValues returns -1/0/1. Numbers compare numerically; strings
-// lexicographically (ISO-8601 timestamps therefore compare chronologically);
-// bools false < true. Mixed types compare by string form so sorts never fail.
-func compareValues(a, b sk.Value) (int, error) {
-	if an, aok := numeric(a); aok {
-		if bn, bok := numeric(b); bok {
-			switch {
-			case an < bn:
-				return -1, nil
-			case an > bn:
-				return 1, nil
-			default:
-				return 0, nil
-			}
+// compareTyped is the filter-path comparison: strict about types so an
+// ordering op can never fall through to string-form matching. A numeric field
+// vs a numeric string compares numerically (query params arrive as strings);
+// anything else mixed is incomparable (the clause is false).
+func compareTyped(a, b sk.Value) (int, bool) {
+	if ai, aok := a.(sk.Int); aok {
+		if bi, bok := b.(sk.Int); bok {
+			return ai.BigInt().Cmp(bi.BigInt()), true
+		}
+	}
+	an, aNum := numericOrString(a)
+	bn, bNum := numericOrString(b)
+	if aNum && bNum {
+		switch {
+		case an < bn:
+			return -1, true
+		case an > bn:
+			return 1, true
+		default:
+			return 0, true
 		}
 	}
 	as, aok := sk.AsString(a)
 	bs, bok := sk.AsString(b)
 	if aok && bok {
-		return strings.Compare(as, bs), nil
+		return strings.Compare(as, bs), true
+	}
+	return 0, false
+}
+
+// compareValues is the sort-path comparison: typed first, then a string-form
+// fallback so sorts over mixed fields never fail (and stay deterministic).
+func compareValues(a, b sk.Value) (int, error) {
+	if c, ok := compareTyped(a, b); ok {
+		return c, nil
 	}
 	return strings.Compare(a.String(), b.String()), nil
+}
+
+// numericOrString reports a numeric value for numbers and for strings that
+// parse as a number; otherwise not numeric.
+func numericOrString(v sk.Value) (float64, bool) {
+	if f, ok := numeric(v); ok {
+		return f, true
+	}
+	if s, ok := sk.AsString(v); ok {
+		if f, err := strconv.ParseFloat(strings.TrimSpace(s), 64); err == nil {
+			return f, true
+		}
+	}
+	return 0, false
 }
 
 func numeric(v sk.Value) (float64, bool) {
@@ -346,7 +389,8 @@ func numeric(v sk.Value) (float64, bool) {
 	case sk.Int:
 		i, ok := n.Int64()
 		if !ok {
-			return 0, false
+			f, _ := new(big.Float).SetInt(n.BigInt()).Float64()
+			return f, true
 		}
 		return float64(i), true
 	case sk.Float:
@@ -355,29 +399,30 @@ func numeric(v sk.Value) (float64, bool) {
 	return 0, false
 }
 
-// likeMatch implements SQL LIKE with % (any run) and _ (one char). The whole
-// pattern must match, case-sensitively.
+// likeMatch implements SQL LIKE with % (any run) and _ (one char — one RUNE,
+// not one byte). The whole pattern must match, case-sensitively.
 func likeMatch(s, pattern string) bool {
 	// Dynamic programming over (len(s)+1) x (len(pattern)+1).
-	m, n := len(s), len(pattern)
+	sr, pr := []rune(s), []rune(pattern)
+	m, n := len(sr), len(pr)
 	dp := make([][]bool, m+1)
 	for i := range dp {
 		dp[i] = make([]bool, n+1)
 	}
 	dp[0][0] = true
-	for j := 1; j <= n && pattern[j-1] == '%'; j++ {
+	for j := 1; j <= n && pr[j-1] == '%'; j++ {
 		dp[0][j] = true
 	}
 	for i := 1; i <= m; i++ {
 		for j := 1; j <= n; j++ {
-			pc := pattern[j-1]
+			pc := pr[j-1]
 			switch pc {
 			case '%':
 				dp[i][j] = dp[i-1][j] || dp[i][j-1]
 			case '_':
 				dp[i][j] = dp[i-1][j-1]
 			default:
-				dp[i][j] = dp[i-1][j-1] && s[i-1] == pc
+				dp[i][j] = dp[i-1][j-1] && sr[i-1] == pc
 			}
 		}
 	}

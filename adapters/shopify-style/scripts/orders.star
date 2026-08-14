@@ -179,8 +179,8 @@ def _apply_order_filters(req, docs):
         f.append(["financial_status", "=", fs])
 
     fls = _get_query(req, "fulfillment_status")
-    if fls != None and fls != "":
-        if fls == "unfulfilled":
+    if fls != None and fls != "" and fls != "any":
+        if fls == "unfulfilled" or fls == "unshipped" or fls == "null":
             f.append(["fulfillment_status", "=", None])
         else:
             f.append(["fulfillment_status", "=", fls])
