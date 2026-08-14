@@ -31,9 +31,11 @@ def on_token(req):
 
     if grant_type == "refresh_token":
         refresh_token = body.get("refresh_token", "")
-        if refresh_token == "":
+        username = store_kv_get("salesforce", "refresh_" + refresh_token)
+        if refresh_token == "" or username == None:
             return _oauth_error("invalid_grant", "invalid refresh_token")
-        return _issue_token("user@mock.org", client_id)
+        store_kv_delete("salesforce", "refresh_" + refresh_token)
+        return _issue_token(username, client_id)
 
     return _oauth_error("unsupported_grant_type", "grant_type not supported")
 
@@ -54,6 +56,9 @@ def _issue_token(username, client_id):
 
     issued_at = _epoch_ms()
 
+    refresh = "refresh_" + _pad_b62(seq, 25)
+    store_kv_set("salesforce", "refresh_" + refresh, username)
+
     return respond(200, {
         "access_token": access,
         "instance_url": "https://mock-instance.my.salesforce.com",
@@ -61,6 +66,7 @@ def _issue_token(username, client_id):
         "token_type": "Bearer",
         "issued_at": issued_at,
         "signature": "mock-signature-base64",
+        "refresh_token": refresh,
     })
 
 # _oauth_error returns an OAuth2 error response.

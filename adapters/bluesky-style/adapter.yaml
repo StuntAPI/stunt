@@ -20,6 +20,9 @@ endpoints:
   - route: /xrpc/com.atproto.server.createSession
     method: POST
     handler: scripts/session.star#on_create_session
+  - route: /xrpc/com.atproto.server.refreshSession
+    method: POST
+    handler: scripts/session.star#on_refresh_session
 
   # --- Records (XRPC; Bearer required for writes) ---
   - route: /xrpc/com.atproto.repo.createRecord
