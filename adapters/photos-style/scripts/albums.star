@@ -69,6 +69,23 @@ def on_get_album(req):
 
     return respond(200, _public_album(doc))
 
+# on_delete_album deletes an album by id. Mirrors the real Google Photos
+# Library API DELETE /v1/albums/{albumId}: removes the album but leaves its
+# media items intact (they are simply unlinked). Returns an empty response.
+def on_delete_album(req):
+    user = _user_for_token(req)
+    if user == None:
+        return respond(401, {"error": {"code": 401, "message": "Invalid credentials", "status": "UNAUTHENTICATED"}})
+
+    album_id = req["params"]["id"]
+    ac = store_collection("albums")
+    doc = ac.get(album_id)
+    if doc == None:
+        return respond(404, {"error": {"code": 404, "message": "Album not found: " + album_id, "status": "NOT_FOUND"}})
+
+    ac.delete(album_id)
+    return respond(200, {})
+
 # _public_album strips internal fields (user) from a stored doc.
 def _public_album(doc):
     return {

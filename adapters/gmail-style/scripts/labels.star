@@ -72,3 +72,24 @@ def on_create_label(req):
         "type": "user",
         "color": doc.get("color", None),
     })
+
+# on_delete_label immediately and permanently deletes the specified user label.
+# System labels cannot be deleted (Gmail returns 400). User labels return 204.
+# DELETE /gmail/v1/users/{userId}/labels/{id} → 204 No Content.
+def on_delete_label(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    _seed()
+
+    label_id = req["params"]["id"]
+    lc = store_collection("labels")
+    for doc in lc.list():
+        if doc.get("id") == label_id:
+            if doc.get("type") == "system":
+                return _bad_request("System labels cannot be deleted.")
+            lc.delete(doc["id"])
+            return respond(204)
+
+    return _not_found("Label not found: " + label_id)

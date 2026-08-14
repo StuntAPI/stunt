@@ -47,6 +47,9 @@ endpoints:
   - route: /rest/api/3/issue/{key}
     method: PUT
     handler: scripts/issue.star#on_update_issue
+  - route: /rest/api/3/issue/{key}
+    method: DELETE
+    handler: scripts/issue.star#on_delete_issue
 
   # --- issue transitions ---
   - route: /rest/api/3/issue/{key}/transitions

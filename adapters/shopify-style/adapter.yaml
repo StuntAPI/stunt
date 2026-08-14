@@ -67,6 +67,9 @@ endpoints:
   - route: /admin/api/2024-10/webhooks.json
     method: POST
     handler: scripts/webhooks.star#on_create_webhook
+  - route: /admin/api/2024-10/webhooks/{webhook_id}
+    method: DELETE
+    handler: scripts/webhooks.star#on_delete_webhook
 
   # --- GraphQL (pattern-match common operations) ---
   - route: /admin/api/2024-10/graphql.json

@@ -105,6 +105,20 @@ def on_get(req):
 
     return respond(200, {"ticket": _ticket_shape(doc)})
 
+def on_delete(req):
+    ok, err = _require_auth(req)
+    if not ok:
+        return err
+
+    ticket_id = req["params"].get("id", "")
+    col = store_collection("tickets")
+    doc = col.get(ticket_id)
+    if doc == None:
+        return _zd_error(404, "RecordNotFound", "Ticket not found")
+
+    col.delete(ticket_id)
+    return respond(204)
+
 def on_update(req):
     ok, err = _require_auth(req)
     if not ok:

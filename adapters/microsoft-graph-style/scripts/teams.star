@@ -55,6 +55,22 @@ def on_create_chat(req):
     entity["@odata.context"] = "https://graph.microsoft.com/v1.0/$metadata#chats/$entity"
     return respond(201, entity)
 
+# on_delete_chat deletes a chat by id.
+# DELETE /v1.0/chats/{id} (Bearer) → 204 No Content
+def on_delete_chat(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    chat_id = req["params"].get("id", "")
+    cc = store_collection("chats")
+    doc = cc.get(chat_id)
+    if doc == None:
+        return _err("ChatNotFound", 404, "Chat '" + chat_id + "' not found.")
+
+    cc.delete(chat_id)
+    return respond(204)
+
 # on_list_chat_messages returns messages in a chat.
 # GET /v1.0/chats/{id}/messages (Bearer)
 def on_list_chat_messages(req):
@@ -108,6 +124,23 @@ def on_send_chat_message(req):
     entity = _chat_message_entity(doc)
     entity["@odata.context"] = "https://graph.microsoft.com/v1.0/$metadata#chats('" + chat_id + "')/messages/$entity"
     return respond(201, entity)
+
+# on_delete_chat_message deletes a message in a chat.
+# DELETE /v1.0/chats/{id}/messages/{messageId} (Bearer) → 204 No Content
+def on_delete_chat_message(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    chat_id = req["params"].get("id", "")
+    msg_id = req["params"].get("messageId", "")
+    cmc = store_collection("chat_messages")
+    doc = cmc.get(msg_id)
+    if doc == None or doc.get("chat_id", "") != chat_id:
+        return _err("ChatMessageNotFound", 404, "Message '" + msg_id + "' not found in chat '" + chat_id + "'.")
+
+    cmc.delete(msg_id)
+    return respond(204)
 
 # --- helpers ---
 

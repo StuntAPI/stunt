@@ -60,6 +60,24 @@ def on_create_invoice(req):
 
     return respond(200, {"Invoice": doc, "time": _now()})
 
+def on_delete_invoice(req):
+    token_doc, err = _require_token(req)
+    if err != None:
+        return err
+
+    realm_id = req["params"]["realmId"]
+    if not _realm_matches(token_doc, realm_id):
+        return _auth_fault()
+
+    inv_id = req["params"]["id"]
+    c = store_collection("invoices")
+    doc = c.get(inv_id)
+    if doc == None:
+        return _fault(404, "620", "Object Not Found", "Invoice " + inv_id + " not found")
+
+    c.delete(inv_id)
+    return respond(200, {"Invoice": {"Id": inv_id, "domain": "QBO", "status": "Deleted"}, "time": _now()})
+
 def on_read_invoice(req):
     token_doc, err = _require_token(req)
     if err != None:

@@ -81,6 +81,22 @@ def on_get_message(req):
     entity["@odata.context"] = "https://graph.microsoft.com/v1.0/$metadata#users('me')/messages/$entity"
     return respond(200, entity)
 
+# on_delete_message deletes a single message by id.
+# DELETE /v1.0/me/messages/{id} (Bearer) → 204 No Content
+def on_delete_message(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    msg_id = req["params"].get("id", "")
+    mc = store_collection("messages")
+    doc = mc.get(msg_id)
+    if doc == None:
+        return _err("MessageNotFound", 404, "Message '" + msg_id + "' not found.")
+
+    mc.delete(msg_id)
+    return respond(204)
+
 # on_send_mail sends a message (creates it in Sent Items).
 # POST /v1.0/me/sendMail (Bearer)
 # Body: { message: { subject, body: { content }, toRecipients: [...] } }

@@ -44,6 +44,9 @@ endpoints:
   - route: /v1.0/me/messages/{id}
     method: GET
     handler: scripts/mail.star#on_get_message
+  - route: /v1.0/me/messages/{id}
+    method: DELETE
+    handler: scripts/mail.star#on_delete_message
   - route: /v1.0/me/sendMail
     method: POST
     handler: scripts/mail.star#on_send_mail
@@ -55,6 +58,12 @@ endpoints:
   - route: /v1.0/me/events
     method: POST
     handler: scripts/calendar.star#on_create_event
+  - route: /v1.0/me/events/{id}
+    method: DELETE
+    handler: scripts/calendar.star#on_delete_event
+  - route: /v1.0/me/events/{id}
+    method: PATCH
+    handler: scripts/calendar.star#on_update_event
 
   # --- OneDrive ---
   # NOTE on colon addressing: the router does not recognize "{param}:" as a
@@ -80,6 +89,9 @@ endpoints:
   - route: /v1.0/me/drive/items/{id}/content
     method: GET
     handler: scripts/drive_upload.star#on_get_content
+  - route: /v1.0/me/drive/items/{id}
+    method: DELETE
+    handler: scripts/drive.star#on_delete_item
   # Simple upload (< 4 MB path): PUT root:/{name}:/content and the
   # items/{parentId}:/{name}:/content variant.
   - route: /v1.0/me/drive/root:/{item}/content
@@ -117,12 +129,18 @@ endpoints:
   - route: /v1.0/me/chats
     method: POST
     handler: scripts/teams.star#on_create_chat
+  - route: /v1.0/chats/{id}
+    method: DELETE
+    handler: scripts/teams.star#on_delete_chat
   - route: /v1.0/chats/{id}/messages
     method: GET
     handler: scripts/teams.star#on_list_chat_messages
   - route: /v1.0/chats/{id}/messages
     method: POST
     handler: scripts/teams.star#on_send_chat_message
+  - route: /v1.0/chats/{id}/messages/{messageId}
+    method: DELETE
+    handler: scripts/teams.star#on_delete_chat_message
 
   # --- Excel ---
   - route: /v1.0/me/drive/items/{id}/workbook/worksheets

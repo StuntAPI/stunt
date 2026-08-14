@@ -22,6 +22,47 @@ def on_list_events(req):
     base_url = "https://graph.microsoft.com/v1.0/me/events"
     return _apply_odata(entities, req["query"], base_url)
 
+# on_delete_event deletes a calendar event by id.
+# DELETE /v1.0/me/events/{id} (Bearer) → 204 No Content
+def on_delete_event(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    event_id = req["params"].get("id", "")
+    ec = store_collection("events")
+    doc = ec.get(event_id)
+    if doc == None:
+        return _err("EventNotFound", 404, "Event '" + event_id + "' not found.")
+
+    ec.delete(event_id)
+    return respond(204)
+
+# on_update_event updates a calendar event by id (PATCH).
+# PATCH /v1.0/me/events/{id} (Bearer) → 200 with the updated event
+def on_update_event(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    event_id = req["params"].get("id", "")
+    ec = store_collection("events")
+    doc = ec.get(event_id)
+    if doc == None:
+        return _err("EventNotFound", 404, "Event '" + event_id + "' not found.")
+
+    body = req["body"]
+    if body == None:
+        body = {}
+    for k in ["subject", "start", "end", "attendees", "location", "body", "isOnlineMeeting"]:
+        if body.get(k) != None:
+            doc[k] = body[k]
+    ec.update(event_id, doc)
+
+    entity = _event_entity(doc)
+    entity["@odata.context"] = "https://graph.microsoft.com/v1.0/$metadata#users('me')/events/$entity"
+    return respond(200, entity)
+
 # on_create_event creates a new calendar event.
 # POST /v1.0/me/events (Bearer)
 # Body: { subject, start:{dateTime,timezone}, end:{dateTime,timezone}, attendees? }

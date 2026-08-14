@@ -3,10 +3,11 @@
 # Requires Bearer + xero-tenant-id.
 # STATEFUL invoices stored in the "invoices" collection.
 #
-# GET  /api.xro/2.0/Invoices           → { Id, Status, Invoices: [...] }
-# PUT  /api.xro/2.0/Invoices           → { Id, Status, Invoices: [...] }
-# GET  /api.xro/2.0/Invoices/{id}      → { Id, Status, Invoices: [...] }
-# POST /api.xro/2.0/Invoices/{id}/Payments → { Id, Status, Payments: [...] }
+# GET    /api.xro/2.0/Invoices           → { Id, Status, Invoices: [...] }
+# PUT    /api.xro/2.0/Invoices           → { Id, Status, Invoices: [...] }
+# GET    /api.xro/2.0/Invoices/{id}      → { Id, Status, Invoices: [...] }
+# DELETE /api.xro/2.0/Invoices/{id}      → 204 No Content
+# POST   /api.xro/2.0/Invoices/{id}/Payments → { Id, Status, Payments: [...] }
 
 # on_list_invoices lists all invoices.
 def on_list_invoices(req):
@@ -95,6 +96,29 @@ def on_get_invoice(req):
     for doc in docs:
         if doc.get("InvoiceID", "") == invoice_id:
             return _envelope("Invoices", [_invoice_public(doc)])
+
+    return _xero_err(404, "NotFound", "NotFound", "The invoice was not found")
+
+# on_delete_invoice deletes a single invoice by ID.
+def on_delete_invoice(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+    err = _require_tenant(req)
+    if err != None:
+        return err
+
+    invoice_id = req["params"].get("id", "")
+    if invoice_id == None or invoice_id == "":
+        return _xero_err(400, "BadRequest", "ValidationError", "Invoice ID is required")
+
+    c = store_collection("invoices")
+    docs = c.list()
+
+    for doc in docs:
+        if doc.get("InvoiceID", "") == invoice_id:
+            c.delete(doc.get("id", doc.get("InvoiceID", "")))
+            return respond(204)
 
     return _xero_err(404, "NotFound", "NotFound", "The invoice was not found")
 

@@ -40,18 +40,24 @@ endpoints:
     method: GET
     handler: scripts/channels.star#on_channels
 
-  # --- Playlists (create + list) ---
+  # --- Playlists (create + list + delete) ---
   - route: /youtube/v3/playlists
     method: POST
     handler: scripts/playlists.star#on_create_playlist
   - route: /youtube/v3/playlists
     method: GET
     handler: scripts/playlists.star#on_list_playlists
+  - route: /youtube/v3/playlists
+    method: DELETE
+    handler: scripts/playlists.star#on_delete_playlist
 
-  # --- Playlist items (add video to playlist) ---
+  # --- Playlist items (add + delete) ---
   - route: /youtube/v3/playlistItems
     method: POST
     handler: scripts/playlists.star#on_add_playlist_item
+  - route: /youtube/v3/playlistItems
+    method: DELETE
+    handler: scripts/playlists.star#on_delete_playlist_item
 
 # Backing stores — collections for stateful data.
 resources:

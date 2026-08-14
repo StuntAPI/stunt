@@ -93,6 +93,28 @@ def on_get_zone(req):
 
     return _cf_ok(_zone_result(zone))
 
+# on_delete_zone deletes a zone by ID.
+# DELETE /zones/{zone_id}
+# Real Cloudflare returns 200 with the deleted zone's id in the result.
+def on_delete_zone(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+
+    zone_id = req["params"]["zone_id"]
+    _ensure_seed_zones()
+    zc = store_collection("zones")
+    target = None
+    for z in zc.list():
+        if z.get("zone_id", "") == zone_id:
+            target = z
+            break
+    if target == None:
+        return _cf_err(404, 1003, "Zone not found.")
+
+    zc.delete(target.get("id", ""))
+    return _cf_ok({"id": zone_id})
+
 # on_list_dns_records returns synthetic DNS records for a zone.
 def on_list_dns_records(req):
     err = _require_auth(req)

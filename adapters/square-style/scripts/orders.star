@@ -67,6 +67,64 @@ def on_create_order(req):
 
     return respond(200, {"order": _order_public(doc)})
 
+# on_update_order updates an open order by merging provided fields.
+#
+# Mirrors Square's real UpdateOrder endpoint (PUT /v2/orders/{order_id}).
+def on_update_order(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+    err = _require_version(req)
+    if err != None:
+        return err
+
+    order_id = req["params"]["id"]
+    c = store_collection("orders")
+    doc = c.get(order_id)
+    if doc == None:
+        return _sq_err(404, "NOT_FOUND", "NOT_FOUND", "Order not found")
+
+    body = req["body"]
+    if body == None:
+        body = {}
+
+    order_input = body.get("order", {})
+    if order_input == None:
+        order_input = {}
+
+    # Merge allowed top-level fields from the supplied order object.
+    for field in ["location_id", "state", "line_items", "total_money"]:
+        val = order_input.get(field, None)
+        if val != None:
+            doc[field] = val
+
+    c.update(order_id, doc)
+
+    return respond(200, {"order": _order_public(doc)})
+
+# on_delete_order removes an order by ID.
+#
+# Square's real Orders API has no DELETE endpoint (orders transition state
+# instead). stunt models a delete anyway so create->delete teardown lifecycle
+# tests can clean up.
+def on_delete_order(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+    err = _require_version(req)
+    if err != None:
+        return err
+
+    order_id = req["params"]["id"]
+    c = store_collection("orders")
+    doc = c.get(order_id)
+    if doc == None:
+        return _sq_err(404, "NOT_FOUND", "NOT_FOUND", "Order not found")
+
+    c.delete(order_id)
+
+    return respond(200, {"order": _order_public(doc)})
+
 # on_get_order retrieves an order by ID.
 def on_get_order(req):
     err = _require_auth(req)

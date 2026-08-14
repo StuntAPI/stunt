@@ -90,3 +90,21 @@ def on_read_customer_by_id(req):
         return _fault(404, "620", "Object Not Found", "Customer " + cust_id + " not found")
 
     return respond(200, {"Customer": doc, "time": _now()})
+
+def on_delete_customer_by_id(req):
+    token_doc, err = _require_token(req)
+    if err != None:
+        return err
+
+    realm_id = req["params"]["realmId"]
+    if not _realm_matches(token_doc, realm_id):
+        return _auth_fault()
+
+    cust_id = req["params"]["id"]
+    c = store_collection("customers")
+    doc = c.get(cust_id)
+    if doc == None:
+        return _fault(404, "620", "Object Not Found", "Customer " + cust_id + " not found")
+
+    c.delete(cust_id)
+    return respond(200, {"Customer": {"Id": cust_id, "domain": "QBO", "status": "Deleted"}, "time": _now()})

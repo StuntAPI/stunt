@@ -70,3 +70,17 @@ def on_create_webhook(req):
     col.insert(doc)
 
     return respond(201, {"webhook": doc})
+
+def on_delete_webhook(req):
+    ok, err = _require_auth(req)
+    if not ok:
+        return err
+
+    webhook_id = req["params"].get("id", "")
+    col = store_collection("webhooks")
+    doc = col.get(webhook_id)
+    if doc == None:
+        return _zd_error(404, "RecordNotFound", "Webhook not found")
+
+    col.delete(webhook_id)
+    return respond(204)

@@ -48,6 +48,9 @@ endpoints:
   - route: /admin/directory/v1/groups/{groupKey}
     method: GET
     handler: scripts/groups.star#on_get_group
+  - route: /admin/directory/v1/groups/{groupKey}
+    method: DELETE
+    handler: scripts/groups.star#on_delete_group
 
   # --- Group members ---
   - route: /admin/directory/v1/groups/{groupKey}/members
@@ -56,6 +59,9 @@ endpoints:
   - route: /admin/directory/v1/groups/{groupKey}/members
     method: POST
     handler: scripts/groups.star#on_add_member
+  - route: /admin/directory/v1/groups/{groupKey}/members/{memberKey}
+    method: DELETE
+    handler: scripts/groups.star#on_delete_member
 
 # Backing stores — collections for stateful data.
 resources:

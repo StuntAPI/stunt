@@ -103,6 +103,23 @@ def on_get_group(req):
 
     return respond(200, _group_entity(doc))
 
+# on_delete_group deletes a group by email or id.
+# DELETE /admin/directory/v1/groups/{groupKey} (Bearer)
+def on_delete_group(req):
+    _, err = _require_bearer(req)
+    if err != None:
+        return err
+
+    group_key = req["params"].get("groupKey", "")
+    doc = _find_group(group_key)
+    if doc == None:
+        return respond(404, _not_found("Group", group_key))
+
+    gc = store_collection("groups")
+    gc.delete(doc["id"])
+
+    return respond(204, None)
+
 # on_list_members returns all members of a group.
 # GET /admin/directory/v1/groups/{groupKey}/members (Bearer)
 def on_list_members(req):
@@ -177,6 +194,33 @@ def on_add_member(req):
         "type": member_doc["type"],
         "status": "ACTIVE",
     })
+
+# on_delete_member removes a member from a group.
+# DELETE /admin/directory/v1/groups/{groupKey}/members/{memberKey} (Bearer)
+def on_delete_member(req):
+    _, err = _require_bearer(req)
+    if err != None:
+        return err
+
+    group_key = req["params"].get("groupKey", "")
+    doc = _find_group(group_key)
+    if doc == None:
+        return respond(404, _not_found("Group", group_key))
+
+    member_key = req["params"].get("memberKey", "")
+    mc = store_collection("members")
+    docs = mc.list()
+    member_doc = None
+    for d in docs:
+        if d.get("groupKey", "") == doc["email"] and (d["id"] == member_key or d.get("email", "") == member_key):
+            member_doc = d
+            break
+    if member_doc == None:
+        return respond(404, _not_found("Member", member_key))
+
+    mc.delete(member_doc["id"])
+
+    return respond(204, None)
 
 # --- helpers ---
 

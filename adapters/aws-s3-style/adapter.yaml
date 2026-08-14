@@ -28,6 +28,10 @@ endpoints:
   - route: /{bucket}
     method: PUT
     handler: scripts/buckets.star#on_create_bucket
+  # Delete bucket: DELETE /{bucket} (must be empty, per S3 semantics)
+  - route: /{bucket}
+    method: DELETE
+    handler: scripts/buckets.star#on_delete_bucket
 
   # --- Object operations ---
   # Upload object: PUT /{bucket}/{key}
