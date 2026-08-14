@@ -720,6 +720,30 @@ func TestStripeStylePagination(t *testing.T) {
 	}
 }
 
+// postJSONAuthIdem is postJSONAuth with an optional Idempotency-Key header.
+func postJSONAuthIdem(t *testing.T, url, token, idemKey string, body map[string]any) (string, int) {
+	t.Helper()
+	data, _ := json.Marshal(body)
+	req, err := http.NewRequest("POST", url, bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	if idemKey != "" {
+		req.Header.Set("Idempotency-Key", idemKey)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return string(b), resp.StatusCode
+}
+
 // TestStripeStylePaymentIntents exercises the canonical modern payment flow:
 // PaymentMethod → PaymentIntent (automatic + manual capture) → confirm/capture
 // state machine → first-class Refunds (full + partial) → list, plus the
@@ -877,5 +901,96 @@ func TestStripeStylePaymentIntents(t *testing.T) {
 	json.Unmarshal([]byte(body), &piBare)
 	if _, status := postJSONAuth(t, base+"/v1/payment_intents/"+piBare["id"].(string)+"/confirm", devToken, map[string]any{}); status != 400 {
 		t.Fatalf("confirm without payment_method -> %d, want 400", status)
+	}
+}
+
+// TestStripeStyleIdempotency proves the Idempotency-Key header replays the
+// original response verbatim: same key → same resource (request body ignored),
+// different key → new resource, no key → distinct resources, and confirm
+// replay is endpoint-scoped (a key reused across create + confirm doesn't collide).
+func TestStripeStyleIdempotency(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "stripe-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"stripe": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["stripe"]
+
+	// Same key → same resource; the replayed request body is ignored.
+	body1, status := postJSONAuthIdem(t, base+"/v1/payment_intents", devToken, "key-A", map[string]any{"amount": 5000, "currency": "usd"})
+	if status != 201 {
+		t.Fatalf("create A -> %d; body %s", status, body1)
+	}
+	var piA map[string]any
+	json.Unmarshal([]byte(body1), &piA)
+	idA := piA["id"].(string)
+
+	body2, status := postJSONAuthIdem(t, base+"/v1/payment_intents", devToken, "key-A", map[string]any{"amount": 9999, "currency": "eur"})
+	if status != 201 {
+		t.Fatalf("replay A -> %d; body %s", status, body2)
+	}
+	var piA2 map[string]any
+	json.Unmarshal([]byte(body2), &piA2)
+	if piA2["id"] != idA {
+		t.Fatalf("replay returned id %v, want %s", piA2["id"], idA)
+	}
+	if piA2["amount"].(float64) != 5000 {
+		t.Fatalf("replay amount = %v, want 5000 (original, not 9999)", piA2["amount"])
+	}
+
+	// Different key → a distinct resource.
+	body3, _ := postJSONAuthIdem(t, base+"/v1/payment_intents", devToken, "key-B", map[string]any{"amount": 1000, "currency": "usd"})
+	var piB map[string]any
+	json.Unmarshal([]byte(body3), &piB)
+	if piB["id"] == idA {
+		t.Fatal("different key returned the same PI")
+	}
+
+	// No key → each call creates a distinct resource.
+	b4, _ := postJSONAuthIdem(t, base+"/v1/payment_intents", devToken, "", map[string]any{"amount": 100, "currency": "usd"})
+	b5, _ := postJSONAuthIdem(t, base+"/v1/payment_intents", devToken, "", map[string]any{"amount": 100, "currency": "usd"})
+	var p4, p5 map[string]any
+	json.Unmarshal([]byte(b4), &p4)
+	json.Unmarshal([]byte(b5), &p5)
+	if p4["id"] == p5["id"] {
+		t.Fatal("no-key calls should create distinct PIs")
+	}
+
+	// Endpoint scoping: reusing key-A's key on the confirm endpoint does NOT
+	// replay the create — it executes. Create a manual PI to confirm.
+	cb, _ := postJSONAuthIdem(t, base+"/v1/payment_intents", devToken, "key-C", map[string]any{"amount": 2000, "currency": "usd", "capture_method": "manual"})
+	var piC map[string]any
+	json.Unmarshal([]byte(cb), &piC)
+	idC := piC["id"].(string)
+
+	confBody, status := postJSONAuthIdem(t, base+"/v1/payment_intents/"+idC+"/confirm", devToken, "key-C", map[string]any{"payment_method": "pm_x"})
+	if status != 200 {
+		t.Fatalf("confirm -> %d; body %s", status, confBody)
+	}
+	// Confirm again with the same key → replay (requires_capture), not a new action.
+	confBody2, _ := postJSONAuthIdem(t, base+"/v1/payment_intents/"+idC+"/confirm", devToken, "key-C", map[string]any{"payment_method": "pm_y"})
+	var cf map[string]any
+	json.Unmarshal([]byte(confBody2), &cf)
+	if cf["status"] != "requires_capture" {
+		t.Fatalf("confirm replay status = %v, want requires_capture", cf["status"])
 	}
 }
