@@ -6,6 +6,19 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-08-14
+
+### Adapters
+
+- **Idempotency across the payment/ERP adapters.** Completes the idempotency
+  gap (`stunt-9of`; stripe shipped in v0.15.0, square already had its own):
+  - **adyen-style / braintree-style** — honor the `Idempotency-Key` header on
+    creates (replay the original response, scoped by method+path+collection+key;
+    2xx only), so retry/idempotency logic is testable.
+  - **netsuite-style** — NetSuite's model is `externalId` upsert: a second create
+    with the same `externalId` returns the existing record's `Location` instead
+    of duplicating.
+
 ## [0.15.0] — 2026-08-14
 
 ### Adapters
