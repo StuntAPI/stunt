@@ -6,6 +6,19 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-08-14
+
+### Adapters
+
+- **Byte-exact binary round-trip (aws-s3, azure-storage).** Object content
+  moved out of the JSON-backed collection (which stored a stringified body map
+  for JSON, `""` for binary, and corrupted invalid-UTF-8 bytes via
+  `json.Marshal`) into the byte-exact filesystem-backed blob store via
+  `req.raw_body`, keyed by a path-safe per-object id. The collection holds
+  metadata only; size/Content-Length come from the real bytes. Binary
+  upload-then-GET now round-trips exactly. (`req.raw_body` documented in
+  `adapters/README.md`.)
+
 ## [0.18.0] — 2026-08-14
 
 ### Adapters
