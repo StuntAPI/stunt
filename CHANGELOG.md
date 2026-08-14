@@ -6,6 +6,23 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-08-14
+
+### Engine
+
+- **OData key-in-parens routing.** `matchRoute` now supports an embedded single
+  `{param}` within a literal segment (`prefix{param}suffix`, e.g.
+  `/accounts({accountid})`), capturing the middle — so OData single-entity URLs
+  that previously 404'd now route. Whole-segment `{name}` and literal segments
+  are unchanged.
+
+### Adapters
+
+- **powerplatform-style Dataverse write side.** `POST`/`PATCH`/`DELETE
+  /accounts` and `GET /accounts({accountid})`, backed by a collection seeded
+  from the fixture; list honors `$select` (projection) and `$count`
+  (`@odata.count`), with `@odata.nextLink` paging.
+
 ## [0.19.0] — 2026-08-14
 
 ### Adapters
