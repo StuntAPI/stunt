@@ -6,6 +6,30 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.31.0] — 2026-08-14
+
+### Adapters
+
+- **Async state machines across 18 adapters (derive-on-read).** Background
+  tasks, checks, messages, and deploys no longer complete instantly or stall
+  forever: docs store `_running_at`/`_done_at` at create time, every read
+  derives the current state from the (injectable) clock — provider-real
+  vocabularies, 1s to in-flight, 3s to terminal — persists the transition,
+  and fires the provider's signed webhook exactly once per new state.
+  Twilio messages `queued→sent→delivered` (with status-callback webhooks at
+  each hop and the real `+15005550001` invalid-number magic trigger);
+  SendGrid `processed→delivered/dropped`; Onfido `in_progress→complete`
+  (clear/consider) and Jumio/Persona KYC lifecycles; Dune executions
+  `PENDING→EXECUTING→COMPLETED/FAILED`; GitHub Actions runs
+  `queued→in_progress→completed` with conclusions; ASC builds
+  `PROCESSING→VALID/INVALID`; Cloudflare deploys and zones; Anaplan tasks;
+  Chainlink Functions; ERC-4337 userOps; eth-jsonrpc receipts; WhatsApp/
+  Instagram/Threads delivery states; Resend `queued→sent→delivered/bounced`.
+  Failure injection: provider-real sandbox triggers where they exist, else a
+  documented `simulate_fail` simulator flag. Poll routes carry
+  `concurrency_key` so concurrent reads can't double-emit, and
+  `TestTwilioStyleLifecycleEmitsOnce` pins the exactly-once guarantee.
+
 ## [0.30.0] — 2026-08-14
 
 ### Adapters
