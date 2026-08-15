@@ -6,6 +6,27 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.35.0] — 2026-08-15
+
+### Adapters
+
+- **Two new reference adapters** (`fattureincloud-style` bookkeeping v2 —
+  `/c/{company_id}` document/supplier/client/product surface, Laravel
+  pagination, decimal-string amounts, F24 taxes, signed webhook
+  subscriptions; `escrow-style` Escrow.com 2017-09-01 — parties/agree/
+  fund lifecycle with real Transaction schema, decimal-string amounts,
+  basic auth). Adapter count is now **93**.
+- **Real inbound shared-key verification (10 adapters).** AWS SigV4
+  verified byte-exact on aws-s3 + aws-iam-sts (canonical request,
+  signing-key chain, presigned URLs with expiry, ±15min skew, payload-hash
+  integrity); Azure SharedKey string-to-sign and service-bus SAS with
+  expiry codes; Onfido/Jumio/Persona receiver HMACs (Persona with the
+  5-minute timestamp window); Xero body MAC; CloudKit ECDSA + date window;
+  GitHub inbound per-hook secrets. Tests sign with real crypto — no bypass.
+- **Clock adoption across 16 adapters**: hardcoded 2024 timestamps replaced
+  with clock-derived values in provider formats, content-derived ETags
+  (aws-s3, dropbox content-hash), real TTLs instead of decorative expiry.
+
 ## [0.34.0] — 2026-08-15
 
 ### Adapters
