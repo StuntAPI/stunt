@@ -1,0 +1,192 @@
+# stunt adapter — Fatture in Cloud-style API v2 simulator (unofficial)
+# Docs: https://stuntapi.com/stunt
+#
+# Mimics the *structure* of a Fatture in Cloud-style invoicing/bookkeeping API
+# for LOCAL TESTING ONLY. It does not call the real API. All data is synthetic.
+# See DISCLAIMER.
+id: fattureincloud-style
+name: "Fatture in Cloud-style API v2 simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Fatture in Cloud API v2"
+  version: "2.0.29"
+
+endpoints:
+  # --- Companies ---
+  - route: /user/companies
+    method: GET
+    handler: scripts/entities.star#on_entities_list
+  - route: /c/{company_id}/company/info
+    method: GET
+    handler: scripts/entities.star#on_entity_info_get
+  - route: /c/{company_id}/company/info
+    method: PUT
+    handler: scripts/entities.star#on_entity_info_put
+
+  # --- Received documents (supplier side — the spend side) ---
+  - route: /c/{company_id}/received_documents
+    method: GET
+    handler: scripts/documents.star#on_received_documents_list
+  - route: /c/{company_id}/received_documents
+    method: POST
+    handler: scripts/documents.star#on_received_documents_create
+  - route: /c/{company_id}/received_documents/info
+    method: GET
+    handler: scripts/documents.star#on_received_documents_info
+  - route: /c/{company_id}/received_documents/{id}
+    method: GET
+    handler: scripts/documents.star#on_received_document_get
+  - route: /c/{company_id}/received_documents/{id}
+    method: PUT
+    handler: scripts/documents.star#on_received_document_modify
+    concurrency_key: id
+  - route: /c/{company_id}/received_documents/{id}
+    method: DELETE
+    handler: scripts/documents.star#on_received_document_delete
+    concurrency_key: id
+
+  # --- Issued documents (sales side, same shape) ---
+  - route: /c/{company_id}/issued_documents
+    method: GET
+    handler: scripts/documents.star#on_issued_documents_list
+  - route: /c/{company_id}/issued_documents
+    method: POST
+    handler: scripts/documents.star#on_issued_documents_create
+  - route: /c/{company_id}/issued_documents/info
+    method: GET
+    handler: scripts/documents.star#on_issued_documents_info
+  - route: /c/{company_id}/issued_documents/{id}
+    method: GET
+    handler: scripts/documents.star#on_issued_document_get
+  - route: /c/{company_id}/issued_documents/{id}
+    method: PUT
+    handler: scripts/documents.star#on_issued_document_modify
+    concurrency_key: id
+  - route: /c/{company_id}/issued_documents/{id}
+    method: DELETE
+    handler: scripts/documents.star#on_issued_document_delete
+    concurrency_key: id
+
+  # --- Suppliers ---
+  - route: /c/{company_id}/suppliers
+    method: GET
+    handler: scripts/contacts.star#on_suppliers_list
+  - route: /c/{company_id}/suppliers
+    method: POST
+    handler: scripts/contacts.star#on_suppliers_create
+  - route: /c/{company_id}/suppliers/{id}
+    method: GET
+    handler: scripts/contacts.star#on_supplier_get
+  - route: /c/{company_id}/suppliers/{id}
+    method: PUT
+    handler: scripts/contacts.star#on_supplier_modify
+    concurrency_key: id
+  - route: /c/{company_id}/suppliers/{id}
+    method: DELETE
+    handler: scripts/contacts.star#on_supplier_delete
+    concurrency_key: id
+
+  # --- Clients ---
+  - route: /c/{company_id}/clients
+    method: GET
+    handler: scripts/contacts.star#on_clients_list
+  - route: /c/{company_id}/clients
+    method: POST
+    handler: scripts/contacts.star#on_clients_create
+  - route: /c/{company_id}/clients/{id}
+    method: GET
+    handler: scripts/contacts.star#on_client_get
+  - route: /c/{company_id}/clients/{id}
+    method: PUT
+    handler: scripts/contacts.star#on_client_modify
+    concurrency_key: id
+  - route: /c/{company_id}/clients/{id}
+    method: DELETE
+    handler: scripts/contacts.star#on_client_delete
+    concurrency_key: id
+
+  # --- Products ---
+  - route: /c/{company_id}/products
+    method: GET
+    handler: scripts/products.star#on_products_list
+  - route: /c/{company_id}/products
+    method: POST
+    handler: scripts/products.star#on_products_create
+  - route: /c/{company_id}/products/{id}
+    method: GET
+    handler: scripts/products.star#on_product_get
+  - route: /c/{company_id}/products/{id}
+    method: PUT
+    handler: scripts/products.star#on_product_modify
+    concurrency_key: id
+  - route: /c/{company_id}/products/{id}
+    method: DELETE
+    handler: scripts/products.star#on_product_delete
+    concurrency_key: id
+
+  # --- Taxes (F24 documents) / cashbook / archive ---
+  - route: /c/{company_id}/taxes
+    method: GET
+    handler: scripts/misc.star#on_taxes_list
+  - route: /c/{company_id}/taxes
+    method: POST
+    handler: scripts/misc.star#on_taxes_create
+  - route: /c/{company_id}/taxes/{id}
+    method: GET
+    handler: scripts/misc.star#on_tax_get
+  - route: /c/{company_id}/taxes/{id}
+    method: PUT
+    handler: scripts/misc.star#on_tax_modify
+    concurrency_key: id
+  - route: /c/{company_id}/taxes/{id}
+    method: DELETE
+    handler: scripts/misc.star#on_tax_delete
+    concurrency_key: id
+  - route: /c/{company_id}/cashbook/{year}/{month}
+    method: GET
+    handler: scripts/misc.star#on_cashbook_month
+  - route: /c/{company_id}/archive
+    method: POST
+    handler: scripts/misc.star#on_archive_upload
+
+  # --- Webhook subscriptions (company level) ---
+  - route: /c/{company_id}/subscriptions
+    method: GET
+    handler: scripts/webhooks.star#on_webhooks_list
+  - route: /c/{company_id}/subscriptions
+    method: POST
+    handler: scripts/webhooks.star#on_webhooks_create
+  - route: /c/{company_id}/subscriptions/{id}
+    method: GET
+    handler: scripts/webhooks.star#on_webhook_get
+  - route: /c/{company_id}/subscriptions/{id}
+    method: PUT
+    handler: scripts/webhooks.star#on_webhook_modify
+    concurrency_key: id
+  - route: /c/{company_id}/subscriptions/{id}
+    method: DELETE
+    handler: scripts/webhooks.star#on_webhook_delete
+    concurrency_key: id
+
+resources:
+  - name: companies
+    kind: collection
+  - name: received_documents
+    kind: collection
+  - name: issued_documents
+    kind: collection
+  - name: suppliers
+    kind: collection
+  - name: clients
+    kind: collection
+  - name: products
+    kind: collection
+  - name: cashbook
+    kind: collection
+  - name: taxes
+    kind: collection
+  - name: archive
+    kind: collection
+  - name: webhooks
+    kind: collection

@@ -1,0 +1,62 @@
+# stunt adapter — Escrow.com-style API simulator (unofficial)
+# Docs: https://stuntapi.com/stunt
+#
+# Mimics the *structure* of an Escrow.com-style transaction API (public
+# 2017-09-01 surface) for LOCAL TESTING ONLY. It does not call the real API.
+# All data is synthetic. See DISCLAIMER.
+id: escrow-style
+name: "Escrow.com-style transaction API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Escrow.com API"
+  version: "2017-09-01"
+
+endpoints:
+  - route: /2017-09-01/customer/me
+    method: GET
+    handler: scripts/transactions.star#on_customer_me
+  - route: /2017-09-01/transaction
+    method: GET
+    handler: scripts/transactions.star#on_transaction_list
+  - route: /2017-09-01/transaction
+    method: POST
+    handler: scripts/transactions.star#on_transaction_create
+  # Literal routes before {param} ones.
+  - route: /2017-09-01/transaction/reference/{reference}
+    method: GET
+    handler: scripts/transactions.star#on_transaction_by_reference
+  - route: /2017-09-01/transaction/{id}
+    method: GET
+    handler: scripts/transactions.star#on_transaction_get
+  - route: /2017-09-01/transaction/{id}
+    method: PATCH
+    handler: scripts/transactions.star#on_transaction_action
+    concurrency_key: id
+  - route: /2017-09-01/customer/me/webhook
+    method: POST
+    handler: scripts/webhooks.star#on_webhook_create
+  - route: /2017-09-01/customer/me/webhook
+    method: GET
+    handler: scripts/webhooks.star#on_webhook_list
+  # Simulator affordance (NOT a real endpoint): stands in for the buyer wiring
+  # funds on the provider's hosted payment page, which no API can drive.
+  - route: /sim/transaction/{id}/fund
+    method: POST
+    handler: scripts/transactions.star#on_sim_fund
+    concurrency_key: id
+
+resources:
+  - name: transactions
+    kind: collection
+  - name: webhooks
+    kind: collection
+
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          errors: ["Not Found"]
