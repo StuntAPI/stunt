@@ -14,12 +14,22 @@ api:
 
 # Endpoints — each maps a route + method to a Starlark handler.
 endpoints:
-  # --- Tokens (test helper) ---
-  # Mints a real identity token for authenticated requests in tests/dev.
-  # Does NOT require auth — it is how callers obtain a valid bearer token.
+  # --- Tokens ---
+  # With a card body: creates a Stripe-style card token (tok_*) whose stored
+  # number drives the decline/SCA test-card behavior (auth required).
+  # Without: mints a real identity token for authenticated requests in
+  # tests/dev. Does NOT require auth — it is how callers obtain a bearer token.
   - route: /v1/tokens
     method: POST
     handler: scripts/tokens.star#on_mint_token
+
+  # --- Events (recorded copies of emitted webhooks) ---
+  - route: /v1/events
+    method: GET
+    handler: scripts/events.star#on_list_events
+  - route: /v1/events/{id}
+    method: GET
+    handler: scripts/events.star#on_retrieve_event
 
   # --- Charges ---
   - route: /v1/charges
@@ -34,9 +44,11 @@ endpoints:
   - route: /v1/charges/{id}/capture
     method: POST
     handler: scripts/charges.star#on_capture_charge
+    concurrency_key: id
   - route: /v1/charges/{id}/refund
     method: POST
     handler: scripts/charges.star#on_refund_charge
+    concurrency_key: id
 
   # --- PaymentIntents (canonical payment object, SCA/3DS-ready) ---
   - route: /v1/payment_intents
@@ -45,9 +57,11 @@ endpoints:
   - route: /v1/payment_intents/{id}/confirm
     method: POST
     handler: scripts/payment_intents.star#on_confirm_payment_intent
+    concurrency_key: id
   - route: /v1/payment_intents/{id}/capture
     method: POST
     handler: scripts/payment_intents.star#on_capture_payment_intent
+    concurrency_key: id
   - route: /v1/payment_intents/{id}
     method: GET
     handler: scripts/payment_intents.star#on_retrieve_payment_intent
@@ -166,6 +180,10 @@ resources:
   - name: payment_methods
     kind: collection
   - name: refunds
+    kind: collection
+  - name: tokens
+    kind: collection
+  - name: events
     kind: collection
 
 # Auth scheme: bearer token validated via identity_validate.

@@ -301,6 +301,24 @@ func ascPostJSON(t *testing.T, rawurl, jwt string, body map[string]any) (string,
 	return string(b), resp.StatusCode
 }
 
+func ascPatchJSON(t *testing.T, rawurl, jwt string, body map[string]any) (string, int) {
+	t.Helper()
+	data, _ := json.Marshal(body)
+	req, err := http.NewRequest("PATCH", rawurl, bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+jwt)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return string(b), resp.StatusCode
+}
+
 // TestAppStoreConnectStyleBuildLifecycle proves the derive-on-read build
 // processing state machine: a fresh app's build is PROCESSING immediately
 // and settles VALID after the 3s window (INVALID with the simulator-only
@@ -407,5 +425,334 @@ func TestAppStoreConnectStyleBuildLifecycle(t *testing.T) {
 	json.Unmarshal([]byte(body), &single)
 	if single["data"].(map[string]any)["attributes"].(map[string]any)["processingState"] != "INVALID" {
 		t.Fatalf("single build state = %v, want INVALID", single["data"])
+	}
+}
+
+// TestAppStoreConnectStyleVersionLifecycle proves the appStoreVersions
+// surface: create (PREPARE_FOR_SUBMISSION), PATCH, submission via the real
+// action (POST /v1/appStoreVersionSubmissions), the derive-on-read review
+// state machine (WAITING_FOR_REVIEW -> IN_REVIEW -> READY_FOR_SALE /
+// REJECTED), builds listed per version, PATCH /v1/apps/{id}, and the
+// duplicate-bundleId 409.
+func TestAppStoreConnectStyleVersionLifecycle(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "apple-appstoreconnect-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"appstoreconnect": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["appstoreconnect"]
+	jwt := mintES256JWT(t)
+
+	// Seed the default app, then create a fresh app whose build is not yet
+	// attached to any version (the version create attaches it).
+	body, status := ascGet(t, base+"/v1/apps", jwt)
+	if status != 200 {
+		t.Fatalf("GET apps -> %d", status)
+	}
+	body, status = ascPostJSON(t, base+"/v1/apps", jwt, map[string]any{
+		"data": map[string]any{
+			"attributes": map[string]any{
+				"name":     "Lifecycle App",
+				"bundleId": "com.example.lifecycle",
+			},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST lifecycle app -> %d; body %s", status, body)
+	}
+	var appsResp map[string]any
+	json.Unmarshal([]byte(body), &appsResp)
+	appID, _ := appsResp["data"].(map[string]any)["id"].(string)
+	if appID == "" {
+		t.Fatalf("lifecycle app id = %v", appsResp["data"])
+	}
+
+	// ===== Create a version (missing versionString -> 409) =====
+	body, status = ascPostJSON(t, base+"/v1/apps/"+appID+"/appStoreVersions", jwt, map[string]any{
+		"data": map[string]any{
+			"type": "appStoreVersions",
+			"attributes": map[string]any{
+				"platform": "IOS",
+			},
+		},
+	})
+	if status != 409 {
+		t.Fatalf("POST appStoreVersions without versionString -> %d; body %s", status, body)
+	}
+
+	// ===== Create a version -> 201 PREPARE_FOR_SUBMISSION =====
+	body, status = ascPostJSON(t, base+"/v1/apps/"+appID+"/appStoreVersions", jwt, map[string]any{
+		"data": map[string]any{
+			"type": "appStoreVersions",
+			"attributes": map[string]any{
+				"versionString": "2.0.0",
+				"releaseType":   "MANUAL",
+			},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST appStoreVersions -> %d; body %s", status, body)
+	}
+	var createdVersion map[string]any
+	json.Unmarshal([]byte(body), &createdVersion)
+	versionData := createdVersion["data"].(map[string]any)
+	versionID, _ := versionData["id"].(string)
+	if versionID == "" {
+		t.Fatalf("created version id = %v", versionData["id"])
+	}
+	versionAttrs := versionData["attributes"].(map[string]any)
+	if versionAttrs["appStoreState"] != "PREPARE_FOR_SUBMISSION" {
+		t.Fatalf("new version state = %v, want PREPARE_FOR_SUBMISSION", versionAttrs["appStoreState"])
+	}
+	if versionAttrs["versionString"] != "2.0.0" {
+		t.Fatalf("new version versionString = %v, want 2.0.0", versionAttrs["versionString"])
+	}
+
+	// ===== Duplicate versionString for the same app -> 409 =====
+	body, status = ascPostJSON(t, base+"/v1/apps/"+appID+"/appStoreVersions", jwt, map[string]any{
+		"data": map[string]any{
+			"attributes": map[string]any{"versionString": "2.0.0"},
+		},
+	})
+	if status != 409 {
+		t.Fatalf("POST duplicate appStoreVersion -> %d, want 409; body %s", status, body)
+	}
+
+	// ===== A version whose review will be rejected. =====
+	body, status = ascPostJSON(t, base+"/v1/apps/"+appID+"/appStoreVersions", jwt, map[string]any{
+		"data": map[string]any{
+			"attributes": map[string]any{
+				"versionString": "3.0.0",
+				"simulate_fail": true,
+			},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST fail version -> %d; body %s", status, body)
+	}
+	var failVersion map[string]any
+	json.Unmarshal([]byte(body), &failVersion)
+	failVersionID, _ := failVersion["data"].(map[string]any)["id"].(string)
+
+	// ===== PATCH the editable version (versionString change) =====
+	body, status = ascPatchJSON(t, base+"/v1/appStoreVersions/"+versionID, jwt, map[string]any{
+		"data": map[string]any{
+			"attributes": map[string]any{
+				"versionString": "2.0.1",
+				"usesIdfa":      true,
+			},
+		},
+	})
+	if status != 200 {
+		t.Fatalf("PATCH appStoreVersion -> %d; body %s", status, body)
+	}
+	var patched map[string]any
+	json.Unmarshal([]byte(body), &patched)
+	patchedAttrs := patched["data"].(map[string]any)["attributes"].(map[string]any)
+	if patchedAttrs["versionString"] != "2.0.1" {
+		t.Fatalf("patched versionString = %v, want 2.0.1", patchedAttrs["versionString"])
+	}
+
+	// ===== GET /v1/appStoreVersions/{id} agrees =====
+	body, status = ascGet(t, base+"/v1/appStoreVersions/"+versionID, jwt)
+	if status != 200 {
+		t.Fatalf("GET appStoreVersion -> %d; body %s", status, body)
+	}
+
+	// ===== Builds listed per version: the seeded app's build attached at
+	// version create (first version grabs the unattached build). =====
+	body, status = ascGet(t, base+"/v1/appStoreVersions/"+versionID+"/builds", jwt)
+	if status != 200 {
+		t.Fatalf("GET version builds -> %d; body %s", status, body)
+	}
+	var buildsResp map[string]any
+	json.Unmarshal([]byte(body), &buildsResp)
+	buildsList, ok := buildsResp["data"].([]any)
+	if !ok || len(buildsList) != 1 {
+		t.Fatalf("version builds = %v, want 1 build", buildsResp["data"])
+	}
+
+	// ===== Submit for review (the real action) =====
+	body, status = ascPostJSON(t, base+"/v1/appStoreVersionSubmissions", jwt, map[string]any{
+		"data": map[string]any{
+			"type": "appStoreVersionSubmissions",
+			"relationships": map[string]any{
+				"appStoreVersion": map[string]any{
+					"data": map[string]any{"type": "appStoreVersions", "id": versionID},
+				},
+			},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST appStoreVersionSubmissions -> %d; body %s", status, body)
+	}
+
+	// Immediately: WAITING_FOR_REVIEW.
+	versionState := func(vid string) string {
+		b, st := ascGet(t, base+"/v1/appStoreVersions/"+vid, jwt)
+		if st != 200 {
+			t.Fatalf("GET appStoreVersion %s -> %d; body %s", vid, st, b)
+		}
+		var vr map[string]any
+		json.Unmarshal([]byte(b), &vr)
+		return vr["data"].(map[string]any)["attributes"].(map[string]any)["appStoreState"].(string)
+	}
+	if s := versionState(versionID); s != "WAITING_FOR_REVIEW" {
+		t.Fatalf("submitted version state = %q, want WAITING_FOR_REVIEW", s)
+	}
+
+	// ===== Resubmitting an in-review version -> 409 =====
+	body, status = ascPostJSON(t, base+"/v1/appStoreVersionSubmissions", jwt, map[string]any{
+		"data": map[string]any{
+			"relationships": map[string]any{
+				"appStoreVersion": map[string]any{
+					"data": map[string]any{"type": "appStoreVersions", "id": versionID},
+				},
+			},
+		},
+	})
+	if status != 409 {
+		t.Fatalf("resubmit -> %d, want 409; body %s", status, body)
+	}
+
+	// ===== PATCH while in review -> 409 =====
+	body, status = ascPatchJSON(t, base+"/v1/appStoreVersions/"+versionID, jwt, map[string]any{
+		"data": map[string]any{
+			"attributes": map[string]any{"versionString": "2.0.2"},
+		},
+	})
+	if status != 409 {
+		t.Fatalf("PATCH in-review version -> %d, want 409; body %s", status, body)
+	}
+
+	// Submit the fail version too.
+	body, status = ascPostJSON(t, base+"/v1/appStoreVersionSubmissions", jwt, map[string]any{
+		"data": map[string]any{
+			"relationships": map[string]any{
+				"appStoreVersion": map[string]any{
+					"data": map[string]any{"type": "appStoreVersions", "id": failVersionID},
+				},
+			},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST fail submission -> %d; body %s", status, body)
+	}
+
+	// Past the 3s decision window: READY_FOR_SALE / REJECTED.
+	time.Sleep(3500 * time.Millisecond)
+	if s := versionState(versionID); s != "READY_FOR_SALE" {
+		t.Fatalf("version after window = %q, want READY_FOR_SALE", s)
+	}
+	if s := versionState(failVersionID); s != "REJECTED" {
+		t.Fatalf("fail version after window = %q, want REJECTED", s)
+	}
+
+	// The app's version list reflects both the seeded release and the
+	// lifecycle above, and the filter param agrees.
+	body, status = ascGet(t, base+"/v1/apps/"+appID+"/appStoreVersions?filter[appStoreState]=READY_FOR_SALE", jwt)
+	if status != 200 {
+		t.Fatalf("GET app versions filtered -> %d", status)
+	}
+	var versionsResp map[string]any
+	json.Unmarshal([]byte(body), &versionsResp)
+	filtered, ok := versionsResp["data"].([]any)
+	if !ok || len(filtered) != 1 {
+		t.Fatalf("READY_FOR_SALE versions = %v, want exactly 1 (3.0.0 is REJECTED)", versionsResp["data"])
+	}
+
+	// ===== Unknown version -> 404 =====
+	body, status = ascGet(t, base+"/v1/appStoreVersions/nonexistent", jwt)
+	if status != 404 {
+		t.Fatalf("GET unknown version -> %d, want 404; body %s", status, body)
+	}
+
+	// ===== PATCH /v1/apps/{id} renames the app and persists =====
+	body, status = ascPatchJSON(t, base+"/v1/apps/"+appID, jwt, map[string]any{
+		"data": map[string]any{
+			"attributes": map[string]any{
+				"name": "Renamed Mock App",
+				"sku":  "MOCK_SKU_002",
+			},
+		},
+	})
+	if status != 200 {
+		t.Fatalf("PATCH app -> %d; body %s", status, body)
+	}
+	var patchedApp map[string]any
+	json.Unmarshal([]byte(body), &patchedApp)
+	patchedAppAttrs := patchedApp["data"].(map[string]any)["attributes"].(map[string]any)
+	if patchedAppAttrs["name"] != "Renamed Mock App" {
+		t.Fatalf("patched app name = %v, want Renamed Mock App", patchedAppAttrs["name"])
+	}
+	body, status = ascGet(t, base+"/v1/apps/"+appID, jwt)
+	if status != 200 {
+		t.Fatalf("GET patched app -> %d", status)
+	}
+	json.Unmarshal([]byte(body), &patchedApp)
+	if patchedApp["data"].(map[string]any)["attributes"].(map[string]any)["name"] != "Renamed Mock App" {
+		t.Fatalf("patched app name not persisted: %v", patchedApp["data"])
+	}
+
+	// ===== Duplicate bundleId on create -> 409 =====
+	body, status = ascPostJSON(t, base+"/v1/apps", jwt, map[string]any{
+		"data": map[string]any{
+			"attributes": map[string]any{
+				"name":     "Clash App",
+				"bundleId": "com.example.mockapp",
+			},
+		},
+	})
+	if status != 409 {
+		t.Fatalf("POST duplicate bundleId -> %d, want 409; body %s", status, body)
+	}
+	var dupResp map[string]any
+	json.Unmarshal([]byte(body), &dupResp)
+	dupErrs := dupResp["errors"].([]any)
+	if dupErrs[0].(map[string]any)["code"] != "ENTITY_ERROR.ATTRIBUTE.INVALID" {
+		t.Fatalf("duplicate bundleId error code = %v", dupErrs[0])
+	}
+
+	// ===== Users come from the store and stay stable across calls =====
+	body, status = ascGet(t, base+"/v1/users", jwt)
+	if status != 200 {
+		t.Fatalf("GET users -> %d; body %s", status, body)
+	}
+	var usersResp map[string]any
+	json.Unmarshal([]byte(body), &usersResp)
+	users := usersResp["data"].([]any)
+	if len(users) < 2 {
+		t.Fatalf("users = %d, want >= 2", len(users))
+	}
+	body, status = ascGet(t, base+"/v1/users?filter[roles]=ADMIN", jwt)
+	if status != 200 {
+		t.Fatalf("GET users filtered by role -> %d; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &usersResp)
+	admins := usersResp["data"].([]any)
+	if len(admins) != 1 {
+		t.Fatalf("ADMIN users = %d, want 1", len(admins))
+	}
+	if admins[0].(map[string]any)["attributes"].(map[string]any)["username"] != "admin@example.com" {
+		t.Fatalf("filtered admin username = %v", admins[0])
 	}
 }

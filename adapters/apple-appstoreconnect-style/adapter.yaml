@@ -23,6 +23,9 @@ endpoints:
   - route: /v1/apps
     method: POST
     handler: scripts/apps.star#on_create_app
+  - route: /v1/appStoreVersionSubmissions
+    method: POST
+    handler: scripts/versions.star#on_create_version_submission
   - route: /v1/users
     method: GET
     handler: scripts/misc.star#on_list_users
@@ -34,9 +37,16 @@ endpoints:
   - route: /v1/apps/{id}
     method: GET
     handler: scripts/apps.star#on_get_app
+  - route: /v1/apps/{id}
+    method: PATCH
+    handler: scripts/apps.star#on_update_app
+    concurrency_key: id
   - route: /v1/apps/{id}/appStoreVersions
     method: GET
-    handler: scripts/apps.star#on_list_app_versions
+    handler: scripts/versions.star#on_list_app_versions
+  - route: /v1/apps/{id}/appStoreVersions
+    method: POST
+    handler: scripts/versions.star#on_create_version
   - route: /v1/apps/{id}/builds
     method: GET
     handler: scripts/apps.star#on_list_builds
@@ -46,12 +56,30 @@ endpoints:
   - route: /v1/builds/{id}
     method: GET
     handler: scripts/apps.star#on_get_build
+    concurrency_key: id # derive-on-read transition persists a state change
+  - route: /v1/appStoreVersions/{id}
+    method: GET
+    handler: scripts/versions.star#on_get_version
+    concurrency_key: id # derive-on-read transition persists a state change
+  - route: /v1/appStoreVersions/{id}
+    method: PATCH
+    handler: scripts/versions.star#on_update_version
+    concurrency_key: id
+  - route: /v1/appStoreVersions/{id}/builds
+    method: GET
+    handler: scripts/versions.star#on_list_version_builds
 
 # Backing stores — collections for stateful data.
 resources:
   - name: apps
     kind: collection
   - name: builds
+    kind: collection
+  - name: versions
+    kind: collection
+  - name: versionSubmissions
+    kind: collection
+  - name: users
     kind: collection
 
 # Auth scheme metadata.

@@ -15,10 +15,14 @@ that Google Photos, Google Drive, and YouTube all authenticate through:
 
 - **Authorize redirect:** `GET /o/oauth2/auth` → 302 with `code` + `state`.
 - **Token exchange:** `POST /o/oauth2/token` (`authorization_code` grant) →
-  `{access_token, token_type:"Bearer", expires_in, refresh_token, scope}`.
+  `{access_token, token_type:"Bearer", expires_in, refresh_token, scope}`, plus
+  a **real RS256 `id_token`** when the granted scope includes `openid`
+  (Google's OIDC behavior).
 - **Refresh:** `grant_type=refresh_token` → new access token (Google refresh
   tokens are NOT rotated — the same one persists).
 - **Userinfo:** `GET /oauth2/v3/userinfo` (Bearer) → `{sub, name, email, picture}`.
+- **JWKS:** `GET /oauth2/v3/certs` → the id_token signing key (Google's real
+  discovery path).
 
 State persists in SQLite-backed collections, so tokens issued in one request are
 valid in subsequent requests within the same `stunt up` session.
@@ -29,7 +33,20 @@ valid in subsequent requests within the same `stunt up` session.
 |--------|-------|---------|-------------|
 | GET | `/o/oauth2/auth` | `oauth.star#on_authorize` | 302 redirect with code + state |
 | POST | `/o/oauth2/token` | `oauth.star#on_token` | Token exchange (auth code + refresh) |
+| GET | `/oauth2/v3/certs` | `oauth.star#on_certs` | JWKS for id_token verification |
 | GET | `/oauth2/v3/userinfo` | `userinfo.star#on_userinfo` | User info (Bearer) |
+
+## OpenID Connect id_tokens
+
+When the granted scope contains `openid`, the token endpoint also returns an
+`id_token`: a **real RS256-signed JWT** (fixed synthetic RSA-2048 keypair, kid
+`mock-google-key-1`) with Google's claim set — `iss:
+"https://accounts.google.com"`, `azp`/`aud` (the client_id), `sub`, `email`,
+`email_verified`, `name`, `picture`, `iat`, `exp` (~1h). The public half of the
+keypair is served at `GET /oauth2/v3/certs` (via `crypto.rsa_public_jwk`), so
+any standards-compliant OIDC library can verify the id_token end-to-end. The
+keypair lives in `scripts/lib.star` and is throwaway mock material that exists
+nowhere but this repository.
 
 Any unmatched route returns `404`.
 

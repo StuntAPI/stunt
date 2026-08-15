@@ -14,9 +14,13 @@ All data is synthetic — no real API data is included.
 
 A broader-than-minimal MVP of a Stripe-style payments API: **PaymentIntents**
 (create/retrieve/list, confirm, capture — the canonical SCA/3DS-ready flow
-with `requires_payment_method → succeeded`/`requires_capture` states),
-**PaymentMethods** (create/retrieve/attach/detach/list), **Refunds**
-(create/retrieve/list, full or partial), charges (create/retrieve/list/capture/
+with `requires_payment_method → succeeded`/`requires_capture` states, plus
+real decline and SCA/3DS test-card behavior), **PaymentMethods**
+(create/retrieve/attach/detach/list), card **tokens** (`POST /v1/tokens`),
+**Refunds** (create/retrieve/list, full or partial, with their own
+pending → succeeded/failed async lifecycle and an over-refund guard),
+**Events** (`GET /v1/events` — the recorded copies of emitted webhooks),
+charges (create/retrieve/list/capture/
 refund), customers (CRUD), and account balance — plus **Stripe Connect**:
 connected accounts (create/retrieve/update/list), account links (onboarding
 URLs), transfers (create/retrieve/list/reverse), and payouts (create/list).
@@ -115,6 +119,99 @@ All list endpoints use Stripe-style cursor pagination:
   returns `400` with `param: "starting_after"` — mirroring Stripe's
   `resource_missing` error instead of silently restarting from the beginning.
 
+## Decline & SCA test cards
+
+Like real Stripe test mode, specific card numbers deterministically trigger
+card outcomes. Create a card token with `POST /v1/tokens` (auth required;
+the full number is stored privately and never returned — only brand/last4):
+
+```bash
+curl -X POST http://localhost:PORT/v1/tokens \
+  -H "Authorization: Bearer sk_test_local" \
+  -d '{"card":{"number":"4000000000009995","exp_month":12,"exp_year":2030,"cvc":"123"}}'
+# → {"id":"tok_1","object":"token","type":"card","card":{"brand":"visa","last4":"9995",...},...}
+```
+
+Use the token at PaymentIntent confirm (`payment_method: "tok_..."`) or charge
+create (`source: "tok_..."`). A PaymentMethod created with an explicit
+`card[number]` behaves the same way.
+
+### Declines
+
+Confirming a PaymentIntent (or creating a charge) with these cards fails with
+`402` and the real `card_error` shape — `error.code` plus the real
+`decline_code`. The PI stays `requires_payment_method` and records
+`last_payment_error`; a `payment_intent.payment_failed` webhook fires. On the
+Charges API the failed charge object is still recorded (status `failed`) and
+`charge.failed` fires.
+
+| Card number | `error.code` | `decline_code` |
+|-------------|--------------|----------------|
+| `4000 0000 0000 0002` | `card_declined` | `generic_decline` |
+| `4000 0000 0000 9995` | `card_declined` | `insufficient_funds` |
+| `4000 0000 0000 9987` | `card_declined` | `lost_card` |
+| `4000 0000 0000 9988` | `card_declined` | `stolen_card` |
+| `4000 0000 0000 0069` | `expired_card` | `expired_card` |
+| `4000 0000 0000 0127` | `incorrect_cvc` | `incorrect_cvc` |
+
+### SCA / 3DS
+
+These cards force an authentication step on PaymentIntent confirm: the PI
+returns `200` with `status: "requires_action"` and a `next_action` object
+(the `payment_intent.requires_action` webhook fires):
+
+| Card number | `next_action.type` |
+|-------------|--------------------|
+| `4000 0027 6000 3184` | `use_stripe_sdk` (in-app `stripe_js` URL) |
+| `4000 0025 0000 3155` | `redirect_to_url` (hosted `url` + your `return_url`) |
+| `4000 0000 0000 3220` | `redirect_to_url` |
+
+Confirm the same PaymentIntent again to complete authentication — it lands on
+`succeeded` (automatic capture) or `requires_capture` (manual). The legacy
+Charges API cannot run 3DS, so SCA cards on `POST /v1/charges` decline with
+`decline_code: "authentication_required"`.
+
+## Refunds
+
+Refunds have their own async lifecycle: `POST /v1/refunds` (or
+`POST /v1/charges/{id}/refund`, which additionally returns the updated
+charge) creates a refund with `status: "pending"`. Every read (retrieve or
+list) derives the terminal state from the clock — `succeeded` after 3 seconds,
+or `failed` when created with the simulator-only `simulate_fail: true` flag —
+persists the transition, and fires `refund.updated` exactly once.
+
+- **Amount** — omitted `amount` refunds the full remaining unrefunded balance;
+  an explicit `amount` refunds partially (the charge keeps `status:
+  "succeeded"`, `refunded: false`, and gains `amount_refunded` until the
+  balance hits the original amount).
+- **Over-refund guard** — the unrefunded balance is computed across *all*
+  non-failed refunds (pending included) of the payment intent / charge.
+  Refunding more than the remainder returns Stripe's real `400`:
+  `Refund amount ($X) is greater than unrefunded amount on charge ($Y)`
+  (or `charge_already_refunded` when nothing remains).
+
+## Events
+
+Every emitted webhook is also recorded as a Stripe event object, readable via
+the real API surface:
+
+- `GET /v1/events` — cursor-paginated list (newest first, `limit` /
+  `starting_after`, filters `type=` and `created` / `created[gt|gte|lt|lte]`).
+- `GET /v1/events/{id}` — single event (`404` for unknown ids).
+
+```json
+{
+  "id": "evt_1", "object": "event", "type": "charge.created",
+  "api_version": "2025-01-27.acacia", "created": 1739577600,
+  "data": {"object": {"id": "ch_1", "amount": 5000, "...": "..."}},
+  "livemode": false, "pending_webhooks": 0,
+  "request": {"id": null, "idempotency_key": null}
+}
+```
+
+The event list always agrees with webhook delivery: both are fed from the same
+emission points.
+
 ## Webhooks
 
 The adapter emits webhook events on lifecycle transitions. Events are
@@ -123,13 +220,14 @@ the operation still succeeds.
 
 | Trigger | Event type |
 |---------|-----------|
-| `POST /v1/charges` (create) | `charge.created` |
+| `POST /v1/charges` (create) | `charge.created` (or `charge.failed` for decline test cards) |
 | `POST /v1/charges/{id}/capture` | `charge.updated` |
-| `POST /v1/charges/{id}/refund` | `charge.refunded` |
-| `POST /v1/payment_intents` (create) | `payment_intent.created` (+ `.succeeded`/`.requires_capture` if confirmed) |
-| `POST /v1/payment_intents/{id}/confirm` | `payment_intent.succeeded` / `.requires_capture` |
+| `POST /v1/charges/{id}/refund` | `charge.refunded` (+ `refund.created`) |
+| `POST /v1/payment_intents` (create) | `payment_intent.created` (+ `.succeeded`/`.requires_capture` if confirmed, `.payment_failed` on decline) |
+| `POST /v1/payment_intents/{id}/confirm` | `payment_intent.succeeded` / `.requires_capture` / `.requires_action` / `.payment_failed` |
 | `POST /v1/payment_intents/{id}/capture` | `payment_intent.succeeded` |
-| `POST /v1/refunds` | `refund.created`, `charge.refunded` |
+| `POST /v1/refunds` | `refund.created`, `charge.refunded` (charge refunds) |
+| refund terminal transition (on first read after ~3s) | `refund.updated` |
 | `POST /v1/accounts` (create) | `account.updated` |
 | `POST /v1/accounts/{id}` (update) | `account.updated` |
 | `POST /v1/transfers` (create) | `transfer.created` |

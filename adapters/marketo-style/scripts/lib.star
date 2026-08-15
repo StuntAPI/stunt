@@ -46,14 +46,32 @@ def _require_auth(req):
         return False, _marketo_auth_err("Access token expired")
     return True, None
 
-# _marketo_err returns a Marketo-style error response.
+# _marketo_err returns a Marketo-style error response (403).
 # Marketo uses {success:false, requestId, errors:[{code, message}]}.
 def _marketo_err(code, message):
-    return respond(403, {
+    return _marketo_err_status(403, code, message)
+
+# _marketo_err_status returns a Marketo-style error envelope with an explicit
+# HTTP status (400 for request errors, 403 for auth/quota, 404 not found).
+def _marketo_err_status(status, code, message):
+    return respond(status, {
         "success": False,
         "requestId": _request_id(),
         "errors": [{"code": str(code), "message": message}],
     })
+
+# Webhook signing secret for the derive-on-read completion notifications
+# (bulk export jobs). Simulator extension documented in the README.
+_WEBHOOK_SECRET = "marketo-style-webhook-secret"
+
+# _signed_emit MACs the exact on-wire body and delivers the webhook with an
+# X-Stunt-Signature header: "sha256=" + hex(HMAC-SHA256(secret, body)).
+# Receivers validate with the same secret (simulator extension; Marketo has
+# no first-party export webhook).
+def _signed_emit(event_type, payload):
+    body = events_body(event_type, payload)
+    sig = crypto.hmac_sha256(_WEBHOOK_SECRET, body)
+    events_emit(event_type, payload, {"X-Stunt-Signature": "sha256=" + sig})
 
 # _marketo_unauth returns a 401 error for missing tokens.
 def _marketo_unauth():

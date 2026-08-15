@@ -18,7 +18,7 @@ def _now():
 # POST /upload/drive/v3/files — create a file or folder.
 #
 # Accepts BOTH request shapes:
-#  - JSON body  {"name","content","mimeType"}                (convenience form)
+#  - JSON body  {"name","content","mimeType","parents"}       (convenience form)
 #  - a real simple media upload: raw bytes as the request body with
 #    ?uploadType=media&name=<filename> (Content-Type application/octet-stream).
 #    The raw bytes arrive in req["raw_body"]; the name comes from the query.
@@ -26,6 +26,9 @@ def _now():
 # For a folder: set body.mimeType to "application/vnd.google-apps.folder".
 # Folders have no blob content — only metadata.
 def on_upload(req):
+    auth = _require_auth(req)
+    if auth != None:
+        return auth
     body = req["body"]
     if body == None:
         body = {}
@@ -66,15 +69,21 @@ def on_upload(req):
         "modifiedTime": _now(),
         "trashed": False,
     }
+    if "parents" in body:
+        doc["parents"] = body["parents"]
 
     c = store_collection("files")
     c.insert(doc)
+    _record_change(file_id, doc, False)
     return respond(201, doc)
 
 # POST /drive/v3/files — create file/folder METADATA (no content upload).
 # Used for folder creation during parent resolution. JSON body
 # {"name","mimeType","parents"} -> 200 with the created resource (incl id).
 def on_create_metadata(req):
+    auth = _require_auth(req)
+    if auth != None:
+        return auth
     body = req["body"]
     if body == None:
         body = {}
@@ -93,11 +102,15 @@ def on_create_metadata(req):
     if "parents" in body:
         doc["parents"] = body["parents"]
     store_collection("files").insert(doc)
+    _record_change(file_id, doc, False)
     return respond(200, doc)
 
 # GET /drive/v3/files/{id} — retrieve file metadata, or download content
 # if ?alt=media is present.
 def on_get(req):
+    auth = _require_auth(req)
+    if auth != None:
+        return auth
     id = req["params"]["id"]
     c = store_collection("files")
     doc = c.get(id)
@@ -121,9 +134,14 @@ def on_get(req):
 # Honors the real Drive files.list params the mock can back: q, orderBy and
 # fields (see _apply_file_filters), plus pageSize/pageToken paging.
 def on_list(req):
+    auth = _require_auth(req)
+    if auth != None:
+        return auth
     c = store_collection("files")
     docs = c.list()
-    visible = _apply_file_filters(req, docs)
+    visible, qerr = _apply_file_filters(req, docs)
+    if qerr != "":
+        return _drive_err(400, "Invalid query filter: " + qerr, "INVALID_ARGUMENT")
     # Apply Drive-style paging (pageSize / pageToken) after filtering.
     page, next_token = _list_page(req, visible)
     result = {"files": page}
@@ -134,74 +152,262 @@ def on_list(req):
 # --- list helpers ---
 
 # _apply_file_filters maps the real Drive files.list params the mock stores
-# can honor onto query_select clauses, applied before paging like the real
-# API:
-#   q       -> clauses joined by " and ": "name = 'x'", "name != 'x'",
-#              "name contains 'x'", the mimeType equivalents, and
-#              "trashed = true|false". Other clause forms (parents, fullText,
-#              properties, ...) are ignored — no invented matching.
+# can honor onto query_select, applied before paging like the real API:
+#   q       -> the Drive q grammar subset (see _q_parse): clauses on name,
+#              mimeType, trashed, parents and modifiedTime/createdTime
+#              joined with "and"/"or". Unparseable q is a 400 (returned as
+#              the second result).
 #   orderBy -> comma-separated keys; the first recognized one wins
 #              (createdTime, modifiedTime, name, quotaBytesUsed -> size),
 #              each with an optional "desc"/"asc" suffix.
 #   fields  -> a "files(k1,k2,...)" selection projects each file object.
 # Trashed files are excluded by default (like real Drive); an explicit
 # trashed clause in q overrides that.
+# Returns (selected docs, "" ) or (None, error message).
 def _apply_file_filters(req, docs):
     q = _get_query(req).get("q", "")
     if q == None:
         q = ""
 
-    f = []
-    trashed_clause = False
-    if q != "":
-        for clause in q.split(" and "):
-            triple = _parse_q_clause(clause.strip())
-            if triple != None:
-                if triple[0] == "trashed":
-                    trashed_clause = True
-                f.append(triple)
-
-    flt = None
-    if len(f) > 0:
-        flt = f
-
-    base = []
-    for d in docs:
-        if trashed_clause:
-            base.append(d)
-        elif not d.get("trashed", False):
-            base.append(d)
+    if q.strip() == "":
+        base = []
+        for d in docs:
+            if not d.get("trashed", False):
+                base.append(d)
+    else:
+        clauses, ops, qerr = _q_parse(q)
+        if qerr != "":
+            return None, qerr
+        explicit_trashed = False
+        for cl in clauses:
+            if cl["field"] == "trashed":
+                explicit_trashed = True
+        base = []
+        for d in docs:
+            if explicit_trashed or not d.get("trashed", False):
+                base.append(d)
+        base = _q_select(base, clauses, ops)
 
     order_by, order_dir = _order_by(req)
-    return query_select(base, flt, order_by, order_dir, None, None, _fields_for(req))
+    return query_select(base, None, order_by, order_dir, None, None, _fields_for(req)), ""
 
-# _parse_q_clause translates one Drive q clause into a query_select triple,
-# or None when the clause is not one of the supported forms.
-def _parse_q_clause(clause):
-    if clause == "trashed = true":
-        return ["trashed", "=", True]
-    if clause == "trashed = false":
-        return ["trashed", "=", False]
-    if clause.startswith("name contains "):
-        return ["name", "contains", _strip_quotes(clause[len("name contains "):].strip())]
-    if clause.startswith("name = "):
-        return ["name", "=", _strip_quotes(clause[len("name = "):].strip())]
-    if clause.startswith("name != "):
-        return ["name", "!=", _strip_quotes(clause[len("name != "):].strip())]
-    if clause.startswith("mimeType contains "):
-        return ["mimeType", "contains", _strip_quotes(clause[len("mimeType contains "):].strip())]
-    if clause.startswith("mimeType = "):
-        return ["mimeType", "=", _strip_quotes(clause[len("mimeType = "):].strip())]
-    if clause.startswith("mimeType != "):
-        return ["mimeType", "!=", _strip_quotes(clause[len("mimeType != "):].strip())]
-    return None
+# --- Drive q grammar (subset) ---
+#
+# Grammar (case-sensitive keywords, like real Drive):
+#
+#   query  := clause ( ("and" | "or") clause )*
+#   clause := field op value
+#   field  := name | mimeType | trashed | parents | modifiedTime |
+#             createdTime | <dotted.property.path>
+#   op     := = | != | < | <= | > | >= | contains | in
+#   value  := 'single-quoted literal (\' and \\ escapes)' |
+#             true | false        (trashed only)
+#
+# "and"/"or" groups are evaluated with or-over-and precedence: clauses in
+# an and-run are AND'ed (via query_select filter triples); or-runs union.
+# The "parents in 'id'" clause checks membership in the file's parents
+# list (evaluated directly; query_select's "in" tests the reverse
+# direction). Unparseable or out-of-subset queries return an error string
+# which the handler maps to a 400.
 
-# _strip_quotes removes one matching pair of surrounding single or double
-# quotes from a q literal, if present.
-def _strip_quotes(s):
-    if len(s) >= 2 and (s[0] == "'" or s[0] == "\"") and s[len(s) - 1] == s[0]:
-        return s[1:len(s) - 1]
-    return s
+# _q_word_char reports whether ch can appear in a bare word (field names,
+# keywords, true/false).
+def _q_word_char(ch):
+    return (ch >= "a" and ch <= "z") or (ch >= "A" and ch <= "Z") or (ch >= "0" and ch <= "9") or ch == "." or ch == "_"
+
+# _q_tokenize lexes a q string into tokens: {"k":"lit","v":s} for quoted
+# literals, {"k":"word","v":w} for bare words, {"k":"op","v":o} for the
+# symbolic operators. Returns (tokens, "") or (None, error).
+def _q_tokenize(q):
+    toks = []
+    i = 0
+    n = len(q)
+    while i < n:
+        ch = q[i]
+        if ch == " " or ch == "\t":
+            i = i + 1
+        elif ch == "'" or ch == "\"":
+            quote = ch
+            i = i + 1
+            buf = ""
+            closed = False
+            while i < n:
+                c = q[i]
+                if c == "\\" and i + 1 < n and (q[i + 1] == "\\" or q[i + 1] == "'"):
+                    buf = buf + q[i + 1]
+                    i = i + 2
+                elif c == quote:
+                    closed = True
+                    i = i + 1
+                    break
+                else:
+                    buf = buf + c
+                    i = i + 1
+            if not closed:
+                return None, "unterminated string literal"
+            toks.append({"k": "lit", "v": buf})
+        elif ch == "=":
+            toks.append({"k": "op", "v": "="})
+            i = i + 1
+        elif ch == "!":
+            if i + 1 < n and q[i + 1] == "=":
+                toks.append({"k": "op", "v": "!="})
+                i = i + 2
+            else:
+                return None, "unexpected '!'"
+        elif ch == "<" or ch == ">":
+            if i + 1 < n and q[i + 1] == "=":
+                toks.append({"k": "op", "v": ch + "="})
+                i = i + 2
+            else:
+                toks.append({"k": "op", "v": ch})
+                i = i + 1
+        elif _q_word_char(ch):
+            buf = ""
+            while i < n and _q_word_char(q[i]):
+                buf = buf + q[i]
+                i = i + 1
+            toks.append({"k": "word", "v": buf})
+        else:
+            return None, "unexpected character '" + ch + "'"
+    return toks, ""
+
+# _q_field_ok reports whether field is one of the supported clause fields
+# (or a dotted custom-property path, resolved by query_select).
+def _q_field_ok(field):
+    if field == "name" or field == "mimeType" or field == "trashed" or field == "parents" or field == "modifiedTime" or field == "createdTime":
+        return True
+    return field.find(".") > 0
+
+# _q_op_ok validates the (field, op) combination against the grammar
+# subset. Returns "" or an error message.
+def _q_op_ok(field, op):
+    if field == "name" or field == "mimeType":
+        if op == "=" or op == "!=" or op == "contains":
+            return ""
+        return "operator " + op + " not supported for " + field
+    if field == "trashed":
+        if op == "=":
+            return ""
+        return "operator " + op + " not supported for trashed"
+    if field == "parents":
+        if op == "in":
+            return ""
+        return "operator " + op + " not supported for parents"
+    # modifiedTime / createdTime / dotted property paths: full comparisons.
+    if op == "=" or op == "!=" or op == "<" or op == "<=" or op == ">" or op == ">=":
+        return ""
+    return "operator " + op + " not supported for " + field
+
+# _q_parse parses a full q string into (clauses, ops, "") where clauses is
+# the ordered list of {"field","op","value"} dicts and ops the "and"/"or"
+# joiners between them (len(ops) == len(clauses)-1). Any deviation from
+# the grammar subset returns (None, None, error).
+def _q_parse(q):
+    toks, err = _q_tokenize(q)
+    if err != "":
+        return None, None, err
+    clauses = []
+    ops = []
+    i = 0
+    n = len(toks)
+    expect_clause = True
+    while i < n:
+        t = toks[i]
+        if expect_clause:
+            if t["k"] != "word":
+                return None, None, "expected a field name"
+            field = t["v"]
+            if not _q_field_ok(field):
+                return None, None, "unsupported field '" + field + "'"
+            i = i + 1
+            if i >= n:
+                return None, None, "expected an operator after '" + field + "'"
+            t2 = toks[i]
+            if t2["k"] == "op":
+                op = t2["v"]
+            elif t2["k"] == "word" and (t2["v"] == "contains" or t2["v"] == "in"):
+                op = t2["v"]
+            else:
+                return None, None, "expected an operator after '" + field + "'"
+            operr = _q_op_ok(field, op)
+            if operr != "":
+                return None, None, operr
+            i = i + 1
+            if i >= n:
+                return None, None, "expected a value after '" + field + " " + op + "'"
+            t3 = toks[i]
+            if field == "trashed":
+                if t3["k"] != "word" or not (t3["v"] == "true" or t3["v"] == "false"):
+                    return None, None, "trashed requires true or false"
+                val = t3["v"] == "true"
+            elif op == "in":
+                if t3["k"] != "lit":
+                    return None, None, "'in' requires a quoted literal value"
+                val = t3["v"]
+            else:
+                if t3["k"] != "lit":
+                    return None, None, "expected a quoted literal value"
+                val = t3["v"]
+            clauses.append({"field": field, "op": op, "value": val})
+            expect_clause = False
+            i = i + 1
+        else:
+            if t["k"] == "word" and (t["v"] == "and" or t["v"] == "or"):
+                ops.append(t["v"])
+                expect_clause = True
+                i = i + 1
+            else:
+                return None, None, "expected 'and' or 'or'"
+    if len(clauses) == 0:
+        return None, None, "empty query"
+    if expect_clause:
+        return None, None, "dangling operator"
+    return clauses, ops, ""
+
+# _q_group_matches evaluates one and-run of clauses over docs. Fields that
+# map onto query_select triples are AND'ed through query_select's filter;
+# "parents in 'id'" clauses are applied directly on top (list membership).
+def _q_group_matches(docs, group):
+    triples = []
+    for cl in group:
+        if cl["field"] != "parents":
+            triples.append([cl["field"], cl["op"], cl["value"]])
+    cur = docs
+    if len(triples) > 0:
+        cur = query_select(cur, triples, "", "", None, None, None)
+    for cl in group:
+        if cl["field"] == "parents":
+            want = cl["value"]
+            nxt = []
+            for d in cur:
+                ps = d.get("parents", None)
+                if ps != None and want in ps:
+                    nxt.append(d)
+            cur = nxt
+    return cur
+
+# _q_select evaluates the parsed (clauses, ops) query over docs with
+# or-over-and precedence: and-runs filter (query_select), or unions,
+# preserving first-seen order and de-duplicating ids.
+def _q_select(docs, clauses, ops):
+    groups = []
+    cur = [clauses[0]]
+    for i in range(len(ops)):
+        if ops[i] == "and":
+            cur.append(clauses[i + 1])
+        else:
+            groups.append(cur)
+            cur = [clauses[i + 1]]
+    groups.append(cur)
+    seen = {}
+    out = []
+    for g in groups:
+        for d in _q_group_matches(docs, g):
+            if d["id"] not in seen:
+                seen[d["id"]] = True
+                out.append(d)
+    return out
 
 # _order_by parses the Drive orderBy param and returns (field, dir) for the
 # first recognized key, or ("", "") when none apply.
@@ -251,6 +457,9 @@ def _fields_for(req):
 
 # PATCH /drive/v3/files/{id} — update file metadata (e.g., name, trashed).
 def on_patch(req):
+    auth = _require_auth(req)
+    if auth != None:
+        return auth
     id = req["params"]["id"]
     c = store_collection("files")
     doc = c.get(id)
@@ -265,10 +474,14 @@ def on_patch(req):
             doc[k] = body[k]
     doc["modifiedTime"] = _now()
     c.update(id, doc)
+    _record_change(id, doc, False)
     return respond(200, doc)
 
 # DELETE /drive/v3/files/{id} — permanently delete a file (content + metadata).
 def on_delete(req):
+    auth = _require_auth(req)
+    if auth != None:
+        return auth
     id = req["params"]["id"]
     c = store_collection("files")
     doc = c.get(id)
@@ -281,4 +494,5 @@ def on_delete(req):
         b.delete(id)
 
     c.delete(id)
+    _record_change(id, None, True)
     return respond(204, None)

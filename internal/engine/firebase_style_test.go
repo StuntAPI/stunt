@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -305,6 +306,371 @@ func TestFirebaseStyleAdapter(t *testing.T) {
 		t.Fatalf("FCM name = %q, want it to contain projects/%s/messages/", fcmName, projectID)
 	}
 
+	// ===== second user: getAccountInfo binds the token to ITS user =====
+
+	const secondEmail = "seconduser@stunt-test.com"
+	body, status = fbPost(t, base+"/v1/accounts:signUp", token, map[string]any{
+		"email":             secondEmail,
+		"password":          "secondPassword456",
+		"returnSecureToken": true,
+	})
+	if status != 200 {
+		t.Fatalf("signUp second -> status %d, want 200; body %s", status, body)
+	}
+	var secondResp map[string]any
+	if err := json.Unmarshal([]byte(body), &secondResp); err != nil {
+		t.Fatalf("unmarshal signUp second: %v (body %s)", err, body)
+	}
+	secondIDToken, ok := secondResp["idToken"].(string)
+	if !ok || secondIDToken == "" {
+		t.Fatalf("second idToken = %v, want non-empty string", secondResp["idToken"])
+	}
+
+	body, status = fbPost(t, base+"/v1/accounts:getAccountInfo", token, map[string]any{
+		"idToken": secondIDToken,
+	})
+	if status != 200 {
+		t.Fatalf("getAccountInfo (second user) -> status %d, want 200; body %s", status, body)
+	}
+	var secondAcct map[string]any
+	if err := json.Unmarshal([]byte(body), &secondAcct); err != nil {
+		t.Fatalf("unmarshal getAccountInfo second: %v (body %s)", err, body)
+	}
+	secondUsers, ok := secondAcct["users"].([]any)
+	if !ok || len(secondUsers) != 1 {
+		t.Fatalf("second users = %v, want 1", secondAcct["users"])
+	}
+	if secondUsers[0].(map[string]any)["email"] != secondEmail {
+		t.Fatalf("second getAccountInfo email = %v, want %v (token must bind to ITS user)",
+			secondUsers[0].(map[string]any)["email"], secondEmail)
+	}
+
+	// ===== getAccountInfo with an unknown idToken -> 401 =====
+
+	body, status = fbPost(t, base+"/v1/accounts:getAccountInfo", token, map[string]any{
+		"idToken": "totally-unknown-id-token",
+	})
+	if status != 401 {
+		t.Fatalf("getAccountInfo unknown token -> status %d, want 401; body %s", status, body)
+	}
+
+	// ===== securetoken: POST /v1/token grant_type=refresh_token exchange =====
+
+	body, status = fbPostForm(t, base+"/v1/token", token, url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+	})
+	if status != 200 {
+		t.Fatalf("securetoken exchange -> status %d, want 200; body %s", status, body)
+	}
+	var stResp map[string]any
+	if err := json.Unmarshal([]byte(body), &stResp); err != nil {
+		t.Fatalf("unmarshal securetoken: %v (body %s)", err, body)
+	}
+	stIDToken, ok := stResp["id_token"].(string)
+	if !ok || stIDToken == "" {
+		t.Fatalf("securetoken id_token = %v, want non-empty string", stResp["id_token"])
+	}
+	if stResp["access_token"] != stIDToken {
+		t.Fatalf("securetoken access_token = %v, want to match id_token", stResp["access_token"])
+	}
+	if stResp["expires_in"] != "3600" {
+		t.Fatalf("securetoken expires_in = %v, want 3600", stResp["expires_in"])
+	}
+	if stResp["token_type"] != "Bearer" {
+		t.Fatalf("securetoken token_type = %v, want Bearer", stResp["token_type"])
+	}
+	if stResp["user_id"] != localID {
+		t.Fatalf("securetoken user_id = %v, want %v", stResp["user_id"], localID)
+	}
+	if _, ok := stResp["refresh_token"].(string); !ok {
+		t.Fatalf("securetoken refresh_token = %v, want string", stResp["refresh_token"])
+	}
+
+	// The freshly minted id_token resolves to the SAME user via the binding.
+	body, status = fbPost(t, base+"/v1/accounts:getAccountInfo", token, map[string]any{
+		"idToken": stIDToken,
+	})
+	if status != 200 {
+		t.Fatalf("getAccountInfo (securetoken id) -> status %d, want 200; body %s", status, body)
+	}
+	var stAcct map[string]any
+	if err := json.Unmarshal([]byte(body), &stAcct); err != nil {
+		t.Fatalf("unmarshal getAccountInfo securetoken: %v (body %s)", err, body)
+	}
+	stUsers := stAcct["users"].([]any)
+	if stUsers[0].(map[string]any)["email"] != signUpEmail {
+		t.Fatalf("securetoken user email = %v, want %v", stUsers[0].(map[string]any)["email"], signUpEmail)
+	}
+
+	// ===== securetoken failure paths =====
+
+	body, status = fbPostForm(t, base+"/v1/token", token, url.Values{
+		"grant_type":    {"password"},
+		"refresh_token": {refreshToken},
+	})
+	if status != 400 {
+		t.Fatalf("securetoken bad grant_type -> status %d, want 400; body %s", status, body)
+	}
+
+	body, status = fbPostForm(t, base+"/v1/token", token, url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {"not-a-real-refresh-token"},
+	})
+	if status != 400 {
+		t.Fatalf("securetoken bad refresh token -> status %d, want 400; body %s", status, body)
+	}
+
+	// ===== Firestore: POST with ?documentId= =====
+
+	peoplePath := base + "/v1/projects/" + projectID + "/databases/(default)/documents/people"
+	body, status = fbPost(t, peoplePath+"?documentId=carol", token, map[string]any{
+		"fields": map[string]any{
+			"name": map[string]any{"stringValue": "Carol Creator"},
+			"age":  map[string]any{"integerValue": "50"},
+		},
+	})
+	if status != 200 {
+		t.Fatalf("create doc with documentId -> status %d, want 200; body %s", status, body)
+	}
+	var carolDoc map[string]any
+	if err := json.Unmarshal([]byte(body), &carolDoc); err != nil {
+		t.Fatalf("unmarshal carol doc: %v (body %s)", err, body)
+	}
+	if carolDoc["name"] != "projects/"+projectID+"/databases/(default)/documents/people/carol" {
+		t.Fatalf("carol name = %v, want explicit documentId path", carolDoc["name"])
+	}
+
+	// Reusing the same documentId -> 409 ALREADY_EXISTS.
+	body, status = fbPost(t, peoplePath+"?documentId=carol", token, map[string]any{
+		"fields": map[string]any{
+			"name": map[string]any{"stringValue": "Duplicate"},
+		},
+	})
+	if status != 409 {
+		t.Fatalf("duplicate documentId -> status %d, want 409; body %s", status, body)
+	}
+
+	// ===== Firestore: create docs for runQuery =====
+
+	for _, p := range []struct {
+		name string
+		age  string
+	}{{"Alice Query", "30"}, {"Bob Query", "40"}} {
+		body, status = fbPost(t, peoplePath, token, map[string]any{
+			"fields": map[string]any{
+				"name": map[string]any{"stringValue": p.name},
+				"age":  map[string]any{"integerValue": p.age},
+			},
+		})
+		if status != 200 {
+			t.Fatalf("create runQuery doc %s -> status %d, want 200; body %s", p.name, status, body)
+		}
+	}
+
+	// ===== Firestore: documents:runQuery (from + where + orderBy + limit) =====
+
+	runQueryPath := base + "/v1/projects/" + projectID + "/databases/(default)/documents:runQuery"
+	body, status = fbPost(t, runQueryPath, token, map[string]any{
+		"structuredQuery": map[string]any{
+			"from": []any{map[string]any{"collectionId": "people"}},
+			"where": map[string]any{
+				"fieldFilter": map[string]any{
+					"field": map[string]any{"fieldPath": "age"},
+					"op":    "GREATER_THAN",
+					"value": map[string]any{"integerValue": "25"},
+				},
+			},
+			"orderBy": []any{map[string]any{
+				"field":     map[string]any{"fieldPath": "age"},
+				"direction": "DESCENDING",
+			}},
+			"limit": 2,
+		},
+	})
+	if status != 200 {
+		t.Fatalf("runQuery -> status %d, want 200; body %s", status, body)
+	}
+	var runResp []map[string]any
+	if err := json.Unmarshal([]byte(body), &runResp); err != nil {
+		t.Fatalf("unmarshal runQuery: %v (body %s)", err, body)
+	}
+	if len(runResp) != 2 {
+		t.Fatalf("runQuery returned %d docs, want 2 (limit); body %s", len(runResp), body)
+	}
+	firstDoc, ok := runResp[0]["document"].(map[string]any)
+	if !ok {
+		t.Fatalf("runQuery[0].document = %v, want object", runResp[0])
+	}
+	firstAge, ok := firstDoc["fields"].(map[string]any)["age"].(map[string]any)["integerValue"]
+	if !ok || firstAge != "50" {
+		t.Fatalf("runQuery[0] age = %v, want 50 (DESCENDING order)", firstDoc["fields"])
+	}
+	if !strings.HasSuffix(firstDoc["name"].(string), "/people/carol") {
+		t.Fatalf("runQuery[0].name = %v, want carol (age 50 first)", firstDoc["name"])
+	}
+
+	// ===== Firestore: runQuery failure path (missing structuredQuery) =====
+
+	body, status = fbPost(t, runQueryPath, token, map[string]any{})
+	if status != 400 {
+		t.Fatalf("runQuery missing structuredQuery -> status %d, want 400; body %s", status, body)
+	}
+
+	// ===== Firestore: runQuery failure path (unsupported op) =====
+
+	body, status = fbPost(t, runQueryPath, token, map[string]any{
+		"structuredQuery": map[string]any{
+			"from": []any{map[string]any{"collectionId": "people"}},
+			"where": map[string]any{
+				"fieldFilter": map[string]any{
+					"field": map[string]any{"fieldPath": "age"},
+					"op":    "SOMETHING_WEIRD",
+					"value": map[string]any{"integerValue": "1"},
+				},
+			},
+		},
+	})
+	if status != 400 {
+		t.Fatalf("runQuery unsupported op -> status %d, want 400; body %s", status, body)
+	}
+
+	// ===== Firestore: nested collection path (subcollection under a doc) =====
+
+	nestedPath := peoplePath + "/carol/addresses"
+	body, status = fbPost(t, nestedPath, token, map[string]any{
+		"fields": map[string]any{
+			"city": map[string]any{"stringValue": "San Francisco"},
+		},
+	})
+	if status != 200 {
+		t.Fatalf("create nested doc -> status %d, want 200; body %s", status, body)
+	}
+	var nestedDoc map[string]any
+	if err := json.Unmarshal([]byte(body), &nestedDoc); err != nil {
+		t.Fatalf("unmarshal nested doc: %v (body %s)", err, body)
+	}
+	nestedName, ok := nestedDoc["name"].(string)
+	if !ok || !strings.HasPrefix(nestedName, "projects/"+projectID+"/databases/(default)/documents/people/carol/addresses/") {
+		t.Fatalf("nested doc name = %v, want full nested resource path", nestedDoc["name"])
+	}
+
+	// List the subcollection and find the doc back.
+	body, status = fbGet(t, nestedPath, token)
+	if status != 200 {
+		t.Fatalf("list nested docs -> status %d, want 200; body %s", status, body)
+	}
+	var nestedList map[string]any
+	if err := json.Unmarshal([]byte(body), &nestedList); err != nil {
+		t.Fatalf("unmarshal nested list: %v (body %s)", err, body)
+	}
+	nestedDocs, ok := nestedList["documents"].([]any)
+	if !ok || len(nestedDocs) != 1 {
+		t.Fatalf("nested documents = %v, want 1", nestedList["documents"])
+	}
+	if nestedDocs[0].(map[string]any)["name"] != nestedName {
+		t.Fatalf("nested list name = %v, want %v", nestedDocs[0], nestedName)
+	}
+
+	// ===== FCM: subscribe tokens to topics (simulator extension) =====
+
+	subscribePath := base + "/v1/projects/" + projectID + "/topics/"
+	body, status = fbPost(t, subscribePath+"news:subscribe", token, map[string]any{
+		"tokens": []string{"device-token-a", "device-token-b"},
+	})
+	if status != 200 {
+		t.Fatalf("subscribe news -> status %d, want 200; body %s", status, body)
+	}
+	body, status = fbPost(t, subscribePath+"sports:subscribe", token, map[string]any{
+		"token": "device-token-c",
+	})
+	if status != 200 {
+		t.Fatalf("subscribe sports -> status %d, want 200; body %s", status, body)
+	}
+
+	// ===== FCM: send by topic -> fanout to subscribed tokens =====
+
+	body, status = fbPost(t, fcmPath, token, map[string]any{
+		"message": map[string]any{
+			"topic": "news",
+			"notification": map[string]any{
+				"title": "News flash",
+			},
+		},
+	})
+	if status != 200 {
+		t.Fatalf("FCM topic send -> status %d, want 200; body %s", status, body)
+	}
+
+	// ===== FCM: send by condition ('news' in topics || 'sports' in topics) =====
+
+	body, status = fbPost(t, fcmPath, token, map[string]any{
+		"message": map[string]any{
+			"condition": "'news' in topics || 'sports' in topics",
+			"notification": map[string]any{
+				"title": "Condition blast",
+			},
+		},
+	})
+	if status != 200 {
+		t.Fatalf("FCM condition send -> status %d, want 200; body %s", status, body)
+	}
+
+	// Verify fanout via the message list (simulator extension).
+	body, status = fbGet(t, base+"/v1/projects/"+projectID+"/messages", token)
+	if status != 200 {
+		t.Fatalf("list messages -> status %d, want 200; body %s", status, body)
+	}
+	var msgList map[string]any
+	if err := json.Unmarshal([]byte(body), &msgList); err != nil {
+		t.Fatalf("unmarshal message list: %v (body %s)", err, body)
+	}
+	messages, ok := msgList["messages"].([]any)
+	if !ok {
+		t.Fatalf("messages = %v, want array", msgList["messages"])
+	}
+	topicFanout, condFanout := -1, -1
+	for _, m := range messages {
+		mm := m.(map[string]any)
+		if mm["topic"] == "news" {
+			recips, _ := mm["recipients"].([]any)
+			topicFanout = len(recips)
+		}
+		if mm["condition"] != "" && mm["condition"] != nil {
+			recips, _ := mm["recipients"].([]any)
+			condFanout = len(recips)
+		}
+	}
+	if topicFanout != 2 {
+		t.Fatalf("topic fanout = %d recipients, want 2 (device-token-a, device-token-b)", topicFanout)
+	}
+	if condFanout != 3 {
+		t.Fatalf("condition fanout = %d recipients, want 3 (a, b, c)", condFanout)
+	}
+
+	// ===== FCM: send with no target -> 400 =====
+
+	body, status = fbPost(t, fcmPath, token, map[string]any{
+		"message": map[string]any{
+			"notification": map[string]any{"title": "Nowhere"},
+		},
+	})
+	if status != 400 {
+		t.Fatalf("FCM no target -> status %d, want 400; body %s", status, body)
+	}
+
+	// ===== FCM: send with multiple targets -> 400 =====
+
+	body, status = fbPost(t, fcmPath, token, map[string]any{
+		"message": map[string]any{
+			"token": "device-token-a",
+			"topic": "news",
+		},
+	})
+	if status != 400 {
+		t.Fatalf("FCM multiple targets -> status %d, want 400; body %s", status, body)
+	}
+
 	// ===== 401 without auth =====
 
 	body, status = fbPostNoAuth(t, base+"/v1/accounts:signUp", map[string]any{
@@ -419,4 +785,23 @@ func fbPostRaw(t *testing.T, rawurl, authHeader string, body map[string]any) *ht
 		t.Fatal(err)
 	}
 	return resp
+}
+
+// fbPostForm sends a form-encoded POST (application/x-www-form-urlencoded),
+// like the real securetoken /v1/token grant.
+func fbPostForm(t *testing.T, rawurl, authHeader string, form url.Values) (string, int) {
+	t.Helper()
+	req, err := http.NewRequest("POST", rawurl, strings.NewReader(form.Encode()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization", authHeader)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return string(b), resp.StatusCode
 }

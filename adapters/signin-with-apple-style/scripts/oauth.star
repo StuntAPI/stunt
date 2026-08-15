@@ -188,28 +188,13 @@ def _handle_refresh(body):
         "expires_in": 3600,
     })
 
-# on_get_keys returns the JWKS public key set.
-# GET /auth/keys
+# on_get_keys returns the JWKS public key set. The key is REAL: derived from
+# the fixed synthetic EC P-256 keypair whose private half signs the id_tokens
+# minted by _mint_id_token (and whose public half verifies client_secret
+# JWTs). GET /auth/keys — mirrors Apple's appleid.apple.com/auth/keys shape.
 def on_get_keys(req):
-    return respond(200, {
-        "keys": [
-            {
-                "kty": "EC",
-                "kid": "A1B2C3D4E5",
-                "use": "sig",
-                "alg": "ES256",
-                "crv": "P-256",
-                "x": "LBL-ty8jZ3j8mRYf3BkQ0q2yJ5QWYs3q5m4Y6o7p8q0",
-                "y": "M5gTc9b3Z8s2N4rV7wX1Y3aB6cD9eF2gH5iJ8kL0mN3",
-            },
-            {
-                "kty": "EC",
-                "kid": "F6G7H8I9J0",
-                "use": "sig",
-                "alg": "ES256",
-                "crv": "P-256",
-                "x": "oP1qR2sT3uV4wX5yZ6aB7cD8eF9gH0iJ1kL2mN3oP4",
-                "y": "Q5rS6tU7vW8xY9zA0bC1dE2fG3hI4jK5lM6nO7pQ8",
-            },
-        ],
-    })
+    key = crypto.ec_public_jwk(_JWT_PUBLIC_KEY)
+    key["kid"] = _JWT_KID
+    key["use"] = "sig"
+    key["alg"] = "ES256"
+    return respond(200, {"keys": [key]})

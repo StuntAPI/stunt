@@ -41,6 +41,11 @@ endpoints:
     method: POST
     handler: scripts/service.star#on_service_api
 
+  # --- JWKS (parameterized: must come after the literal routes above) ---
+  - route: /{userPoolId}/.well-known/jwks.json
+    method: GET
+    handler: scripts/oauth.star#on_jwks
+
 # Backing stores — collections for stateful data.
 resources:
   - name: users

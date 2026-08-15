@@ -6,7 +6,7 @@
 # See DISCLAIMER.
 id: gdocs-style
 name: "Google Docs API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Google Docs API"
@@ -27,9 +27,12 @@ endpoints:
     handler: scripts/documents.star#on_get_revisions
 
   # --- Batch update (POST with :batchUpdate suffix) ---
+  # Read-modify-write over the document's structural model: serialize
+  # concurrent batchUpdate calls against the same documentId.
   - route: /v1/documents/{documentId}/batchUpdate
     method: POST
     handler: scripts/documents.star#on_batch_update
+    concurrency_key: documentId
 
   # --- Get document ---
   - route: /v1/documents/{documentId}

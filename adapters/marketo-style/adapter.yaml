@@ -31,6 +31,10 @@ endpoints:
   - route: /rest/v1/leads
     method: POST
     handler: scripts/leads.star#on_create_lead
+  # Literal describe route BEFORE the parameterized /rest/v1/leads/{id}.
+  - route: /rest/v1/leads/describe
+    method: GET
+    handler: scripts/leads.star#on_describe
   - route: /rest/v1/leads/{id}
     method: GET
     handler: scripts/leads.star#on_get_lead
@@ -64,6 +68,40 @@ endpoints:
     method: GET
     handler: scripts/activities.star#on_list_activities
 
+  # --- Bulk Lead Extract (derive-on-read async export jobs) ---
+  # concurrency_key serialises the read-modify-write poll/cancel/file
+  # handlers against the same job.
+  - route: /bulk/v1/leads/export/create
+    method: POST
+    handler: scripts/export.star#on_export_create
+  - route: /bulk/v1/leads/export/create.json
+    method: POST
+    handler: scripts/export.star#on_export_create
+  - route: /bulk/v1/leads/export/{exportId}/status
+    method: GET
+    handler: scripts/export.star#on_export_status
+    concurrency_key: exportId
+  - route: /bulk/v1/leads/export/{exportId}/status.json
+    method: GET
+    handler: scripts/export.star#on_export_status
+    concurrency_key: exportId
+  - route: /bulk/v1/leads/export/{exportId}/file
+    method: GET
+    handler: scripts/export.star#on_export_file
+    concurrency_key: exportId
+  - route: /bulk/v1/leads/export/{exportId}/file.json
+    method: GET
+    handler: scripts/export.star#on_export_file
+    concurrency_key: exportId
+  - route: /bulk/v1/leads/export/{exportId}/cancel
+    method: POST
+    handler: scripts/export.star#on_export_cancel
+    concurrency_key: exportId
+  - route: /bulk/v1/leads/export/{exportId}/cancel.json
+    method: POST
+    handler: scripts/export.star#on_export_cancel
+    concurrency_key: exportId
+
 # Backing stores — collections for stateful data.
 resources:
   - name: leads
@@ -82,6 +120,8 @@ resources:
     kind: collection
     seed: fixtures/activities.jsonl
   - name: tokens
+    kind: collection
+  - name: exports
     kind: collection
 
 # Auth scheme: Bearer token or ?access_token= query param.

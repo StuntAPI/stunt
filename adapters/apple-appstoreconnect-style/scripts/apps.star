@@ -2,20 +2,23 @@
 #
 # GET   /v1/apps              → list apps
 # GET   /v1/apps/{id}         → get a single app
-# POST  /v1/apps              → create an app
-# GET   /v1/apps/{id}/appStoreVersions → list versions for an app
+# POST  /v1/apps              → create an app (bundleId dedupe → 409)
+# PATCH /v1/apps/{id}         → modify an app
 # GET   /v1/apps/{id}/builds  → list builds for an app
 # GET   /v1/apps/{id}/appPrices → list prices for an app
+#
+# appStoreVersions endpoints live in scripts/versions.star.
 #
 # All endpoints require a valid JWT bearer token (ES256, structural check).
 # Responses follow JSON:API conventions: { data: ..., links: ..., meta: ... }.
 # Errors: { errors: [ { status, code, title, detail } ] }.
 
-# Shared helpers (_require_jwt, _ok, _ok_list, _err, _not_found_err,
-# _to_int, _b64url_decode, _jose_header, _reverse) are preloaded from
-# scripts/lib.star.
+# Shared helpers (_require_jwt, _ok, _err, _not_found_err, _find_app,
+# _advance_build, _build_entity, _apply_build_query, _to_int, _b64url_decode,
+# _jose_header, _reverse, _num) are preloaded from scripts/lib.star.
 
-# _seed populates a default app (and its build) on first access.
+# _seed populates a default app (with a READY_FOR_SALE 1.0.0 version and its
+# build) on first access.
 def _seed():
     if store_kv_get("asc", "seeded") == "yes":
         return
@@ -28,12 +31,34 @@ def _seed():
         "en-US",
     )
     c.insert(doc)
-    _create_build(doc["id"], False)
+
+    # The seeded app is long since released: version 1.0.0 was submitted in
+    # the past (submission timestamps stamped 60s ago), so the derive-on-read
+    # machine settles it at READY_FOR_SALE.
+    now = clock.now_unix()
+    version_id = "av_" + doc["id"]
+    vc = store_collection("versions")
+    vc.insert({
+        "id": version_id,
+        "app": doc["id"],
+        "platform": "IOS",
+        "versionString": "1.0.0",
+        "appStoreState": "READY_FOR_SALE",
+        "releaseType": "AFTER_APPROVAL",
+        "usesIdfa": False,
+        "createdDate": clock.now_rfc3339(),
+        "_submitted_at": now - 60,
+        "_review_at": now - 59,
+        "_decision_at": now - 57,
+    })
+
+    _create_build(doc["id"], False, version_id)
 
 # _app_doc builds a stored app document.
 def _app_doc(bundle_id, name, sku, locale):
     seq = store_kv_incr("asc", "app_seq")
-    app_id = "app_" + str(1500000000 + seq)
+    # Numeric app id assembled arithmetically (1_500_000_000 + seq).
+    app_id = "app_" + str(15 * 1000 * 1000 * 100 + seq)
     return {
         "id": app_id,
         "name": name,
@@ -60,21 +85,17 @@ def _app_entity(doc):
         },
     }
 
-# _find_app looks up an app by id. Returns the doc or None.
-def _find_app(app_id):
-    c = store_collection("apps")
-    return c.get(app_id)
-
-# --- build lifecycle (derive-on-read) ---
+# --- build creation (derive-on-read lifecycle) ---
 
 # _create_build stores a freshly uploaded build for an app with the
 # derive-on-read timestamps: _running_at (create + 1s) and _done_at
 # (create + 3s) computed from clock.now_unix(). fail is the simulator-only
-# simulate_fail flag from the app-creation attributes.
-def _create_build(app_id, fail):
+# simulate_fail flag from the app-creation attributes. version_id optionally
+# links the build to an appStoreVersion (the seeded released version).
+def _create_build(app_id, fail, version_id):
     now = clock.now_unix()
     bc = store_collection("builds")
-    bc.insert({
+    doc = {
         "id": "bld_" + app_id + "_1",
         "app": app_id,
         "version": "1",
@@ -83,51 +104,10 @@ def _create_build(app_id, fail):
         "_running_at": now + 1,
         "_done_at": now + 3,
         "_fail": fail,
-    })
-
-# _derive_build_state maps the clock onto Apple's real processingState
-# vocabulary: PROCESSING while Apple processes the upload, then VALID (or
-# INVALID for the simulate_fail path).
-def _derive_build_state(b):
-    if b.get("_done_at", None) == None:
-        return b.get("processingState", "VALID")
-    now = clock.now_unix()
-    if now < b["_done_at"]:
-        return "PROCESSING"
-    if b.get("_fail", False):
-        return "INVALID"
-    return "VALID"
-
-# _advance_build derives the current processingState and persists the
-# transition back to the builds collection so polls, lists, and the
-# processingState filter agree. App Store Connect has no build webhooks, so
-# no events are emitted.
-def _advance_build(b, bc):
-    state = _derive_build_state(b)
-    if b.get("processingState", "") == state:
-        return state
-    b["processingState"] = state
-    bc.update(b.get("id", ""), b)
-    return state
-
-# _build_entity builds a JSON:API resource object from a stored build doc
-# (the internal underscore-prefixed lifecycle fields never appear).
-def _build_entity(doc):
-    return {
-        "id": doc["id"],
-        "type": "builds",
-        "attributes": {
-            "version": doc.get("version", "1"),
-            "uploadedDate": doc.get("uploadedDate", ""),
-            "processingState": doc.get("processingState", "PROCESSING"),
-            "usesNonExemptEncryption": False,
-        },
-        "relationships": {
-            "app": {
-                "data": {"type": "apps", "id": doc.get("app", "")},
-            },
-        },
     }
+    if version_id != None:
+        doc["appStoreVersion"] = version_id
+    bc.insert(doc)
 
 # --- handlers ---
 
@@ -174,18 +154,25 @@ def on_get_app(req):
         },
     })
 
-# on_create_app handles POST /v1/apps.
+# on_create_app handles POST /v1/apps (Register a New App). The bundleId must
+# be unique across apps — a duplicate is rejected with 409, like the real API.
 def on_create_app(req):
     _, err = _require_jwt(req)
     if err != None:
         return err
+
+    _seed()
 
     body = req["body"]
     if body == None:
         body = {}
 
     data = body.get("data", body)
+    if data == None:
+        data = {}
     attrs = data.get("attributes", {})
+    if attrs == None:
+        attrs = {}
     name = attrs.get("name", "")
     bundle_id = attrs.get("bundleId", "")
     sku = attrs.get("sku", "")
@@ -196,17 +183,23 @@ def on_create_app(req):
                      "An attribute is missing or invalid",
                      "The required attributes 'name' and 'bundleId' must be provided.")
 
+    c = store_collection("apps")
+    for existing in c.list():
+        if existing.get("bundleId", "") == bundle_id:
+            return _err(409, "ENTITY_ERROR.ATTRIBUTE.INVALID",
+                         "An attribute is invalid",
+                         "The bundleId '" + bundle_id + "' has already been registered for another app.")
+
     fail = attrs.get("simulate_fail", False)
     if fail == None:
         fail = False
 
     doc = _app_doc(bundle_id, name, sku, locale)
-    c = store_collection("apps")
     c.insert(doc)
 
     # A freshly uploaded build starts PROCESSING (derive-on-read lifecycle,
     # see on_list_builds).
-    _create_build(doc["id"], fail)
+    _create_build(doc["id"], fail, None)
 
     return respond(201, {
         "data": _app_entity(doc),
@@ -215,8 +208,10 @@ def on_create_app(req):
         },
     })
 
-# on_list_app_versions handles GET /v1/apps/{id}/appStoreVersions.
-def on_list_app_versions(req):
+# on_update_app handles PATCH /v1/apps/{id} (Modify an App): name, bundleId,
+# sku, primaryLocale, and contentRightsDeclaration are patchable. A bundleId
+# change that collides with another app is rejected with 409.
+def on_update_app(req):
     _, err = _require_jwt(req)
     if err != None:
         return err
@@ -226,31 +221,46 @@ def on_list_app_versions(req):
     if doc == None:
         return _not_found_err("App", app_id)
 
-    data = [
-        {
-            "id": "av_" + app_id,
-            "type": "appStoreVersions",
-            "attributes": {
-                "versionString": "1.0.0",
-                "appStoreState": "READY_FOR_SALE",
-                "releaseType": "AFTER_APPROVAL",
-                "usesIdfa": False,
-            },
-            "relationships": {
-                "app": {
-                    "data": {"type": "apps", "id": app_id},
-                },
-            },
-        }
-    ]
+    body = req["body"]
+    if body == None:
+        body = {}
+    data = body.get("data", body)
+    if data == None:
+        data = {}
+    attrs = data.get("attributes", {})
+    if attrs == None:
+        attrs = {}
 
-    # Real list params (filter[appStoreState], filter[versionString], sort).
-    data = _apply_version_query(req, data)
+    new_bundle_id = attrs.get("bundleId", None)
+    if new_bundle_id != None and new_bundle_id != "" and new_bundle_id != doc.get("bundleId", ""):
+        c = store_collection("apps")
+        for existing in c.list():
+            if existing.get("id", "") != app_id and existing.get("bundleId", "") == new_bundle_id:
+                return _err(409, "ENTITY_ERROR.ATTRIBUTE.INVALID",
+                             "An attribute is invalid",
+                             "The bundleId '" + new_bundle_id + "' has already been registered for another app.")
+        doc["bundleId"] = new_bundle_id
+
+    new_name = attrs.get("name", None)
+    if new_name != None and new_name != "":
+        doc["name"] = new_name
+    new_sku = attrs.get("sku", None)
+    if new_sku != None and new_sku != "":
+        doc["sku"] = new_sku
+    new_locale = attrs.get("primaryLocale", None)
+    if new_locale != None and new_locale != "":
+        doc["primaryLocale"] = new_locale
+    new_crd = attrs.get("contentRightsDeclaration", None)
+    if new_crd != None and new_crd != "":
+        doc["contentRightsDeclaration"] = new_crd
+
+    c = store_collection("apps")
+    c.update(app_id, doc)
 
     return respond(200, {
-        "data": data,
+        "data": _app_entity(doc),
         "links": {
-            "self": "/v1/apps/" + app_id + "/appStoreVersions",
+            "self": "/v1/apps/" + app_id,
         },
     })
 
@@ -373,47 +383,3 @@ def _apply_apps_query(req, data):
     data = query_select(data, f if len(f) > 0 else None, order_by, order_dir, None, None, None)
 
     return _project_jsonapi_fields(data, _get_query(req, "fields[apps]"))
-
-# _apply_version_query maps the real appStoreVersions list params
-# (filter[appStoreState], filter[versionString], sort) over the entities.
-def _apply_version_query(req, data):
-    f = []
-
-    v = _get_query(req, "filter[appStoreState]")
-    if v != "":
-        f.append(["attributes.appStoreState", "=", v])
-    v = _get_query(req, "filter[versionString]")
-    if v != "":
-        f.append(["attributes.versionString", "=", v])
-
-    sort_field, desc = _asc_sort(req)
-    order_by = None
-    if sort_field == "versionString" or sort_field == "appStoreState":
-        order_by = "attributes." + sort_field
-        order_dir = "desc" if desc else "asc"
-    else:
-        order_dir = ""
-
-    return query_select(data, f if len(f) > 0 else None, order_by, order_dir, None, None, None)
-
-# _apply_build_query maps the real builds list params
-# (filter[processingState], filter[version], sort) over the entities.
-def _apply_build_query(req, data):
-    f = []
-
-    v = _get_query(req, "filter[processingState]")
-    if v != "":
-        f.append(["attributes.processingState", "=", v])
-    v = _get_query(req, "filter[version]")
-    if v != "":
-        f.append(["attributes.version", "=", v])
-
-    sort_field, desc = _asc_sort(req)
-    order_by = None
-    if sort_field == "version" or sort_field == "uploadedDate" or sort_field == "processingState":
-        order_by = "attributes." + sort_field
-        order_dir = "desc" if desc else "asc"
-    else:
-        order_dir = ""
-
-    return query_select(data, f if len(f) > 0 else None, order_by, order_dir, None, None, None)

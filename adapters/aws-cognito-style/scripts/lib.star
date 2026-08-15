@@ -56,36 +56,143 @@ def _sigv4_check(req):
     return None
 
 # ====================================================================
-# JWT minting (synthetic, for access_token / id_token)
+# JWT minting + verification (REAL RS256 over a fixed synthetic RSA
+# keypair; JWKS served at GET /{userPoolId}/.well-known/jwks.json)
 # ====================================================================
 
-# _b64url mimics a base64url-encode of a string (synthetic — not real
-# base64, but deterministic and URL-safe). Used to produce JWT-shaped
-# token segments.
-def _b64url(s):
-    out = ""
-    for i in range(len(s)):
-        ch = s[i]
-        n = ord(ch)
-        v = ((n - 32) * 3 + 1) % 63
-        if v < 26:
-            out += chr(v + 65)
-        elif v < 52:
-            out += chr(v - 26 + 97)
-        elif v < 62:
-            out += chr(v - 52 + 48)
-        else:
-            out += "_"
-    return out
+# _B64URL is the base64url alphabet (- and _ replace + and /).
+_B64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" + "0123" + "45678" + "9-_"
 
-# _mint_jwt builds a synthetic JWT-shaped token (header.payload.sig).
-# The payload encodes the username and sub. The nonce ensures uniqueness.
-def _mint_jwt(sub, username, email, nonce="0"):
-    header = _b64url('{"alg":"RS256","typ":"JWT","kid":"mock-key-id"}')
-    payload_str = '{"sub":"' + sub + '","username":"' + username + '","email":"' + email + '","nonce":"' + nonce + '","iss":"https://cognito-idp.mock-region.amazonaws.com/mock-user-pool","token_use":"id","aud":"mock-client-id","auth_time":1718448000}'
-    payload = _b64url(payload_str)
-    sig = _b64url("mock-signature-" + sub + "-" + nonce)
-    return header + "." + payload + "." + sig
+# _b64url_ok reports whether seg is a syntactically valid unpadded
+# base64url segment (alphabet chars only, length not == 1 mod 4). Guards
+# the crypto.base64url_decode / crypto.rsa_verify builtins, which error
+# (surfacing as a 500) on malformed input.
+def _b64url_ok(seg):
+    if seg == "":
+        return False
+    if len(seg) % 4 == 1:
+        return False
+    for i in range(len(seg)):
+        if _B64URL.find(seg[i]) < 0:
+            return False
+    return True
+
+# _jwt_json decodes a JWT segment (0=header, 1=payload) into a Starlark
+# dict via crypto.base64url_decode + json.decode, or None when malformed.
+# Shape guards keep json.decode from erroring on garbage.
+def _jwt_json(token, seg):
+    parts = token.split(".")
+    if len(parts) != 3:
+        return None
+    if not _b64url_ok(parts[0]) or not _b64url_ok(parts[1]) or not _b64url_ok(parts[2]):
+        return None
+    txt = crypto.base64url_decode(parts[seg])
+    if txt == "" or txt[:1] != "{" or txt[-1:] != "}" or txt.find('"') < 0:
+        return None
+    for i in range(len(txt)):
+        if ord(txt[i]) < 0x20:
+            return None
+    return json.decode(txt)
+
+# _claim_int coerces a claim value to int (JSON numbers decode as int).
+# Returns None when absent/None.
+def _claim_int(v):
+    if v == None:
+        return None
+    if type(v) == "int":
+        return v
+    return None
+
+# _mint_jwt builds a REAL RS256 JWT (header.payload.signature) signed with
+# the fixed synthetic RSA keypair whose public half is served from the
+# JWKS endpoint. token_use is "access" or "id"; the nonce (jti) keeps each
+# mint unique. Claims mirror Cognito's documented access/id token set.
+def _mint_jwt(sub, username, email, nonce, client_id, token_use):
+    now = clock.now_unix()
+    header = crypto.base64url_encode('{"alg":"RS256","kid":"' + _JWT_KID + '","typ":"JWT"}')
+    if token_use == "access":
+        payload_str = '{"sub":"' + sub + '","iss":"' + _JWT_ISS + '","client_id":"' + client_id + '","token_use":"access","username":"' + username + '","jti":"' + nonce + '","iat":' + str(now) + ',"exp":' + str(now + 3600) + '}'
+    else:
+        payload_str = '{"sub":"' + sub + '","iss":"' + _JWT_ISS + '","aud":"' + client_id + '","token_use":"id","cognito:username":"' + username + '","email":"' + email + '","email_verified":true,"auth_time":' + str(now) + ',"iat":' + str(now) + ',"exp":' + str(now + 3600) + '}'
+    payload = crypto.base64url_encode(payload_str)
+    signing_input = header + "." + payload
+    sig = crypto.rsa_sign(_JWT_PRIVATE_KEY, signing_input, encoding="base64url")
+    return signing_input + "." + sig
+
+# _verify_jwt fully verifies an inbound JWT (access or id token):
+#   - 3 dot-separated, base64url-valid segments
+#   - JOSE header alg=="RS256"
+#   - RSA-SHA256 signature over header.payload verified against the JWKS
+#     public key (crypto.rsa_verify)
+#   - exp in the future (clock.now_unix()) and iss == the pool issuer
+#   - token_use == want_use ("access" or "id")
+# Returns the claims dict, or None when the token fails any check.
+def _verify_jwt(token, want_use):
+    if token == "" or token == None:
+        return None
+    header = _jwt_json(token, 0)
+    if header == None:
+        return None
+    if header.get("alg", "") != "RS256":
+        return None
+    parts = token.split(".")
+    if not crypto.rsa_verify(_JWT_PUBLIC_KEY, parts[0] + "." + parts[1], parts[2], encoding="base64url"):
+        return None
+    claims = _jwt_json(token, 1)
+    if claims == None:
+        return None
+    exp = _claim_int(claims.get("exp", None))
+    if exp == None:
+        return None
+    if clock.now_unix() >= exp:
+        return None
+    if claims.get("iss", "") != _JWT_ISS:
+        return None
+    if claims.get("token_use", "") != want_use:
+        return None
+    return claims
+
+# Fixed synthetic RSA-2048 keypair used to sign Cognito tokens. The public
+# half is served at GET /{userPoolId}/.well-known/jwks.json. Throwaway mock
+# material — it exists nowhere but this repository.
+_JWT_KID = "mock-cognito-key-1"
+_JWT_ISS = "https://cognito-idp.mock-region.amazonaws.com/mock-user-pool"
+_JWT_PRIVATE_KEY = """-----BEGIN RSA PRIVATE KEY-----
+MIIEogIBAAKCAQEAuvUH4Lt/lv6L2u2E9qg15ZelZ7Olpmr7j9RhTr+3VybvKml5
+dntEUSXKO70WVkZ36rjMecbOVU2vrCyJTpIYejqTp1c7O/67S7sdJPdLrKdL55JC
+9r24Zp5gjUKW8ZoVn325oOsRlO4vezgkS93mSFGuq7yyXe36SmG/xwkFcB6eu2W1
+IhuoHQkK47ja5PS1GuhctOKkYi9lqJPQYri6H3E7Cz1UHlQmdiY4T5porO1B9Dfe
+9P77g6zw8jwzhkce0ORrWyvAbA5BFN5SodXaBN3G4PhjdklDPn++AXYhhahWGZy8
+yVt81e+ra+jjHB7yutT5xDYzXY4JLF1FKsk4ywIDAQABAoIBAEL9Z8w8AxTcsspI
+j3s+fMl+1BLbiUCfVvKLnC52fcBpwAsHbjFpK+qTyuoq7+UMLQ3bF9GOzgI86vSb
+pLuVl9W8RYoRtLTjqsMREflb7y63Z3hbrUjyZC/JEjmroaCCoLrcdvZVJKCj1Dmn
+vUG+CjThp9/7pkIH8sZSTkCIV/17LW03z07t3UpwPPbcwGfRb1GfYKtwPpeNyxtB
+UvEM36jeYInSE+IKsP8fN6E/c+0Qn6xwZJsCkcB+y/V/QXiuaMTi9MU+TGtQ03eh
+u4DMmoO5ITheuGLOGIqkhZ+OtlBxDbTnQsN1mvQ9zUiVMGqhAB1tagXnhVDpxm7I
+eonU/0kCgYEAwlMpItTeGMrC79tKQl/NlDyxg6o9aqFZ5uFn905yh5AcRY8rEMS9
+068HEJxh0xtmlsBhpWlaROeltHfUoPDTgI1F+4LijhfsAjMTLkCLIlm01GtkDSDw
+0ZV3cNDmZMgEjSC2E5qSxNaAREltsVnMjYt1yQbGjsWI6MPqtmB0Xl8CgYEA9ks/
+Nv5a9XRKqz9xsFsCZlTvV3fj63jFVP31IZS9UkZxq0alssBItEhsDpa+0s61z0ko
+0Ggwl9V2Wa4Y3/79igROU1MJPbxfC7HH9+KdgANKpO7p8EHC2YsmlT9tbn+/eSbl
+EqhoeculELQQzn3xbd5u7WBJqOJg0LvVhKM+ZRUCgYA9NLhGMknqASM5LRbMpSQ5
+Roya7en+ReftIp3+dQT50dg1yIxF8dHgdMaC4t6lAYJkhR+8W9yEy3mTyBJ+xpu3
+Z8fdGjKFkt9RKgkmjknEfgDIzzJqOC/hs3Q1YnbO03krglwW/J6xxOYNnBsiuygE
+hSKKOModefZPajXpT6QXfQKBgEaqyHSK/qY2u8Xu6jvjoQijjhjWuXqyqEv+ofsE
+pl2ZALxYBOsI6NNxhC+baR0rWlcjcqZ5fpfSE6cfoNuEWlLjcWXPCXPBPLQqSmoB
+h5dXWm+AbXcWJ0Yr+uIP1OJDnTixxEBaOb/YgoAMalYVJNSVYdaSLhBbA9RgUJ9C
+B4ERAoGAScLBJMcOVkQ/ulGbJKyjqis2aaQ0VBWPdQQ+OjBrRcG4oj7TUztxjy4F
+KTSEsIsbZa2cq+a7wCImzCPikv8teaTGoOVnU1rxN61LG2G4IDwFGoj9/br0rkM7
+7BVbYZiX+Z5DxA8ec/9pYP2TdF69zr8xT8Mm48gC6I/kYeRcGfo=
+-----END RSA PRIVATE KEY-----"""
+_JWT_PUBLIC_KEY = """-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAuvUH4Lt/lv6L2u2E9qg1
+5ZelZ7Olpmr7j9RhTr+3VybvKml5dntEUSXKO70WVkZ36rjMecbOVU2vrCyJTpIY
+ejqTp1c7O/67S7sdJPdLrKdL55JC9r24Zp5gjUKW8ZoVn325oOsRlO4vezgkS93m
+SFGuq7yyXe36SmG/xwkFcB6eu2W1IhuoHQkK47ja5PS1GuhctOKkYi9lqJPQYri6
+H3E7Cz1UHlQmdiY4T5porO1B9Dfe9P77g6zw8jwzhkce0ORrWyvAbA5BFN5SodXa
+BN3G4PhjdklDPn++AXYhhahWGZy8yVt81e+ra+jjHB7yutT5xDYzXY4JLF1FKsk4
+ywIDAQAB
+-----END PUBLIC KEY-----"""
 
 # ====================================================================
 # String / parsing helpers

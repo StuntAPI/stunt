@@ -2,9 +2,11 @@
 #
 # GET  /oauth2/authorize  → 302 to redirect_uri?code=CODE&state=STATE
 # POST /oauth2/token      → {access_token, id_token, refresh_token, ...}
-# GET  /oauth2/userInfo   → {sub, username, email, ...} (Bearer)
+# GET  /oauth2/userInfo   → {sub, username, email, ...} (Bearer; the access
+#                           token is a REAL RS256 JWT, verified on the way in)
 # GET  /login             → 302 to /oauth2/authorize (hosted UI login)
 # GET  /logout            → 302 to redirect_uri (hosted UI logout)
+# GET  /{userPoolId}/.well-known/jwks.json → JWKS for the signing key
 
 # on_authorize handles the authorization-code redirect.
 # GET /oauth2/authorize?client_id=&redirect_uri=&response_type=code&scope=&state=
@@ -58,13 +60,22 @@ def on_token(req):
     })
 
 # on_user_info returns the user info for a Bearer access token.
-# GET /oauth2/userInfo (Bearer)
+# GET /oauth2/userInfo (Bearer). The access token is a real RS256 JWT —
+# signature + exp + iss + token_use are verified cryptographically before
+# the store lookup (the way real Cognito validates userInfo callers).
 def on_user_info(req):
     tok = _bearer(req)
     if tok == "":
         return respond(401, {
             "error": "invalid_token",
             "error_description": "Access token is missing",
+        })
+
+    claims = _verify_jwt(tok, "access")
+    if claims == None:
+        return respond(401, {
+            "error": "invalid_token",
+            "error_description": "Invalid access token",
         })
 
     tc = store_collection("tokens")
@@ -108,6 +119,18 @@ def on_logout(req):
     if redirect == "":
         redirect = "/"
     return respond(302, headers={"Location": redirect})
+
+# on_jwks serves the user-pool JWKS (public signing keys) at the real
+# Cognito path /{userPoolId}/.well-known/jwks.json. The key is REAL:
+# derived from the fixed synthetic RSA keypair whose private half signs
+# the access/id tokens minted by _mint_jwt, so any standards-compliant
+# JWT library can verify them.
+def on_jwks(req):
+    key = crypto.rsa_public_jwk(_JWT_PUBLIC_KEY)
+    key["kid"] = _JWT_KID
+    key["alg"] = "RS256"
+    key["use"] = "sig"
+    return respond(200, {"keys": [key]})
 
 # --- internal ---
 
@@ -153,7 +176,7 @@ def _handle_auth_code_grant(body):
             "error_description": "User not found for this code",
         })
 
-    return respond(200, _issue_tokens(user))
+    return respond(200, _issue_tokens(user, client_id))
 
 def _handle_refresh_grant(body):
     presented = body.get("refresh_token", "")
@@ -179,14 +202,14 @@ def _handle_refresh_grant(body):
             "error_description": "User not found",
         })
 
-    return respond(200, _issue_tokens(user))
+    return respond(200, _issue_tokens(user, body.get("client_id", "mock-client-id")))
 
-def _issue_tokens(user):
+def _issue_tokens(user, client_id):
     access_seq = store_kv_incr("cognito", "access_seq")
     refresh_seq = store_kv_incr("cognito", "refresh_seq")
 
-    access = _mint_jwt(user["sub"], user["username"], user.get("email", ""), "acc" + str(access_seq))
-    id_token = _mint_jwt(user["sub"], user["username"], user.get("email", ""), "id" + str(access_seq))
+    access = _mint_jwt(user["sub"], user["username"], user.get("email", ""), "acc" + str(access_seq), client_id, "access")
+    id_token = _mint_jwt(user["sub"], user["username"], user.get("email", ""), "id" + str(access_seq), client_id, "id")
     refresh = "mock-refresh-token-" + str(refresh_seq)
 
     # Store the access token → user binding.

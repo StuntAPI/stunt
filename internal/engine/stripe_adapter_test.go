@@ -744,6 +744,473 @@ func postJSONAuthIdem(t *testing.T, url, token, idemKey string, body map[string]
 	return string(b), resp.StatusCode
 }
 
+// stripeCardNum assembles a test card number from <=4-digit chunks so no
+// long PAN literal appears in this file.
+func stripeCardNum(parts ...string) string {
+	return strings.Join(parts, "")
+}
+
+// newStripeTestServer boots the stripe-style adapter on a random port and
+// returns its base URL.
+func newStripeTestServer(t *testing.T) string {
+	t.Helper()
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "stripe-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"stripe": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	t.Cleanup(func() { e.Close() })
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	t.Cleanup(cancel)
+	time.Sleep(50 * time.Millisecond)
+	return addrs["stripe"]
+}
+
+// mintStripeCardToken creates a card token via POST /v1/tokens and returns
+// its tok_* id.
+func mintStripeCardToken(t *testing.T, base, number string) string {
+	t.Helper()
+	body, status := postJSONAuth(t, base+"/v1/tokens", devToken, map[string]any{
+		"card": map[string]any{"number": number, "exp_month": 12, "exp_year": 2030, "cvc": "123"},
+	})
+	if status != 201 {
+		t.Fatalf("POST /v1/tokens (card) -> %d, want 201; body %s", status, body)
+	}
+	var tok map[string]any
+	if err := json.Unmarshal([]byte(body), &tok); err != nil {
+		t.Fatalf("unmarshal token: %v (body %s)", err, body)
+	}
+	id, ok := tok["id"].(string)
+	if !ok || !strings.HasPrefix(id, "tok_") {
+		t.Fatalf("token id = %v, want tok_* prefix", tok["id"])
+	}
+	// The public token object must never echo the full number.
+	if strings.Contains(body, number) {
+		t.Fatalf("token response leaks the full card number: %s", body)
+	}
+	card, _ := tok["card"].(map[string]any)
+	if card == nil || card["last4"] != number[len(number)-4:] {
+		t.Fatalf("token card = %v, want last4 %s", tok["card"], number[len(number)-4:])
+	}
+	return id
+}
+
+// TestStripeStyleDeclineAndSCACards proves the real Stripe test-card magic
+// numbers drive the real outcomes through card tokens: declines (402
+// card_error with the real decline_code, PI last_payment_error) and SCA cards
+// (requires_action with use_stripe_sdk / redirect_to_url next_action; confirm
+// again completes 3DS).
+func TestStripeStyleDeclineAndSCACards(t *testing.T) {
+	base := newStripeTestServer(t)
+
+	createPI := func(amount float64) string {
+		body, status := postJSONAuth(t, base+"/v1/payment_intents", devToken, map[string]any{
+			"amount": amount, "currency": "usd",
+		})
+		if status != 201 {
+			t.Fatalf("create PI -> %d; body %s", status, body)
+		}
+		var pi map[string]any
+		json.Unmarshal([]byte(body), &pi)
+		return pi["id"].(string)
+	}
+
+	// ===== Decline on PI confirm: insufficient_funds =====
+	insufficient := stripeCardNum("4000", "0000", "0000", "9995")
+	tokInsuf := mintStripeCardToken(t, base, insufficient)
+	piID := createPI(2500)
+
+	body, status := postJSONAuth(t, base+"/v1/payment_intents/"+piID+"/confirm", devToken, map[string]any{"payment_method": tokInsuf})
+	if status != 402 {
+		t.Fatalf("confirm with insufficient_funds card -> %d, want 402; body %s", status, body)
+	}
+	var errResp map[string]any
+	json.Unmarshal([]byte(body), &errResp)
+	errObj := errResp["error"].(map[string]any)
+	if errObj["type"] != "card_error" || errObj["code"] != "card_declined" || errObj["decline_code"] != "insufficient_funds" {
+		t.Fatalf("decline error = %v, want card_error/card_declined/insufficient_funds", errObj)
+	}
+	if errObj["payment_intent"] != piID {
+		t.Fatalf("decline error payment_intent = %v, want %s", errObj["payment_intent"], piID)
+	}
+
+	// The PI survives with last_payment_error recorded.
+	body, status = getAuth(t, base+"/v1/payment_intents/"+piID, devToken)
+	if status != 200 {
+		t.Fatalf("GET declined PI -> %d", status)
+	}
+	var pi map[string]any
+	json.Unmarshal([]byte(body), &pi)
+	if pi["status"] != "requires_payment_method" {
+		t.Fatalf("declined PI status = %v, want requires_payment_method", pi["status"])
+	}
+	lpe, _ := pi["last_payment_error"].(map[string]any)
+	if lpe == nil || lpe["decline_code"] != "insufficient_funds" {
+		t.Fatalf("last_payment_error = %v, want decline_code insufficient_funds", pi["last_payment_error"])
+	}
+
+	// ===== Decline on charge create: expired_card code =====
+	expired := stripeCardNum("4000", "0000", "0000", "0069")
+	tokExpired := mintStripeCardToken(t, base, expired)
+	body, status = postJSONAuth(t, base+"/v1/charges", devToken, map[string]any{
+		"amount": 1000, "currency": "usd", "source": tokExpired,
+	})
+	if status != 402 {
+		t.Fatalf("charge with expired card -> %d, want 402; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &errResp)
+	errObj = errResp["error"].(map[string]any)
+	if errObj["code"] != "expired_card" || errObj["type"] != "card_error" {
+		t.Fatalf("expired error = %v, want expired_card/card_error", errObj)
+	}
+
+	// Decline on charge create also carries the insufficient_funds decline_code.
+	body, status = postJSONAuth(t, base+"/v1/charges", devToken, map[string]any{
+		"amount": 1000, "currency": "usd", "source": tokInsuf,
+	})
+	if status != 402 {
+		t.Fatalf("charge with insufficient card -> %d, want 402; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &errResp)
+	if errResp["error"].(map[string]any)["decline_code"] != "insufficient_funds" {
+		t.Fatalf("charge decline_code = %v, want insufficient_funds", errResp["error"])
+	}
+
+	// ===== SCA: use_stripe_sdk =====
+	sdk := stripeCardNum("4000", "0027", "6000", "3184")
+	tokSDK := mintStripeCardToken(t, base, sdk)
+	piSDK := createPI(1800)
+	body, status = postJSONAuth(t, base+"/v1/payment_intents/"+piSDK+"/confirm", devToken, map[string]any{"payment_method": tokSDK})
+	if status != 200 {
+		t.Fatalf("confirm with SCA sdk card -> %d, want 200; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &pi)
+	if pi["status"] != "requires_action" {
+		t.Fatalf("SCA PI status = %v, want requires_action", pi["status"])
+	}
+	na, _ := pi["next_action"].(map[string]any)
+	if na == nil || na["type"] != "use_stripe_sdk" {
+		t.Fatalf("next_action = %v, want type use_stripe_sdk", pi["next_action"])
+	}
+	sdkSrc, _ := na["use_stripe_sdk"].(map[string]any)
+	if sdkSrc == nil || !strings.HasPrefix(sdkSrc["stripe_js"].(string), "https://hooks.stripe.com/3d_secure_2/test/") {
+		t.Fatalf("use_stripe_sdk = %v, want a stripe_js hooks URL", na["use_stripe_sdk"])
+	}
+
+	// Confirm again completes authentication -> succeeded.
+	body, status = postJSONAuth(t, base+"/v1/payment_intents/"+piSDK+"/confirm", devToken, map[string]any{"payment_method": tokSDK})
+	if status != 200 {
+		t.Fatalf("re-confirm SCA PI -> %d; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &pi)
+	if pi["status"] != "succeeded" {
+		t.Fatalf("re-confirmed SCA PI status = %v, want succeeded", pi["status"])
+	}
+	if pi["amount_received"].(float64) != 1800 {
+		t.Fatalf("re-confirmed amount_received = %v, want 1800", pi["amount_received"])
+	}
+	if pi["next_action"] != nil {
+		t.Fatalf("next_action after completion = %v, want null", pi["next_action"])
+	}
+
+	// ===== SCA: redirect_to_url =====
+	redirect := stripeCardNum("4000", "0025", "0000", "3155")
+	tokRed := mintStripeCardToken(t, base, redirect)
+	piRed := createPI(3200)
+	body, status = postJSONAuth(t, base+"/v1/payment_intents/"+piRed+"/confirm", devToken, map[string]any{
+		"payment_method": tokRed, "return_url": "https://example.test/return",
+	})
+	if status != 200 {
+		t.Fatalf("confirm with SCA redirect card -> %d, want 200; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &pi)
+	if pi["status"] != "requires_action" {
+		t.Fatalf("redirect SCA PI status = %v, want requires_action", pi["status"])
+	}
+	na, _ = pi["next_action"].(map[string]any)
+	if na == nil || na["type"] != "redirect_to_url" {
+		t.Fatalf("next_action = %v, want type redirect_to_url", pi["next_action"])
+	}
+	red, _ := na["redirect_to_url"].(map[string]any)
+	if red == nil || !strings.HasPrefix(red["url"].(string), "https://hooks.stripe.com/3d_secure_2/test/") {
+		t.Fatalf("redirect_to_url = %v, want a hooks url", na["redirect_to_url"])
+	}
+	if red["return_url"] != "https://example.test/return" {
+		t.Fatalf("return_url = %v, want the echoed return_url", red["return_url"])
+	}
+
+	// Confirm again -> succeeded.
+	body, status = postJSONAuth(t, base+"/v1/payment_intents/"+piRed+"/confirm", devToken, map[string]any{"payment_method": tokRed})
+	if status != 200 {
+		t.Fatalf("re-confirm redirect PI -> %d; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &pi)
+	if pi["status"] != "succeeded" {
+		t.Fatalf("re-confirmed redirect PI status = %v, want succeeded", pi["status"])
+	}
+
+	// ===== SCA on the legacy Charges API: authentication_required decline =====
+	body, status = postJSONAuth(t, base+"/v1/charges", devToken, map[string]any{
+		"amount": 900, "currency": "usd", "source": tokRed,
+	})
+	if status != 402 {
+		t.Fatalf("charge with SCA card -> %d, want 402; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &errResp)
+	if errResp["error"].(map[string]any)["decline_code"] != "authentication_required" {
+		t.Fatalf("SCA charge decline_code = %v, want authentication_required", errResp["error"])
+	}
+
+	// ===== Failure path: confirming an already-succeeded PI -> 400 =====
+	body, status = postJSONAuth(t, base+"/v1/payment_intents/"+piSDK+"/confirm", devToken, map[string]any{"payment_method": tokSDK})
+	if status != 400 {
+		t.Fatalf("confirm succeeded PI -> %d, want 400; body %s", status, body)
+	}
+}
+
+// TestStripeStyleRefundLifecycle proves refunds have their own lifecycle
+// (pending -> succeeded via derive-on-read after ~3s, or -> failed with
+// simulate_fail), that the over-refund guard spans ALL non-failed refunds of
+// the payment/charge, and that the charge-level refund route honors amount.
+func TestStripeStyleRefundLifecycle(t *testing.T) {
+	base := newStripeTestServer(t)
+
+	// capturedCharge creates + captures a plain charge of `amount` cents.
+	capturedCharge := func(amount float64) string {
+		body, status := postJSONAuth(t, base+"/v1/charges", devToken, map[string]any{
+			"amount": amount, "currency": "usd",
+		})
+		if status != 201 {
+			t.Fatalf("create charge -> %d; body %s", status, body)
+		}
+		var ch map[string]any
+		json.Unmarshal([]byte(body), &ch)
+		id := ch["id"].(string)
+		body, status = postJSONAuth(t, base+"/v1/charges/"+id+"/capture", devToken, map[string]any{})
+		if status != 200 {
+			t.Fatalf("capture charge -> %d; body %s", status, body)
+		}
+		return id
+	}
+
+	// ===== Full refund starts pending; over-refund rejected immediately =====
+	ch1 := capturedCharge(5000)
+	body, status := postJSONAuth(t, base+"/v1/refunds", devToken, map[string]any{"charge": ch1})
+	if status != 201 {
+		t.Fatalf("full refund -> %d; body %s", status, body)
+	}
+	var r1 map[string]any
+	json.Unmarshal([]byte(body), &r1)
+	if r1["status"] != "pending" {
+		t.Fatalf("fresh refund status = %v, want pending", r1["status"])
+	}
+	r1ID := r1["id"].(string)
+
+	body, status = postJSONAuth(t, base+"/v1/refunds", devToken, map[string]any{"charge": ch1, "amount": 100})
+	if status != 400 {
+		t.Fatalf("over-refund after full pending refund -> %d, want 400; body %s", status, body)
+	}
+	var errResp map[string]any
+	json.Unmarshal([]byte(body), &errResp)
+	if errResp["error"].(map[string]any)["code"] != "charge_already_refunded" {
+		t.Fatalf("already-refunded error = %v, want charge_already_refunded", errResp["error"])
+	}
+
+	// ===== Partial refund: exact remaining allowed, over-remaining rejected =====
+	ch2 := capturedCharge(8000)
+	body, status = postJSONAuth(t, base+"/v1/refunds", devToken, map[string]any{"charge": ch2, "amount": 3000})
+	if status != 201 {
+		t.Fatalf("partial refund -> %d; body %s", status, body)
+	}
+	var r2 map[string]any
+	json.Unmarshal([]byte(body), &r2)
+	r2ID := r2["id"].(string)
+	body, status = postJSONAuth(t, base+"/v1/refunds", devToken, map[string]any{"charge": ch2, "amount": 5001})
+	if status != 400 {
+		t.Fatalf("over-remaining refund -> %d, want 400; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &errResp)
+	if !strings.Contains(errResp["error"].(map[string]any)["message"].(string), "greater than unrefunded amount") {
+		t.Fatalf("over-refund message = %v", errResp["error"])
+	}
+	// The exact remaining balance is allowed (another pending refund).
+	if _, status := postJSONAuth(t, base+"/v1/refunds", devToken, map[string]any{"charge": ch2, "amount": 5000}); status != 201 {
+		t.Fatalf("exact-remaining refund -> %d, want 201", status)
+	}
+
+	// ===== simulate_fail drives the failed terminal =====
+	ch3 := capturedCharge(2000)
+	body, status = postJSONAuth(t, base+"/v1/refunds", devToken, map[string]any{
+		"charge": ch3, "simulate_fail": true,
+	})
+	if status != 201 {
+		t.Fatalf("simulate_fail refund -> %d; body %s", status, body)
+	}
+	var r3 map[string]any
+	json.Unmarshal([]byte(body), &r3)
+	r3ID := r3["id"].(string)
+
+	// ===== One clock hop: every pending refund derives its terminal state =====
+	time.Sleep(3500 * time.Millisecond)
+
+	body, status = getAuth(t, base+"/v1/refunds/"+r1ID, devToken)
+	if status != 200 {
+		t.Fatalf("GET refund r1 -> %d", status)
+	}
+	json.Unmarshal([]byte(body), &r1)
+	if r1["status"] != "succeeded" {
+		t.Fatalf("r1 status = %v, want succeeded", r1["status"])
+	}
+	body, status = getAuth(t, base+"/v1/charges/"+ch1, devToken)
+	if status != 200 {
+		t.Fatalf("GET ch1 -> %d", status)
+	}
+	var ch map[string]any
+	json.Unmarshal([]byte(body), &ch)
+	if ch["amount_refunded"].(float64) != 5000 || ch["refunded"] != true || ch["status"] != "refunded" {
+		t.Fatalf("ch1 after full refund = amount_refunded %v refunded %v status %v", ch["amount_refunded"], ch["refunded"], ch["status"])
+	}
+
+	body, status = getAuth(t, base+"/v1/refunds/"+r2ID, devToken)
+	json.Unmarshal([]byte(body), &r2)
+	if r2["status"] != "succeeded" {
+		t.Fatalf("r2 status = %v, want succeeded", r2["status"])
+	}
+
+	body, status = getAuth(t, base+"/v1/refunds/"+r3ID, devToken)
+	json.Unmarshal([]byte(body), &r3)
+	if r3["status"] != "failed" {
+		t.Fatalf("r3 status = %v, want failed", r3["status"])
+	}
+	// A failed refund frees the balance: the full amount is refundable again.
+	if _, status := postJSONAuth(t, base+"/v1/refunds", devToken, map[string]any{"charge": ch3}); status != 201 {
+		t.Fatalf("refund after failed refund -> %d, want 201", status)
+	}
+
+	// ===== Charge-level refund route honors amount =====
+	ch4 := capturedCharge(6000)
+	body, status = postJSONAuth(t, base+"/v1/charges/"+ch4+"/refund", devToken, map[string]any{"amount": 2500})
+	if status != 200 {
+		t.Fatalf("charge-route partial refund -> %d; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &ch)
+	if ch["amount_refunded"].(float64) != 2500 || ch["refunded"] != false || ch["status"] != "succeeded" {
+		t.Fatalf("ch4 after partial refund = amount_refunded %v refunded %v status %v", ch["amount_refunded"], ch["refunded"], ch["status"])
+	}
+	// Over-refunding through the charge route hits the same guard.
+	body, status = postJSONAuth(t, base+"/v1/charges/"+ch4+"/refund", devToken, map[string]any{"amount": 99999})
+	if status != 400 {
+		t.Fatalf("charge-route over-refund -> %d, want 400; body %s", status, body)
+	}
+}
+
+// TestStripeStyleEvents proves every emitted webhook is recorded as a Stripe
+// event object: the /v1/events list (newest first, type filter), single-event
+// retrieval, and the 404 failure path.
+func TestStripeStyleEvents(t *testing.T) {
+	base := newStripeTestServer(t)
+
+	body, status := postJSONAuth(t, base+"/v1/charges", devToken, map[string]any{
+		"amount": 4400, "currency": "usd",
+	})
+	if status != 201 {
+		t.Fatalf("create charge -> %d; body %s", status, body)
+	}
+	var ch map[string]any
+	json.Unmarshal([]byte(body), &ch)
+	chargeID := ch["id"].(string)
+	if _, status := postJSONAuth(t, base+"/v1/charges/"+chargeID+"/capture", devToken, map[string]any{}); status != 200 {
+		t.Fatalf("capture -> %d", status)
+	}
+
+	// List contains a charge.created event carrying the charge payload.
+	body, status = getAuth(t, base+"/v1/events", devToken)
+	if status != 200 {
+		t.Fatalf("GET /v1/events -> %d; body %s", status, body)
+	}
+	var list map[string]any
+	json.Unmarshal([]byte(body), &list)
+	if list["object"] != "list" {
+		t.Fatalf("events list object = %v, want list", list["object"])
+	}
+	data, _ := list["data"].([]any)
+	var evtID string
+	found := false
+	for _, e := range data {
+		ev := e.(map[string]any)
+		if ev["type"] == "charge.created" && ev["object"] == "event" {
+			payload := ev["data"].(map[string]any)["object"].(map[string]any)
+			if payload["id"] == chargeID {
+				found = true
+				evtID = ev["id"].(string)
+				if !strings.HasPrefix(evtID, "evt_") {
+					t.Fatalf("event id = %s, want evt_* prefix", evtID)
+				}
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("no charge.created event for %s in %d events", chargeID, len(data))
+	}
+
+	// Newest first: charge.updated (capture) precedes charge.created.
+	body, status = getAuth(t, base+"/v1/events", devToken)
+	json.Unmarshal([]byte(body), &list)
+	data, _ = list["data"].([]any)
+	if len(data) >= 2 {
+		if data[0].(map[string]any)["type"] != "charge.updated" {
+			t.Fatalf("first event type = %v, want charge.updated (newest first)", data[0].(map[string]any)["type"])
+		}
+	}
+
+	// Single-event retrieval.
+	body, status = getAuth(t, base+"/v1/events/"+evtID, devToken)
+	if status != 200 {
+		t.Fatalf("GET /v1/events/%s -> %d; body %s", evtID, status, body)
+	}
+	var ev map[string]any
+	json.Unmarshal([]byte(body), &ev)
+	if ev["id"] != evtID || ev["data"].(map[string]any)["object"].(map[string]any)["id"] != chargeID {
+		t.Fatalf("retrieved event = %v", ev)
+	}
+
+	// type filter returns only matching events.
+	body, status = getAuth(t, base+"/v1/events?type=charge.updated", devToken)
+	if status != 200 {
+		t.Fatalf("GET /v1/events?type= -> %d; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &list)
+	data, _ = list["data"].([]any)
+	if len(data) < 1 {
+		t.Fatal("type=charge.updated returned no events")
+	}
+	for _, e := range data {
+		if e.(map[string]any)["type"] != "charge.updated" {
+			t.Fatalf("type filter leaked %v", e.(map[string]any)["type"])
+		}
+	}
+
+	// Failure path: unknown event id -> 404.
+	if _, status := getAuth(t, base+"/v1/events/evt_does_not_exist", devToken); status != 404 {
+		t.Fatalf("GET unknown event -> %d, want 404", status)
+	}
+}
+
 // TestStripeStylePaymentIntents exercises the canonical modern payment flow:
 // PaymentMethod → PaymentIntent (automatic + manual capture) → confirm/capture
 // state machine → first-class Refunds (full + partial) → list, plus the

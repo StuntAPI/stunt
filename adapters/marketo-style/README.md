@@ -19,6 +19,26 @@ marketing automation integrations during local development:
   project with `fields=id,firstName,lastName,...`),
   `POST /rest/v1/leads` (create/update), `GET /rest/v1/leads/{id}`,
   `POST /rest/v1/leads.json` (sync leads bulk upsert).
+- **Lead describe:** `GET /rest/v1/leads/describe` — field metadata shape
+  (`displayName`, `name`, `dataType`, `length`, `rest`/`soap`/`multipart` bindings).
+- **Sync results carry per-record status:** every sync/create result entry is
+  `{id, status}` with status `created` / `updated` / `skipped`. `updateOnly`
+  on a lead that does not exist returns `{"status":"skipped","reasons":[{"code":"1013","message":"Lead not found"}]}`
+  — never a silent create. **Custom fields** on input records (e.g. `company`,
+  `leadScore`) are preserved through creates and merged updates.
+- **Bulk Lead Extract (derive-on-read async):** `POST /bulk/v1/leads/export/create`
+  enqueues a job (`Queued`); `GET /bulk/v1/leads/export/{exportId}/status` polls
+  it through the real Marketo status vocabulary — `Queued` → `Processing`
+  (after ~1s) → `Completed` (after ~3s). On the poll that first reaches
+  `Completed` the CSV result is enqueued (rendered once, `fileSize` +
+  `fileChecksum` reported) and a signed webhook fires exactly once
+  (`X-Stunt-Signature: sha256=<hex HMAC-SHA256 of the body, secret
+  "marketo-style-webhook-secret">` — simulator extension; register the target
+  with `events_register`). `GET /bulk/v1/leads/export/{exportId}/file`
+  downloads the CSV (`text/csv`); before completion it fails with code `1030`.
+  `POST .../cancel` pins a queued/processing job to `Cancelled` (cancelling a
+  completed job fails with `1030`). The `.json`-suffixed variants of all four
+  routes are supported.
 - **Campaigns (stateful):** `GET /rest/v1/campaigns` → list campaigns,
   `POST /rest/v1/campaigns/{id}/trigger` → trigger a campaign for lead IDs.
 - **Programs:** `GET /rest/v1/programs` → marketing programs.
@@ -84,6 +104,11 @@ Common error codes: `601` (auth missing), `602` (quota exceeded), `603` (access 
 | GET | `/rest/v1/leads/{id}` | `leads.star#on_get_lead` | Get lead |
 | GET | `/rest/v1/leads/{id}.json` | `leads.star#on_get_lead_json` | Get lead (.json) |
 | POST | `/rest/v1/leads.json` | `leads.star#on_sync_leads` | Sync leads (bulk) |
+| GET | `/rest/v1/leads/describe` | `leads.star#on_describe` | Lead field metadata |
+| POST | `/bulk/v1/leads/export/create(.json)` | `export.star#on_export_create` | Enqueue bulk lead extract |
+| GET | `/bulk/v1/leads/export/{exportId}/status(.json)` | `export.star#on_export_status` | Poll export job status |
+| GET | `/bulk/v1/leads/export/{exportId}/file(.json)` | `export.star#on_export_file` | Download CSV result |
+| POST | `/bulk/v1/leads/export/{exportId}/cancel(.json)` | `export.star#on_export_cancel` | Cancel export job |
 | GET | `/rest/v1/campaigns` | `campaigns.star#on_list` | List campaigns |
 | POST | `/rest/v1/campaigns/{id}/trigger` | `campaigns.star#on_trigger` | Trigger campaign |
 | GET | `/rest/v1/programs` | `programs.star#on_list_programs` | List programs |
@@ -101,6 +126,7 @@ Common error codes: `601` (auth missing), `602` (quota exceeded), `603` (access 
 | `folders` | Folder hierarchy (seeded) |
 | `activities` | Lead activities (seeded) |
 | `tokens` | OAuth access tokens |
+| `exports` | Bulk lead extract jobs |
 
 ## Usage
 

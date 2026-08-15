@@ -5,9 +5,11 @@
 # they were builtins — without Starlark's load() (which stunt does not
 # support). See internal/starlark/vm.go LoadWithLib.
 #
-# JWT validation here is STRUCTURAL only: we decode the JOSE header from
-# base64url and confirm alg=="ES256". We do NOT verify the ECDSA signature
-# (documented stretch goal). See README for details.
+# JWTs are cryptographically REAL here: id_tokens are minted with
+# crypto.ecdsa_sign_p256 (ES256, raw r||s signature) over a fixed synthetic
+# EC P-256 keypair, the JWKS at /auth/keys is derived from the same key via
+# crypto.ec_public_jwk, and inbound client_secret JWTs are VERIFIED with
+# crypto.ecdsa_verify_p256 (signature + alg + aud + exp claims). See README.
 
 # --- base64url decode (pure Starlark, no builtins) ---
 
@@ -118,37 +120,108 @@ def _jwt_payload(token):
 def _contains(s, substr):
     return s.find(substr) >= 0
 
-# _mint_jwt creates a plausible JWT string (header.payload.signature) with an
-# ES256 JOSE header. The signature is NOT a real ECDSA signature — it's a
-# synthetic placeholder. Used for minting id_tokens.
-def _mint_jwt(header_json, payload_json):
-    h = _b64url_encode(header_json)
-    p = _b64url_encode(payload_json)
-    sig = "c3ludGhldGljLXNpZ25hdHVyZS1wbGFjZWhvbGRlcg"
-    return h + "." + p + "." + sig
+# _b64url_ok reports whether seg is a syntactically valid unpadded
+# base64url segment (alphabet chars only, length not == 1 mod 4). Guards the
+# crypto.base64url_decode builtin, which errors (500) on malformed input.
+def _b64url_ok(seg):
+    if seg == "":
+        return False
+    if len(seg) % 4 == 1:
+        return False
+    for i in range(len(seg)):
+        if _B64URL.find(seg[i]) < 0:
+            return False
+    return True
 
-# _check_client_secret_jwt validates the client_secret JWT structurally.
-# Sign in with Apple uses a signed JWT as the client_secret.
-# Returns True if structurally valid (ES256 JOSE header + 3 segments).
+# _jwt_json decodes a JWT segment (0=header, 1=payload) into a Starlark
+# dict via crypto.base64url_decode + json.decode, or None when malformed.
+# Shape guards keep json.decode from erroring on garbage (a Starlark
+# evaluation error would surface as a 500, not a 4xx).
+def _jwt_json(token, seg):
+    parts = token.split(".")
+    if len(parts) != 3:
+        return None
+    if not _b64url_ok(parts[0]) or not _b64url_ok(parts[1]) or not _b64url_ok(parts[2]):
+        return None
+    txt = crypto.base64url_decode(parts[seg])
+    if txt == "" or txt[:1] != "{" or txt[-1:] != "}" or txt.find('"') < 0:
+        return None
+    for i in range(len(txt)):
+        if ord(txt[i]) < 0x20:
+            return None
+    return json.decode(txt)
+
+# _claim_int coerces a claim value to int (JSON numbers decode as int;
+# guard anyway). Returns None when absent/None.
+def _claim_int(v):
+    if v == None:
+        return None
+    if type(v) == "int":
+        return v
+    return None
+
+# _mint_jwt signs header_json/payload_json (compact JSON strings) into a real
+# ES256 JWT: base64url(header).base64url(payload).base64url(raw r||s ECDSA
+# P-256 signature over "header.payload").
+def _mint_jwt(header_json, payload_json):
+    h = crypto.base64url_encode(header_json)
+    p = crypto.base64url_encode(payload_json)
+    signing_input = h + "." + p
+    sig = crypto.ecdsa_sign_p256(_JWT_PRIVATE_KEY, signing_input, encoding="base64url")
+    return signing_input + "." + sig
+
+# _check_client_secret_jwt validates the client_secret JWT cryptographically.
+# Sign in with Apple uses an ES256-signed JWT as the client_secret; the mock
+# verifies it against the same fixed synthetic P-256 keypair that backs the
+# served JWKS (documented as the locally "registered" developer key).
+# Checks: 3 segments, alg==ES256 JOSE header, ECDSA signature over
+# header.payload, aud=="https://appleid.apple.com", exp in the future.
 def _check_client_secret_jwt(jwt_str):
     if jwt_str == "" or jwt_str == None:
         return False
+    header = _jwt_json(jwt_str, 0)
+    if header == None:
+        return False
+    if header.get("alg", "") != "ES256":
+        return False
     parts = jwt_str.split(".")
-    if len(parts) != 3:
+    if not crypto.ecdsa_verify_p256(_JWT_PUBLIC_KEY, parts[0] + "." + parts[1], parts[2], encoding="base64url"):
         return False
-    header = _jose_header(jwt_str)
-    if header == "":
+    claims = _jwt_json(jwt_str, 1)
+    if claims == None:
         return False
-    if not _contains(header, "ES256"):
+    if claims.get("aud", "") != "https://appleid.apple.com":
+        return False
+    exp = _claim_int(claims.get("exp", None))
+    if exp == None:
+        return False
+    if clock.now_unix() >= exp:
         return False
     return True
 
-# _mint_id_token creates a Sign in with Apple id_token JWT.
-# The payload contains: iss, aud, sub, email, email_verified, is_private_email.
+# _mint_id_token creates a real ES256-signed Sign in with Apple id_token.
+# The payload contains iss, aud (the client_id / services ID), sub, email,
+# email_verified, is_private_email, auth_time, iat, exp (1h) and
+# nonce_supported, mirroring Apple's documented claim set.
 def _mint_id_token(client_id, user_id, email):
-    header = "{\"alg\":\"ES256\",\"kid\":\"A1B2C3D4E5\",\"typ\":\"JWT\"}"
-    payload = "{\"iss\":\"https://appleid.apple.com\",\"aud\":\"" + client_id + "\",\"sub\":\"" + user_id + "\",\"email\":\"" + email + "\",\"email_verified\":\"true\",\"is_private_email\":\"false\",\"auth_time\":1700000000,\"nonce_supported\":true}"
+    now = clock.now_unix()
+    header = "{\"alg\":\"ES256\",\"kid\":\"" + _JWT_KID + "\",\"typ\":\"JWT\"}"
+    payload = "{\"iss\":\"https://appleid.apple.com\",\"aud\":\"" + client_id + "\",\"sub\":\"" + user_id + "\",\"email\":\"" + email + "\",\"email_verified\":\"true\",\"is_private_email\":\"false\",\"auth_time\":" + str(now) + ",\"iat\":" + str(now) + ",\"exp\":" + str(now + 3600) + ",\"nonce_supported\":true}"
     return _mint_jwt(header, payload)
+
+# Fixed synthetic EC P-256 keypair used to sign id_tokens and verify
+# client_secret JWTs. The public half is served at GET /auth/keys. This is
+# throwaway mock key material — it exists nowhere but this repository.
+_JWT_KID = "mock-siwa-key-1"
+_JWT_PRIVATE_KEY = """-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwp+ZPlH6FJFcHfYS
+Nd1ENT6RzZQUkTDz67JzlvlvoRShRANCAAREw7SM/k20F3w/oDzR9M6V6jHDK4Hi
+RkybQejVvpvgn2EoiMcG6uzUH+aAOgtE+0wCB2gWqc5DoeX6fHyFgDqT
+-----END PRIVATE KEY-----"""
+_JWT_PUBLIC_KEY = """-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAERMO0jP5NtBd8P6A80fTOleoxwyuB
+4kZMm0Ho1b6b4J9hKIjHBurs1B/mgDoLRPtMAgdoFqnOQ6Hl+nx8hYA6kw==
+-----END PUBLIC KEY-----"""
 
 # --- misc helpers ---
 

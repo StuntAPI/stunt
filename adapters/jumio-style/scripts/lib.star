@@ -47,6 +47,49 @@ def _derive_scan_status(doc):
         return "DONE"
     return "PENDING"
 
+# ============================================================================
+# REJECTION REASON CODES
+# ============================================================================
+# When a Netverify scan ends FAILED, the retrieval response carries the
+# rejection reason. These are Netverify's real reject-reason values (see the
+# Jumio docs' reject reasons table); a scan created with simulate_fail and
+# no explicit reason defaults to MANIPULATED_DOCUMENT.
+
+_REJECT_DESCRIPTIONS = {
+    "CANCELLED_BY_USER": "The user cancelled the transaction.",
+    "COMPROMISED_DOCUMENT": "The security features of the document are compromised.",
+    "DATE_OF_BIRTH_MISMATCH": "The date of birth does not match the document data.",
+    "DOCUMENT_EXPIRED": "The document has expired.",
+    "DOCUMENT_NOT_FOUND": "The document could not be located/read.",
+    "DOCUMENT_TYPE_MISMATCH": "The uploaded document does not match the expected type.",
+    "DUPLICATE": "A duplicate transaction was detected.",
+    "EXPIRED_TRANSACTION": "The transaction expired before completion.",
+    "FORGED_IMAGES": "Forged images were detected.",
+    "MANIPULATED_DOCUMENT": "The document showed signs of digital manipulation.",
+    "PAPER_DOCUMENT": "A picture of a paper copy was submitted.",
+    "PHOTOCOPY": "The uploaded image is a photocopy.",
+    "SCREEN_CAPTURE": "The uploaded image is a screen capture.",
+    "SELFIE_WITH_PAPER_DOCUMENT": "The selfie shows a paper document.",
+    "SUSPECTED_DOCUMENT": "The document is suspected to be fraudulent.",
+    "SYSTEM_ABORT": "The transaction was aborted by the system.",
+}
+
+_DEFAULT_REJECT_REASON = "MANIPULATED_DOCUMENT"
+
+# _reject_reason resolves the stored rejection reason for a FAILED scan,
+# falling back to the default reason.
+def _reject_reason(doc):
+    reason = doc.get("_reject", "")
+    if reason == None or reason == "":
+        return _DEFAULT_REJECT_REASON
+    return reason
+
+# _reject_description maps a reject reason to its human-readable text
+# ("" when unknown).
+def _reject_description(reason):
+    return _REJECT_DESCRIPTIONS.get(reason, "")
+
+
 # scans.star defines _advance_scan, which derives the scan's current status
 # from the clock (via _derive_scan_status), persists the transition, and
 # fires once-only side effects (signed webhook + extracted data seeding) at

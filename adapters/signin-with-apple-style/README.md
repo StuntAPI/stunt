@@ -19,7 +19,10 @@ verification, and the JWKS endpoint.
   `{access_token, id_token, refresh_token}`.
 - **Refresh:** `POST /auth/token` (refresh_token grant) → new access_token.
 - **JWKS:** `GET /auth/keys` → public key set for id_token verification.
-- **id_token:** A JWT with `{iss:"https://appleid.apple.com",aud,sub,email,...}`.
+- **id_token:** A REAL ES256-signed JWT with
+  `{iss:"https://appleid.apple.com",aud,sub,email,iat,exp,...}`.
+- **Client-secret verification:** the `client_secret` JWT is verified
+  cryptographically (ES256 signature + `aud` + `exp` claims).
 - **Stateful auth codes:** single-use (consumed on exchange).
 
 ## Endpoints
@@ -28,26 +31,42 @@ verification, and the JWKS endpoint.
 |--------|-------|---------|-------------|
 | GET | `/auth/authorize` | `oauth.star#on_authorize` | 302 redirect with code+state |
 | POST | `/auth/token` | `oauth.star#on_token` | Token exchange + refresh |
-| GET | `/auth/keys` | `oauth.star#on_get_keys` | JWKS public key set |
+| GET | `/auth/keys` | `oauth.star#on_get_keys` | JWKS public key set (real P-256 key) |
 
-## JWT validation
+## JWT verification (real crypto)
 
-This adapter performs **structural validation** of the `client_secret` JWT:
+This adapter performs **full cryptographic verification** of the inbound
+`client_secret` JWT, exactly the way Apple's token endpoint does (modulo the
+fixed mock key):
 
 1. The `client_secret` form parameter must be a JWT (3 dot-separated segments).
-2. The JOSE header (segment 0) is **base64url-decoded** and checked to contain
-   `ES256` (the `alg` claim).
+2. The JOSE header (decoded via `crypto.base64url_decode` + `json.decode`) must
+   carry `alg:"ES256"`.
+3. The ES256 signature over `header.payload` is verified with
+   `crypto.ecdsa_verify_p256` against the adapter's fixed synthetic P-256
+   public key.
+4. Claims are enforced: `aud` must be `https://appleid.apple.com` and `exp`
+   must be in the future (checked against `clock.now_unix()`).
 
-**Signature crypto is NOT verified.** Real ECDSA signature verification is the
-documented stretch goal.
+A malformed, forged, or expired `client_secret` returns
+`400 {"error":"invalid_client"}`.
 
-The **id_token** returned by the token endpoint is a structurally valid JWT with
-an ES256 JOSE header. Its payload contains the standard Sign in with Apple claims:
-`iss`, `aud`, `sub`, `email`, `email_verified`, `is_private_email`.
+The **id_token** returned by the token endpoint is a real ES256 JWT signed with
+the private half of the same keypair (raw `r||s` signature). Its payload
+contains the standard Sign in with Apple claims: `iss`, `aud`, `sub`, `email`,
+`email_verified`, `is_private_email`, `auth_time`, `iat`, `exp` (1 hour),
+`nonce_supported`. The public half is served at `GET /auth/keys` (via
+`crypto.ec_public_jwk`), so any standards-compliant JWT library can verify it.
 
-Real Sign in with Apple client_secrets are signed ES256 with header
-`{alg:"ES256",kid:<keyId>,typ:"JWT"}` and payload
-`{iss:<teamId>,iat,exp,aud:"https://appleid.apple.com",sub:<clientId>}`.
+### Test key material
+
+The fixed synthetic EC P-256 keypair lives in `scripts/lib.star`
+(`_JWT_PRIVATE_KEY` / `_JWT_PUBLIC_KEY`, kid `mock-siwa-key-1`). It is
+throwaway mock material that exists nowhere else. To mint a client_secret
+accepted by this adapter, sign an ES256 JWT with the private key
+(PKCS#8 PEM above) and payload
+`{iss:<teamId>,iat,exp,aud:"https://appleid.apple.com",sub:<clientId>}` —
+see `internal/engine/signin_with_apple_style_test.go` for a worked example.
 
 ## Usage
 

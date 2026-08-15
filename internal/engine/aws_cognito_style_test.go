@@ -3,11 +3,20 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -133,6 +142,66 @@ func TestAWSCognitoStyleAdapter(t *testing.T) {
 	}
 	if strings.Count(idToken, ".") != 2 {
 		t.Fatalf("id_token is not JWT-shaped (expected 3 segments): %s", idToken)
+	}
+
+	// ===== JWKS: tokens are real RS256 JWTs verifiable against the served key =====
+
+	jwksBody, jwksStatus := cognitoGetNoAuth(t, base+"/mock-user-pool/.well-known/jwks.json")
+	if jwksStatus != 200 {
+		t.Fatalf("GET jwks -> status %d, want 200; body %s", jwksStatus, jwksBody)
+	}
+	var jwks struct {
+		Keys []map[string]any `json:"keys"`
+	}
+	if err := json.Unmarshal([]byte(jwksBody), &jwks); err != nil {
+		t.Fatalf("unmarshal jwks: %v (body %s)", err, jwksBody)
+	}
+	if len(jwks.Keys) != 1 {
+		t.Fatalf("jwks keys = %d, want 1", len(jwks.Keys))
+	}
+	jwk := jwks.Keys[0]
+	if jwk["kty"] != "RSA" || jwk["alg"] != "RS256" || jwk["use"] != "sig" {
+		t.Fatalf("jwks key = %v, want RSA/RS256/sig", jwk)
+	}
+	cognitoVerifyRS256(t, accessToken, jwk, clientID)
+	cognitoVerifyRS256(t, idToken, jwk, clientID)
+
+	// Header must carry the JWKS kid.
+	hdrBytes, err := base64.RawURLEncoding.DecodeString(strings.Split(accessToken, ".")[0])
+	if err != nil {
+		t.Fatalf("decode header: %v", err)
+	}
+	var hdr map[string]any
+	if err := json.Unmarshal(hdrBytes, &hdr); err != nil {
+		t.Fatalf("unmarshal header: %v", err)
+	}
+	if hdr["kid"] != jwk["kid"] {
+		t.Fatalf("header kid = %v, want %v", hdr["kid"], jwk["kid"])
+	}
+
+	// ===== userInfo with a tampered signature → 401 =====
+
+	tampered := cognitoTamperToken(accessToken)
+	body, status = cognitoGetBearer(t, base+"/oauth2/userInfo", tampered)
+	if status != 401 {
+		t.Fatalf("userInfo with tampered token -> status %d, want 401; body %s", status, body)
+	}
+
+	// ===== GetUser with an expired token → NotAuthorizedException =====
+
+	expiredTok := cognitoMintExpiredToken(t, clientID)
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.GetUser",
+		map[string]any{"AccessToken": expiredTok})
+	if status != 400 {
+		t.Fatalf("GetUser with expired token -> status %d, want 400; body %s", status, body)
+	}
+	var expiredErr map[string]any
+	if err := json.Unmarshal([]byte(body), &expiredErr); err != nil {
+		t.Fatalf("unmarshal expired error: %v", err)
+	}
+	if expiredErr["__type"] != "NotAuthorizedException" {
+		t.Fatalf("expired token __type = %v, want NotAuthorizedException", expiredErr["__type"])
 	}
 
 	// ===== Hosted UI: userInfo (Bearer) =====
@@ -391,6 +460,128 @@ func TestAWSCognitoStyleAdapter(t *testing.T) {
 }
 
 // === AWS Cognito test helpers ===
+
+// cognitoPrivateKeyPEM mirrors the adapter's documented fixed synthetic
+// RSA-2048 keypair (see adapters/aws-cognito-style/scripts/lib.star): the
+// public half is served at /{userPoolId}/.well-known/jwks.json, the private
+// half lets tests mint properly signed tokens (e.g. expired ones).
+const cognitoPrivateKeyPEM = `-----BEGIN RSA PRIVATE KEY-----
+MIIEogIBAAKCAQEAuvUH4Lt/lv6L2u2E9qg15ZelZ7Olpmr7j9RhTr+3VybvKml5
+dntEUSXKO70WVkZ36rjMecbOVU2vrCyJTpIYejqTp1c7O/67S7sdJPdLrKdL55JC
+9r24Zp5gjUKW8ZoVn325oOsRlO4vezgkS93mSFGuq7yyXe36SmG/xwkFcB6eu2W1
+IhuoHQkK47ja5PS1GuhctOKkYi9lqJPQYri6H3E7Cz1UHlQmdiY4T5porO1B9Dfe
+9P77g6zw8jwzhkce0ORrWyvAbA5BFN5SodXaBN3G4PhjdklDPn++AXYhhahWGZy8
+yVt81e+ra+jjHB7yutT5xDYzXY4JLF1FKsk4ywIDAQABAoIBAEL9Z8w8AxTcsspI
+j3s+fMl+1BLbiUCfVvKLnC52fcBpwAsHbjFpK+qTyuoq7+UMLQ3bF9GOzgI86vSb
+pLuVl9W8RYoRtLTjqsMREflb7y63Z3hbrUjyZC/JEjmroaCCoLrcdvZVJKCj1Dmn
+vUG+CjThp9/7pkIH8sZSTkCIV/17LW03z07t3UpwPPbcwGfRb1GfYKtwPpeNyxtB
+UvEM36jeYInSE+IKsP8fN6E/c+0Qn6xwZJsCkcB+y/V/QXiuaMTi9MU+TGtQ03eh
+u4DMmoO5ITheuGLOGIqkhZ+OtlBxDbTnQsN1mvQ9zUiVMGqhAB1tagXnhVDpxm7I
+eonU/0kCgYEAwlMpItTeGMrC79tKQl/NlDyxg6o9aqFZ5uFn905yh5AcRY8rEMS9
+068HEJxh0xtmlsBhpWlaROeltHfUoPDTgI1F+4LijhfsAjMTLkCLIlm01GtkDSDw
+0ZV3cNDmZMgEjSC2E5qSxNaAREltsVnMjYt1yQbGjsWI6MPqtmB0Xl8CgYEA9ks/
+Nv5a9XRKqz9xsFsCZlTvV3fj63jFVP31IZS9UkZxq0alssBItEhsDpa+0s61z0ko
+0Ggwl9V2Wa4Y3/79igROU1MJPbxfC7HH9+KdgANKpO7p8EHC2YsmlT9tbn+/eSbl
+EqhoeculELQQzn3xbd5u7WBJqOJg0LvVhKM+ZRUCgYA9NLhGMknqASM5LRbMpSQ5
+Roya7en+ReftIp3+dQT50dg1yIxF8dHgdMaC4t6lAYJkhR+8W9yEy3mTyBJ+xpu3
+Z8fdGjKFkt9RKgkmjknEfgDIzzJqOC/hs3Q1YnbO03krglwW/J6xxOYNnBsiuygE
+hSKKOModefZPajXpT6QXfQKBgEaqyHSK/qY2u8Xu6jvjoQijjhjWuXqyqEv+ofsE
+pl2ZALxYBOsI6NNxhC+baR0rWlcjcqZ5fpfSE6cfoNuEWlLjcWXPCXPBPLQqSmoB
+h5dXWm+AbXcWJ0Yr+uIP1OJDnTixxEBaOb/YgoAMalYVJNSVYdaSLhBbA9RgUJ9C
+B4ERAoGAScLBJMcOVkQ/ulGbJKyjqis2aaQ0VBWPdQQ+OjBrRcG4oj7TUztxjy4F
+KTSEsIsbZa2cq+a7wCImzCPikv8teaTGoOVnU1rxN61LG2G4IDwFGoj9/br0rkM7
+7BVbYZiX+Z5DxA8ec/9pYP2TdF69zr8xT8Mm48gC6I/kYeRcGfo=
+-----END RSA PRIVATE KEY-----`
+
+// cognitoVerifyRS256 fetches nothing: it verifies token against a JWK
+// (reconstructed RSA public key) over header.payload, and checks the claim
+// set (exp fresh, iss, token_use, aud/client_id binding).
+func cognitoVerifyRS256(t *testing.T, token string, jwk map[string]any, clientID string) {
+	t.Helper()
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("token has %d parts, want 3", len(parts))
+	}
+	nBytes, err := base64.RawURLEncoding.DecodeString(jwk["n"].(string))
+	if err != nil {
+		t.Fatalf("decode n: %v", err)
+	}
+	eBytes, err := base64.RawURLEncoding.DecodeString(jwk["e"].(string))
+	if err != nil {
+		t.Fatalf("decode e: %v", err)
+	}
+	pub := &rsa.PublicKey{
+		N: new(big.Int).SetBytes(nBytes),
+		E: int(new(big.Int).SetBytes(eBytes).Int64()),
+	}
+	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		t.Fatalf("decode signature: %v", err)
+	}
+	h := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
+	if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, h[:], sig); err != nil {
+		t.Fatalf("RS256 signature did not verify against the JWKS key: %v", err)
+	}
+	var claims map[string]any
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("decode payload: %v", err)
+	}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		t.Fatalf("unmarshal claims: %v", err)
+	}
+	if exp, ok := claims["exp"].(float64); !ok || exp <= float64(time.Now().Unix()) {
+		t.Fatalf("exp = %v, want future timestamp", claims["exp"])
+	}
+	if claims["iss"] != "https://cognito-idp.mock-region.amazonaws.com/mock-user-pool" {
+		t.Fatalf("iss = %v", claims["iss"])
+	}
+	if claims["token_use"] == "access" && claims["client_id"] != clientID {
+		t.Fatalf("client_id = %v, want %v", claims["client_id"], clientID)
+	}
+	if claims["token_use"] == "id" && claims["aud"] != clientID {
+		t.Fatalf("aud = %v, want %v", claims["aud"], clientID)
+	}
+}
+
+// cognitoTamperToken flips the last character of the signature segment.
+func cognitoTamperToken(token string) string {
+	parts := strings.Split(token, ".")
+	sig := parts[2]
+	last := "A"
+	if sig[len(sig)-1] == 'A' {
+		last = "B"
+	}
+	parts[2] = sig[:len(sig)-1] + last
+	return strings.Join(parts, ".")
+}
+
+// cognitoMintExpiredToken mints a properly signed RS256 access token whose
+// exp is in the past — the signature verifies, only the expiry fails.
+func cognitoMintExpiredToken(t *testing.T, clientID string) string {
+	t.Helper()
+	block, _ := pem.Decode([]byte(cognitoPrivateKeyPEM))
+	if block == nil {
+		t.Fatal("bad test key PEM")
+	}
+	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		t.Fatalf("parse test key: %v", err)
+	}
+	now := time.Now().Unix()
+	header := `{"alg":"RS256","kid":"mock-cognito-key-1","typ":"JWT"}`
+	payload := `{"sub":"00000000-0000-0000-0000-000001","iss":"https://cognito-idp.mock-region.amazonaws.com/mock-user-pool",` +
+		`"client_id":"` + clientID + `","token_use":"access","username":"expired-user",` +
+		`"iat":` + strconv.FormatInt(now-7200, 10) + `,"exp":` + strconv.FormatInt(now-3600, 10) + `}`
+	h := base64.RawURLEncoding.EncodeToString([]byte(header))
+	p := base64.RawURLEncoding.EncodeToString([]byte(payload))
+	digest := sha256.Sum256([]byte(h + "." + p))
+	sig, err := rsa.SignPKCS1v15(rand.Reader, priv, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	return h + "." + p + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
 
 func cognitoGetNoRedirect(t *testing.T, rawurl string) *http.Response {
 	t.Helper()

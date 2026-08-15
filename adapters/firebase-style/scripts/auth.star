@@ -63,6 +63,48 @@ def on_get_account_info(req):
     id_token = body.get("idToken", "")
     return _do_get_account_info(id_token, "v1")
 
+# on_securetoken: POST /v1/token (securetoken.googleapis.com grant)
+# Content-Type: application/x-www-form-urlencoded
+# Body: grant_type=refresh_token&refresh_token=<token>
+# Exchanges a VERIFIED inbound refresh token for freshly minted
+# id/access/refresh tokens (1h expiry), like the real Secure Token Service.
+def on_securetoken(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+    body = req["body"]
+    if body == None:
+        body = {}
+
+    grant_type = body.get("grant_type", "")
+    if grant_type != "refresh_token":
+        return _err(400, 400, "Only grant_type=refresh_token is supported (INVALID_GRANT_TYPE).", "INVALID_ARGUMENT")
+
+    presented = body.get("refresh_token", "")
+    if presented == "":
+        return _err(400, 400, "refresh_token is required (MISSING_REFRESH_TOKEN).", "INVALID_ARGUMENT")
+
+    user_id = store_kv_get("fb_refresh", presented)
+    if user_id == None or user_id == "":
+        return _err(400, 400, "The refresh token supplied is invalid (INVALID_REFRESH_TOKEN).", "INVALID_ARGUMENT")
+
+    user = store_collection("users").get(user_id)
+    if user == None:
+        return _err(400, 400, "The refresh token supplied is invalid (INVALID_REFRESH_TOKEN).", "INVALID_ARGUMENT")
+
+    # Mint fresh tokens (the new idToken is bound to this user with a 1h
+    # expiry; the new refresh token is bound like the original).
+    resp = _auth_response(user)
+    return respond(200, {
+        "access_token": resp["idToken"],
+        "id_token": resp["idToken"],
+        "refresh_token": resp["refreshToken"],
+        "expires_in": "3600",
+        "token_type": "Bearer",
+        "user_id": user["localId"],
+        "project_id": "stunt-firebase-project",
+    })
+
 # --- v3 handlers ---
 
 # on_relyingparty dispatches all /identitytoolkit/v3/relyingparty/{action}
@@ -86,7 +128,7 @@ def on_relyingparty(req):
     if action == "refreshToken":
         presented = body.get("refresh_token", body.get("refreshToken", ""))
         return _do_refresh(presented)
-    return _err(404, 404, "UNKNOWN_ACTION", "Unknown relyingparty action: " + action, "NOT_FOUND")
+    return _err(404, 404, "Unknown relyingparty action: " + action, "NOT_FOUND")
 
 # --- internal ---
 
@@ -171,11 +213,13 @@ def _do_sign_in_with_idp(body, version):
     }]
     return respond(200, resp)
 
-# _do_get_account_info returns user info for a given idToken.
+# _do_get_account_info returns user info for the user the idToken was
+# ISSUED to (token->uid binding; never the first user). An unknown or
+# expired token is 401.
 def _do_get_account_info(id_token, version):
     user = _user_for_token(id_token)
     if user == None:
-        return _err(400, 400, "INVALID_ID_TOKEN", "INVALID_ARGUMENT")
+        return _err(401, 401, "The token supplied is invalid or expired (INVALID_ID_TOKEN).", "UNAUTHENTICATED")
 
     return respond(200, {
         "users": [{
@@ -189,17 +233,17 @@ def _do_get_account_info(id_token, version):
 # _do_refresh exchanges a refresh token for a new idToken.
 def _do_refresh(presented):
     if presented == "":
-        return _err(400, 400, "MISSING_REFRESH_TOKEN", "INVALID_ARGUMENT")
+        return _err(400, 400, "refresh_token is required (MISSING_REFRESH_TOKEN).", "INVALID_ARGUMENT")
 
     # Look up the user ID bound to this refresh token (stored in KV).
     user_id = store_kv_get("fb_refresh", presented)
     if user_id == "" or user_id == None:
-        return _err(400, 400, "INVALID_REFRESH_TOKEN", "INVALID_ARGUMENT")
+        return _err(400, 400, "The refresh token supplied is invalid (INVALID_REFRESH_TOKEN).", "INVALID_ARGUMENT")
 
     uc = store_collection("users")
     user = uc.get(user_id)
     if user == None:
-        return _err(400, 400, "INVALID_REFRESH_TOKEN", "INVALID_ARGUMENT")
+        return _err(400, 400, "The refresh token supplied is invalid (INVALID_REFRESH_TOKEN).", "INVALID_ARGUMENT")
 
     # Issue new tokens.
     resp = _auth_response(user)
@@ -212,7 +256,10 @@ def _do_refresh(presented):
         "token_type": "Bearer",
     })
 
-# _auth_response issues tokens for a user and stores the refresh token.
+# _auth_response issues tokens for a user and stores the bindings: every
+# idToken is bound to ITS user (id -> uid, with a 1h expiry) and every
+# refresh token is bound to its user. getAccountInfo / securetoken exchanges
+# verify against these bindings.
 def _auth_response(user):
     access_seq = store_kv_incr("fb", "token_seq")
     refresh_seq = store_kv_incr("fb", "refresh_seq")
@@ -220,7 +267,9 @@ def _auth_response(user):
     id_token = "firebase-id-token-" + str(access_seq)
     refresh = "firebase-refresh-token-" + str(refresh_seq)
 
-    # Store the refresh→user binding in KV for later validation.
+    # idToken -> uid, expiring after 1 hour (3600s).
+    store_kv_set("fb_idtoken", id_token, user["id"] + "|" + str(clock.now_unix() + 3600))
+    # refreshToken -> uid (long-lived binding for securetoken exchanges).
     store_kv_set("fb_refresh", refresh, user["id"])
 
     return {
@@ -234,15 +283,18 @@ def _auth_response(user):
         "kind": "identitytoolkit#VerifyPasswordResponse",
     }
 
-# _user_for_token looks up a user by idToken. Since idTokens are ephemeral
-# (generated fresh each sign-in), we can't look up by token directly.
-# For testing purposes, we accept any non-empty idToken and return the first
-# user.
+# _user_for_token resolves the user an idToken was ISSUED to via the
+# token->uid binding (with expiry). Unknown, expired, or empty tokens
+# return None — the caller then 401s.
 def _user_for_token(id_token):
-    if id_token == "":
+    if id_token == "" or id_token == None:
         return None
-    uc = store_collection("users")
-    docs = uc.list()
-    if len(docs) == 0:
+    raw = store_kv_get("fb_idtoken", id_token)
+    if raw == None or raw == "":
         return None
-    return docs[0]
+    parts = raw.split("|")
+    if len(parts) != 2:
+        return None
+    if clock.now_unix() >= _to_int(parts[1]):
+        return None
+    return store_collection("users").get(parts[0])

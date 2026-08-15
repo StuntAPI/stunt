@@ -12,8 +12,11 @@ All data is synthetic — no real API data is included.
 
 A broader-than-minimal MVP of a Google-Drive-style files API: file upload
 (with content), file metadata retrieval, content download (`alt=media`),
-file listing, file metadata update (patch/rename/trash), file deletion,
-folder creation, storage quota (`about`), and a minimal `changes` endpoint.
+file listing with the real `q` filter grammar, file metadata update
+(patch/rename/trash), file deletion, folder creation, storage quota
+(`about`), a **real changes feed** (entries recorded on every mutation,
+replayed by `pageToken` cursor), and **Google-style OAuth2**
+(authorization-code + refresh-token grants).
 
 State persists across requests: file content is stored in a filesystem-backed
 blob store, and file metadata in an SQLite-backed collection store. Data you
@@ -24,43 +27,113 @@ create in one request is visible in subsequent requests within the same
 
 | Method | Route | Handler | Description |
 |--------|-------|---------|-------------|
-| POST | `/upload/drive/v3/files` | `files.star#on_upload` | Upload a file (JSON `{name, content}` or folder via `mimeType`) |
+| GET | `/o/oauth2/auth` | `oauth.star#on_authorize` | OAuth2 authorize → 302 redirect with `code`+`state` |
+| POST | `/o/oauth2/token` | `oauth.star#on_token` | OAuth2 token (authorization_code / refresh_token grants) |
+| POST | `/upload/drive/v3/files` | `files.star#on_upload` | Upload a file (JSON `{name, content, parents}` or folder via `mimeType`) |
+| GET | `/drive/v3/files` | `files.star#on_list` | List files (honors `q`, `orderBy`, `fields` + paging) |
+| POST | `/drive/v3/files` | `files.star#on_create_metadata` | Create file/folder metadata (no content) |
 | GET | `/drive/v3/files/{id}` | `files.star#on_get` | Retrieve file metadata |
 | GET | `/drive/v3/files/{id}?alt=media` | `files.star#on_get` | Download file content |
-| GET | `/drive/v3/files` | `files.star#on_list` | List files (honors `q`, `orderBy`, `fields` + paging) |
 | PATCH | `/drive/v3/files/{id}` | `files.star#on_patch` | Update file metadata (name, trashed, …) |
 | DELETE | `/drive/v3/files/{id}` | `files.star#on_delete` | Permanently delete a file |
 | GET | `/drive/v3/about` | `misc.star#on_about` | Return synthetic storage quota + user |
-| GET | `/drive/v3/changes` | `misc.star#on_changes` | Return a minimal (empty) change list |
+| GET | `/drive/v3/changes/startPageToken` | `misc.star#on_changes_start` | Current change cursor for future changes |
+| GET | `/drive/v3/changes` | `misc.star#on_changes` | Replay recorded changes after `pageToken` |
 
 Any unmatched route returns `404 {"error":"resource_not_found"}`.
+
+## Auth
+
+All `/drive/v3/*` and `/upload/*` routes enforce `Authorization: Bearer
+<token>`. Tokens are validated against the `tokens` collection (with
+expiry) and minted two ways:
+
+1. **OAuth2 flow** — `GET /o/oauth2/auth?client_id=…&redirect_uri=…&state=…`
+   returns a 302 with a single-use `code`; `POST /o/oauth2/token`
+   (`grant_type=authorization_code`, with matching `client_id`,
+   `client_secret`, `redirect_uri`) returns
+   `{access_token (ya29.…), token_type:"Bearer", expires_in:3599,
+   refresh_token (1//…), scope:drive}`. `grant_type=refresh_token` mints a
+   new access token for the same user and does NOT rotate the refresh
+   token (Google's behavior).
+2. **Static test token** — seeded once on first request, for tests that do
+   not want to run a full flow: `ya29.mock_test_token_drive`.
+
+Missing/unknown/expired tokens get a Google-style 401 error envelope.
 
 ## Listing params
 
 `GET /drive/v3/files` honors the real Drive list params, applied before
 paging:
 
-- `q` — clauses joined by ` and `: `name = 'x'`, `name != 'x'`,
-  `name contains 'x'`, the `mimeType` equivalents, and
-  `trashed = true|false`. Other clause forms are ignored rather than
-  guessed. Trashed files stay excluded by default; an explicit `trashed`
-  clause overrides that, like the real API.
+- `q` — the Drive q grammar subset below. Clauses are joined with `and` /
+  `or` (or-over-and precedence). Trashed files stay excluded by default;
+  an explicit `trashed` clause overrides that, like the real API.
+  **Anything outside the subset is a 400** (`Invalid query filter: …`),
+  never silently ignored.
 - `orderBy` — comma-separated keys; the first recognized one wins
   (`createdTime`, `modifiedTime`, `name`, `quotaBytesUsed`), each with an
   optional `desc`/`asc` suffix.
 - `fields` — a `files(id,name,...)` selection projects each file object.
-- `pageSize`/`pageToken` — paging (unchanged).
+- `pageSize`/`pageToken` — paging.
+
+### q grammar subset
+
+```
+query  := clause ( ("and" | "or") clause )*
+clause := field op value
+field  := name | mimeType | trashed | parents | modifiedTime |
+          createdTime | <dotted.property.path>
+op     := = | != | < | <= | > | >= | contains | in
+value  := 'single-quoted literal (\' and \\ escapes)' | true | false
+```
+
+Examples:
+
+- `name = 'x'`, `name != 'x'`, `name contains 'x'` (literals may contain
+  `=`, spaces, quotes via `\'` — the tokenizer never splits on content)
+- `mimeType = 'application/vnd.google-apps.folder'`
+- `trashed = false` / `trashed = true`
+- `parents in '<folderId>'` (membership in the file's parents list)
+- `modifiedTime > '2024-01-01T00:00:00Z'` (RFC 3339 literals compare
+  lexicographically, which is chronologically correct)
+- `name contains 'doc' and modifiedTime > '2023-01-01T00:00:00Z'`
+- `name = 'a' or name = 'b'`
+
+Filterable fields map onto `query_select` filter triples (dotted property
+paths resolve through it); `parents in` is evaluated directly since it
+tests list membership.
+
+## Changes feed
+
+Every file mutation (upload, metadata create, patch, permanent delete)
+appends an entry to the `changes` collection with a monotonically
+increasing change token:
+
+- `GET /drive/v3/changes/startPageToken` → `{startPageToken}` — poll from
+  here to see only future changes.
+- `GET /drive/v3/changes?pageToken=T` → `{changes: [{kind, changeType:
+  "file", fileId, removed, time, file?}], newStartPageToken}` — entries
+  with token > `T` in order; `pageSize`/`pageToken` paging applies and
+  `nextPageToken` appears on non-final pages. Deletions carry
+  `removed: true` and no `file`, like the real change resource.
+- Omitting `pageToken` is a 400 (the real API requires it).
 
 ## Backing stores
 
 | Store | Kind | Purpose |
 |-------|------|---------|
 | `files` | collection | File/folder metadata records |
+| `changes` | collection | Change-feed entries (one per mutation) |
+| `tokens` | collection | Validated bearer access tokens (+ expiry) |
+| `refresh_tokens` | collection | OAuth2 refresh tokens (not rotated) |
+| `codes` | collection | Single-use OAuth2 authorization codes |
 | `drive` | blob | File content (raw bytes) |
-| `drive` | kv | Sequence counter for file IDs |
+| `drive` | kv | Sequence counters (file ids, change tokens, auth) |
 
 IDs are generated with a provider-style prefix (`file_`) via a KV-backed
-sequence counter.
+sequence counter. `PATCH /drive/v3/files/{id}` is serialized per file id
+via `concurrency_key` (read-modify-write).
 
 ## Layout
 
@@ -70,7 +143,8 @@ DISCLAIMER                Not affiliated / synthetic-only notice
 README.md                 This file
 scripts/
   files.star              File upload/get/list/patch/delete handlers
-  misc.star               About (quota) + changes handlers
+  misc.star               About (quota) + changes feed handlers
+  oauth.star              OAuth2 authorize/token handlers
 fixtures/
   files.jsonl             Seed data for the files collection
 templates/
@@ -78,12 +152,6 @@ templates/
 schemas/
   file.schema.json        JSON Schema for a file object
 ```
-
-## Auth
-
-The adapter declares `identity.token_scheme: bearer` as metadata. Auth is **not
-enforced** — any (or no) `Authorization` header is accepted. This is intentional
-for local testing convenience.
 
 ## Usage
 
@@ -95,4 +163,5 @@ services:
     adapter: ./adapters/drive-style
 ```
 
-Then `stunt up` and make requests to the served address.
+Then `stunt up`, run an OAuth2 flow (or use the static test token
+`ya29.mock_test_token_drive`) and make requests to the served address.

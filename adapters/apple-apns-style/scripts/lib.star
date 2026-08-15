@@ -5,9 +5,11 @@
 # they were builtins — without Starlark's load() (which stunt does not
 # support). See internal/starlark/vm.go LoadWithLib.
 #
-# JWT validation here is STRUCTURAL only: we decode the JOSE header from
-# base64url and confirm alg=="ES256". We do NOT verify the ECDSA signature
-# (documented stretch goal). See README for details.
+# Provider-token verification is cryptographically REAL: the inbound
+# authorization: bearer <jwt> is checked for an ES256 JOSE header, its
+# signature is verified with crypto.ecdsa_verify_p256 against a fixed
+# synthetic EC P-256 public key, and the claims are expired-checked
+# (exp, or iat + 1h per real APNs provider-token lifetime). See README.
 
 # --- base64url decode (pure Starlark, no builtins) ---
 
@@ -113,38 +115,103 @@ def _jwt_payload(token):
 def _contains(s, substr):
     return s.find(substr) >= 0
 
-# _check_jwt_bearer validates the authorization: bearer <jwt> header for
-# APNs requests. Header name is case-insensitive in real APNs (HTTP/2);
-# we check both "authorization" and "Authorization".
-#
-# Structural validation only:
-#   - authorization header must be "bearer <jwt>"
-#   - JWT must have 3 dot-separated segments
-#   - JOSE header (base64url-decoded) must contain "ES256"
-# Signature crypto is NOT verified (documented stretch goal).
-def _check_jwt_bearer(req):
-    auth = req["headers"].get("Authorization", "")
-    if auth == "":
-        auth = req["headers"].get("authorization", "")
-    if auth[:7] != "Bearer " and auth[:7] != "bearer ":
-        return None
-    token = auth[7:]
+# _b64url_ok reports whether seg is a syntactically valid unpadded
+# base64url segment (alphabet chars only, length not == 1 mod 4). Guards the
+# crypto.base64url_decode / crypto.ecdsa_verify_p256 builtins, which error
+# (surfacing as a 500) on malformed input.
+def _b64url_ok(seg):
+    if seg == "":
+        return False
+    if len(seg) % 4 == 1:
+        return False
+    for i in range(len(seg)):
+        if _B64URL.find(seg[i]) < 0:
+            return False
+    return True
+
+# _jwt_json decodes a JWT segment (0=header, 1=payload) into a Starlark
+# dict via crypto.base64url_decode + json.decode, or None when malformed.
+# Shape guards keep json.decode from erroring on garbage.
+def _jwt_json(token, seg):
     parts = token.split(".")
     if len(parts) != 3:
         return None
-    header = _jose_header(token)
-    if header == "":
+    if not _b64url_ok(parts[0]) or not _b64url_ok(parts[1]) or not _b64url_ok(parts[2]):
         return None
-    if not _contains(header, "ES256"):
+    txt = crypto.base64url_decode(parts[seg])
+    if txt == "" or txt[:1] != "{" or txt[-1:] != "}" or txt.find('"') < 0:
         return None
-    return token
+    for i in range(len(txt)):
+        if ord(txt[i]) < 0x20:
+            return None
+    return json.decode(txt)
+
+# _claim_int coerces a claim value to int (JSON numbers decode as int).
+# Returns None when absent/None.
+def _claim_int(v):
+    if v == None:
+        return None
+    if type(v) == "int":
+        return v
+    return None
+
+# _provider_token_expired reports whether the provider-token claims are
+# stale: exp when present, otherwise iat + 3600 (APNs caps provider-token
+# lifetime at one hour). Tokens without either claim never read as fresh.
+def _provider_token_expired(claims):
+    now = clock.now_unix()
+    exp = _claim_int(claims.get("exp", None))
+    if exp != None:
+        return now >= exp
+    iat = _claim_int(claims.get("iat", None))
+    if iat != None:
+        return now >= iat + 3600
+    return True
 
 # _require_jwt returns the token if valid, or an error response if not.
+# Distinct reasons per real APNs: a present-but-expired provider token is
+# 403 ExpiredProviderToken; anything else unusable is 403 (bad/missing
+# provider auth).
 def _require_jwt(req):
-    token = _check_jwt_bearer(req)
+    auth = req["headers"].get("Authorization", "")
+    if auth == "":
+        auth = req["headers"].get("authorization", "")
+    token, expired = _verify_provider_token(auth)
     if token == None:
+        if expired:
+            return None, respond(403, {"reason": "ExpiredProviderToken"})
         return None, respond(403, {"reason": "BadDeviceToken"})
     return token, None
+
+# _verify_provider_token validates a bearer token value end-to-end.
+# Returns (token, expired_flag); token is None when invalid, with
+# expired_flag True only for the expired case.
+def _verify_provider_token(auth):
+    if auth[:7] != "Bearer " and auth[:7] != "bearer ":
+        return None, False
+    token = auth[7:]
+    header = _jwt_json(token, 0)
+    if header == None:
+        return None, False
+    if header.get("alg", "") != "ES256":
+        return None, False
+    parts = token.split(".")
+    if not crypto.ecdsa_verify_p256(_JWT_PUBLIC_KEY, parts[0] + "." + parts[1], parts[2], encoding="base64url"):
+        return None, False
+    claims = _jwt_json(token, 1)
+    if claims == None:
+        return None, False
+    if _provider_token_expired(claims):
+        return None, True
+    return token, False
+
+# Fixed synthetic EC P-256 public key used to verify provider JWTs (the
+# locally "registered" provider key). Throwaway mock material — it exists
+# nowhere but this repository.
+_JWT_PUBLIC_KEY = """-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEujjAWCmCOpqAjKNBXkNtwgL0DE+b
+MjGa3+4zCpr4ZiP2jCbqHTVquHi0quv1+KFq4mmO0bCsSK0ORf0JfsulyQ==
+-----END PUBLIC KEY-----"""
 
 # _mint_jwt creates a plausible JWT string with an ES256 JOSE header.
 # Used for internal token minting (not for signature verification).

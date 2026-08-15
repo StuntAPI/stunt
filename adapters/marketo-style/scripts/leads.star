@@ -1,7 +1,8 @@
-# Leads handlers — Marketo lead CRUD + sync.
+# Leads handlers — Marketo lead CRUD + sync + describe.
 #
 # GET  /rest/v1/leads?filterType=email&filterValues=... -> filtered leads
 # POST /rest/v1/leads                                    -> create/update lead
+# GET  /rest/v1/leads/describe                           -> lead field metadata
 # GET  /rest/v1/leads/{id}                               -> get single lead
 # GET  /rest/v1/leads/{id}.json                          -> get single lead (.json)
 # POST /rest/v1/leads.json                               -> sync leads (bulk upsert)
@@ -10,9 +11,15 @@
 
 # Shared helpers from lib.star.
 
-# _lead_shape builds the Marketo lead shape from a stored doc.
+# The built-in lead fields every lead carries. Anything else on an input
+# record is a CUSTOM field and is preserved verbatim through upserts.
+_LEAD_BASE_FIELDS = ["id", "email", "firstName", "lastName", "createdAt", "updatedAt"]
+
+# _lead_shape builds the Marketo lead shape from a stored doc. Custom fields
+# stored on the doc (anything outside the base fields that is not a leading-
+# underscore simulator key) are returned too, like the real API.
 def _lead_shape(doc):
-    return {
+    out = {
         "id": doc.get("id", ""),
         "email": doc.get("email", ""),
         "firstName": doc.get("firstName", ""),
@@ -20,6 +27,63 @@ def _lead_shape(doc):
         "createdAt": doc.get("createdAt", _now()),
         "updatedAt": doc.get("updatedAt", _now()),
     }
+    for k in doc:
+        if k in _LEAD_BASE_FIELDS:
+            continue
+        if k[:1] == "_":
+            continue
+        out[k] = doc[k]
+    return out
+
+# on_describe returns the lead field metadata shape (GET /rest/v1/leads/describe):
+# displayName, name, dataType, length, and the rest/soap/multipart bindings
+# the real describe endpoint returns.
+def on_describe(req):
+    ok, err = _require_auth(req)
+    if not ok:
+        return err
+    if _check_quota():
+        return _quota_err()
+
+    fields = _lead_describe_fields()
+    return respond(200, {
+        "requestId": _request_id(),
+        "success": True,
+        "result": fields,
+        "moreResult": False,
+    })
+
+# _lead_describe_fields returns the metadata entries for the fields this
+# simulator supports (built-ins plus the customary custom fields that are
+# preserved on upsert).
+def _lead_describe_fields():
+    specs = [
+        # name, displayName, dataType, length, readOnly
+        ["id", "Marketo Id", "integer", 0, True],
+        ["email", "Email Address", "email", 255, False],
+        ["firstName", "First Name", "string", 255, False],
+        ["lastName", "Last Name", "string", 255, False],
+        ["createdAt", "Created At", "datetime", 0, True],
+        ["updatedAt", "Updated At", "datetime", 0, True],
+        ["company", "Company Name", "string", 255, False],
+        ["phone", "Phone Number", "string", 255, False],
+        ["leadSource", "Lead Source", "string", 255, False],
+        ["leadScore", "Lead Score", "integer", 0, False],
+        ["unsubscribed", "Unsubscribed", "boolean", 0, False],
+    ]
+    out = []
+    for s in specs:
+        name = s[0]
+        out.append({
+            "displayName": s[1],
+            "name": name,
+            "dataType": s[2],
+            "length": s[3],
+            "rest": {"name": name, "readOnly": s[4]},
+            "soap": {"name": name, "readOnly": s[4]},
+            "multipart": {"name": name, "readOnly": s[4]},
+        })
+    return out
 
 def on_list_leads(req):
     ok, err = _require_auth(req)
@@ -175,51 +239,78 @@ def _get_lead(req):
         "moreResult": False,
     })
 
-# _upsert_lead inserts or updates a lead, returning the Marketo result shape.
+# _upsert_lead inserts or updates a lead, returning the per-record Marketo
+# sync result shape: {id, status} where status is "created" or "updated", or
+# {"status": "skipped", "reasons": [...]} when the action cannot be applied
+# (updateOnly on a lead that does not exist -> skipped, code 1013, NEVER a
+# silent create). Custom fields on the input record are preserved through
+# both creates and updates.
 def _upsert_lead(inp, action):
     col = store_collection("leads")
     email = inp.get("email", "")
+    if email == None:
+        email = ""
 
     if action == "createOnly":
-        lead_id = _next_id("lead")
-        doc = {
-            "id": lead_id,
-            "email": email,
-            "firstName": inp.get("firstName", ""),
-            "lastName": inp.get("lastName", ""),
-            "createdAt": _now(),
-            "updatedAt": _now(),
+        doc = _insert_lead(inp, col)
+        return {"id": doc.get("id", ""), "status": "created"}
+
+    # updateOnly / createOrUpdate: dedupe against an existing lead by id
+    # first (explicit), then by email (the default lookupField).
+    existing = None
+    lead_id = inp.get("id", "")
+    if lead_id != "" and lead_id != None:
+        d = col.get(lead_id)
+        if d != None:
+            existing = d
+    if existing == None and email != "":
+        for d in col.list():
+            if d.get("email", "") == email:
+                existing = d
+                break
+
+    if existing != None:
+        # Merge the input onto the existing lead: every input field (base
+        # and custom) overwrites, fields absent from the input (including
+        # pre-existing CUSTOM fields) are preserved.
+        updated = _lead_shape(existing)
+        for k in inp:
+            if k == "id":
+                continue
+            updated[k] = inp[k]
+        updated["id"] = existing.get("id", "")
+        updated["createdAt"] = existing.get("createdAt", _now())
+        updated["updatedAt"] = _now()
+        col.update(existing.get("id", ""), updated)
+        return {"id": updated.get("id", ""), "status": "updated"}
+
+    if action == "updateOnly":
+        return {
+            "status": "skipped",
+            "reasons": [{"code": "1013", "message": "Lead not found"}],
         }
-        col.insert(doc)
-        return _lead_shape(doc)
 
-    if action == "updateOnly" or action == "createOrUpdate":
-        # Try to find existing by email.
-        if email != "":
-            docs = col.list()
-            for d in docs:
-                if d.get("email", "") == email:
-                    updated = {
-                        "id": d.get("id", ""),
-                        "email": email,
-                        "firstName": inp.get("firstName", d.get("firstName", "")),
-                        "lastName": inp.get("lastName", d.get("lastName", "")),
-                        "createdAt": d.get("createdAt", _now()),
-                        "updatedAt": _now(),
-                    }
-                    col.update(d.get("id", ""), updated)
-                    return _lead_shape(updated)
+    # No existing lead and creating is allowed (createOrUpdate /
+    # createDuplicateStandard).
+    doc = _insert_lead(inp, col)
+    return {"id": doc.get("id", ""), "status": "created"}
 
-    # Create new (createOrUpdate or createDuplicateStandard).
+# _insert_lead stores a brand-new lead built from an input record, carrying
+# every custom field from the input onto the stored doc.
+def _insert_lead(inp, col):
     lead_id = _next_id("lead")
     doc = {
         "id": lead_id,
-        "email": email,
+        "email": inp.get("email", ""),
         "firstName": inp.get("firstName", ""),
         "lastName": inp.get("lastName", ""),
         "createdAt": _now(),
         "updatedAt": _now(),
     }
+    for k in inp:
+        if k in _LEAD_BASE_FIELDS:
+            continue
+        doc[k] = inp[k]
     col.insert(doc)
-    return _lead_shape(doc)
+    return doc
 

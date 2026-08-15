@@ -2,6 +2,10 @@
 #
 # GET  /o/oauth2/auth   -> 302 redirect with code+state
 # POST /o/oauth2/token  -> { access_token, expires_in, refresh_token, scope, token_type:"Bearer" }
+#                          plus a real RS256 id_token when the granted scope
+#                          includes openid (Google's OIDC behavior)
+# GET  /oauth2/v3/certs -> JWKS for the id_token signing key (Google's real
+#                          discovery path)
 #
 # The authorization-code flow mints a new user per code; the refresh_token
 # grant issues a new access token for the same user (Google refresh tokens are
@@ -30,8 +34,10 @@ def _mint_user():
     }
 
 # _issue_tokens mints an access token + refresh token for a user and stores
-# them. Returns the token response body.
-def _issue_tokens(user):
+# them. When the granted scope includes openid, a real RS256 id_token is
+# minted too (verifiable against GET /oauth2/v3/certs). Returns the token
+# response body.
+def _issue_tokens(user, scope, client_id):
     access_seq = store_kv_incr("google", "access_seq")
     refresh_seq = store_kv_incr("google", "refresh_seq")
     access = "ya29.mock_access_" + str(access_seq)
@@ -52,15 +58,19 @@ def _issue_tokens(user):
     for k in user:
         rdoc[k] = user[k]
     rdoc["id"] = refresh
+    rdoc["scope"] = scope
     rc.insert(rdoc)
 
-    return {
+    resp = {
         "access_token": access,
         "token_type": "Bearer",
         "expires_in": 3599,
         "refresh_token": refresh,
-        "scope": "openid email profile",
+        "scope": scope,
     }
+    if _contains(scope, "openid"):
+        resp["id_token"] = _mint_id_token(user, client_id)
+    return resp
 
 # --- handlers ---
 
@@ -81,6 +91,7 @@ def on_authorize(req):
         "id": code,
         "client_id": client_id,
         "redirect_uri": redirect_uri,
+        "scope": req["query"].get("scope", "openid email profile"),
     })
 
     sep = "?"
@@ -114,7 +125,8 @@ def on_token(req):
         for k in user:
             if k != "id":
                 u[k] = user[k]
-        return respond(200, _issue_tokens_keep_refresh(u, presented))
+        scope = user.get("scope", "openid email profile")
+        return respond(200, _issue_tokens_keep_refresh(u, presented, scope, client_id))
 
     if grant_type != "authorization_code":
         return respond(400, {"error": "unsupported_grant_type"})
@@ -136,11 +148,24 @@ def on_token(req):
     if client_id != want_cid or redirect_uri != want_uri or client_secret == "":
         return respond(400, {"error": "invalid_client", "error_description": "client mismatch"})
 
-    return respond(200, _issue_tokens(_mint_user()))
+    scope = code_doc.get("scope", "openid email profile")
+    return respond(200, _issue_tokens(_mint_user(), scope, client_id))
+
+# on_certs serves the JWKS at Google's real discovery path
+# (/oauth2/v3/certs). The key is REAL: derived from the fixed synthetic
+# RSA keypair whose private half signs the id_tokens minted when the
+# granted scope includes openid.
+def on_certs(req):
+    key = crypto.rsa_public_jwk(_JWT_PUBLIC_KEY)
+    key["kid"] = _JWT_KID
+    key["alg"] = "RS256"
+    key["use"] = "sig"
+    return respond(200, {"keys": [key]})
 
 # _issue_tokens_keep_refresh mints a new access token for an existing user
-# but keeps the same refresh_token (Google's behavior).
-def _issue_tokens_keep_refresh(user, refresh):
+# but keeps the same refresh_token (Google's behavior). An id_token is
+# minted when the granted scope still includes openid.
+def _issue_tokens_keep_refresh(user, refresh, scope, client_id):
     access_seq = store_kv_incr("google", "access_seq")
     access = "ya29.mock_access_" + str(access_seq)
 
@@ -152,10 +177,13 @@ def _issue_tokens_keep_refresh(user, refresh):
     u["expires_at"] = clock.now_unix() + 3599
     tc.insert(u)
 
-    return {
+    resp = {
         "access_token": access,
         "token_type": "Bearer",
         "expires_in": 3599,
         "refresh_token": refresh,
-        "scope": "openid email profile",
+        "scope": scope,
     }
+    if _contains(scope, "openid"):
+        resp["id_token"] = _mint_id_token(user, client_id)
+    return resp
