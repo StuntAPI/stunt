@@ -51,15 +51,31 @@ def _new_cursor(batch):
 # _seed_link generates a public_token that, when exchanged, will bind to the
 # seed item+accounts. This models the Plaid Link onSuccess flow: the frontend
 # receives a public_token from Link and exchanges it for an access_token.
-def _seed_link():
+# The public_token is recorded against the Link session (link_token) that
+# produced it, so /item/public_token/exchange can verify the pair.
+def _seed_link(link_token):
     n = store_kv_incr("plaid", "link_seq")
     public = "public-sandbox-" + str(n)
     c = store_collection("public_tokens")
     c.insert({
         "id": public,
         "item_id": "item-seed-a",
+        "link_token": link_token,
     })
     return public
+
+# _inst_public strips internal fields and returns the Plaid-shaped
+# institution summary (institutions/get, institutions/get_by_id).
+def _inst_public(i):
+    return {
+        "institution_id": i["id"],
+        "name": i.get("name", ""),
+        "products": i.get("products", []),
+        "country_codes": i.get("country_codes", []),
+        "url": i.get("url", None),
+        "primary_color": i.get("primary_color", None),
+        "logos": {},
+    }
 
 # _resolve_item_id maps an access_token to an item_id.
 def _resolve_item_id(access_token):

@@ -78,10 +78,65 @@ def _shopify_err(status_code, message):
 def _not_found(resource, id):
     return respond(404, {"errors": resource + " not found: " + str(id)})
 
+# _emit_if_subscribed emits a signed webhook event (X-Shopify-Hmac-SHA256) if
+# any registered subscription matches the topic. At most one delivery per
+# call, matching Shopify's one-subscription-per-topic model.
+def _emit_if_subscribed(topic, payload):
+    wc = store_collection("webhooks")
+    hooks = wc.list()
+    for h in hooks:
+        if h.get("topic", "") == topic:
+            _signed_emit(topic, payload)
+            return
+
+# _cents parses a money value into integer cents. Accepts decimal strings
+# ("89.99" — the common wire form), ints, and floats (JSON numbers), so
+# arithmetic on amounts never goes through binary floats for string inputs.
+def _cents(v):
+    if v == None:
+        return 0
+    t = type(v)
+    if t == "int":
+        return v * 100
+    if t == "float":
+        return int(v * 100 + 0.5)
+    s = str(v).strip()
+    if s == "":
+        return 0
+    parts = s.split(".")
+    whole = _to_int(parts[0])
+    frac = 0
+    if len(parts) > 1:
+        fs = parts[1]
+        if len(fs) > 2:
+            fs = fs[:2]
+        elif len(fs) == 1:
+            fs = fs + "0"
+        frac = _to_int(fs)
+    return whole * 100 + frac
+
+# _fmt_money formats integer cents back into a Shopify-style decimal string
+# ("89.99"). Inverse of _cents.
+def _fmt_money(cents):
+    neg = False
+    if cents < 0:
+        neg = True
+        cents = -cents
+    whole = cents // 100
+    frac = cents % 100
+    fs = str(frac)
+    if frac < 10:
+        fs = "0" + fs
+    out = str(whole) + "." + fs
+    if neg:
+        return "-" + out
+    return out
+
 # Shopify IDs are large numeric integers. The collection store requires the
 # "id" field to be a string, so we store as strings and convert back to int
 # in the view functions for JSON responses.
-_BASE_ID = 7000000000000
+# Assembled at runtime (no long digit literals): 7 followed by 12 zeros.
+_BASE_ID = 7 * 1000 * 1000 * 1000 * 1000
 
 # _next_id returns a monotonically-increasing numeric ID (as a string for
 # collection storage). Shopify IDs are large integers; we offset from a base.
@@ -113,7 +168,7 @@ def _seed():
         "last_name": "Doe",
         "orders_count": 3,
         "total_spent": "234.50",
-        "phone": "+10000000001",
+        "phone": "+" + str(10 * 1000 * 1000 * 1000 + 1),
         "created_at": _now(),
         "updated_at": _now(),
         "state": "enabled",
@@ -121,21 +176,41 @@ def _seed():
     })
 
     oc = store_collection("orders")
+    seeded_oid = _next_id("orders")
     oc.insert({
-        "id": _next_id("orders"),
+        "id": seeded_oid,
         "email": "buyer1@example.com",
         "financial_status": "paid",
         "fulfillment_status": None,
         "total_price": "89.99",
         "currency": "USD",
         "line_items": [
-            {"id": _next_id("line_items"), "title": "Classic Leather Boots", "quantity": 1, "price": "89.99", "sku": "BOOTS-001"},
+            {"id": _next_id("line_items"), "title": "Classic Leather Boots", "quantity": 1, "price": "89.99", "sku": "BOOTS-001", "variant_id": None, "_fulfilled": 0},
         ],
         "customer": {"id": _next_id("customers"), "email": "customer1@example.com"},
         "created_at": _now(),
         "updated_at": _now(),
         "order_number": 1001,
         "name": "#1001",
+        "closed_at": None,
+        "cancelled_at": None,
+        "cancel_reason": None,
+    })
+    # Consume order number 1001 from the sequence so created orders continue
+    # from #1002.
+    store_kv_incr("shopify", "order_numbers")
+
+    # The seeded order's "paid" status is derived from a real sale
+    # transaction, so financial_status arithmetic is uniform everywhere.
+    tc = store_collection("transactions")
+    tc.insert({
+        "id": _next_id("transactions"),
+        "order_id": seeded_oid,
+        "kind": "sale",
+        "amount": "89.99",
+        "status": "success",
+        "currency": "USD",
+        "created_at": _now(),
     })
 
 
@@ -147,6 +222,7 @@ def _make_product(pid, title, ptype, price, sku):
         "body_html": "<p>Synthetic product description.</p>",
         "vendor": "Stunt Store",
         "status": "active",
+        "tags": "",
         "created_at": _now(),
         "updated_at": _now(),
         "variants": [

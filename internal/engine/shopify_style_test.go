@@ -732,3 +732,526 @@ func TestShopifyStyleOrderFilters(t *testing.T) {
 		t.Fatalf("fields projection left %d keys, want 2: %v", len(orders[0]), orders[0])
 	}
 }
+
+// TestShopifyStyleOrderLifecycleAndWrites pins the P2 write surface:
+//
+//   - Order create (standard): line items normalized, total computed,
+//     pending/unfulfilled, order numbering continues the seed
+//   - 422 on order create without line items
+//   - Partial fulfillment at the line-item level (partial -> fulfilled)
+//   - 422 over-fulfillment and unknown line-item id
+//   - financial_status derived from transactions:
+//     pending -> paid -> partially_refunded -> refunded
+//   - Cancel: cancelled_at + cancel_reason, restock returns unfulfilled
+//     quantity to variant inventory; double-cancel is 422
+//   - Close: closed_at set; closing a cancelled order is 422
+//   - Customers: create (201), duplicate email 422, update, archive-delete
+//     (list hides it, second delete 404)
+//   - Product update: arbitrary fields + variants merge; invalid status 422
+func TestShopifyStyleOrderLifecycleAndWrites(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "shopify-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"shopify": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["shopify"]
+	const token = "shpat_test_token"
+
+	// ===== Order create (standard) =====
+
+	body, status := shopifyPostJSON(t, base+"/admin/api/2024-10/orders.json", token, map[string]any{
+		"order": map[string]any{
+			"email": "buyer2@example.com",
+			"line_items": []map[string]any{
+				{"title": "Boots", "quantity": 3, "price": "10.00", "sku": "BOOTS-001"},
+				{"title": "Hoodie", "quantity": 2, "price": "2.50", "sku": "HOOD-002"},
+			},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST order -> %d; %s", status, body)
+	}
+	var created map[string]any
+	if err := json.Unmarshal([]byte(body), &created); err != nil {
+		t.Fatal(err)
+	}
+	order := created["order"].(map[string]any)
+	if order["financial_status"] != "pending" {
+		t.Fatalf("new order financial_status = %v, want pending", order["financial_status"])
+	}
+	if order["fulfillment_status"] != nil {
+		t.Fatalf("new order fulfillment_status = %v, want nil", order["fulfillment_status"])
+	}
+	if order["total_price"] != "35.00" {
+		t.Fatalf("new order total_price = %v, want 35.00", order["total_price"])
+	}
+	if num, _ := order["order_number"].(float64); num < 1002 {
+		t.Fatalf("order_number = %v, want >= 1002 (seed consumes 1001)", order["order_number"])
+	}
+	lines := order["line_items"].([]any)
+	if len(lines) != 2 {
+		t.Fatalf("line_items = %v, want 2", lines)
+	}
+	lineA := lines[0].(map[string]any)
+	lineB := lines[1].(map[string]any)
+	if lineA["fulfillable_quantity"] != float64(3) || lineB["fulfillable_quantity"] != float64(2) {
+		t.Fatalf("fulfillable_quantity = %v/%v, want 3/2", lineA["fulfillable_quantity"], lineB["fulfillable_quantity"])
+	}
+	lineAID := shopifyIDToString(lineA["id"])
+	lineBID := shopifyIDToString(lineB["id"])
+	orderID := shopifyIDToString(order["id"])
+
+	getOrder := func(id string) map[string]any {
+		t.Helper()
+		body, status := shopifyGet(t, base+"/admin/api/2024-10/orders/"+id+".json", token)
+		if status != 200 {
+			t.Fatalf("GET order %s -> %d; %s", id, status, body)
+		}
+		var out struct {
+			Order map[string]any `json:"order"`
+		}
+		if err := json.Unmarshal([]byte(body), &out); err != nil {
+			t.Fatal(err)
+		}
+		return out.Order
+	}
+
+	// 422: order without line items.
+	_, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders.json", token, map[string]any{
+		"order": map[string]any{"email": "buyer3@example.com"},
+	})
+	if status != 422 {
+		t.Fatalf("POST order without line items -> %d, want 422", status)
+	}
+
+	// ===== Partial fulfillment (line-item quantities) =====
+
+	body, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders/"+orderID+"/fulfillments.json", token, map[string]any{
+		"fulfillment": map[string]any{
+			"tracking_number": "1Z999AA1",
+			"line_items":      []map[string]any{{"id": lineAID, "quantity": 2}},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST partial fulfillment -> %d; %s", status, body)
+	}
+	var fulResp map[string]any
+	if err := json.Unmarshal([]byte(body), &fulResp); err != nil {
+		t.Fatal(err)
+	}
+	fulLines := fulResp["fulfillment"].(map[string]any)["line_items"].([]any)
+	if len(fulLines) != 1 || fulLines[0].(map[string]any)["quantity"] != float64(2) {
+		t.Fatalf("fulfillment line_items = %v, want 1 line of qty 2", fulLines)
+	}
+	order = getOrder(orderID)
+	if order["fulfillment_status"] != "partial" {
+		t.Fatalf("after partial fulfillment, fulfillment_status = %v, want partial", order["fulfillment_status"])
+	}
+	lines = order["line_items"].([]any)
+	lineA = lines[0].(map[string]any)
+	lineB = lines[1].(map[string]any)
+	if lineA["fulfillable_quantity"] != float64(1) || lineA["fulfillment_status"] != "partial" {
+		t.Fatalf("line A after partial: %+v", lineA)
+	}
+	if lineB["fulfillable_quantity"] != float64(2) || lineB["fulfillment_status"] != nil {
+		t.Fatalf("line B after partial: %+v", lineB)
+	}
+
+	// Complete the fulfillment.
+	_, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders/"+orderID+"/fulfillments.json", token, map[string]any{
+		"fulfillment": map[string]any{
+			"line_items": []map[string]any{
+				{"id": lineAID, "quantity": 1},
+				{"id": lineBID, "quantity": 2},
+			},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST completing fulfillment -> %d; %s", status, body)
+	}
+	if order = getOrder(orderID); order["fulfillment_status"] != "fulfilled" {
+		t.Fatalf("fulfillment_status = %v, want fulfilled", order["fulfillment_status"])
+	}
+
+	// 422: nothing left to fulfill (over-fulfillment caps at remaining = 0).
+	_, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders/"+orderID+"/fulfillments.json", token, map[string]any{
+		"fulfillment": map[string]any{
+			"line_items": []map[string]any{{"id": lineAID, "quantity": 5}},
+		},
+	})
+	if status != 422 {
+		t.Fatalf("over-fulfillment -> %d, want 422", status)
+	}
+	// 422: unknown line-item id.
+	_, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders/"+orderID+"/fulfillments.json", token, map[string]any{
+		"fulfillment": map[string]any{
+			"line_items": []map[string]any{{"id": 42, "quantity": 1}},
+		},
+	})
+	if status != 422 {
+		t.Fatalf("unknown line item -> %d, want 422", status)
+	}
+
+	// ===== financial_status derived from transactions =====
+
+	body, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders.json", token, map[string]any{
+		"order": map[string]any{
+			"line_items": []map[string]any{{"title": "Paid Item", "quantity": 1, "price": "30.00"}},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST paid order -> %d; %s", status, body)
+	}
+	paidOrderID := shopifyIDToString(jsonMustKey(t, body, "order", "id"))
+
+	postTx := func(kind, amount string) {
+		t.Helper()
+		_, status := shopifyPostJSON(t, base+"/admin/api/2024-10/orders/"+paidOrderID+"/transactions.json", token, map[string]any{
+			"transaction": map[string]any{"kind": kind, "amount": amount, "status": "success"},
+		})
+		if status != 201 {
+			t.Fatalf("POST transaction %s %s -> %d", kind, amount, status)
+		}
+	}
+	if fs := getOrder(paidOrderID)["financial_status"]; fs != "pending" {
+		t.Fatalf("before capture financial_status = %v, want pending", fs)
+	}
+	postTx("capture", "30.00")
+	if fs := getOrder(paidOrderID)["financial_status"]; fs != "paid" {
+		t.Fatalf("after capture financial_status = %v, want paid", fs)
+	}
+	postTx("refund", "10.00")
+	if fs := getOrder(paidOrderID)["financial_status"]; fs != "partially_refunded" {
+		t.Fatalf("after partial refund financial_status = %v, want partially_refunded", fs)
+	}
+	postTx("refund", "20.00")
+	if fs := getOrder(paidOrderID)["financial_status"]; fs != "refunded" {
+		t.Fatalf("after full refund financial_status = %v, want refunded", fs)
+	}
+
+	// ===== Cancel with restock =====
+
+	// Find the seeded boots product + variant inventory.
+	body, status = shopifyGet(t, base+"/admin/api/2024-10/products.json", token)
+	if status != 200 {
+		t.Fatalf("GET products -> %d", status)
+	}
+	var prodList map[string]any
+	if err := json.Unmarshal([]byte(body), &prodList); err != nil {
+		t.Fatal(err)
+	}
+	var bootsID, variantID string
+	var variantInv float64
+	for _, p := range prodList["products"].([]any) {
+		pm := p.(map[string]any)
+		if pm["title"] == "Classic Leather Boots" {
+			bootsID = shopifyIDToString(pm["id"])
+			v := pm["variants"].([]any)[0].(map[string]any)
+			variantID = shopifyIDToString(v["id"])
+			variantInv = v["inventory_quantity"].(float64)
+		}
+	}
+	if bootsID == "" {
+		t.Fatal("seeded boots product not found")
+	}
+
+	body, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders.json", token, map[string]any{
+		"order": map[string]any{
+			"line_items": []map[string]any{
+				{"title": "Boots", "quantity": 2, "price": "89.99", "variant_id": variantID},
+			},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST restock order -> %d; %s", status, body)
+	}
+	restockOrderID := shopifyIDToString(jsonMustKey(t, body, "order", "id"))
+
+	// Fulfill one of the two units first: restock should only return the
+	// unfulfilled one.
+	body, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders/"+restockOrderID+"/fulfillments.json", token, map[string]any{
+		"fulfillment": map[string]any{
+			"line_items": []map[string]any{{"id": shopifyIDToString(jsonMustLineID(t, body)), "quantity": 1}},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST pre-cancel fulfillment -> %d; %s", status, body)
+	}
+
+	body, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders/"+restockOrderID+"/cancel.json", token, map[string]any{
+		"restock": true,
+		"reason":  "customer",
+	})
+	if status != 200 {
+		t.Fatalf("POST cancel -> %d; %s", status, body)
+	}
+	order = getOrder(restockOrderID)
+	if order["cancelled_at"] == nil {
+		t.Fatal("cancelled_at not set after cancel")
+	}
+	if order["cancel_reason"] != "customer" {
+		t.Fatalf("cancel_reason = %v, want customer", order["cancel_reason"])
+	}
+
+	// Restock returned the 1 unfulfilled unit to the variant.
+	body, status = shopifyGet(t, base+"/admin/api/2024-10/products/"+bootsID+".json", token)
+	if status != 200 {
+		t.Fatalf("GET product after restock -> %d", status)
+	}
+	var fetched map[string]any
+	if err := json.Unmarshal([]byte(body), &fetched); err != nil {
+		t.Fatal(err)
+	}
+	restocked := fetched["product"].(map[string]any)["variants"].([]any)[0].(map[string]any)
+	if restocked["inventory_quantity"] != variantInv+1 {
+		t.Fatalf("inventory after restock = %v, want %v", restocked["inventory_quantity"], variantInv+1)
+	}
+
+	// Double-cancel is a 422.
+	_, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders/"+restockOrderID+"/cancel.json", token, map[string]any{})
+	if status != 422 {
+		t.Fatalf("double cancel -> %d, want 422", status)
+	}
+
+	// ===== Close =====
+
+	body, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders.json", token, map[string]any{
+		"order": map[string]any{
+			"line_items": []map[string]any{{"title": "Closable", "quantity": 1, "price": "1.00"}},
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST closable order -> %d; %s", status, body)
+	}
+	closableID := shopifyIDToString(jsonMustKey(t, body, "order", "id"))
+
+	body, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders/"+closableID+"/close.json", token, map[string]any{})
+	if status != 200 {
+		t.Fatalf("POST close -> %d; %s", status, body)
+	}
+	if getOrder(closableID)["closed_at"] == nil {
+		t.Fatal("closed_at not set after close")
+	}
+	body, status = shopifyGet(t, base+"/admin/api/2024-10/orders.json?status=closed", token)
+	if status != 200 {
+		t.Fatalf("GET orders status=closed -> %d", status)
+	}
+	var closedList map[string]any
+	if err := json.Unmarshal([]byte(body), &closedList); err != nil {
+		t.Fatal(err)
+	}
+	if len(closedList["orders"].([]any)) != 1 {
+		t.Fatalf("status=closed -> %v orders, want exactly the closed one", closedList["orders"])
+	}
+
+	// Closing a cancelled order is a 422.
+	_, status = shopifyPostJSON(t, base+"/admin/api/2024-10/orders/"+restockOrderID+"/close.json", token, map[string]any{})
+	if status != 422 {
+		t.Fatalf("close cancelled -> %d, want 422", status)
+	}
+
+	// ===== Customers write surface =====
+
+	body, status = shopifyPostJSON(t, base+"/admin/api/2024-10/customers.json", token, map[string]any{
+		"customer": map[string]any{
+			"email":      "newbie@example.com",
+			"first_name": "Ada",
+			"last_name":  "Lovelace",
+			"tags":       "vip",
+		},
+	})
+	if status != 201 {
+		t.Fatalf("POST customer -> %d; %s", status, body)
+	}
+	custID := shopifyIDToString(jsonMustKey(t, body, "customer", "id"))
+	if got := jsonMustKey(t, body, "customer", "tags"); got != "vip" {
+		t.Fatalf("created customer tags = %v, want vip", got)
+	}
+
+	// PUT update merges fields.
+	body, status = shopifyPutJSON(t, base+"/admin/api/2024-10/customers/"+custID+".json", token, map[string]any{
+		"customer": map[string]any{"last_name": "Byron", "note": "computing pioneer"},
+	})
+	if status != 200 {
+		t.Fatalf("PUT customer -> %d; %s", status, body)
+	}
+	cust := jsonMustKey(t, body, "customer", "")
+	_ = cust
+	if got := jsonMustKey(t, body, "customer", "first_name"); got != "Ada" {
+		t.Fatalf("first_name after PUT = %v, want Ada (merge must preserve)", got)
+	}
+	if got := jsonMustKey(t, body, "customer", "last_name"); got != "Byron" {
+		t.Fatalf("last_name after PUT = %v, want Byron", got)
+	}
+
+	// Duplicate email is a 422.
+	_, status = shopifyPostJSON(t, base+"/admin/api/2024-10/customers.json", token, map[string]any{
+		"customer": map[string]any{"email": "newbie@example.com"},
+	})
+	if status != 422 {
+		t.Fatalf("duplicate customer email -> %d, want 422", status)
+	}
+
+	// Unknown customer PUT is a 404.
+	_, status = shopifyPutJSON(t, base+"/admin/api/2024-10/customers/1.json", token, map[string]any{
+		"customer": map[string]any{"first_name": "Nobody"},
+	})
+	if status != 404 {
+		t.Fatalf("PUT unknown customer -> %d, want 404", status)
+	}
+
+	// DELETE archives: 200 {}, hidden from the list, second DELETE 404.
+	_, status = shopifyDelete(t, base+"/admin/api/2024-10/customers/"+custID+".json", token)
+	if status != 200 {
+		t.Fatalf("DELETE customer -> %d, want 200", status)
+	}
+	body, status = shopifyGet(t, base+"/admin/api/2024-10/customers.json", token)
+	if status != 200 {
+		t.Fatalf("GET customers after delete -> %d", status)
+	}
+	var custList map[string]any
+	if err := json.Unmarshal([]byte(body), &custList); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range custList["customers"].([]any) {
+		if shopifyIDToString(c.(map[string]any)["id"]) == custID {
+			t.Fatal("archived customer still in list")
+		}
+	}
+	// The duplicate email is claimable again after the archive.
+	_, status = shopifyPostJSON(t, base+"/admin/api/2024-10/customers.json", token, map[string]any{
+		"customer": map[string]any{"email": "newbie@example.com"},
+	})
+	if status != 201 {
+		t.Fatalf("re-create archived email -> %d, want 201", status)
+	}
+	_, status = shopifyDelete(t, base+"/admin/api/2024-10/customers/"+custID+".json", token)
+	if status != 404 {
+		t.Fatalf("second DELETE -> %d, want 404", status)
+	}
+
+	// ===== Product update: arbitrary fields + variants merge =====
+
+	body, status = shopifyPutJSON(t, base+"/admin/api/2024-10/products/"+bootsID+".json", token, map[string]any{
+		"product": map[string]any{
+			"title":     "Classic Leather Boots v2",
+			"vendor":    "New Cobbler",
+			"tags":      "leather,boots",
+			"status":    "draft",
+			"body_html": "<p>Updated description.</p>",
+			"variants": []map[string]any{
+				{"id": variantID, "price": "95.00", "inventory_quantity": 7},
+				{"title": "Wide", "price": "99.00", "sku": "BOOTS-001-W"},
+			},
+		},
+	})
+	if status != 200 {
+		t.Fatalf("PUT product -> %d; %s", status, body)
+	}
+	updated := jsonMustKey(t, body, "product", "")
+	_ = updated
+	if got := jsonMustKey(t, body, "product", "title"); got != "Classic Leather Boots v2" {
+		t.Fatalf("updated title = %v", got)
+	}
+	if got := jsonMustKey(t, body, "product", "vendor"); got != "New Cobbler" {
+		t.Fatalf("updated vendor = %v", got)
+	}
+	if got := jsonMustKey(t, body, "product", "tags"); got != "leather,boots" {
+		t.Fatalf("updated tags = %v", got)
+	}
+	if got := jsonMustKey(t, body, "product", "status"); got != "draft" {
+		t.Fatalf("updated status = %v", got)
+	}
+	if got := jsonMustKey(t, body, "product", "body_html"); got != "<p>Updated description.</p>" {
+		t.Fatalf("updated body_html = %v", got)
+	}
+	variants := jsonMustKey(t, body, "product", "variants").([]any)
+	if len(variants) != 2 {
+		t.Fatalf("variants after merge = %d, want 2", len(variants))
+	}
+	merged := variants[0].(map[string]any)
+	if merged["price"] != "95.00" || merged["inventory_quantity"] != float64(7) {
+		t.Fatalf("merged variant = %v, want price 95.00 / inventory 7", merged)
+	}
+	appended := variants[1].(map[string]any)
+	if appended["sku"] != "BOOTS-001-W" || appended["title"] != "Wide" || appended["price"] != "99.00" {
+		t.Fatalf("appended variant = %v", appended)
+	}
+
+	// Invalid status is a 422.
+	_, status = shopifyPutJSON(t, base+"/admin/api/2024-10/products/"+bootsID+".json", token, map[string]any{
+		"product": map[string]any{"status": "bogus"},
+	})
+	if status != 422 {
+		t.Fatalf("PUT product invalid status -> %d, want 422", status)
+	}
+
+	// Unknown variant id in a variants merge is a 404.
+	_, status = shopifyPutJSON(t, base+"/admin/api/2024-10/products/"+bootsID+".json", token, map[string]any{
+		"product": map[string]any{
+			"variants": []map[string]any{{"id": 42, "price": "1.00"}},
+		},
+	})
+	if status != 404 {
+		t.Fatalf("PUT product unknown variant -> %d, want 404", status)
+	}
+}
+
+// jsonMustKey unmarshals body and returns body[top][key]; when key is ""
+// returns body[top] (any).
+func jsonMustKey(t *testing.T, body, top, key string) any {
+	t.Helper()
+	var out map[string]any
+	if err := json.Unmarshal([]byte(body), &out); err != nil {
+		t.Fatalf("jsonMustKey: %v (body %s)", err, body)
+	}
+	node, ok := out[top].(map[string]any)
+	if !ok {
+		t.Fatalf("jsonMustKey: %q is not an object: %v", top, out[top])
+	}
+	if key == "" {
+		return node
+	}
+	return node[key]
+}
+
+// jsonMustLineID extracts the first line item id from a created-order body.
+func jsonMustLineID(t *testing.T, orderBody string) any {
+	t.Helper()
+	var out struct {
+		Order struct {
+			LineItems []struct {
+				ID any `json:"id"`
+			} `json:"line_items"`
+		} `json:"order"`
+	}
+	if err := json.Unmarshal([]byte(orderBody), &out); err != nil {
+		t.Fatalf("jsonMustLineID: %v", err)
+	}
+	if len(out.Order.LineItems) == 0 {
+		t.Fatal("jsonMustLineID: no line items")
+	}
+	return out.Order.LineItems[0].ID
+}

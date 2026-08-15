@@ -6,7 +6,7 @@
 # See DISCLAIMER.
 id: paypal-style
 name: "PayPal Orders v2-style API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "PayPal Orders API"
@@ -26,20 +26,47 @@ endpoints:
   - route: /v2/checkout/orders/{id}
     method: GET
     handler: scripts/orders.star#on_get_order
+  - route: /v2/checkout/orders/{id}/approve
+    method: POST
+    handler: scripts/orders.star#on_approve_order
+    concurrency_key: id # read-modify-write of the order status
   - route: /v2/checkout/orders/{id}/capture
     method: POST
     handler: scripts/orders.star#on_capture_order
+    concurrency_key: id # read-modify-write of the order + capture creation
   - route: /v2/checkout/orders/{id}/authorize
     method: POST
     handler: scripts/orders.star#on_authorize_order
+    concurrency_key: id # read-modify-write of the order + authorization creation
 
-  # --- Payments / Captures ---
+  # --- Payments / Authorizations ---
+  - route: /v2/payments/authorizations/{id}
+    method: GET
+    handler: scripts/authorizations.star#on_get_authorization
+  - route: /v2/payments/authorizations/{id}/reauthorize
+    method: POST
+    handler: scripts/authorizations.star#on_reauthorize_authorization
+    concurrency_key: id # read-modify-write of the authorization status
+  - route: /v2/payments/authorizations/{id}/void
+    method: POST
+    handler: scripts/authorizations.star#on_void_authorization
+    concurrency_key: id # read-modify-write of the authorization status
+  - route: /v2/payments/authorizations/{id}/capture
+    method: POST
+    handler: scripts/authorizations.star#on_capture_authorization
+    concurrency_key: id # read-modify-write of the authorization + capture creation
+
+  # --- Payments / Captures / Refunds ---
   - route: /v2/payments/captures/{id}
     method: GET
     handler: scripts/payments.star#on_get_capture
   - route: /v2/payments/captures/{capture_id}/refund
     method: POST
     handler: scripts/payments.star#on_refund
+    concurrency_key: capture_id # over-refund guard reads then writes refund state
+  - route: /v2/payments/refunds/{id}
+    method: GET
+    handler: scripts/payments.star#on_get_refund
 
   # --- Webhooks ---
   - route: /v1/notifications/webhooks
@@ -62,6 +89,8 @@ resources:
   - name: captures
     kind: collection
   - name: refunds
+    kind: collection
+  - name: authorizations
     kind: collection
   - name: access_tokens
     kind: collection

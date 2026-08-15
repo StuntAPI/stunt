@@ -47,6 +47,7 @@ endpoints:
   - route: /rest/api/3/issue/{key}
     method: PUT
     handler: scripts/issue.star#on_update_issue
+    concurrency_key: key # read-modify-write on the issue fields
   - route: /rest/api/3/issue/{key}
     method: DELETE
     handler: scripts/issue.star#on_delete_issue
@@ -58,11 +59,22 @@ endpoints:
   - route: /rest/api/3/issue/{key}/transitions
     method: POST
     handler: scripts/issue.star#on_do_transition
+    concurrency_key: key # read-modify-write on the issue status
 
   # --- issue comments ---
   - route: /rest/api/3/issue/{key}/comment
+    method: GET
+    handler: scripts/issue.star#on_list_comments
+  - route: /rest/api/3/issue/{key}/comment
     method: POST
     handler: scripts/issue.star#on_add_comment
+  - route: /rest/api/3/issue/{key}/comment/{id}
+    method: PUT
+    handler: scripts/issue.star#on_update_comment
+    concurrency_key: key # read-modify-write on the comment body
+  - route: /rest/api/3/issue/{key}/comment/{id}
+    method: DELETE
+    handler: scripts/issue.star#on_delete_comment
 
   # --- webhooks (dynamic webhook registration) ---
   - route: /rest/api/3/webhook

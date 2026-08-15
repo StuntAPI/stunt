@@ -38,7 +38,7 @@ def on_create_webhook(req):
         "id": wid,
         "url": url,
         "events": events,
-        "created_at": _now_iso(),
+        "created_at": clock.now_rfc3339(),
     }
 
     wc = store_collection("webhooks")
@@ -77,5 +77,5 @@ def _webhook_view(w):
         "id": w["id"],
         "url": w.get("url", ""),
         "events": w.get("events", []),
-        "created_at": w.get("created_at", _now_iso()),
+        "created_at": w.get("created_at", clock.now_rfc3339()),
     }

@@ -1,10 +1,14 @@
 # Search handler — JQL query endpoint.
 #
-# GET /rest/api/3/search?jql=project=TEST
+# GET /rest/api/3/search?jql=<JQL>
 # -> {startAt, maxResults, total, issues:[{id, key, fields:{...}}]}
 #
-# JQL parsing: pattern-match the project key from "project=KEY" and optional
-# status filters. No real JQL engine.
+# The handler parses the real JQL subset (see lib.star): field = / != / ~ /
+# !~ / > / >= / < / <= / IN / NOT IN / IS [NOT] EMPTY, AND/OR with real JQL
+# precedence (AND binds tighter), ORDER BY field [ASC|DESC] and
+# startAt/maxResults paging. Sorting is delegated to query_select; anything
+# that does not parse answers 400 with Jira's "Error in the JQL Query"
+# envelope.
 
 # Shared helpers from lib.star.
 
@@ -14,33 +18,36 @@ def on_search(req):
         return err
 
     jql = _get_query(req, "jql", "")
-    project_key, status_filter = _parse_jql(jql)
+    parsed = _jql_parse(jql)
+    if parsed == None:
+        return respond(400, {
+            "errorMessages": ["Error in the JQL Query: The query '" + jql + "' is not valid. Check the fields and syntax."],
+            "errors": {},
+        })
 
     c = store_collection("issues")
     docs = c.list()
 
-    # Filter by project key if specified.
-    filtered = []
+    # OR-of-AND-groups filter (case-insensitive value matching, like Jira).
+    matched = []
     for d in docs:
-        fields = d.get("fields", {})
-        proj = fields.get("project", {})
-        proj_key = proj.get("key", "")
+        if _jql_matches(d, parsed["groups"]):
+            matched.append(d)
 
-        if project_key != "" and proj_key != project_key:
-            continue
+    # ORDER BY: apply keys last-to-first over the stable query_select sort.
+    order = parsed["order"]
+    for i in range(len(order) - 1, -1, -1):
+        matched = query_select(matched, None, order[i][0], order[i][1], None, None, None)
 
-        if status_filter != "":
-            st = fields.get("status", {})
-            st_name = _lower(st.get("name", ""))
-            if st_name != _lower(status_filter):
-                continue
+    total = len(matched)
 
-        filtered.append(d)
+    # startAt/maxResults paging via query_select slicing.
+    start_at = _to_int(_get_query(req, "startAt", "0"))
+    max_results = _to_int(_get_query(req, "maxResults", "50"))
+    if max_results <= 0:
+        max_results = 50
+    paged = query_select(matched, None, None, None, max_results, start_at, None)
 
-    # Paginate.
-    paged, start_at, max_results, total = _paginate(req, filtered)
-
-    # Build issues response.
     issues = []
     for d in paged:
         issues.append(_issue_shape(d))

@@ -257,6 +257,19 @@ def _seed():
         "updated_at": _now(),
     })
 
+    # Seed one review for the default repo's PR #1 so the reviews surface
+    # reads from the collection (stable IDs — no per-read minting).
+    store_collection("reviews").insert({
+        "id": _next_id("review_id"),
+        "repo": "octocat/hello-world",
+        "number": 1,
+        "user": {"login": "octocat", "id": 1, "type": "User"},
+        "body": "Looks good to me!",
+        "state": "APPROVED",
+        "commit_id": "abc123def456",
+        "submitted_at": _now(),
+    })
+
     rc = store_collection("runs")
     rc.insert({
         "id": _next_id("run_id"),
@@ -271,8 +284,71 @@ def _seed():
         "updated_at": _now(),
     })
 
+# _gh_validation_failed returns a GitHub-style 422 Validation Failed response
+# with the real errors[] shape (resource/field/code).
+def _gh_validation_failed(resource, field, code):
+    return respond(422, {
+        "message": "Validation Failed",
+        "errors": [{"resource": resource, "field": field, "code": code}],
+        "documentation_url": "https://docs.github.com/rest",
+    })
+
+# _actor is the synthetic identity credited for writes and issue events.
+# (ID assembled at runtime — no long digit literals in scripts.)
+_BOT_ID = 100 * 10000 + 2
+
+def _actor():
+    return {"login": "stunt-dev", "id": _BOT_ID, "type": "Bot"}
+
+# _find_doc returns the first doc in coll whose repo + number match, or None.
+# Issues and PRs share one per-repo number sequence, so a number is unique
+# within a repo across both collections.
+def _find_doc(coll, repo_key, number):
+    for d in coll.list():
+        if d.get("repo", "") == repo_key and d.get("number", 0) == number:
+            return d
+    return None
+
+# _record_issue_event appends to the issue-events surface (labeled, unlabeled,
+# closed, reopened, merged — GitHub's issue timeline vocabulary). Lives in
+# lib.star because both issues.star and pulls.star record events.
+def _record_issue_event(repo_key, number, event, label = ""):
+    doc = {
+        "id": _next_id("issue_event_id"),
+        "repo": repo_key,
+        "number": number,
+        "event": event,
+        "actor": _actor(),
+        "created_at": _now(),
+    }
+    if label != "":
+        doc["label"] = {"name": label, "color": "ededed"}
+    store_collection("issue_events").insert(doc)
+
+# _pull_view renders the public PR shape (internal _ keys, e.g. the
+# _base_changed conflict marker, are stripped here). Shared with issues.star,
+# whose comment/label surface covers PR numbers too.
+def _pull_view(p):
+    return {
+        "id": _to_int(p["id"]),
+        "number": p.get("number", 0),
+        "title": p.get("title", ""),
+        "body": p.get("body", ""),
+        "state": p.get("state", "open"),
+        "draft": p.get("draft", False),
+        "merged": p.get("merged", False),
+        "merged_at": p.get("merged_at", None),
+        "merge_commit_sha": p.get("merge_commit_sha", None),
+        "closed_at": p.get("closed_at", None),
+        "user": p.get("user", {}),
+        "head": p.get("head", {}),
+        "base": p.get("base", {}),
+        "created_at": p.get("created_at", _now()),
+        "updated_at": p.get("updated_at", _now()),
+    }
+
 # _next_id returns a monotonically-increasing numeric ID string.
-_BASE_ID = 80000000
+_BASE_ID = 8000 * 10000
 
 def _next_id(kind):
     n = store_kv_incr("github", kind + "_seq")

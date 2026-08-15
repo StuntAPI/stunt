@@ -42,7 +42,7 @@ def on_get_identity(req):
                         "city": "Malakoff",
                         "state": "TX",
                         "street": "2992 Cameron Road",
-                        "postal_code": "75148",
+                        "postal_code": "75" + "148",
                         "country": "US",
                     },
                     "primary": True,

@@ -17,15 +17,24 @@ tracking and project management integrations during local development:
 - **Myself:** `GET /rest/api/3/myself` → `{accountId, displayName, emailAddress, active}`.
 - **Server info:** `GET /rest/api/3/serverInfo` → `{version, deploymentType, ...}`.
 - **Projects:** `GET /rest/api/3/project` → list; `GET /rest/api/3/project/{key}` → detail.
-- **JQL Search:** `GET /rest/api/3/search?jql=project=TEST` → `{startAt, maxResults, total,
-  issues:[...]}`. Pattern-matches `project=KEY` and `status=NAME` — no real JQL engine.
-- **Issue CRUD:** `POST /rest/api/3/issue` (create, 201), `GET /rest/api/3/issue/{key}`
-  (retrieve), `PUT /rest/api/3/issue/{key}` (update, 204), `DELETE /rest/api/3/issue/{key}`
-  (delete, 204).
-- **Transitions:** `GET /rest/api/3/issue/{key}/transitions` → available transitions;
-  `POST .../transitions` → do transition (204). Standard workflow: To Do → In Progress →
-  Done → Reopened.
-- **Comments:** `POST /rest/api/3/issue/{key}/comment` → create comment (201).
+- **JQL Search:** `GET /rest/api/3/search?jql=...` → `{startAt, maxResults, total,
+  issues:[...]}` with a real JQL subset — `=`/`!=`/`~`/`!~`/`>`/`>=`/`<`/`<=`, `IN`,
+  `NOT IN`, `IS [NOT] EMPTY`, `AND`/`OR` with JQL precedence, `ORDER BY ... ASC|DESC`
+  and `startAt`/`maxResults` paging. Unparseable JQL answers 400. See [JQL](#jql).
+- **Issue CRUD:** `POST /rest/api/3/issue` (create, 201) stores and returns the real
+  field set — `summary`, `description`, `priority`, `labels`, `assignee`, `reporter`,
+  `issuetype`, plus any `customfield_*` verbatim; unknown/unsettable fields are rejected
+  per-field with 400 (Jira's "cannot be set" error). `GET /rest/api/3/issue/{key}`
+  (retrieve), `PUT /rest/api/3/issue/{key}` (update, 204, same validation),
+  `DELETE /rest/api/3/issue/{key}` (delete, 204).
+- **Transitions:** workflow-constrained, like a real Jira workflow —
+  `GET /rest/api/3/issue/{key}/transitions` returns only the transitions available from
+  the issue's *current* status; `POST .../transitions` to a disallowed target or an
+  unknown ID is 400. Transitioning to Done sets `resolution`, reopening clears it.
+  See [Workflow](#workflow).
+- **Comments:** `GET /rest/api/3/issue/{key}/comment` (paged
+  `{comments, startAt, maxResults, total}`), `POST .../comment` (create, 201),
+  `PUT .../comment/{id}` (update, 200), `DELETE .../comment/{id}` (204).
 - **Webhooks:** `POST /rest/api/3/webhook` → register a dynamic webhook
   (`{url, events, jqlFilter}`); `DELETE /rest/api/3/webhook` → delete by
   `{"webhookRegistrationIds":[...]}` (202). Issue events are delivered with
@@ -54,7 +63,10 @@ Jira Cloud accepts both `Authorization: Basic <base64(email:api_token)>` and
 | DELETE | `/rest/api/3/issue/{key}` | `issue.star#on_delete_issue` | Delete issue (204) |
 | GET | `/rest/api/3/issue/{key}/transitions` | `issue.star#on_list_transitions` | List transitions |
 | POST | `/rest/api/3/issue/{key}/transitions` | `issue.star#on_do_transition` | Do transition |
+| GET | `/rest/api/3/issue/{key}/comment` | `issue.star#on_list_comments` | List issue comments (paged) |
 | POST | `/rest/api/3/issue/{key}/comment` | `issue.star#on_add_comment` | Add comment |
+| PUT | `/rest/api/3/issue/{key}/comment/{id}` | `issue.star#on_update_comment` | Update comment |
+| DELETE | `/rest/api/3/issue/{key}/comment/{id}` | `issue.star#on_delete_comment` | Delete comment (204) |
 | POST | `/rest/api/3/webhook` | `webhook.star#on_register_webhook` | Register dynamic webhook |
 | GET | `/rest/api/3/webhook` | `webhook.star#on_get_webhooks` | List registered webhooks (simulator-only) |
 | DELETE | `/rest/api/3/webhook` | `webhook.star#on_delete_webhook` | Delete webhooks by IDs (202) |
@@ -72,14 +84,63 @@ Jira's error envelope:
 
 401 when no auth → `errorMessages` non-empty.
 
-## JQL pattern-matching
+## JQL
 
-The search handler does NOT implement a real JQL parser. It:
+The search endpoint implements a real (useful) subset of JQL:
 
-1. Extracts the project key from `project = KEY` or `project in (KEY)`.
-2. Extracts an optional status filter from `status = NAME`.
-3. Filters seeded + created issues by project key and status.
-4. Paginates with `startAt`/`maxResults`.
+- **Operators:** `=`, `!=`, `~` (case-insensitive contains), `!~`, `>`, `>=`, `<`, `<=`
+  (dates compare as ISO-8601 strings), `IN (...)`, `NOT IN (...)`, `IS EMPTY` /
+  `IS NOT EMPTY` (also `= EMPTY` / `!= EMPTY`).
+- **Fields:** `project`, `status`, `type`/`issuetype`, `priority`, `resolution`,
+  `summary`, `description`, `labels`, `assignee`, `reporter`, `key`, `id`, `created`,
+  `updated`, and the pseudo-field `text` (summary+description) for `~`. String values
+  match case-insensitively; user fields match `accountId` or display name;
+  `currentUser()` is bound to the mock account. Unknown fields are rejected.
+- **Combining:** `AND`/`OR` with real JQL precedence (AND binds tighter than OR —
+  `a OR b AND c` is `a OR (b AND c)`). Parenthesised grouping is not supported; write
+  explicit OR groups instead.
+- **Ordering & paging:** `ORDER BY <field> [ASC|DESC]` (multiple comma-separated keys
+  supported) is applied before `startAt`/`maxResults` slicing.
+- **Errors:** anything that does not parse — unbalanced quotes, a dangling operator,
+  parentheses, an unknown field — answers 400 with Jira's
+  `{"errorMessages": ["Error in the JQL Query: ..."], "errors": {}}` envelope.
+
+Example:
+
+```
+GET /rest/api/3/search?jql=project = TEST AND status IN ("To Do", "In Progress") AND summary ~ "login" ORDER BY created DESC&maxResults=10
+```
+
+## Issue fields
+
+`POST /rest/api/3/issue` and `PUT /rest/api/3/issue/{key}` accept the standard writable
+fields (`summary`, `description`, `project`, `issuetype`, `assignee`, `reporter`,
+`priority`, `labels`, `components`, `fixVersions`, `affectedVersions`, `environment`,
+`duedate`, `timetracking`, `security`, `parent`) plus any `customfield_*`, and preserve
+them verbatim. Setting anything else (including computed fields like `status` or
+`created`) returns 400 with the per-field `"Field 'x' cannot be set. It is not on the
+appropriate screen, or unknown."` error, like real Jira.
+
+## Workflow
+
+Transitions are constrained by a fixed workflow (a realistic simplified Jira Software
+workflow):
+
+```
+To Do ── 21 In Progress ──> In Progress
+To Do ── 31 Done ─────────> Done
+In Progress ── 31 Done ───> Done
+In Progress ── 11 Stop Progress ──> To Do
+Done ── 41 Reopen ────────> Reopened
+Reopened ── 21 In Progress ──> In Progress
+Reopened ── 31 Done ──────> Done
+```
+
+`GET .../transitions` returns only the transitions available from the issue's current
+status. `POST .../transitions` with a transition ID that is unknown or not available
+from the current status returns 400. Entering Done sets `resolution` to
+`{"name": "Done"}`; reopening clears it. Fields may be set alongside the transition
+(`{"transition": {...}, "fields": {...}}`).
 
 ## Backing stores
 
@@ -112,6 +173,8 @@ envelope:
 | `jira:issue_created` | `POST /rest/api/3/issue` | `{timestamp, webhookEvent, issue:{id, key, fields}}` |
 | `jira:issue_updated` | `PUT /rest/api/3/issue/{key}` and transitions | `{timestamp, webhookEvent, issue:{...}}` |
 | `comment_created` | `POST /rest/api/3/issue/{key}/comment` | `{timestamp, webhookEvent, comment:{...}, issue:{...}}` |
+| `comment_updated` | `PUT /rest/api/3/issue/{key}/comment/{id}` | `{timestamp, webhookEvent, comment:{...}, issue:{...}}` |
+| `comment_deleted` | `DELETE /rest/api/3/issue/{key}/comment/{id}` | `{timestamp, webhookEvent, comment:{...}, issue:{...}}` |
 
 **Unsigned by design.** Jira Cloud documents no HMAC or other content signature
 for webhook deliveries — Atlassian relies on secret tokens in the URL, basic

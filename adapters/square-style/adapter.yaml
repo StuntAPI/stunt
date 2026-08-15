@@ -21,6 +21,9 @@ endpoints:
 
   # --- Payments ---
   - route: /v2/payments
+    method: GET
+    handler: scripts/payments.star#on_list_payments
+  - route: /v2/payments
     method: POST
     handler: scripts/payments.star#on_create_payment
   - route: /v2/payments/{id}
@@ -32,8 +35,16 @@ endpoints:
   - route: /v2/payments/{id}/complete
     method: POST
     handler: scripts/payments.star#on_complete_payment
+    concurrency_key: id # status read-modify-write
+  - route: /v2/payments/{id}/capture
+    method: POST
+    handler: scripts/payments.star#on_capture_payment
+    concurrency_key: id # status read-modify-write
 
   # --- Refunds ---
+  - route: /v2/refunds
+    method: GET
+    handler: scripts/refunds.star#on_list_payment_refunds
   - route: /v2/refunds
     method: POST
     handler: scripts/refunds.star#on_create_refund
@@ -52,15 +63,27 @@ endpoints:
   - route: /v2/orders
     method: POST
     handler: scripts/orders.star#on_create_order
+  - route: /v2/orders/calculate
+    method: POST
+    handler: scripts/orders.star#on_calculate_order
   - route: /v2/orders/{id}
     method: GET
     handler: scripts/orders.star#on_get_order
   - route: /v2/orders/{id}
     method: PUT
     handler: scripts/orders.star#on_update_order
+    concurrency_key: id # read-modify-write field merge (+ re-pricing)
   - route: /v2/orders/{id}
     method: DELETE
     handler: scripts/orders.star#on_delete_order
+  - route: /v2/orders/{id}/pay
+    method: POST
+    handler: scripts/orders.star#on_pay_order
+    concurrency_key: id # state read-modify-write (+ payment creation)
+  - route: /v2/orders/{id}/complete
+    method: POST
+    handler: scripts/orders.star#on_complete_order
+    concurrency_key: id # state read-modify-write
 
 # Backing stores — collections for stateful data.
 resources:

@@ -34,7 +34,7 @@ def on_get_balances(req):
         "accounts": accounts,
         "item": {
             "item_id": item_id,
-            "institution_id": "ins_000000000000",
+            "institution_id": "ins_1",
         },
         "request_id": _request_id(),
     })
@@ -67,7 +67,7 @@ def on_get_accounts(req):
         "accounts": accounts,
         "item": {
             "item_id": item_id,
-            "institution_id": "ins_000000000000",
+            "institution_id": "ins_1",
         },
         "request_id": _request_id(),
     })

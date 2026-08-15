@@ -17,7 +17,8 @@ curl -X POST http://localhost:8080/oauth2/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d 'grant_type=authorization_code&code=sq0cgp-code123&client_id=sq0idp-test&client_secret=shpss-test'
 
-# Create a payment
+# Create a payment (autocomplete=false → APPROVED; omit it and the payment
+# completes immediately)
 curl -X POST http://localhost:8080/v2/payments \
   -H "Authorization: Bearer EAAA5000000001_mock_access_token" \
   -H "Square-Version: 2024-08-21" \
@@ -25,6 +26,7 @@ curl -X POST http://localhost:8080/v2/payments \
   -d '{
     "source_id": "cnon:card-nonce-ok",
     "idempotency_key": "idem-001",
+    "autocomplete": false,
     "amount_money": { "amount": 1000, "currency": "USD" },
     "location_id": "LH3A4XKVS0RZR"
   }'
@@ -66,15 +68,21 @@ envelope `{"errors": [{"category": "AUTHENTICATION_FAILURE", "code":
 |--------|-------|-------------|
 | POST | `/oauth2/token` | OAuth2 token exchange |
 | POST | `/v2/payments` | Create a payment |
+| GET | `/v2/payments` | List payments (cursor-paginated, filterable) |
 | GET | `/v2/payments/{id}` | Retrieve a payment |
 | DELETE | `/v2/payments/{id}` | Delete a payment *(stunt extension)* |
-| POST | `/v2/payments/{id}/complete` | Complete a payment |
+| POST | `/v2/payments/{id}/complete` | Complete an approved payment |
+| POST | `/v2/payments/{id}/capture` | Capture a delayed/authorized payment |
 | POST | `/v2/refunds` | Create a refund |
+| GET | `/v2/refunds` | List refunds (cursor-paginated, filterable) |
 | GET | `/v2/locations` | List merchant locations (cursor-paginated) |
 | POST | `/v2/catalog/search` | Search catalog objects |
 | POST | `/v2/orders` | Create an order |
+| POST | `/v2/orders/calculate` | Price an order without persisting it |
 | GET | `/v2/orders/{id}` | Retrieve an order |
 | PUT | `/v2/orders/{id}` | Update an order |
+| POST | `/v2/orders/{id}/pay` | Pay (and complete) an order |
+| POST | `/v2/orders/{id}/complete` | Complete an order |
 | DELETE | `/v2/orders/{id}` | Delete an order *(stunt extension)* |
 
 Square's real Payments/Orders APIs expose no DELETE (orders transition
@@ -83,17 +91,63 @@ create → delete teardown lifecycle tests can clean up.
 
 ## Pagination
 
-`GET /v2/locations` pages via Square's cursor scheme: a `limit` query
-param (> 0) sets the page size, and the next page's opaque token is
-returned as a top-level `cursor` field in the response (empty string when
-there are no more pages). Pass it back as the `cursor` query param.
-Without a `limit`, all items are returned in one page.
+`GET /v2/locations`, `GET /v2/payments` and `GET /v2/refunds` page via
+Square's cursor scheme: a `limit` query param (> 0) sets the page size, and
+the next page's opaque token is returned as a top-level `cursor` field in
+the response (empty string when there are no more pages). Pass it back as
+the `cursor` query param. Without a `limit`, all items are returned in one
+page.
+
+List endpoints also honor Square's list filters, mapped onto typed
+filter/sort:
+
+- `GET /v2/payments` — `location_id`, `total` (matches `amount_money.amount`),
+  `last_4`, `card_brand`, and `sort_order=ASC|DESC` (by `created_at`)
+- `GET /v2/refunds` — `status`, `location_id`, `sort_order=ASC|DESC`
 
 ## Payment lifecycle
 
+Payment creation follows Square's autocomplete semantics:
+
 ```
-APPROVED → COMPLETED  (via /complete)
+autocomplete=true (default)            → COMPLETED at create
+autocomplete=false                     → APPROVED    → /complete   → COMPLETED
+delayed_capture=true / delay_duration  → AUTHORIZATION_PENDING → /capture → COMPLETED
 ```
+
+`POST /v2/payments/{id}/complete` only completes an `APPROVED` payment
+(delayed payments must be captured); completing an already-completed
+payment returns `400 PAYMENT_ALREADY_COMPLETED`.
+
+## Refund semantics
+
+- Only `COMPLETED` payments are refundable — anything else returns
+  `400` with Square's `errors` envelope (`INVALID_REQUEST_ERROR` /
+  `INVALID_REQUEST`).
+- A refund's `amount_money.amount` must not exceed the payment's unrefunded
+  balance (`amount_money.amount` minus prior refund totals). Partial
+  refunds accumulate; each one updates the payment's `refunded_amount`.
+- Omitting `amount_money` (or its `amount`) refunds the full remaining
+  balance.
+
+## Order lifecycle and pricing
+
+Orders move `DRAFT → OPEN → COMPLETED`:
+
+- `POST /v2/orders` creates an `OPEN` order by default (pass
+  `"state": "DRAFT"` in the order object to create a draft)
+- `POST /v2/orders/{id}/pay` creates a `COMPLETED` payment for the order
+  total (or the supplied `amount_money`) and completes the order
+- `POST /v2/orders/{id}/complete` completes a draft/open order without a
+  payment; completing a completed order returns `400 ORDER_ALREADY_COMPLETED`
+
+Line items are priced the way Square prices them: gross =
+`base_price_money × quantity`, minus discounts (Square percentage strings
+like `"7.25"` or fixed `amount_money`, capped at gross), plus taxes on the
+discounted net. Totals roll up into the order's `total_money`,
+`tax_money` and `discount_money`. `POST /v2/orders/calculate` takes the
+same body as `POST /v2/orders` and returns the priced order without
+persisting it.
 
 ## Idempotency
 

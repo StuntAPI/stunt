@@ -6,7 +6,7 @@
 # DISCLAIMER.
 id: plaid-style
 name: "Plaid-style API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Plaid API"
@@ -50,6 +50,25 @@ endpoints:
     method: POST
     handler: scripts/item.star#on_remove_item
 
+  # --- Institutions ---
+  - route: /institutions/get
+    method: POST
+    handler: scripts/institutions.star#on_list_institutions
+  - route: /institutions/get_by_id
+    method: POST
+    handler: scripts/institutions.star#on_get_institution_by_id
+
+  # --- Sandbox (local-testing surface) ---
+  - route: /sandbox/public_token/create
+    method: POST
+    handler: scripts/sandbox.star#on_create_public_token
+  - route: /sandbox/item/reset_login
+    method: POST
+    handler: scripts/sandbox.star#on_reset_login
+  - route: /sandbox/item/fire_webhook
+    method: POST
+    handler: scripts/sandbox.star#on_fire_webhook
+
 # Backing stores — collections for stateful data.
 resources:
   - name: items
@@ -61,6 +80,9 @@ resources:
   - name: transactions
     kind: collection
     seed: fixtures/transactions.jsonl
+  - name: institutions
+    kind: collection
+    seed: fixtures/institutions.jsonl
   - name: public_tokens
     kind: collection
   - name: access_tokens

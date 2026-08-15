@@ -18,12 +18,42 @@ commerce integrations during local development:
 - **OAuth install flow:** `GET /admin/oauth/authorize` → 302 redirect with
   `code` + `state`; `POST /admin/oauth/access_token` → `{access_token, scope}`.
 - **Products (stateful CRUD):** list, create, get-by-id, update (PUT), delete.
-- **Orders (stateful):** list, get-by-id. Seed orders come `paid` +
-  `unfulfilled`.
-- **Fulfillments:** `POST /orders/{id}/fulfillments.json` → updates the order's
-  `fulfillment_status` to `fulfilled`.
-- **Transactions:** `POST /orders/{id}/transactions.json` (capture/refund).
-- **Customers:** `GET /customers.json`.
+  Updates honor arbitrary fields — `title`, `body_html`, `vendor`, `tags`,
+  `status` (validated: `active`/`archived`/`draft`, else 422), and a
+  `variants` array that replaces the variant set: variants matched by `id`
+  are field-merged, id-less variants are appended with fresh ids, an unknown
+  variant id is a 404.
+- **Orders (stateful) with a full state machine:**
+  - `POST /orders.json` creates a standard order — line items required
+    (else 422), quantities/prices normalized, `total_price` computed from the
+    lines, order numbering continues the seed. New orders start `pending` +
+    unfulfilled.
+  - `POST /orders/{id}/cancel.json` sets `cancelled_at` (+ `cancel_reason`);
+    `{"restock": true}` returns each line's **unfulfilled** quantity to its
+    variant's `inventory_quantity`. Double-cancel → 422.
+  - `POST /orders/{id}/close.json` sets `closed_at`; closing a cancelled
+    order → 422.
+- **Financial status is derived, not static:** every successful transaction
+  (`capture`/`sale`/`refund`/`void`) on the order recomputes
+  `financial_status`: no captures → `pending`; captures and no refunds →
+  `paid`; partial refund → `partially_refunded`; refunds ≥ captured →
+  `refunded`; a void → `voided`. The seeded order's `paid` status is backed by
+  a real `sale` transaction, so the arithmetic is uniform.
+- **Fulfillments are partial-capable at the line-item level:**
+  `POST /orders/{id}/fulfillments.json` with
+  `{"fulfillment": {"line_items": [{"id": ..., "quantity": N}]}}` fulfills N
+  units of that line (capped at the remaining quantity); omitting
+  `line_items` fulfills everything remaining. The order's
+  `fulfillment_status` moves `null` → `partial` → `fulfilled`, and each line
+  reports `fulfillable_quantity` and a per-line `fulfillment_status`.
+  Over-fulfilling a fully fulfilled line or referencing an unknown line id →
+  422.
+- **Transactions:** `POST /orders/{id}/transactions.json`
+  (capture/sale/refund/void) — see the financial-status derivation above.
+- **Customers (write surface):** list, create (duplicate live email → 422
+  `{"errors":{"email":"has already been taken"}}`), update (PUT, field merge),
+  delete. DELETE archives (the record persists under an internal flag) — it
+  disappears from the list, reads as 404, and frees the email for reuse.
 - **Webhooks:** register, list, and delete subscriptions. Events are emitted
   (signed, see below) via `events_emit` when webhooks are subscribed, and the
   subscription `address` is registered with the events emitter on create.
@@ -94,10 +124,16 @@ compute it on its own authorize redirect.
 | PUT | `/admin/api/2024-10/products/{id}.json` | `products.star#on_update_product` | Update product |
 | DELETE | `/admin/api/2024-10/products/{id}.json` | `products.star#on_delete_product` | Delete product (200 {}) |
 | GET | `/admin/api/2024-10/orders.json` | `orders.star#on_list_orders` | List orders (filters: `status` open/closed/cancelled/any — default open, `financial_status`, `fulfillment_status`, `since_id`, `ids`, `created_at_min`/`max`, `fields` projection) |
+| POST | `/admin/api/2024-10/orders.json` | `orders.star#on_create_order` | Create order (201; line items required) |
 | GET | `/admin/api/2024-10/orders/{id}.json` | `orders.star#on_get_order` | Get order |
-| POST | `/admin/api/2024-10/orders/{id}/fulfillments.json` | `orders.star#on_create_fulfillment` | Create fulfillment (201) |
-| POST | `/admin/api/2024-10/orders/{id}/transactions.json` | `orders.star#on_create_transaction` | Create transaction (201) |
+| POST | `/admin/api/2024-10/orders/{id}/cancel.json` | `orders.star#on_cancel_order` | Cancel order (optional `restock`, `reason`) |
+| POST | `/admin/api/2024-10/orders/{id}/close.json` | `orders.star#on_close_order` | Close order |
+| POST | `/admin/api/2024-10/orders/{id}/fulfillments.json` | `orders.star#on_create_fulfillment` | Create (partial) fulfillment (201) |
+| POST | `/admin/api/2024-10/orders/{id}/transactions.json` | `orders.star#on_create_transaction` | Create transaction; re-derives `financial_status` |
 | GET | `/admin/api/2024-10/customers.json` | `customers.star#on_list_customers` | List customers |
+| POST | `/admin/api/2024-10/customers.json` | `customers.star#on_create_customer` | Create customer (201) |
+| PUT | `/admin/api/2024-10/customers/{id}.json` | `customers.star#on_update_customer` | Update customer (field merge) |
+| DELETE | `/admin/api/2024-10/customers/{id}.json` | `customers.star#on_delete_customer` | Archive customer (200 `{}`) |
 | GET | `/admin/api/2024-10/webhooks.json` | `webhooks.star#on_list_webhooks` | List webhooks |
 | POST | `/admin/api/2024-10/webhooks.json` | `webhooks.star#on_create_webhook` | Register webhook (201) |
 | DELETE | `/admin/api/2024-10/webhooks/{id}.json` | `webhooks.star#on_delete_webhook` | Delete webhook (200 {}) |
