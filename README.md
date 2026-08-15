@@ -62,7 +62,7 @@ brew install --cask stuntapi/tap/stunt
 ```powershell
 # clone the manifest repo, then install from the local manifest dir
 git clone --depth 1 https://github.com/stuntapi/winget
-winget install --manifest winget/manifests/s/StuntAPI/Stunt/0.25.0
+winget install --manifest winget/manifests/s/StuntAPI/Stunt/0.31.0
 ```
 
 > Once stunt is submitted to the default winget source, this becomes simply
@@ -150,6 +150,11 @@ synthetic-data-only, with a DISCLAIMER). Browse them with `stunt catalog search`
 
 Full adapter authoring reference (the `adapter.yaml` schema, **Starlark builtins reference** with
 exact signatures, gRPC/WebSocket/GraphQL sections): **[`adapters/README.md`](adapters/README.md)**.
+
+**Fidelity platform** (cross-cutting, in every adapter): real list-filter/query params
+(`query_select`), cursor pagination, validated tokens with expiry (401 paths), per-provider
+signed webhook delivery (HMAC/ECDSA/Ed25519 schemes), derive-on-read async state machines
+(RUNNING/FAILED + failure injection), multipart uploads, byte-exact binary round-trips.
 
 ## Transports & primitives
 
