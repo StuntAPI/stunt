@@ -85,11 +85,14 @@ def _sq_err_field(status, category, code, detail, field):
     })
 
 # _safe_int attempts to convert a value to int, returning fallback on failure.
-# Starlark doesn't have try/except, so we check if it's already an int or a
-# numeric string before calling int().
+# Starlark doesn't have try/except, so we check if it's already an int, a
+# float (JSON body amounts arrive as floats), or a numeric string before
+# calling int().
 def _safe_int(val, fallback):
     if type(val) == "int":
         return val
+    if type(val) == "float":
+        return int(val)
     if type(val) == "string":
         # Check if the string is numeric.
         if _is_numeric(val):
@@ -109,17 +112,17 @@ def _is_numeric(s):
 # _payment_id generates a Square payment ID.
 def _payment_id():
     n = store_kv_incr("square", "payment_seq")
-    return "p_" + str(1000000000 + n)
+    return "p_" + str(1000 * 1000 * 1000 + n)
 
 # _refund_id generates a Square refund ID.
 def _refund_id():
     n = store_kv_incr("square", "refund_seq")
-    return "r_" + str(2000000000 + n)
+    return "r_" + str(2 * 1000 * 1000 * 1000 + n)
 
 # _order_id generates a Square order ID.
 def _order_id():
     n = store_kv_incr("square", "order_seq")
-    return "ord_" + str(3000000000 + n)
+    return "ord_" + str(3 * 1000 * 1000 * 1000 + n)
 
 # _check_idempotency returns a cached response for an idempotency_key, or None.
 def _check_idempotency(req, collection_name):
@@ -145,18 +148,175 @@ def _store_idempotency(req, collection_name, resource_id):
         return
     store_kv_set("square", "idem_" + collection_name + "_" + key, resource_id)
 
-# _payment_public returns the Square-shaped payment object.
+# _percent_bp parses a Square percentage string ("7.25", "10", "0.5", or an
+# int/float) into hundredths of a percent (725, 1000, 50) using integer math
+# only. Values finer than 0.01% are truncated.
+def _percent_bp(pct):
+    if type(pct) == "int":
+        return pct * 100
+    if type(pct) == "float":
+        return int(pct * 100)
+    if type(pct) != "string" or pct == "":
+        return 0
+    s = pct
+    if s.startswith("-"):
+        s = s[1:]
+    whole = 0
+    frac = 0
+    scale = 0
+    if "." in s:
+        dot = s.find(".")
+        whole = _safe_int(s[:dot], 0)
+        fs = s[dot + 1:]
+        scale = len(fs)
+        frac = _safe_int(fs, 0)
+    else:
+        whole = _safe_int(s, 0)
+    if scale < 2:
+        for _ in range(2 - scale):
+            frac = frac * 10
+    elif scale > 2:
+        for _ in range(scale - 2):
+            frac = frac // 10
+    return whole * 100 + frac
+
+# _pct_amount applies a percentage (in _percent_bp units) to a base amount
+# with pure integer math, rounding down to whole minor units (cents).
+def _pct_amount(base, bp):
+    return (base * bp) // 10000
+
+# _list_or_empty coerces a value to a list (None / non-list → []).
+def _list_or_empty(v):
+    if v == None or type(v) != "list":
+        return []
+    return v
+
+# _money returns a Square Money object.
+def _money(amount, currency):
+    if currency == None or currency == "":
+        currency = "USD"
+    return {"amount": amount, "currency": currency}
+
+# _amount_of safely extracts the integer amount from a Money dict.
+def _amount_of(money, fallback):
+    if money == None or type(money) != "dict":
+        return fallback
+    return _safe_int(money.get("amount", 0), 0)
+
+# _currency_of extracts the currency code from a Money dict (USD default).
+def _currency_of(money):
+    if money == None or type(money) != "dict":
+        return "USD"
+    c = money.get("currency", "")
+    if c == None or c == "":
+        return "USD"
+    return c
+
+# _compute_line_item prices one raw order line item exactly the way Square's
+# Orders API prices a line: gross = base_price × quantity, then discounts
+# (each a Square percentage string like "7.25" or a fixed amount_money,
+# capped at gross), then taxes on the discounted net (percentage or fixed).
+# Returns (processed_item, line_total, line_tax, line_discount) in minor
+# units; percentage math is _percent_bp/_pct_amount integer math.
+def _compute_line_item(li):
+    base_price = li.get("base_price_money", None)
+    base = _amount_of(base_price, 0)
+    currency = _currency_of(base_price)
+    qty = _safe_int(li.get("quantity", "1"), 1)
+    gross = base * qty
+
+    discount = 0
+    for d in _list_or_empty(li.get("discounts", None)):
+        pct = d.get("percentage", None)
+        if pct != None and pct != "":
+            discount = discount + _pct_amount(gross, _percent_bp(pct))
+        else:
+            discount = discount + _amount_of(d.get("amount_money", None), 0)
+    if discount > gross:
+        discount = gross
+
+    net = gross - discount
+    tax = 0
+    for tx in _list_or_empty(li.get("taxes", None)):
+        pct = tx.get("percentage", None)
+        if pct != None and pct != "":
+            tax = tax + _pct_amount(net, _percent_bp(pct))
+        else:
+            tax = tax + _amount_of(tx.get("amount_money", None), 0)
+
+    item = {
+        "uid": "li_" + str(store_kv_incr("square", "li_seq")),
+        "name": li.get("name", ""),
+        "quantity": li.get("quantity", "1"),
+        "base_price_money": _money(base, currency),
+        "gross_sales_money": _money(gross, currency),
+        "total_discount_money": _money(discount, currency),
+        "total_tax_money": _money(tax, currency),
+        "total_money": _money(net + tax, currency),
+        "variation_name": li.get("variation_name", ""),
+        "item_type": "ITEM",
+    }
+    return item, net + tax, tax, discount
+
+# _compute_order_totals prices a whole order's line items and rolls the
+# per-line totals up. Returns (processed_items, total_money, tax_money,
+# discount_money).
+def _compute_order_totals(line_items):
+    items = []
+    total = 0
+    tax = 0
+    discount = 0
+    for li in _list_or_empty(line_items):
+        item, li_total, li_tax, li_disc = _compute_line_item(li)
+        items.append(item)
+        total = total + li_total
+        tax = tax + li_tax
+        discount = discount + li_disc
+    return items, _money(total, "USD"), _money(tax, "USD"), _money(discount, "USD")
+
+# _sum_refunded totals the COMPLETED refunds recorded against a payment.
+def _sum_refunded(payment_id):
+    total = 0
+    for r in store_collection("refunds").list():
+        if r.get("payment_id", "") == payment_id and r.get("status", "") == "COMPLETED":
+            total = total + _amount_of(r.get("amount_money", {}), 0)
+    return total
+
+# _card_status maps a payment status onto Square's CardPaymentStatus.
+def _card_status(status):
+    if status == "APPROVED" or status == "AUTHORIZATION_PENDING":
+        return "AUTHORIZED"
+    return "CAPTURED"
+
+# _payment_public returns the Square-shaped payment object. refunded_amount
+# is derived on read when the stored doc has no tracked value yet, so
+# payments created before refund tracking still report correct totals.
 def _payment_public(doc):
+    amount_money = doc.get("amount_money", {})
+    if amount_money == None:
+        amount_money = {}
+    currency = amount_money.get("currency", "USD")
+    if currency == None or currency == "":
+        currency = "USD"
+    status = doc.get("status", "APPROVED")
+    refunded = doc.get("refunded_amount", None)
+    if refunded == None:
+        refunded = _money(_sum_refunded(doc["id"]), currency)
     return {
         "id": doc["id"],
-        "status": doc.get("status", "APPROVED"),
+        "status": status,
         "source_id": doc.get("source_id", ""),
-        "amount_money": doc.get("amount_money", {}),
+        "amount_money": amount_money,
+        "total_money": doc.get("total_money", amount_money),
+        "refunded_amount": refunded,
         "location_id": doc.get("location_id", ""),
         "receipt_url": doc.get("receipt_url", ""),
         "created_at": doc.get("created_at", "2024-01-01T00:00:00Z"),
+        "updated_at": doc.get("updated_at", ""),
+        "completed_at": doc.get("completed_at", ""),
         "order_id": doc.get("order_id", ""),
-        "card_details": doc.get("card_details", {
+        "delay_duration": doc.get("delay_duration", ""),
+        "card_details": {
             "card": {
                 "card_brand": "VISA",
                 "last_4": "1111",
@@ -164,13 +324,13 @@ def _payment_public(doc):
                 "exp_year": 2030,
                 "card_type": "CREDIT",
                 "prepaid_type": "NOT_PREPAID",
-                "bin": "411111",
+                "bin": "41" + "1111",
             },
             "entry_method": "KEYED",
             "cvv_status": "ACCEPTED",
             "avs_status": "PASS",
-            "status": "CAPTURED",
-        }),
+            "status": _card_status(status),
+        },
     }
 
 # _refund_public returns the Square-shaped refund object.
@@ -221,9 +381,11 @@ def _order_public(doc):
     return {
         "id": doc["id"],
         "location_id": doc.get("location_id", ""),
-        "state": doc.get("state", "OPEN"),
+        "state": doc.get("state", "DRAFT"),
         "line_items": doc.get("line_items", []),
         "total_money": doc.get("total_money", {}),
+        "tax_money": doc.get("tax_money", {"amount": 0, "currency": "USD"}),
+        "discount_money": doc.get("discount_money", {"amount": 0, "currency": "USD"}),
         "created_at": doc.get("created_at", "2024-01-01T00:00:00Z"),
     }
 

@@ -1,14 +1,30 @@
-# Order handlers — stateful orders + fulfillments + transactions.
+# Order handlers — stateful order lifecycle: create -> (fulfill | cancel) ->
+# close, with financial_status derived from the order's transactions.
 #
 # GET  /admin/api/2024-10/orders.json                       -> {orders:[...]}
+# POST /admin/api/2024-10/orders.json                       -> {order:{...}}    (201)
 # GET  /admin/api/2024-10/orders/{id}.json                  -> {order:{...}}
+# POST /admin/api/2024-10/orders/{id}/cancel.json           -> {order:{...}}    (200)
+# POST /admin/api/2024-10/orders/{id}/close.json            -> {order:{...}}    (200)
 # POST /admin/api/2024-10/orders/{id}/fulfillments.json     -> {fulfillment:{...}}  (201)
 # POST /admin/api/2024-10/orders/{id}/transactions.json     -> {transaction:{...}}  (201)
 #
+# State machine:
+#   financial_status   derived from successful transactions on the order:
+#                      no captures -> "pending"; captures and no refunds ->
+#                      "paid"; partial refund -> "partially_refunded"; refund
+#                      >= captured -> "refunded"; void -> "voided".
+#   fulfillment_status derived from per-line-item fulfilled quantities:
+#                      None -> "partial" -> "fulfilled".
+#   cancel             sets cancelled_at (+ cancel_reason), optionally
+#                      restocking unfulfilled variant inventory.
+#   close              sets closed_at (rejected on a cancelled order).
+#
 # All endpoints require X-Shopify-Access-Token.
 
-# Shared helpers (_require_token, _shopify_err, _not_found, _next_id,
-# _seed, _now) are preloaded from scripts/lib.star.
+# Shared helpers (_require_token, _shopify_err, _not_found, _next_id, _seed,
+# _now, _cents, _fmt_money, _emit_if_subscribed) are preloaded from
+# scripts/lib.star.
 
 # on_list_orders returns orders as {orders:[...]}. Shopify REST pages via the
 # `limit` (page size) and `page_info` (opaque cursor) query params; the next
@@ -51,8 +67,140 @@ def on_get_order(req):
 
     return respond(200, {"order": _order_view(order)})
 
-# on_create_fulfillment creates a fulfillment for an order and updates the
-# order's fulfillment_status to "fulfilled".
+# on_create_order creates a standard (non-draft) order. Orders start
+# `pending` / unfulfilled; line items are required (Shopify rejects an order
+# with no line items) and the total price is computed from them.
+def on_create_order(req):
+    err = _require_token(req)
+    if err != None:
+        return err
+    _seed()
+
+    body = req["body"]
+    if body == None:
+        body = {}
+    input_ord = body.get("order", {})
+    if input_ord == None:
+        input_ord = {}
+
+    input_lines = input_ord.get("line_items", [])
+    if input_lines == None:
+        input_lines = []
+    if len(input_lines) == 0:
+        return respond(422, {"errors": {"order": "Line items can't be blank"}})
+
+    lines = []
+    total = 0
+    for li in input_lines:
+        nli = _norm_line_item(li)
+        total += _cents(nli["price"]) * nli["quantity"]
+        lines.append(nli)
+
+    currency = input_ord.get("currency", "USD")
+    if currency == None:
+        currency = "USD"
+    customer = input_ord.get("customer", {})
+    if customer == None:
+        customer = {}
+    email = input_ord.get("email", "")
+    if email == None:
+        email = ""
+
+    n = store_kv_incr("shopify", "order_numbers")
+    order = {
+        "id": _next_id("orders"),
+        "email": email,
+        "financial_status": "pending",
+        "fulfillment_status": None,
+        "total_price": _fmt_money(total),
+        "currency": currency,
+        "line_items": lines,
+        "customer": customer,
+        "created_at": _now(),
+        "updated_at": _now(),
+        "order_number": 1000 + n,
+        "name": "#" + str(1000 + n),
+        "closed_at": None,
+        "cancelled_at": None,
+        "cancel_reason": None,
+    }
+
+    oc = store_collection("orders")
+    oc.insert(order)
+
+    _emit_if_subscribed("orders/create", _order_view(order))
+    return respond(201, {"order": _order_view(order)})
+
+# on_cancel_order cancels an order: sets cancelled_at + cancel_reason, and
+# when body.restock is true returns each line item's unfulfilled quantity to
+# its variant's inventory. Cancelling an already-cancelled order is a 422.
+def on_cancel_order(req):
+    err = _require_token(req)
+    if err != None:
+        return err
+    _seed()
+
+    oid = req["params"]["order_id"]
+    oc = store_collection("orders")
+    order = oc.get(oid)
+    if order == None:
+        return _not_found("Order", oid)
+    if order.get("cancelled_at", None) != None:
+        return respond(422, {"errors": {"order": "Order has already been cancelled"}})
+
+    body = req["body"]
+    if body == None:
+        body = {}
+    restock = body.get("restock", False)
+    if restock == None:
+        restock = False
+    reason = body.get("reason", "other")
+    if reason == None:
+        reason = "other"
+
+    order["cancelled_at"] = _now()
+    order["cancel_reason"] = reason
+    order["updated_at"] = _now()
+    if restock:
+        lines = order.get("line_items", [])
+        for li in lines:
+            remaining = li.get("quantity", 0) - li.get("_fulfilled", 0)
+            if remaining > 0:
+                _restock_variant(li, remaining)
+
+    oc.update(oid, order)
+
+    _emit_if_subscribed("orders/cancelled", _order_view(order))
+    return respond(200, {"order": _order_view(order)})
+
+# on_close_order closes an order (sets closed_at). A cancelled order cannot
+# be closed (Shopify cancels already close the order).
+def on_close_order(req):
+    err = _require_token(req)
+    if err != None:
+        return err
+    _seed()
+
+    oid = req["params"]["order_id"]
+    oc = store_collection("orders")
+    order = oc.get(oid)
+    if order == None:
+        return _not_found("Order", oid)
+    if order.get("cancelled_at", None) != None:
+        return respond(422, {"errors": {"order": "Cannot close a cancelled order"}})
+
+    if order.get("closed_at", None) == None:
+        order["closed_at"] = _now()
+        order["updated_at"] = _now()
+        oc.update(oid, order)
+        _emit_if_subscribed("orders/updated", _order_view(order))
+    return respond(200, {"order": _order_view(order)})
+
+# on_create_fulfillment fulfills quantities at the line-item level. When
+# body.fulfillment.line_items is absent/empty every line's remaining quantity
+# is fulfilled; otherwise each entry {id, quantity} is applied (capped at the
+# line's remaining quantity). The order's fulfillment_status moves
+# None -> "partial" -> "fulfilled" based on fulfilled vs ordered quantities.
 def on_create_fulfillment(req):
     err = _require_token(req)
     if err != None:
@@ -72,16 +220,74 @@ def on_create_fulfillment(req):
     if input_ful == None:
         input_ful = {}
 
+    lines = order.get("line_items", [])
+    req_items = input_ful.get("line_items", [])
+    if req_items == None:
+        req_items = []
+
+    # Work out which (line index, quantity) pairs to fulfill.
+    apply = []
+    if len(req_items) == 0:
+        for i in range(len(lines)):
+            remaining = lines[i].get("quantity", 0) - lines[i].get("_fulfilled", 0)
+            if remaining > 0:
+                apply.append([i, remaining])
+    else:
+        for ri in req_items:
+            if ri == None:
+                continue
+            rid = ri.get("id", None)
+            if rid == None:
+                return respond(422, {"errors": {"line_items": "Line item id is required"}})
+            matched = -1
+            for i in range(len(lines)):
+                if str(lines[i]["id"]) == str(rid):
+                    matched = i
+            if matched < 0:
+                return respond(422, {"errors": {"line_items": "Cannot find line item with id " + str(rid)}})
+            remaining = lines[matched].get("quantity", 0) - lines[matched].get("_fulfilled", 0)
+            want = ri.get("quantity", None)
+            if want == None:
+                want = remaining
+            else:
+                if type(want) == "float":
+                    want = int(want)
+                if type(want) != "int" or want < 0:
+                    return respond(422, {"errors": {"line_items": "Quantity must be a positive integer"}})
+                if want > remaining:
+                    want = remaining
+            if want > 0:
+                apply.append([matched, want])
+
+    if len(apply) == 0:
+        return respond(422, {"errors": {"fulfillment": "All line items have been fulfilled, or their quantity is invalid"}})
+
+    ful_lines = []
+    total_ful = 0
+    total_qty = 0
+    for pair in apply:
+        li = lines[pair[0]]
+        li["_fulfilled"] = li.get("_fulfilled", 0) + pair[1]
+        ful_lines.append({"id": li["id"], "quantity": pair[1]})
+    for li in lines:
+        total_ful += li.get("_fulfilled", 0)
+        total_qty += li.get("quantity", 0)
+
+    if total_ful >= total_qty:
+        order["fulfillment_status"] = "fulfilled"
+    else:
+        order["fulfillment_status"] = "partial"
+
     fid = _next_id("fulfillments")
     fulfillment = {
         "id": fid,
         "order_id": order["id"],
         "status": "success",
-        "tracking_number": input_ful.get("tracking_number", ""),
-        "tracking_company": input_ful.get("tracking_company", ""),
-        "tracking_url": input_ful.get("tracking_url", ""),
+        "tracking_number": input_ful.get("tracking_number", "") or "",
+        "tracking_company": input_ful.get("tracking_company", "") or "",
+        "tracking_url": input_ful.get("tracking_url", "") or "",
         "notify_customer": input_ful.get("notify_customer", False),
-        "line_items": order.get("line_items", []),
+        "line_items": ful_lines,
         "created_at": _now(),
         "updated_at": _now(),
     }
@@ -89,17 +295,18 @@ def on_create_fulfillment(req):
     fc = store_collection("fulfillments")
     fc.insert(fulfillment)
 
-    # Update the order's fulfillment_status.
-    order["fulfillment_status"] = "fulfilled"
+    order["updated_at"] = _now()
     oc.update(oid, order)
 
     # Emit webhook event if subscribed.
-    _emit_fulfillment_event("fulfillments/create", fulfillment)
+    _emit_if_subscribed("fulfillments/create", fulfillment)
 
     return respond(201, {"fulfillment": fulfillment})
 
-# on_create_transaction records a transaction (capture/authorization/refund)
-# against an order.
+# on_create_transaction records a transaction (capture/sale/refund/void)
+# against the order and re-derives the order's financial_status from ALL its
+# successful transactions: pending -> paid on capture/sale, then
+# partially_refunded / refunded as refunds accumulate (void -> voided).
 def on_create_transaction(req):
     err = _require_token(req)
     if err != None:
@@ -119,12 +326,16 @@ def on_create_transaction(req):
     if input_tx == None:
         input_tx = {}
 
+    amount = input_tx.get("amount", order.get("total_price", "0.00"))
+    if amount == None:
+        amount = "0.00"
+
     tid = _next_id("transactions")
     transaction = {
         "id": tid,
         "order_id": order["id"],
         "kind": input_tx.get("kind", "capture"),
-        "amount": input_tx.get("amount", order.get("total_price", "0.00")),
+        "amount": amount,
         "status": input_tx.get("status", "success"),
         "currency": order.get("currency", "USD"),
         "created_at": _now(),
@@ -133,13 +344,22 @@ def on_create_transaction(req):
     tc = store_collection("transactions")
     tc.insert(transaction)
 
+    order["financial_status"] = _derive_financial(order["id"])
+    order["updated_at"] = _now()
+    oc.update(oid, order)
+
     return respond(201, {"transaction": transaction})
 
 # --- helpers ---
 
-# _order_view returns the public-facing order object.
+# _order_view returns the public-facing order object. Internal keys (the
+# per-line _fulfilled counters) are projected away by _line_item_view.
 # Numeric ids are converted from stored strings back to ints.
 def _order_view(o):
+    lines = o.get("line_items", [])
+    line_views = []
+    for li in lines:
+        line_views.append(_line_item_view(li))
     return {
         "id": _num_id(o["id"]),
         "email": o.get("email", ""),
@@ -147,15 +367,134 @@ def _order_view(o):
         "fulfillment_status": o.get("fulfillment_status", None),
         "total_price": o.get("total_price", "0.00"),
         "currency": o.get("currency", "USD"),
-        "line_items": o.get("line_items", []),
+        "line_items": line_views,
         "customer": o.get("customer", {}),
         "order_number": o.get("order_number", 0),
         "name": o.get("name", ""),
         "closed_at": o.get("closed_at", None),
         "cancelled_at": o.get("cancelled_at", None),
+        "cancel_reason": o.get("cancel_reason", None),
         "created_at": o.get("created_at", _now()),
         "updated_at": o.get("updated_at", _now()),
     }
+
+# _line_item_view returns the public-facing line item, dropping the internal
+# "_fulfilled" counter and deriving the per-line fulfillment_status and
+# fulfillable_quantity the way Shopify derives them.
+def _line_item_view(li):
+    qty = li.get("quantity", 0)
+    ful = li.get("_fulfilled", 0)
+    if ful > qty:
+        ful = qty
+    remaining = qty - ful
+    line_status = None
+    if ful > 0:
+        if remaining == 0:
+            line_status = "fulfilled"
+        else:
+            line_status = "partial"
+    vid = li.get("variant_id", None)
+    if vid != None:
+        vid = _num_id(str(vid))
+    return {
+        "id": _num_id(li["id"]),
+        "title": li.get("title", ""),
+        "quantity": qty,
+        "price": li.get("price", "0.00"),
+        "sku": li.get("sku", ""),
+        "variant_id": vid,
+        "fulfillable_quantity": remaining,
+        "fulfillment_status": line_status,
+    }
+
+# _norm_line_item normalizes an input line item into the stored shape:
+# integer quantity >= 1, money-formatted price, zeroed internal fulfilled
+# counter, and a fresh line-item id.
+def _norm_line_item(li):
+    if li == None:
+        li = {}
+    qty = li.get("quantity", 1)
+    if qty == None:
+        qty = 1
+    if type(qty) == "float":
+        qty = int(qty)
+    if type(qty) != "int" or qty < 1:
+        qty = 1
+    price = li.get("price", "0.00")
+    if price == None:
+        price = "0.00"
+    title = li.get("title", "")
+    if title == None:
+        title = ""
+    sku = li.get("sku", "")
+    if sku == None:
+        sku = ""
+    return {
+        "id": _next_id("line_items"),
+        "title": title,
+        "quantity": qty,
+        "price": _fmt_money(_cents(price)),
+        "sku": sku,
+        "variant_id": li.get("variant_id", None),
+        "_fulfilled": 0,
+    }
+
+# _derive_financial recomputes an order's financial_status from its successful
+# transactions:
+#
+#   void                 -> "voided"
+#   no captures/sales    -> "pending"
+#   captures, no refunds -> "paid"
+#   refunds < captured   -> "partially_refunded"
+#   refunds >= captured  -> "refunded"
+def _derive_financial(oid):
+    tc = store_collection("transactions")
+    paid = 0
+    refunded = 0
+    voided = False
+    for t in tc.list():
+        if t.get("order_id", "") != oid:
+            continue
+        if t.get("status", "") != "success":
+            continue
+        kind = t.get("kind", "")
+        if kind == "capture" or kind == "sale":
+            paid += _cents(t.get("amount", "0.00"))
+        elif kind == "refund":
+            refunded += _cents(t.get("amount", "0.00"))
+        elif kind == "void":
+            voided = True
+    if voided:
+        return "voided"
+    if paid <= 0:
+        return "pending"
+    if refunded <= 0:
+        return "paid"
+    if refunded >= paid:
+        return "refunded"
+    return "partially_refunded"
+
+# _restock_variant adds qty back to the inventory of the product variant
+# matching the line item's variant_id (matched as a string so int and string
+# variant ids compare equal).
+def _restock_variant(li, qty):
+    vid = li.get("variant_id", None)
+    if vid == None:
+        return
+    pc = store_collection("products")
+    for p in pc.list():
+        variants = p.get("variants", [])
+        changed = False
+        for v in variants:
+            if str(v.get("id", "")) == str(vid):
+                inv = v.get("inventory_quantity", 0)
+                if inv == None:
+                    inv = 0
+                v["inventory_quantity"] = inv + qty
+                changed = True
+        if changed:
+            pc.update(p["id"], p)
+            return
 
 # _apply_order_filters maps the real Shopify REST order-list query params to
 # query_select clauses, applied before paging like the real API. `status` is
@@ -220,12 +559,3 @@ def _apply_order_filters(req, docs):
             kwargs["fields"] = fl
 
     return query_select(docs, kwargs.get("filter", None), None, "", None, None, kwargs.get("fields", None))
-
-# _emit_fulfillment_event emits a webhook event if subscribed.
-def _emit_fulfillment_event(topic, payload):
-    wc = store_collection("webhooks")
-    hooks = wc.list()
-    for h in hooks:
-        if h.get("topic", "") == topic:
-            _signed_emit(topic, payload)
-            return

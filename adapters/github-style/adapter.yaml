@@ -48,6 +48,25 @@ endpoints:
   - route: /repos/{owner}/{repo}/issues/{issue_number}
     method: PATCH
     handler: scripts/issues.star#on_update_issue
+    concurrency_key: issue_number
+  - route: /repos/{owner}/{repo}/issues/{issue_number}/comments
+    method: GET
+    handler: scripts/issues.star#on_list_comments
+  - route: /repos/{owner}/{repo}/issues/{issue_number}/comments
+    method: POST
+    handler: scripts/issues.star#on_create_comment
+    concurrency_key: issue_number
+  - route: /repos/{owner}/{repo}/issues/{issue_number}/labels/{name}
+    method: POST
+    handler: scripts/issues.star#on_add_label
+    concurrency_key: issue_number
+  - route: /repos/{owner}/{repo}/issues/{issue_number}/labels/{name}
+    method: DELETE
+    handler: scripts/issues.star#on_remove_label
+    concurrency_key: issue_number
+  - route: /repos/{owner}/{repo}/issues/{issue_number}/events
+    method: GET
+    handler: scripts/issues.star#on_list_issue_events
 
   # --- Pull requests (stateful) ---
   - route: /repos/{owner}/{repo}/pulls
@@ -56,9 +75,24 @@ endpoints:
   - route: /repos/{owner}/{repo}/pulls
     method: POST
     handler: scripts/pulls.star#on_create_pull
+  - route: /repos/{owner}/{repo}/pulls/{pull_number}
+    method: GET
+    handler: scripts/pulls.star#on_get_pull
+  - route: /repos/{owner}/{repo}/pulls/{pull_number}
+    method: PATCH
+    handler: scripts/pulls.star#on_update_pull
+    concurrency_key: pull_number
+  - route: /repos/{owner}/{repo}/pulls/{pull_number}/merge
+    method: PUT
+    handler: scripts/pulls.star#on_merge_pull
+    concurrency_key: pull_number
   - route: /repos/{owner}/{repo}/pulls/{pull_number}/reviews
     method: GET
     handler: scripts/pulls.star#on_list_reviews
+  - route: /repos/{owner}/{repo}/pulls/{pull_number}/reviews
+    method: POST
+    handler: scripts/pulls.star#on_create_review
+    concurrency_key: pull_number
 
   # --- Actions ---
   - route: /repos/{owner}/{repo}/dispatches
@@ -93,6 +127,10 @@ resources:
   - name: runs
     kind: collection
   - name: reviews
+    kind: collection
+  - name: comments
+    kind: collection
+  - name: issue_events
     kind: collection
   - name: installation_tokens
     kind: collection

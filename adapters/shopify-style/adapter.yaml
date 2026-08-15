@@ -41,24 +41,48 @@ endpoints:
     method: DELETE
     handler: scripts/products.star#on_delete_product
 
-  # --- Orders REST (stateful) + fulfillments + transactions ---
+  # --- Orders REST (stateful) + cancel/close + fulfillments + transactions ---
   - route: /admin/api/2024-10/orders.json
     method: GET
     handler: scripts/orders.star#on_list_orders
+  - route: /admin/api/2024-10/orders.json
+    method: POST
+    handler: scripts/orders.star#on_create_order
   - route: /admin/api/2024-10/orders/{order_id}
     method: GET
     handler: scripts/orders.star#on_get_order
+  - route: /admin/api/2024-10/orders/{order_id}/cancel.json
+    method: POST
+    handler: scripts/orders.star#on_cancel_order
+    concurrency_key: order_id # read-modify-write on the order (+ restock)
+  - route: /admin/api/2024-10/orders/{order_id}/close.json
+    method: POST
+    handler: scripts/orders.star#on_close_order
+    concurrency_key: order_id # read-modify-write on the order
   - route: /admin/api/2024-10/orders/{order_id}/fulfillments.json
     method: POST
     handler: scripts/orders.star#on_create_fulfillment
+    concurrency_key: order_id # line-item fulfilled-quantity read-modify-write
   - route: /admin/api/2024-10/orders/{order_id}/transactions.json
     method: POST
     handler: scripts/orders.star#on_create_transaction
+    concurrency_key: order_id # financial_status derivation read-modify-write
 
-  # --- Customers REST ---
+  # --- Customers REST (list + write surface) ---
   - route: /admin/api/2024-10/customers.json
     method: GET
     handler: scripts/customers.star#on_list_customers
+  - route: /admin/api/2024-10/customers.json
+    method: POST
+    handler: scripts/customers.star#on_create_customer
+  - route: /admin/api/2024-10/customers/{customer_id}
+    method: PUT
+    handler: scripts/customers.star#on_update_customer
+    concurrency_key: customer_id # read-modify-write on the customer
+  - route: /admin/api/2024-10/customers/{customer_id}
+    method: DELETE
+    handler: scripts/customers.star#on_delete_customer
+    concurrency_key: customer_id # archive read-modify-write
 
   # --- Webhooks REST (register + list) ---
   - route: /admin/api/2024-10/webhooks.json

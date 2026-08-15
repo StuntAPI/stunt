@@ -26,6 +26,10 @@ def on_create_link_token(req):
     n = store_kv_incr("plaid", "link_token_seq")
     link_token = "link-sandbox-" + str(n) + "-" + str(client_user_id)
 
+    # Real link tokens expire 4 hours after creation; the mock reports the
+    # creation timestamp as the expiration.
+    expiration = clock.now_rfc3339()
+
     lc = store_collection("link_tokens")
     lc.insert({
         "id": link_token,
@@ -33,15 +37,17 @@ def on_create_link_token(req):
         "products": products,
         "country_codes": country_codes,
         "client_user_id": client_user_id,
-        "expiration": "2025-12-31T23:59:59Z",
+        "expiration": expiration,
     })
 
     # Also pre-generate a public_token that the Link success callback would
-    # produce. Store it so the exchange endpoint can look it up.
-    public = _seed_link()
+    # produce. It is recorded against this Link session so the exchange
+    # endpoint can verify a public_token/link_token pair (Plaid: one Link
+    # session can produce multiple items via /sandbox/public_token/create).
+    _seed_link(link_token)
 
     return respond(200, {
         "link_token": link_token,
-        "expiration": "2025-12-31T23:59:59Z",
+        "expiration": expiration,
         "request_id": _request_id(),
     })

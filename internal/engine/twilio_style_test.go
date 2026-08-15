@@ -468,12 +468,16 @@ func TestTwilioStyleMessageFilters(t *testing.T) {
 	if got := len(list("?From=" + url.QueryEscape("+15559999999"))); got != 0 {
 		t.Fatalf("From miss -> %d messages, want 0", got)
 	}
-	// Queued messages have date_sent=null: a DateSent filter must exclude them.
-	if got := len(list("?DateSent=2024-08-15")); got != 0 {
-		t.Fatalf("DateSent on queued-only -> %d messages, want 0", got)
+	// DateSent filters must never fabricate matches: use dates no message can
+	// carry, so the assertions hold whether the messages are still queued
+	// (null date_sent excluded) or already sent (real date outside the window).
+	if got := len(list("?DateSent=2030-01-01")); got != 0 {
+		t.Fatalf("DateSent future date -> %d messages, want 0", got)
 	}
-	if got := len(list("?DateSent>=2020-01-01")); got != 0 {
-		t.Fatalf("DateSent> on queued-only -> %d messages, want 0", got)
+	// NB: the DateSent< param needs the "=" separator ("DateSent<=D"); without
+	// it the whole string parses as the key and no filter is applied.
+	if got := len(list("?DateSent<=2000-01-01")); got != 0 {
+		t.Fatalf("DateSent< ancient date -> %d messages, want 0", got)
 	}
 }
 

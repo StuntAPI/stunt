@@ -36,7 +36,7 @@ def on_get_app(req):
         "id": 1000001,
         "slug": "stunt-dev-app",
         "node_id": "MDM6QXBwMTAwMDAwMQ==",
-        "owner": {"login": "stunt-dev", "id": 1000002, "type": "Organization"},
+        "owner": {"login": "stunt-dev", "id": _BOT_ID, "type": "Organization"},
         "name": "Stunt Dev App",
         "description": "Synthetic GitHub App for local testing",
         "external_url": "https://example.com",

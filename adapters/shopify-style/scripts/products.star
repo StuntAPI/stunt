@@ -80,7 +80,8 @@ def on_create_product(req):
         "product_type": ptype,
         "body_html": input_prod.get("body_html", ""),
         "vendor": input_prod.get("vendor", "Stunt Store"),
-        "status": "active",
+        "status": _valid_status_or_default(input_prod.get("status", None), "active"),
+        "tags": input_prod.get("tags", "") or "",
         "created_at": _now(),
         "updated_at": _now(),
         "variants": built_variants,
@@ -90,7 +91,7 @@ def on_create_product(req):
     pc.insert(prod)
 
     # Emit webhook event if any webhooks subscribed to products/create.
-    _emit_if_subscribed("products/create", {"id": pid, "title": title})
+    _emit_if_subscribed("products/create", _product_view(prod))
 
     return respond(201, {"product": _product_view(prod)})
 
@@ -109,7 +110,12 @@ def on_get_product(req):
 
     return respond(200, {"product": _product_view(prod)})
 
-# on_update_product updates a product (PUT).
+# on_update_product updates a product (PUT). Any of title, product_type,
+# body_html, vendor, tags, and status may be set; status must be one of
+# Shopify's product statuses (active/archived/draft) or the update is a 422.
+# A variants array REPLACES the variant set (Shopify semantics): variants
+# whose id matches an existing variant are field-merged, id-less variants are
+# appended with fresh ids, and an unknown variant id is a 404.
 def on_update_product(req):
     err = _require_token(req)
     if err != None:
@@ -129,18 +135,37 @@ def on_update_product(req):
     if input_prod == None:
         input_prod = {}
 
-    if input_prod.get("title", None) != None:
-        prod["title"] = input_prod["title"]
-    if input_prod.get("product_type", None) != None:
-        prod["product_type"] = input_prod["product_type"]
-    if input_prod.get("body_html", None) != None:
-        prod["body_html"] = input_prod["body_html"]
-    if input_prod.get("vendor", None) != None:
-        prod["vendor"] = input_prod["vendor"]
-    prod["updated_at"] = _now()
+    status = input_prod.get("status", None)
+    if status != None:
+        if status != "active" and status != "archived" and status != "draft":
+            return respond(422, {"errors": {"status": "Invalid status specified. Status must be active, archived, or draft"}})
+        prod["status"] = status
+    for key in ["title", "product_type", "body_html", "vendor", "tags"]:
+        if input_prod.get(key, None) != None:
+            prod[key] = input_prod[key]
 
+    in_variants = input_prod.get("variants", None)
+    if in_variants != None and len(in_variants) > 0:
+        merged = []
+        for v in in_variants:
+            vid = v.get("id", None) if v != None else None
+            if vid == None:
+                merged.append(_variant_from_input(v, pid, _next_id("variants")))
+                continue
+            match = None
+            for ev in prod.get("variants", []):
+                if str(ev.get("id", "")) == str(vid):
+                    match = ev
+            if match == None:
+                return _shopify_err(404, "Cannot find variant " + str(vid) + " on product " + str(_num_id(pid)))
+            _merge_variant(match, v)
+            merged.append(match)
+        prod["variants"] = merged
+
+    prod["updated_at"] = _now()
     pc.update(pid, prod)
 
+    _emit_if_subscribed("products/update", _product_view(prod))
     return respond(200, {"product": _product_view(prod)})
 
 # on_delete_product deletes a product. Shopify returns 200 with an empty
@@ -173,12 +198,15 @@ def _product_view(p):
         "body_html": p.get("body_html", ""),
         "vendor": p.get("vendor", ""),
         "status": p.get("status", "active"),
+        "tags": p.get("tags", ""),
         "created_at": p.get("created_at", _now()),
         "updated_at": p.get("updated_at", _now()),
         "variants": p.get("variants", []),
     }
 
-# _variant_view normalizes a variant from input.
+# _variant_view normalizes a variant from input (create path). The variant
+# gets its own numeric id offset from the product id, matching how Shopify
+# seeds the default variant of a new product.
 def _variant_view(v, pid):
     if v == None:
         v = {}
@@ -191,12 +219,39 @@ def _variant_view(v, pid):
         "inventory_quantity": v.get("inventory_quantity", 0),
     }
 
-# _emit_if_subscribed emits a webhook event if any webhook subscriptions
-# exist for the given topic (fire-and-forget).
-def _emit_if_subscribed(topic, payload):
-    wc = store_collection("webhooks")
-    hooks = wc.list()
-    for h in hooks:
-        if h.get("topic", "") == topic:
-            _signed_emit(topic, payload)
-            return
+# _variant_from_input builds a fresh stored variant from input (update path:
+# appended id-less variants), keeping the stored string-id convention.
+def _variant_from_input(v, pid, vid):
+    if v == None:
+        v = {}
+    return {
+        "id": vid,
+        "product_id": pid,
+        "title": v.get("title", "Default Title") or "Default Title",
+        "price": _fmt_money(_cents(v.get("price", "0.00"))),
+        "sku": v.get("sku", "") or "",
+        "inventory_quantity": v.get("inventory_quantity", 0) or 0,
+    }
+
+# _merge_variant merges the writable fields of an input variant into an
+# existing stored variant (matched by id).
+def _merge_variant(existing, v):
+    if v == None:
+        return
+    for key in ["title", "price", "sku", "barcode", "compare_at_price"]:
+        if v.get(key, None) != None:
+            existing[key] = v[key]
+    inv = v.get("inventory_quantity", None)
+    if inv != None:
+        if type(inv) == "float":
+            inv = int(inv)
+        if type(inv) == "int":
+            existing["inventory_quantity"] = inv
+
+# _valid_status_or_default validates a product status, returning it when
+# valid and the default otherwise (the create path defers hard validation to
+# explicit checks only where Shopify documents an error).
+def _valid_status_or_default(status, default):
+    if status == "active" or status == "archived" or status == "draft":
+        return status
+    return default

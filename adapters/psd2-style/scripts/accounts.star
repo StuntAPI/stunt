@@ -1,16 +1,21 @@
 # Account handlers — list accounts, get balances, get transactions.
 #
-# These endpoints require a valid consent (after SCA finalisation).
+# These endpoints are consent-bound: the request must carry a bearer token
+# AND a valid, unexpired AIS consent covering the account. The consent is
+# selected via the Consent-ID header (NextGenPSD2) or, absent that, any
+# valid unexpired consent. An empty access.<kind> list is the "all
+# accounts" grant; a non-empty list restricts reads to those IBANs — reads
+# of an uncovered account are 404 RESOURCE_UNKNOWN.
 #
 # GET /v1/accounts                         → { accounts: [{ resourceId, iban, currency, name }] }
 # GET /v1/accounts/{resourceId}/balances   → { account:{ iban }, balances:[{ balanceAmount, balanceType, ... }] }
 # GET /v1/accounts/{resourceId}/transactions → { transactions:{ booked:[...], pending:[...] } }
 
-# on_list_accounts returns the PSU's accounts (requires valid consent).
+# on_list_accounts returns the PSU's accounts (requires a covering consent).
 # The real API honors the withBalance query param (include balance data in
 # each account object when true).
 def on_list_accounts(req):
-    err = _require_consent(req)
+    err, consent = _select_consent(req)
     if err != None:
         return err
 
@@ -23,6 +28,8 @@ def on_list_accounts(req):
 
     result = []
     for a in all_accounts:
+        if not _consent_covers(consent, "accounts", a.get("iban", "")):
+            continue
         entry = {
             "resourceId": a["id"],
             "iban": a.get("iban", ""),
@@ -75,9 +82,10 @@ def on_list_accounts(req):
         "_links": links,
     })
 
-# on_get_balances returns the balances for a specific account.
+# on_get_balances returns the balances for a specific account. The
+# consenting AIS grant must cover this account's IBAN for balance reads.
 def on_get_balances(req):
-    err = _require_consent(req)
+    err, consent = _select_consent(req)
     if err != None:
         return err
 
@@ -88,6 +96,8 @@ def on_get_balances(req):
         return _psd2_err(404, "ERROR", "RESOURCE_UNKNOWN", "Account not found")
 
     iban = account.get("iban", "")
+    if not _consent_covers(consent, "balances", iban):
+        return _psd2_err(404, "ERROR", "RESOURCE_UNKNOWN", "Account not covered by the consent")
     currency = account.get("currency", "EUR")
 
     balances = [
@@ -120,9 +130,10 @@ def on_get_balances(req):
         "balances": balances,
     })
 
-# on_get_transactions returns the transactions for a specific account.
+# on_get_transactions returns the transactions for a specific account. The
+# consenting AIS grant must cover this account's IBAN for transaction reads.
 def on_get_transactions(req):
-    err = _require_consent(req)
+    err, consent = _select_consent(req)
     if err != None:
         return err
 
@@ -133,6 +144,8 @@ def on_get_transactions(req):
         return _psd2_err(404, "ERROR", "RESOURCE_UNKNOWN", "Account not found")
 
     iban = account.get("iban", "")
+    if not _consent_covers(consent, "transactions", iban):
+        return _psd2_err(404, "ERROR", "RESOURCE_UNKNOWN", "Account not covered by the consent")
     currency = account.get("currency", "EUR")
 
     # Get transactions from the transactions collection.

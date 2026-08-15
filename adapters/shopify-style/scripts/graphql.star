@@ -71,19 +71,19 @@ def _gql_orders():
         })
     return {"data": {"orders": {"edges": edges, "pageInfo": {"hasNextPage": False, "endCursor": None}}}}
 
-# _gql_customer returns a single customer (from seeded data).
+# _gql_customer returns a single live (non-archived) customer.
 def _gql_customer():
     cc = store_collection("customers")
     all_customers = cc.list()
-    if len(all_customers) == 0:
-        return {"data": {"customer": None}}
-    c = all_customers[0]
-    return {"data": {"customer": {
-        "id": "gid://shopify/Customer/" + str(c["id"]),
-        "email": c.get("email", ""),
-        "firstName": c.get("first_name", ""),
-        "lastName": c.get("last_name", ""),
-    }}}
+    for c in all_customers:
+        if not c.get("_archived", False):
+            return {"data": {"customer": {
+                "id": "gid://shopify/Customer/" + str(c["id"]),
+                "email": c.get("email", ""),
+                "firstName": c.get("first_name", ""),
+                "lastName": c.get("last_name", ""),
+            }}}
+    return {"data": {"customer": None}}
 
 # _gql_shop returns shop metadata.
 def _gql_shop():

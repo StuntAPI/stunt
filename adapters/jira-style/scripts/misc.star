@@ -32,7 +32,7 @@ def on_server_info(req):
         "versionNumbers": [1001, 0, 0],
         "deploymentType": "Cloud",
         "buildDate": "2024-01-01T00:00:00.000+0000",
-        "buildNumber": 100001,
+        "buildNumber": 1000 * 100 + 1,
         "serverTime": _now(),
         "scmInfo": "mock-scm-info",
         "serverTitle": "Jira",

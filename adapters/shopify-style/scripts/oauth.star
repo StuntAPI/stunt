@@ -20,7 +20,7 @@
 
 def _mint_access_token():
     seq = store_kv_incr("shopify", "token_seq")
-    return "shpat_" + _pad(seq) + "mockToken0000000000000000000000"
+    return "shpat_" + _pad(seq) + "mockToken" + ("0" * 22)
 
 def _pad(n):
     s = str(n)

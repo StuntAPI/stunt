@@ -1,16 +1,23 @@
 # Authorisation handlers — the SCA (Strong Customer Authentication) flow.
 #
 # This is the core PSD2 pain point: the PSU (end-user) must authenticate via
-# the bank's SCA page. The flow:
+# the bank's SCA page. The flow is a STAGED chain (no jumping):
 #
-#   started → psuAuthenticated → finalised
+#   started → psuAuthenticated → scaReceived → finalised
 #
-# POST /v1/consents/{consentId}/authorisations
-#     → { authorisationId, scaStatus:"started", _links:{ scaRedirect } }
-# GET  /v1/consents/{consentId}/authorisations/{authorisationId}
-#     → { scaStatus, authenticationMethodId, _links }
-# PUT  /v1/consents/{consentId}/authorisations/{authorisationId}
-#     → { scaStatus:"finalised" }  (consent becomes valid)
+#   POST /v1/consents/{consentId}/authorisations
+#       → { authorisationId, scaStatus:"started", _links:{ scaRedirect } }
+#   GET  /v1/consents/{consentId}/authorisations/{authorisationId}
+#       → { scaStatus, ... }  (derive-on-read: scaReceived finalises once
+#                              the challenge window elapses)
+#   PUT  /v1/consents/{consentId}/authorisations/{authorisationId}
+#       → one hop per call: authenticationMethodId → psuAuthenticated,
+#         scaAuthenticationData → scaReceived. The consent becomes "valid"
+#         only when the authorisation finalises (derive-on-read).
+#
+# Shared helpers (_load_authorisation, _sca_get, _sca_update, _advance_auth,
+# _signed_emit) are preloaded from scripts/lib.star; payment authorisations
+# (scripts/payments.star) run the exact same chain.
 
 # on_start_authorisation begins the SCA flow for a consent.
 def on_start_authorisation(req):
@@ -28,6 +35,8 @@ def on_start_authorisation(req):
 
     doc = {
         "id": auth_id,
+        "resourceType": "consent",
+        "resourceId": consent_id,
         "consentId": consent_id,
         "scaStatus": "started",
         "authenticationMethodId": "",
@@ -54,68 +63,19 @@ def on_start_authorisation(req):
 
     return respond(201, _authorisation_public(doc))
 
-# on_get_authorisation retrieves the SCA status of an authorisation.
+# on_get_authorisation retrieves the SCA status of an authorisation,
+# advancing the derive-on-read chain first.
 def on_get_authorisation(req):
     err = _require_tpp(req)
     if err != None:
         return err
+    return _sca_get(req, "consent")
 
-    consent_id = req["params"]["consentId"]
-    auth_id = req["params"]["authorisationId"]
-
-    ac = store_collection("authorisations")
-    doc = ac.get(auth_id)
-    if doc == None:
-        return _psd2_err(404, "ERROR", "RESOURCE_UNKNOWN", "Authorisation not found")
-
-    if doc.get("consentId", "") != consent_id:
-        return _psd2_err(404, "ERROR", "RESOURCE_UNKNOWN", "Authorisation does not belong to this consent")
-
-    return respond(200, _authorisation_public(doc))
-
-# on_update_authorisation updates the SCA authentication data.
-# This simulates the PSU completing the SCA challenge, finalising the
-# authorisation and making the consent valid.
+# on_update_authorisation advances the SCA chain one hop (method selection
+# or OTP submission). Finalisation — and the consent becoming "valid" — is
+# derive-on-read once the challenge window elapses.
 def on_update_authorisation(req):
     err = _require_tpp(req)
     if err != None:
         return err
-
-    consent_id = req["params"]["consentId"]
-    auth_id = req["params"]["authorisationId"]
-
-    ac = store_collection("authorisations")
-    doc = ac.get(auth_id)
-    if doc == None:
-        return _psd2_err(404, "ERROR", "RESOURCE_UNKNOWN", "Authorisation not found")
-
-    if doc.get("consentId", "") != consent_id:
-        return _psd2_err(404, "ERROR", "RESOURCE_UNKNOWN", "Authorisation does not belong to this consent")
-
-    body = req["body"]
-    if body == None:
-        body = {}
-
-    auth_method_id = body.get("authenticationMethodId", "901")
-    sca_auth_data = body.get("scaAuthenticationData", "")
-
-    # Transition SCA status to finalised.
-    doc["scaStatus"] = "finalised"
-    doc["authenticationMethodId"] = auth_method_id
-    ac.update(auth_id, doc)
-
-    # Mark the consent as valid.
-    cc = store_collection("consents")
-    consent = cc.get(consent_id)
-    if consent != None:
-        consent["consentStatus"] = "valid"
-        cc.update(consent_id, consent)
-
-    # Emit consent status change event.
-    events_emit("consent.status.changed", {
-        "consentId": consent_id,
-        "consentStatus": "valid",
-        "scaStatus": "finalised",
-    })
-
-    return respond(200, _authorisation_public(doc))
+    return _sca_update(req, "consent")

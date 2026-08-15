@@ -6,25 +6,20 @@
 # synthetic. See DISCLAIMER.
 id: revenuecat-style
 name: "RevenueCat-style API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "RevenueCat API"
-  version: "v2"
+  version: "v1"
 
 # Endpoints — each maps a route + method to a Starlark handler.
 # NOTE: literal routes must come BEFORE parameterized routes so they are
 # matched first (the dispatch engine checks in declaration order).
+# concurrency_key serialises read-modify-write handlers against the same
+# subscriber (derive-on-read expiry + revoke transitions).
 endpoints:
-  # --- Subscribers ---
-  - route: /v1/subscribers/{app_user_id}
-    method: GET
-    handler: scripts/subscribers.star#on_get_subscriber
-  - route: /v1/subscribers/{app_user_id}
-    method: POST
-    handler: scripts/subscribers.star#on_post_subscriber
-
-  # --- Receipts ---
+  # --- Receipts (literal route; reads/writes the subscriber named in the
+  # body — no path param to key concurrency on, so it runs unserialised). ---
   - route: /v1/receipts
     method: POST
     handler: scripts/receipts.star#on_post_receipt
@@ -37,6 +32,24 @@ endpoints:
     method: GET
     handler: scripts/webhooks.star#on_list_webhooks
 
+  # --- Subscribers (param routes; specific multi-segment routes first). ---
+  - route: /v1/subscribers/{app_user_id}/subscriptions/{product_id}/revoke
+    method: POST
+    handler: scripts/subscribers.star#on_revoke_subscription
+    concurrency_key: app_user_id
+  - route: /v1/subscribers/{app_user_id}
+    method: GET
+    handler: scripts/subscribers.star#on_get_subscriber
+    concurrency_key: app_user_id
+  - route: /v1/subscribers/{app_user_id}
+    method: POST
+    handler: scripts/subscribers.star#on_post_subscriber
+    concurrency_key: app_user_id
+  - route: /v1/subscribers/{app_user_id}
+    method: DELETE
+    handler: scripts/subscribers.star#on_delete_subscriber
+    concurrency_key: app_user_id
+
 # Backing stores — collections for stateful data.
 resources:
   - name: subscribers
@@ -46,7 +59,8 @@ resources:
   - name: webhooks
     kind: collection
 
-# Auth scheme metadata (mock: accept any non-empty bearer key, like a dev key).
+# Auth scheme metadata (mock: Bearer sk_... public SDK key; the well-known
+# static test key in scripts/lib.star is seeded into the token store).
 identity:
   token_scheme: bearer
 

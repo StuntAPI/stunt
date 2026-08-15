@@ -432,12 +432,33 @@ func ghPostBearer(t *testing.T, rawurl, token string, body map[string]any) (stri
 
 func ghPatchBearer(t *testing.T, rawurl, token string, body map[string]any) (string, int) {
 	t.Helper()
-	data, _ := json.Marshal(body)
-	req, err := http.NewRequest("PATCH", rawurl, bytes.NewReader(data))
+	return ghDoBearer(t, "PATCH", rawurl, token, body)
+}
+
+func ghPutBearer(t *testing.T, rawurl, token string, body map[string]any) (string, int) {
+	t.Helper()
+	return ghDoBearer(t, "PUT", rawurl, token, body)
+}
+
+func ghDeleteBearer(t *testing.T, rawurl, token string) (string, int) {
+	t.Helper()
+	return ghDoBearer(t, "DELETE", rawurl, token, nil)
+}
+
+func ghDoBearer(t *testing.T, method, rawurl, token string, body map[string]any) (string, int) {
+	t.Helper()
+	var rdr io.Reader
+	if body != nil {
+		data, _ := json.Marshal(body)
+		rdr = bytes.NewReader(data)
+	}
+	req, err := http.NewRequest(method, rawurl, rdr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	ghSetAuth(req, token)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -626,4 +647,431 @@ func TestGitHubStyleActionsRunLifecycle(t *testing.T) {
 	if single["status"] != "completed" || single["conclusion"] != "success" {
 		t.Fatalf("single run = %v/%v, want completed/success", single["status"], single["conclusion"])
 	}
+}
+
+// ghBoot starts a github-style service for a test and returns its base URL
+// plus teardown.
+func ghBoot(t *testing.T, webhookURL string) string {
+	t.Helper()
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "github-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := map[string]any{}
+	if webhookURL != "" {
+		cfg["webhook_url"] = webhookURL
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"github": {Adapter: adapterDir, Config: cfg},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	t.Cleanup(func() { e.Close() })
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	t.Cleanup(cancel)
+	time.Sleep(50 * time.Millisecond)
+	return addrs["github"]
+}
+
+// TestGitHubStylePRLifecycle exercises the PR lifecycle (PATCH edit, PUT
+// merge incl. the 405 conflict path, reviews) and the issue-comments / labels
+// / issue-events / PATCH-state-validation surfaces, including failure paths.
+func TestGitHubStylePRLifecycle(t *testing.T) {
+	base := ghBoot(t, "")
+	const token = "ghp_pat_token_mock"
+	const ownerRepo = "repos/octocat/hello-world"
+
+	// ===== Create a PR to drive through the lifecycle =====
+
+	body, status := ghPostBearer(t, base+"/"+ownerRepo+"/pulls", token, map[string]any{
+		"title": "feat: lifecycle PR",
+		"head":  "feature-x",
+		"base":  "main",
+	})
+	if status != 201 {
+		t.Fatalf("POST PR -> %d; body %s", status, body)
+	}
+	var pr map[string]any
+	if err := json.Unmarshal([]byte(body), &pr); err != nil {
+		t.Fatal(err)
+	}
+	prNum := ghToInt(pr["number"])
+	prURL := base + "/" + ownerRepo + "/pulls/" + strconv.Itoa(prNum)
+
+	// ===== PATCH: title/body edit =====
+
+	body, status = ghPatchBearer(t, prURL, token, map[string]any{"title": "feat: renamed"})
+	if status != 200 {
+		t.Fatalf("PATCH PR title -> %d; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &pr); err != nil {
+		t.Fatal(err)
+	}
+	if pr["title"] != "feat: renamed" {
+		t.Fatalf("patched PR title = %v", pr["title"])
+	}
+
+	// ===== PATCH: invalid state -> 422 (GitHub Validation Failed) =====
+
+	body, status = ghPatchBearer(t, prURL, token, map[string]any{"state": "merged"})
+	if status != 422 {
+		t.Fatalf("PATCH PR state=merged -> %d, want 422; body %s", status, body)
+	}
+	var valErr map[string]any
+	if err := json.Unmarshal([]byte(body), &valErr); err != nil {
+		t.Fatal(err)
+	}
+	if valErr["message"] != "Validation Failed" {
+		t.Fatalf("422 message = %v", valErr["message"])
+	}
+
+	// ===== Merge conflict path: retarget base, merge -> 405, resolve, merge -> 200 =====
+
+	if _, status = ghPatchBearer(t, prURL, token, map[string]any{"base": "develop"}); status != 200 {
+		t.Fatalf("PATCH PR base -> %d", status)
+	}
+	body, status = ghPutBearer(t, prURL+"/merge", token, map[string]any{})
+	if status != 405 {
+		t.Fatalf("merge with moved base -> %d, want 405; body %s", status, body)
+	}
+	// Re-PATCH the same base = conflicts resolved.
+	if _, status = ghPatchBearer(t, prURL, token, map[string]any{"base": "develop"}); status != 200 {
+		t.Fatalf("PATCH PR base resolve -> %d", status)
+	}
+	body, status = ghPutBearer(t, prURL+"/merge", token, map[string]any{})
+	if status != 200 {
+		t.Fatalf("merge -> %d, want 200; body %s", status, body)
+	}
+	var merged map[string]any
+	if err := json.Unmarshal([]byte(body), &merged); err != nil {
+		t.Fatal(err)
+	}
+	if merged["merged"] != true {
+		t.Fatalf("merge merged = %v, want true", merged["merged"])
+	}
+	if _, ok := merged["sha"].(string); !ok || merged["sha"] == "" {
+		t.Fatalf("merge sha = %v, want non-empty string", merged["sha"])
+	}
+
+	// The PR itself now reports merged + closed, with the merge commit sha.
+	body, status = ghGetBearer(t, prURL, token)
+	if status != 200 {
+		t.Fatalf("GET PR -> %d; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &pr); err != nil {
+		t.Fatal(err)
+	}
+	if pr["merged"] != true || pr["state"] != "closed" {
+		t.Fatalf("merged PR = %v/%v, want closed/merged", pr["state"], pr["merged"])
+	}
+	if pr["merge_commit_sha"] != merged["sha"] {
+		t.Fatalf("merge_commit_sha = %v, want %v", pr["merge_commit_sha"], merged["sha"])
+	}
+	if _, ok := pr["merged_at"].(string); !ok {
+		t.Fatalf("merged_at = %v, want string", pr["merged_at"])
+	}
+	// Internal _ keys (the _base_changed conflict marker) must never leak.
+	if strings.Contains(body, "_base_changed") {
+		t.Fatalf("PR view leaked internal _base_changed: %s", body)
+	}
+
+	// ===== Re-merge -> 405 not mergeable =====
+
+	if _, status = ghPutBearer(t, prURL+"/merge", token, map[string]any{}); status != 405 {
+		t.Fatalf("re-merge -> %d, want 405", status)
+	}
+
+	// ===== Reviews: submit + list + invalid event =====
+
+	body, status = ghPostBearer(t, base+"/"+ownerRepo+"/pulls", token, map[string]any{
+		"title": "feat: reviewed PR",
+		"head":  "feature-y",
+		"base":  "main",
+	})
+	if status != 201 {
+		t.Fatalf("POST reviewed PR -> %d; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &pr); err != nil {
+		t.Fatal(err)
+	}
+	revNum := ghToInt(pr["number"])
+	revURL := base + "/" + ownerRepo + "/pulls/" + strconv.Itoa(revNum)
+
+	body, status = ghPostBearer(t, revURL+"/reviews", token, map[string]any{
+		"body":  "ship it",
+		"event": "APPROVE",
+	})
+	if status != 200 {
+		t.Fatalf("POST APPROVE review -> %d; body %s", status, body)
+	}
+	var review map[string]any
+	if err := json.Unmarshal([]byte(body), &review); err != nil {
+		t.Fatal(err)
+	}
+	if review["state"] != "APPROVED" {
+		t.Fatalf("approve review state = %v", review["state"])
+	}
+
+	body, status = ghPostBearer(t, revURL+"/reviews", token, map[string]any{
+		"body":  "one more thing",
+		"event": "REQUEST_CHANGES",
+	})
+	if status != 200 {
+		t.Fatalf("POST REQUEST_CHANGES review -> %d; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &review); err != nil {
+		t.Fatal(err)
+	}
+	if review["state"] != "CHANGES_REQUESTED" {
+		t.Fatalf("request-changes review state = %v", review["state"])
+	}
+
+	// Invalid event value -> 422.
+	if _, status = ghPostBearer(t, revURL+"/reviews", token, map[string]any{
+		"event": "BAD_EVENT",
+	}); status != 422 {
+		t.Fatalf("POST review bad event -> %d, want 422", status)
+	}
+
+	// List shows both submitted reviews.
+	body, status = ghGetBearer(t, revURL+"/reviews", token)
+	if status != 200 {
+		t.Fatalf("GET reviews -> %d; body %s", status, body)
+	}
+	var reviews []any
+	if err := json.Unmarshal([]byte(body), &reviews); err != nil {
+		t.Fatal(err)
+	}
+	states := map[string]int{}
+	for _, r := range reviews {
+		states[r.(map[string]any)["state"].(string)]++
+	}
+	if states["APPROVED"] != 1 || states["CHANGES_REQUESTED"] != 1 {
+		t.Fatalf("review states = %v, want one APPROVED + one CHANGES_REQUESTED", states)
+	}
+
+	// ===== Issue comments: create + list + empty-body 422; works on PRs too =====
+
+	num := strconv.Itoa(revNum)
+	body, status = ghPostBearer(t, base+"/"+ownerRepo+"/issues/"+num+"/comments", token, map[string]any{
+		"body": "commenting on a PR via the issues API",
+	})
+	if status != 201 {
+		t.Fatalf("POST PR comment -> %d; body %s", status, body)
+	}
+	var comment map[string]any
+	if err := json.Unmarshal([]byte(body), &comment); err != nil {
+		t.Fatal(err)
+	}
+	if comment["body"] != "commenting on a PR via the issues API" {
+		t.Fatalf("comment body = %v", comment["body"])
+	}
+
+	if _, status = ghPostBearer(t, base+"/"+ownerRepo+"/issues/"+num+"/comments", token, map[string]any{}); status != 422 {
+		t.Fatalf("POST empty comment -> %d, want 422", status)
+	}
+
+	body, status = ghGetBearer(t, base+"/"+ownerRepo+"/issues/"+num+"/comments", token)
+	if status != 200 {
+		t.Fatalf("GET PR comments -> %d; body %s", status, body)
+	}
+	var comments []any
+	if err := json.Unmarshal([]byte(body), &comments); err != nil {
+		t.Fatal(err)
+	}
+	if len(comments) != 1 {
+		t.Fatalf("PR comments = %d, want 1", len(comments))
+	}
+
+	// ===== Labels: add (idempotent), remove, remove-absent 404 =====
+
+	body, status = ghPostBearer(t, base+"/"+ownerRepo+"/issues/"+num+"/labels/bug", token, nil)
+	if status != 200 {
+		t.Fatalf("POST label -> %d; body %s", status, body)
+	}
+	var labels []any
+	if err := json.Unmarshal([]byte(body), &labels); err != nil {
+		t.Fatal(err)
+	}
+	if len(labels) != 1 || labels[0].(map[string]any)["name"] != "bug" {
+		t.Fatalf("labels after add = %v", labels)
+	}
+	// Idempotent re-add keeps exactly one instance.
+	if _, status = ghPostBearer(t, base+"/"+ownerRepo+"/issues/"+num+"/labels/bug", token, nil); status != 200 {
+		t.Fatalf("POST label re-add -> %d", status)
+	}
+
+	if _, status = ghDeleteBearer(t, base+"/"+ownerRepo+"/issues/"+num+"/labels/bug", token); status != 204 {
+		t.Fatalf("DELETE label -> %d, want 204", status)
+	}
+	if _, status = ghDeleteBearer(t, base+"/"+ownerRepo+"/issues/"+num+"/labels/bug", token); status != 404 {
+		t.Fatalf("DELETE absent label -> %d, want 404", status)
+	}
+
+	// ===== Issue events surface: labeled/unlabeled from above + merged + closed =====
+
+	body, status = ghGetBearer(t, base+"/"+ownerRepo+"/issues/"+strconv.Itoa(prNum)+"/events", token)
+	if status != 200 {
+		t.Fatalf("GET merged PR events -> %d; body %s", status, body)
+	}
+	var events []any
+	if err := json.Unmarshal([]byte(body), &events); err != nil {
+		t.Fatal(err)
+	}
+	// The merged PR's timeline: merged (from PUT merge).
+	found := false
+	for _, e := range events {
+		if e.(map[string]any)["event"] == "merged" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("merged PR timeline missing merged event: %v", events)
+	}
+
+	body, status = ghGetBearer(t, base+"/"+ownerRepo+"/issues/"+num+"/events", token)
+	if status != 200 {
+		t.Fatalf("GET PR events -> %d; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &events); err != nil {
+		t.Fatal(err)
+	}
+	kinds := map[string]int{}
+	for _, e := range events {
+		kinds[e.(map[string]any)["event"].(string)]++
+	}
+	if kinds["labeled"] != 1 || kinds["unlabeled"] != 1 {
+		t.Fatalf("PR timeline = %v, want labeled + unlabeled", kinds)
+	}
+	// The labeled event carries the label object.
+	for _, e := range events {
+		em := e.(map[string]any)
+		if em["event"] == "labeled" {
+			l, ok := em["label"].(map[string]any)
+			if !ok || l["name"] != "bug" {
+				t.Fatalf("labeled event label = %v, want bug", em["label"])
+			}
+		}
+	}
+
+	// ===== Issue PATCH state validation + closed_at/state_reason =====
+
+	body, status = ghPostBearer(t, base+"/"+ownerRepo+"/issues", token, map[string]any{
+		"title": "state validation target",
+	})
+	if status != 201 {
+		t.Fatalf("POST issue -> %d; body %s", status, body)
+	}
+	var issue map[string]any
+	if err := json.Unmarshal([]byte(body), &issue); err != nil {
+		t.Fatal(err)
+	}
+	issueNum := strconv.Itoa(ghToInt(issue["number"]))
+
+	if _, status = ghPatchBearer(t, base+"/"+ownerRepo+"/issues/"+issueNum, token, map[string]any{
+		"state": "MERGED",
+	}); status != 422 {
+		t.Fatalf("PATCH issue bad state -> %d, want 422", status)
+	}
+	if _, status = ghPatchBearer(t, base+"/"+ownerRepo+"/issues/"+issueNum, token, map[string]any{
+		"state":        "closed",
+		"state_reason": "bogus",
+	}); status != 422 {
+		t.Fatalf("PATCH issue bad state_reason -> %d, want 422", status)
+	}
+
+	body, status = ghPatchBearer(t, base+"/"+ownerRepo+"/issues/"+issueNum, token, map[string]any{
+		"state":        "closed",
+		"state_reason": "completed",
+	})
+	if status != 200 {
+		t.Fatalf("PATCH issue close -> %d; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &issue); err != nil {
+		t.Fatal(err)
+	}
+	if issue["state"] != "closed" || issue["state_reason"] != "completed" {
+		t.Fatalf("closed issue = %v/%v", issue["state"], issue["state_reason"])
+	}
+	if _, ok := issue["closed_at"].(string); !ok {
+		t.Fatalf("closed_at = %v, want string", issue["closed_at"])
+	}
+
+	// Reopen clears closed_at.
+	body, status = ghPatchBearer(t, base+"/"+ownerRepo+"/issues/"+issueNum, token, map[string]any{
+		"state": "open",
+	})
+	if status != 200 {
+		t.Fatalf("PATCH issue reopen -> %d", status)
+	}
+	if err := json.Unmarshal([]byte(body), &issue); err != nil {
+		t.Fatal(err)
+	}
+	if issue["state"] != "open" || issue["closed_at"] != nil {
+		t.Fatalf("reopened issue = %v closed_at=%v", issue["state"], issue["closed_at"])
+	}
+}
+
+// TestGitHubStyleCommentAndReviewWebhooks proves the new surfaces deliver
+// signed webhooks with the per-hook secret: issue_comment on comment creation
+// and pull_request_review on review submission.
+func TestGitHubStyleCommentAndReviewWebhooks(t *testing.T) {
+	const secret = "gh_p2_hook_secret"
+	const token = "ghp_signature_test"
+	sink := newCaptureSink()
+	defer sink.close()
+	base := ghBoot(t, sink.srv.URL)
+
+	// Register a hook with its own secret, subscribing to the new events.
+	if _, status := ghPostBearer(t, base+"/repos/octocat/hello-world/hooks", token, map[string]any{
+		"config": map[string]any{"url": sink.srv.URL, "content_type": "json", "secret": secret},
+		"events": []string{"issue_comment", "pull_request_review"},
+	}); status != 201 {
+		t.Fatalf("POST hooks -> %d, want 201", status)
+	}
+
+	// Comment on the seeded issue #1 -> signed issue_comment delivery.
+	if _, status := ghPostBearer(t, base+"/repos/octocat/hello-world/issues/1/comments", token, map[string]any{
+		"body": "signed comment delivery",
+	}); status != 201 {
+		t.Fatalf("POST comment -> %d, want 201", status)
+	}
+	raw, hdr := sink.awaitDelivery(t, time.Second)
+	verifyGitHubSig(t, raw, hdr, secret, "issue_comment")
+	if strings.Contains(string(raw), "_base_changed") {
+		t.Fatalf("issue_comment payload leaked internal keys: %s", raw)
+	}
+
+	// Review the seeded PR #1 -> signed pull_request_review delivery.
+	if _, status := ghPostBearer(t, base+"/repos/octocat/hello-world/pulls/1/reviews", token, map[string]any{
+		"body":  "signed review delivery",
+		"event": "APPROVE",
+	}); status != 200 {
+		t.Fatalf("POST review -> %d, want 200", status)
+	}
+	deadline := time.Now().Add(time.Second)
+	for time.Now().Before(deadline) {
+		sink.mu.Lock()
+		n := len(sink.notifies)
+		sink.mu.Unlock()
+		if n >= 2 {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	sink.mu.Lock()
+	second := sink.notifies[len(sink.notifies)-1]
+	sink.mu.Unlock()
+	verifyGitHubSig(t, second.body, second.hdr, secret, "pull_request_review")
 }

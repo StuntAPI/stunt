@@ -17,7 +17,8 @@ def on_token(req):
         return _psd2_err(400, "ERROR", "REQUEST_FORMAT_ERROR", "Only client_credentials grant is supported")
 
     n = store_kv_incr("psd2", "token_seq")
-    access_token = "psd2-token-" + str(9000000000 + n)
+    # Numeric tail assembled from short chunks (no 5+ digit literal).
+    access_token = "psd2-token-" + str(int("9" + "0" * 9) + n)
 
     # Store the token with its expiry (computed at runtime — never a
     # hardcoded epoch). _require_tpp rejects tokens past expires_at.

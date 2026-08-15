@@ -20,7 +20,11 @@ def on_create_consent(req):
     if access == None:
         access = {}
     recurring_indicator = body.get("recurringIndicator", True)
-    valid_until = body.get("validUntil", "2025-12-31")
+    valid_until = body.get("validUntil", "")
+    if valid_until == None or valid_until == "":
+        # Default expiry is one year out, computed at runtime (a hardcoded
+        # default date would silently expire).
+        valid_until = _default_valid_until()
     frequency_per_day = body.get("frequencyPerDay", 4)
     combined_service_indicator = body.get("combinedServiceIndicator", False)
 
