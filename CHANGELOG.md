@@ -6,6 +6,39 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.32.0] — 2026-08-15
+
+### Adapters
+
+- **Seven P1 sev-3 gaps closed** (braintree, apple-searchads, adyen, zuora,
+  azure-devops, helius, cloudflare — 32 gaps, 50 endpoints, 56 test cases):
+  - **braintree** — full transaction state machine (authorized →
+    submitted_for_settlement → settled, derive-on-read) with real error codes
+    (void 91506, refund 91507, over-refund 91521, amount 81501), partial
+    captures, authorization expiry, advanced_search with the real criteria
+    vocabulary, and subscriptions/plans with billing cycles + signed
+    subscription webhooks.
+  - **apple-searchads** — ES256 client-secret JWT → bearer OAuth2 exchange
+    (validated, stored, expiring), campaign PATCH, keyword single/bulk
+    update + delete.
+  - **adyen** — 3DS `/payments/details` (fingerprint → authorised/refused),
+    modification amount ceilings (422s), paymentLinks lifecycle.
+  - **zuora** — payments applied to invoices (partial application, unapply
+    with balance restoration), subscription-generated invoices, computed
+    billing preview, cancellation_policy semantics.
+  - **azure-devops** — pipelines + runs (queued → in_progress → completed),
+    git pushes that actually store commits/refs, items served from stored
+    state, work-item patch-document REST semantics, WIQL subset.
+  - **helius** — parsed transactions (TRANSFER/SWAP, filters, cursor
+    paging), sendTransaction → getSignatureStatuses linked
+    (processed → confirmed → finalized), getTransaction/getBalance.
+  - **cloudflare** — DNS record CRUD, a D1 query engine (SELECT subset,
+    INSERT/UPDATE, CREATE TABLE, 400 on unknown SQL), store-backed
+    firewall/page-rule CRUD, multipart worker deploys.
+  Review fixed: zuora config-sink callouts + partial-unapply bookkeeping,
+  D1 empty-select `_rid` leak, patch-document validation, crash-path 400s,
+  confirmation-timestamp stability, error-code test pins.
+
 ## [0.31.0] — 2026-08-14
 
 ### Adapters
