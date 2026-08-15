@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -15,8 +16,8 @@ import (
 
 // TestFattureInCloudStyleAdapter exercises the v2 bookkeeping surface:
 //
-//   - 401 without a Bearer token
-//   - company discovery via GET /entities, foreign/unknown company ids are 404s
+//   - 401 without a Bearer token (flat OAuth error shape)
+//   - company discovery via GET /user/companies; unknown company ids are 404s
 //   - received-document create + list with date filtering and the Laravel
 //     pagination envelope (last_page must be followed)
 //   - amounts are decimal strings
@@ -57,21 +58,67 @@ func TestFattureInCloudStyleAdapter(t *testing.T) {
 	const token = "Bearer fic-local-test"
 
 	// ===== 401 without Authorization =====
-	resp, err := http.Get(base + "/entities")
+	resp, err := http.Get(base + "/user/companies")
 	if err != nil {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
 	if resp.StatusCode != 401 {
-		t.Fatalf("no-auth /entities -> %d, want 401", resp.StatusCode)
+		t.Fatalf("no-auth /user/companies -> %d, want 401", resp.StatusCode)
 	}
 
-	// ===== create a company =====
-	companyID := ficCreate(t, base, "/entities", map[string]any{"name": "Acme SRL"})
-	docPath := fmt.Sprintf("/entities/%s/received_documents", companyID)
+	// ===== 401 uses the flat OAuth shape =====
+	req401, _ := http.NewRequest("GET", base+"/user/companies", nil)
+	r401, err := http.DefaultClient.Do(req401)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r401.Body.Close()
+	var e401 map[string]any
+	_ = json.NewDecoder(r401.Body).Decode(&e401)
+	if _, ok := e401["error"].(string); !ok {
+		t.Fatalf("401 shape = %v, want flat {error, error_description}", e401)
+	}
+
+	// ===== unknown company 404 uses the nested SCREAMING_SNAKE shape =====
+	var e404 map[string]any
+	req404b, _ := http.NewRequest("GET", base+"/c/999999/received_documents", nil)
+	req404b.Header.Set("Authorization", "Bearer fic-local-test")
+	resp404b, err := http.DefaultClient.Do(req404b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp404b.Body.Close()
+	_ = json.NewDecoder(resp404b.Body).Decode(&e404)
+	if code, _ := e404["error"].(map[string]any)["code"].(string); code != "NOT_FOUND" {
+		t.Fatalf("404 error.code = %v, want NOT_FOUND", e404)
+	}
+
+	// The v2 API has no create-company endpoint; the seeded company is
+	// discovered through the real list surface.
+	list := ficGet(t, base, "/user/companies")
+	companies := list["data"].(map[string]any)["companies"].([]any)
+	if len(companies) < 1 {
+		t.Fatal("no seeded company")
+	}
+	companyID := fmt.Sprint(companies[0].(map[string]any)["id"])
+	docPath := fmt.Sprintf("/c/%s/received_documents", companyID)
+
+	// ===== malformed JSON -> 400, never a 500 =====
+	reqBad, _ := http.NewRequest("POST", base+"/c/"+companyID+"/suppliers", strings.NewReader("{bad"))
+	reqBad.Header.Set("Authorization", "Bearer fic-local-test")
+	reqBad.Header.Set("Content-Type", "application/json")
+	rBad, err := http.DefaultClient.Do(reqBad)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rBad.Body.Close()
+	if rBad.StatusCode != 400 {
+		t.Fatalf("malformed JSON -> %d, want 400", rBad.StatusCode)
+	}
 
 	// ===== unknown company id is a 404 (auth still required) =====
-	req404, _ := http.NewRequest("GET", base+"/entities/999999/received_documents", nil)
+	req404, _ := http.NewRequest("GET", base+"/c/999999/received_documents", nil)
 	req404.Header.Set("Authorization", "Bearer fic-local-test")
 	resp404, err := http.DefaultClient.Do(req404)
 	if err != nil {
@@ -116,17 +163,29 @@ func TestFattureInCloudStyleAdapter(t *testing.T) {
 	}
 
 	// ===== suppliers CRUD =====
-	supplierID := ficCreate(t, base, fmt.Sprintf("/entities/%s/suppliers", companyID), map[string]any{"name": "Metro"})
-	got := ficGet(t, base, fmt.Sprintf("/entities/%s/suppliers/%s", companyID, supplierID))
+	supplierID := ficCreate(t, base, fmt.Sprintf("/c/%s/suppliers", companyID), map[string]any{"name": "Metro"})
+	got := ficGet(t, base, fmt.Sprintf("/c/%s/suppliers/%s", companyID, supplierID))
 	if got["data"].(map[string]any)["name"] != "Metro" {
 		t.Fatalf("supplier round-trip: %v", got)
 	}
 
-	// ===== webhooks are account-level =====
-	ficCreate(t, base, "/webhooks", map[string]any{"url": "https://sink.test/hook", "types": []string{"it.fattureincloud.received_documents.create"}})
-	hooks := ficGet(t, base, "/webhooks")
-	if hooks["total"].(float64) != 1 {
-		t.Fatalf("webhook list total %v, want 1", hooks["total"])
+	// ===== subscriptions are company-scoped, real shape (data.sink, SUB ids) =====
+	sub := ficCreateRaw(t, base, fmt.Sprintf("/c/%s/subscriptions", companyID), map[string]any{
+		"data": map[string]any{"sink": "https://sink.test/hook", "types": []string{"it.fattureincloud.entities.supplier.create"}},
+	})
+	var subDoc struct {
+		Data map[string]any `json:"data"`
+	}
+	_ = json.Unmarshal([]byte(sub), &subDoc)
+	if id, _ := subDoc.Data["id"].(string); !strings.HasPrefix(id, "SUB") {
+		t.Fatalf("subscription id = %v, want SUB*", subDoc.Data["id"])
+	}
+	if subDoc.Data["sink"] != "https://sink.test/hook" {
+		t.Fatalf("subscription sink = %v", subDoc.Data["sink"])
+	}
+	subs := ficGet(t, base, fmt.Sprintf("/c/%s/subscriptions", companyID))
+	if subs["total"].(float64) != 1 {
+		t.Fatalf("subscription list total %v, want 1", subs["total"])
 	}
 }
 
@@ -154,6 +213,24 @@ func ficCreate(t *testing.T, base, path string, body map[string]any) string {
 		t.Fatal(err)
 	}
 	return fmt.Sprint(out.Data["id"])
+}
+
+func ficCreateRaw(t *testing.T, base, path string, body map[string]any) string {
+	t.Helper()
+	buf, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", base+path, strings.NewReader(string(buf)))
+	req.Header.Set("Authorization", "Bearer fic-local-test")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 201 {
+		t.Fatalf("POST %s -> %d, want 201", path, resp.StatusCode)
+	}
+	return string(raw)
 }
 
 func ficGet(t *testing.T, base, path string) map[string]any {

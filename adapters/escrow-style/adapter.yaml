@@ -17,6 +17,9 @@ endpoints:
     method: GET
     handler: scripts/transactions.star#on_customer_me
   - route: /2017-09-01/transaction
+    method: GET
+    handler: scripts/transactions.star#on_transaction_list
+  - route: /2017-09-01/transaction
     method: POST
     handler: scripts/transactions.star#on_transaction_create
   # Literal routes before {param} ones.
@@ -29,6 +32,7 @@ endpoints:
   - route: /2017-09-01/transaction/{id}
     method: PATCH
     handler: scripts/transactions.star#on_transaction_action
+    concurrency_key: id
   - route: /2017-09-01/customer/me/webhook
     method: POST
     handler: scripts/webhooks.star#on_webhook_create
@@ -40,6 +44,7 @@ endpoints:
   - route: /sim/transaction/{id}/fund
     method: POST
     handler: scripts/transactions.star#on_sim_fund
+    concurrency_key: id
 
 resources:
   - name: transactions

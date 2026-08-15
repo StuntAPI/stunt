@@ -53,3 +53,19 @@ curl -X POST localhost:4210/2017-09-01/transaction -H 'Content-Type: application
                      [{"amount": 1000.0, "payer_customer": "buyer@sim.invalid",
                        "beneficiary_customer": "seller@sim.invalid"}]}]}'
 ```
+
+## Response shapes
+
+The Transaction object carries **no top-level status**: funding state lives on
+`items[].schedule[].status.secured`, item lifecycle on `items[].status`
+(accepted/received/shipped/rejected/canceled/in_dispute). Amounts and fees
+render as decimal strings ("1000.00"). The initiating (first-listed) party is
+auto-agreed at creation, matching the real API's creator-agrees rule.
+Validation errors use the real nested shape
+(`{"errors":{"parties":{"0":["Transaction must have 1 seller"]}}}`).
+
+## Auth
+
+HTTP Basic with the documented synthetic credentials
+`escrow-test` / `escrow-test-api-key`; a 401 carries `WWW-Authenticate`.
+Webhook deliveries are unsigned-by-design (Escrow.com does not sign).

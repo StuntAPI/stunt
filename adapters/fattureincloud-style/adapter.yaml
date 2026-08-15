@@ -13,138 +13,161 @@ api:
   version: "2.0.29"
 
 endpoints:
-  # --- Companies (entities) ---
-  - route: /entities
+  # --- Companies ---
+  - route: /user/companies
     method: GET
     handler: scripts/entities.star#on_entities_list
-  - route: /entities
-    method: POST
-    handler: scripts/entities.star#on_entities_create
-  - route: /entities/{company_id}/info
+  - route: /c/{company_id}/company/info
     method: GET
     handler: scripts/entities.star#on_entity_info_get
-  - route: /entities/{company_id}/info
+  - route: /c/{company_id}/company/info
     method: PUT
     handler: scripts/entities.star#on_entity_info_put
 
   # --- Received documents (supplier side — the spend side) ---
-  - route: /entities/{company_id}/received_documents
+  - route: /c/{company_id}/received_documents
     method: GET
     handler: scripts/documents.star#on_received_documents_list
-  - route: /entities/{company_id}/received_documents
+  - route: /c/{company_id}/received_documents
     method: POST
     handler: scripts/documents.star#on_received_documents_create
-  - route: /entities/{company_id}/received_documents/info
+  - route: /c/{company_id}/received_documents/info
     method: GET
     handler: scripts/documents.star#on_received_documents_info
-  - route: /entities/{company_id}/received_documents/{id}
+  - route: /c/{company_id}/received_documents/{id}
     method: GET
     handler: scripts/documents.star#on_received_document_get
-  - route: /entities/{company_id}/received_documents/{id}
+  - route: /c/{company_id}/received_documents/{id}
     method: PUT
     handler: scripts/documents.star#on_received_document_modify
-  - route: /entities/{company_id}/received_documents/{id}
+    concurrency_key: id
+  - route: /c/{company_id}/received_documents/{id}
     method: DELETE
     handler: scripts/documents.star#on_received_document_delete
+    concurrency_key: id
 
   # --- Issued documents (sales side, same shape) ---
-  - route: /entities/{company_id}/issued_documents
+  - route: /c/{company_id}/issued_documents
     method: GET
     handler: scripts/documents.star#on_issued_documents_list
-  - route: /entities/{company_id}/issued_documents
+  - route: /c/{company_id}/issued_documents
     method: POST
     handler: scripts/documents.star#on_issued_documents_create
-  - route: /entities/{company_id}/issued_documents/info
+  - route: /c/{company_id}/issued_documents/info
     method: GET
     handler: scripts/documents.star#on_issued_documents_info
-  - route: /entities/{company_id}/issued_documents/{id}
+  - route: /c/{company_id}/issued_documents/{id}
     method: GET
     handler: scripts/documents.star#on_issued_document_get
-  - route: /entities/{company_id}/issued_documents/{id}
+  - route: /c/{company_id}/issued_documents/{id}
     method: PUT
     handler: scripts/documents.star#on_issued_document_modify
-  - route: /entities/{company_id}/issued_documents/{id}
+    concurrency_key: id
+  - route: /c/{company_id}/issued_documents/{id}
     method: DELETE
     handler: scripts/documents.star#on_issued_document_delete
+    concurrency_key: id
 
   # --- Suppliers ---
-  - route: /entities/{company_id}/suppliers
+  - route: /c/{company_id}/suppliers
     method: GET
     handler: scripts/contacts.star#on_suppliers_list
-  - route: /entities/{company_id}/suppliers
+  - route: /c/{company_id}/suppliers
     method: POST
     handler: scripts/contacts.star#on_suppliers_create
-  - route: /entities/{company_id}/suppliers/{id}
+  - route: /c/{company_id}/suppliers/{id}
     method: GET
     handler: scripts/contacts.star#on_supplier_get
-  - route: /entities/{company_id}/suppliers/{id}
+  - route: /c/{company_id}/suppliers/{id}
     method: PUT
     handler: scripts/contacts.star#on_supplier_modify
-  - route: /entities/{company_id}/suppliers/{id}
+    concurrency_key: id
+  - route: /c/{company_id}/suppliers/{id}
     method: DELETE
     handler: scripts/contacts.star#on_supplier_delete
+    concurrency_key: id
 
   # --- Clients ---
-  - route: /entities/{company_id}/clients
+  - route: /c/{company_id}/clients
     method: GET
     handler: scripts/contacts.star#on_clients_list
-  - route: /entities/{company_id}/clients
+  - route: /c/{company_id}/clients
     method: POST
     handler: scripts/contacts.star#on_clients_create
-  - route: /entities/{company_id}/clients/{id}
+  - route: /c/{company_id}/clients/{id}
     method: GET
     handler: scripts/contacts.star#on_client_get
-  - route: /entities/{company_id}/clients/{id}
+  - route: /c/{company_id}/clients/{id}
     method: PUT
     handler: scripts/contacts.star#on_client_modify
-  - route: /entities/{company_id}/clients/{id}
+    concurrency_key: id
+  - route: /c/{company_id}/clients/{id}
     method: DELETE
     handler: scripts/contacts.star#on_client_delete
+    concurrency_key: id
 
   # --- Products ---
-  - route: /entities/{company_id}/products
+  - route: /c/{company_id}/products
     method: GET
     handler: scripts/products.star#on_products_list
-  - route: /entities/{company_id}/products
+  - route: /c/{company_id}/products
     method: POST
     handler: scripts/products.star#on_products_create
-  - route: /entities/{company_id}/products/{id}
+  - route: /c/{company_id}/products/{id}
     method: GET
     handler: scripts/products.star#on_product_get
-  - route: /entities/{company_id}/products/{id}
+  - route: /c/{company_id}/products/{id}
     method: PUT
     handler: scripts/products.star#on_product_modify
-  - route: /entities/{company_id}/products/{id}
+    concurrency_key: id
+  - route: /c/{company_id}/products/{id}
     method: DELETE
     handler: scripts/products.star#on_product_delete
+    concurrency_key: id
 
-  # --- Taxes / cashbook / archive ---
-  - route: /entities/{company_id}/taxes
+  # --- Taxes (F24 documents) / cashbook / archive ---
+  - route: /c/{company_id}/taxes
     method: GET
     handler: scripts/misc.star#on_taxes_list
-  - route: /entities/{company_id}/cashbook/{year}/{month}
+  - route: /c/{company_id}/taxes
+    method: POST
+    handler: scripts/misc.star#on_taxes_create
+  - route: /c/{company_id}/taxes/{id}
+    method: GET
+    handler: scripts/misc.star#on_tax_get
+  - route: /c/{company_id}/taxes/{id}
+    method: PUT
+    handler: scripts/misc.star#on_tax_modify
+    concurrency_key: id
+  - route: /c/{company_id}/taxes/{id}
+    method: DELETE
+    handler: scripts/misc.star#on_tax_delete
+    concurrency_key: id
+  - route: /c/{company_id}/cashbook/{year}/{month}
     method: GET
     handler: scripts/misc.star#on_cashbook_month
-  - route: /entities/{company_id}/archive
+  - route: /c/{company_id}/archive
     method: POST
     handler: scripts/misc.star#on_archive_upload
 
-  # --- Webhooks (account level) ---
-  - route: /webhooks
+  # --- Webhook subscriptions (company level) ---
+  - route: /c/{company_id}/subscriptions
     method: GET
     handler: scripts/webhooks.star#on_webhooks_list
-  - route: /webhooks
+  - route: /c/{company_id}/subscriptions
     method: POST
     handler: scripts/webhooks.star#on_webhooks_create
-  - route: /webhooks/{id}
+  - route: /c/{company_id}/subscriptions/{id}
     method: GET
     handler: scripts/webhooks.star#on_webhook_get
-  - route: /webhooks/{id}
+  - route: /c/{company_id}/subscriptions/{id}
     method: PUT
     handler: scripts/webhooks.star#on_webhook_modify
-  - route: /webhooks/{id}
+    concurrency_key: id
+  - route: /c/{company_id}/subscriptions/{id}
     method: DELETE
     handler: scripts/webhooks.star#on_webhook_delete
+    concurrency_key: id
 
 resources:
   - name: companies
@@ -160,6 +183,8 @@ resources:
   - name: products
     kind: collection
   - name: cashbook
+    kind: collection
+  - name: taxes
     kind: collection
   - name: archive
     kind: collection

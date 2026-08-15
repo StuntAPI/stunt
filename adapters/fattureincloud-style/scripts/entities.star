@@ -1,30 +1,18 @@
-# Company (entity) handlers — everything in the v2 API is scoped under
-# /entities/{company_id}.
+# Company handlers — the v2 API lists companies at /user/companies and scopes
+# everything else under /c/{company_id}. There is no create-company endpoint.
 
 def on_entities_list(req):
     err = _require_auth(req)
     if err:
         return err
+    _ensure_seed_company()
     rows = [_strip_internal(c) for c in _companies().list()]
-    return respond(200, {"current_page": 1, "data": rows, "from": 1 if rows else None,
-                         "last_page": 1, "per_page": 50,
-                         "to": len(rows) if rows else None, "total": len(rows)})
-
-def on_entities_create(req):
-    err = _require_auth(req)
-    if err:
-        return err
-    body = _body_of(req)
-    doc = {
-        "id": _next_id("companies"),
-        "name": body.get("name", ""),
-        "type": body.get("type", "company"),
-        "country": body.get("country", "IT"),
-        "vat_number": body.get("vat_number", ""),
-        "tax_code": body.get("tax_code", ""),
-    }
-    _companies().insert(doc)
-    return respond(201, {"data": _strip_internal(doc)})
+    return respond(200, {
+        "data": {
+            "companies": rows,
+            "info": {"need_marketing_consents": False, "need_password_change": False, "need_plan_invoice": False},
+        },
+    })
 
 def on_entity_info_get(req):
     err = _require_auth(req)
@@ -45,6 +33,8 @@ def on_entity_info_put(req):
     if err:
         return err
     body = _body_of(req)
+    if body == None:
+        return _bad_body()
     patch = {}
     for k in company:
         patch[k] = company[k]

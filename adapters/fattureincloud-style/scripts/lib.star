@@ -16,11 +16,16 @@ def _require_auth(req):
     headers = req.get("headers", {})
     auth = headers.get("Authorization", "") or headers.get("authorization", "")
     if not auth.startswith("Bearer ") or len(auth) <= 7:
-        return _api_error(401, "unauthorized", "The access token is missing or invalid.")
+        return _flat_error(401, "invalid_request", "The access token is missing or invalid.")
     return None
 
 def _api_error(status, code, message):
-    return respond(status, {"error": {"code": code, "message": message}})
+    # v2 resource errors use the nested shape with SCREAMING_SNAKE codes.
+    return respond(status, {"error": {"code": code.upper(), "message": message}})
+
+def _flat_error(status, code, message):
+    # Auth errors use the OAuth2-style flat shape.
+    return respond(status, {"error": code, "error_description": message})
 
 # _to_int parses a decimal string to int with a fallback. No try/except in
 # Starlark, and strings are not iterable here — hence isdigit().
@@ -40,25 +45,41 @@ def _q1(query, name, default=""):
     return str(v)
 
 def _body_of(req):
-    # Parsed JSON body, or an empty dict.
+    # Parsed JSON body, an empty dict, or None when the body is non-empty but
+    # undecodable (callers answer 400 — never a 500 from json.decode raising).
+    # raw_body is authoritative when present: an undecodable body surfaces as
+    # an empty dict via req.body, which would silently pass the defaults.
+    raw = req.get("raw_body", "")
+    if raw == None:
+        raw = ""
+    if raw != "":
+        decoded = json_safe_decode(raw)
+        if decoded == None or type(decoded) != "dict":
+            return None
+        return decoded
     b = req.get("body")
     if b == None:
-        raw = req.get("raw_body", "")
-        if raw == "":
-            return {}
-        return json.loads(raw)
+        return {}
+    if type(b) != "dict":
+        return None
     return b
+
+def _bad_body():
+    return _flat_error(400, "invalid_request", "Request body is not valid JSON.")
 
 def _next_id(resource):
     return str(store_kv_incr("fattureincloud", resource + "_seq"))
 
 def _strip_internal(doc):
-    # Drop bookkeeping fields before a document leaves the simulator.
+    # Drop bookkeeping fields before a document leaves the simulator:
+    # the company scoping key, any engine _-prefixed key (_batch et al),
+    # and render ids as ints (real FIC ids are integers).
     out = {}
     for k in doc:
-        if k in ("company_id",):
+        if k == "company_id" or k[:1] == "_":
             continue
         out[k] = doc[k]
+    out["id"] = _to_int(out.get("id", "0"), 0)
     return out
 
 def _companies():
@@ -80,31 +101,18 @@ def _rows(resource, company_id):
     return rows
 
 def _by_date(rows):
-    # Insertion sort by date — no list .sort here, and sorted() refuses our
-    # kwargs. Oldest first, matching the real API's default ordering.
-    out = []
-    for r in rows:
-        k = str(r.get("date", ""))
-        placed = False
-        for i in range(len(out)):
-            if k <= str(out[i].get("date", "")):
-                out.insert(i, r)
-                placed = True
-                break
-        if not placed:
-            out.append(r)
-    return out
+    return query_select(rows, None, order_by="date", order_dir="asc")
 
 def _paginate(rows, req, path):
-    # Laravel-style envelope: current_page / data / from / last_page / path /
-    # per_page / to / total. Clients must follow last_page.
+    # Laravel-style envelope built on the paginate builtin (page-number style:
+    # per_page + offset-as-cursor, like xero-style).
     per_page = min(200, max(1, _to_int(_q1(req.get("query", {}), "per_page", "50"), 50)))
     page = max(1, _to_int(_q1(req.get("query", {}), "page", "1"), 1))
     total = len(rows)
     last_page = max(1, (total + per_page - 1) // per_page)
     page = min(page, last_page)
+    chunk, _next = paginate(rows, per_page, str((page - 1) * per_page))
     start = (page - 1) * per_page
-    chunk = rows[start:start + per_page]
     return {
         "current_page": page,
         "data": chunk,
@@ -115,6 +123,37 @@ def _paginate(rows, req, path):
         "to": min(start + per_page, total) if total > 0 else None,
         "total": total,
     }
+
+def _filter_docs(req, rows):
+    # q/type/date_start/date_end translated to query_select triples.
+    query = req.get("query", {})
+    f = []
+    t = _q1(query, "type", "")
+    if t != "":
+        f.append(["type", "=", t])
+    ds = _q1(query, "date_start", "")
+    if ds != "":
+        f.append(["date", ">=", ds])
+    de = _q1(query, "date_end", "")
+    if de != "":
+        f.append(["date", "<=", de])
+    q = _q1(query, "q", "").lower()
+    if q != "":
+        # OR across the searched fields is not expressible as AND'ed triples;
+        # scan for the q term after the structured clauses.
+        out = []
+        for d in query_select(rows, f if len(f) > 0 else None):
+            entity = d.get("entity", {})
+            entity_name = entity.get("name", "") if type(entity) == "dict" else ""
+            hay = " ".join([str(entity_name), str(d.get("description", "")),
+                            str(d.get("name", "")), str(d.get("code", "")),
+                            str(d.get("category", ""))]).lower()
+            if q in hay:
+                out.append(d)
+        return out
+    if len(f) > 0:
+        return query_select(rows, f)
+    return rows
 
 def _doc_wanted(req):
     # Filters shared by the document-ish resources: q, type, date_start/date_end
@@ -154,10 +193,9 @@ def _crud_list(req, resource):
     company, err = _require_company(req)
     if err:
         return err
-    wanted = _doc_wanted(req)
-    rows = [_strip_internal(d) for d in _rows(resource, company.get("id")) if wanted(d)]
+    rows = [_strip_internal(d) for d in _filter_docs(req, _rows(resource, company.get("id")))]
     rows = _by_date(rows)
-    return respond(200, _paginate(rows, req, "/entities/" + str(company.get("id")) + "/" + resource))
+    return respond(200, _paginate(rows, req, "/c/" + str(company.get("id")) + "/" + resource))
 
 def _crud_create(req, resource, defaults):
     err = _require_auth(req)
@@ -167,6 +205,8 @@ def _crud_create(req, resource, defaults):
     if err:
         return err
     body = _body_of(req)
+    if body == None:
+        return _bad_body()
     doc = {}
     for k in defaults:
         doc[k] = defaults[k]
@@ -175,6 +215,7 @@ def _crud_create(req, resource, defaults):
     doc["id"] = _next_id(resource)
     doc["company_id"] = str(company.get("id"))
     store_collection(resource).insert(doc)
+    _emit_if_subscribed(str(company.get("id")), "entity." + resource[:-1] + ".create", _strip_internal(doc))
     return respond(201, {"data": _strip_internal(doc)})
 
 def _crud_get(req, resource, what):
@@ -199,6 +240,8 @@ def _crud_modify(req, resource, what):
         return err
     doc_id = str(req.get("params", {}).get("id", ""))
     body = _body_of(req)
+    if body == None:
+        return _bad_body()
     coll = store_collection(resource)
     for d in _rows(resource, company.get("id")):
         if str(d.get("id")) == doc_id:
@@ -208,7 +251,9 @@ def _crud_modify(req, resource, what):
             for k in body:
                 patch[k] = body[k]
             coll.update(d.get("id"), patch)
-            return respond(200, {"data": _strip_internal(coll.get(d.get("id")))})
+            updated = coll.get(d.get("id"))
+            _emit_if_subscribed(str(company.get("id")), "entity." + resource[:-1] + ".update", _strip_internal(updated))
+            return respond(200, {"data": _strip_internal(updated)})
     return _api_error(404, "not_found", what + " not found.")
 
 def _crud_delete(req, resource, what):
@@ -239,3 +284,40 @@ def _categories_in_use(req, resource):
         if c != "" and c not in seen:
             seen.append(c)
     return respond(200, {"data": {"categories": sorted(seen), "currencies": ["EUR"]}})
+
+# ── webhook delivery ────────────────────────────────────────────────────────
+# (Lives in lib: the CRUD helpers below reference it at load time.)
+
+_WEBHOOK_SECRET = "fic-stunt-webhook-signing-secret"
+
+def _signed_emit(event_type, payload):
+    # Fatture in Cloud signs notifications with X-Signature = base64 HMAC.
+    body = events_body(event_type, payload)
+    sig = crypto.hmac_sha256(_WEBHOOK_SECRET, body, encoding="base64")
+    events_emit(event_type, payload, {"X-Signature": sig})
+
+def _emit_if_subscribed(company_id, event_type, payload):
+    for w in _rows("webhooks", company_id):
+        types = w.get("types", [])
+        if types == None:
+            types = []
+        if len(types) == 0 or event_type in types:
+            _signed_emit(event_type, payload)
+            return
+
+# _ensure_seed_company seeds one synthetic company on first use (the v2 API
+# has no create-company endpoint, so discovery needs one to exist).
+def _ensure_seed_company():
+    if store_kv_get("fattureincloud", "company_seeded") == "yes":
+        return
+    store_kv_set("fattureincloud", "company_seeded", "yes")
+    _companies().insert({
+        "id": _next_id("companies"),
+        "name": "Acme SRL",
+        "type": "company",
+        "country": "IT",
+        "vat_number": "IT01234567890",
+        "tax_code": "",
+        "company_id": "none",
+        "currency": {"symbol": "EUR", "precision": 2},
+    })

@@ -1,20 +1,30 @@
-# Taxes, cashbook, archive.
+# Taxes (F24 documents), cashbook, archive.
+
+# _tax_defaults seeds a synthetic F24 (the v2 "taxes" resource is the F24
+# tax-payment document collection, not VAT bands).
+def _tax_defaults():
+    return {
+        "amount": "0.00",
+        "due_date": clock.now_rfc3339()[:10],
+        "status": "not_paid",
+        "attachment_url": "",
+        "attachment_token": "",
+    }
 
 def on_taxes_list(req):
-    err = _require_auth(req)
-    if err:
-        return err
-    company, err = _require_company(req)
-    if err:
-        return err
-    # The standard Italian VAT bands, synthetic but shape-accurate.
-    return respond(200, {"data": [
-        {"id": 1, "name": "Aliquota 22%", "percent": 22.0, "is_negative": False},
-        {"id": 2, "name": "Aliquota 10%", "percent": 10.0, "is_negative": False},
-        {"id": 3, "name": "Aliquota 4%", "percent": 4.0, "is_negative": False},
-        {"id": 4, "name": "Non imponibile", "percent": 0.0, "is_negative": False},
-        {"id": 5, "name": "Reverse charge", "percent": 0.0, "is_negative": False},
-    ]})
+    return _crud_list(req, "taxes")
+
+def on_taxes_create(req):
+    return _crud_create(req, "taxes", _tax_defaults())
+
+def on_tax_get(req):
+    return _crud_get(req, "taxes", "F24")
+
+def on_tax_modify(req):
+    return _crud_modify(req, "taxes", "F24")
+
+def on_tax_delete(req):
+    return _crud_delete(req, "taxes", "F24")
 
 def on_cashbook_month(req):
     err = _require_auth(req)
@@ -35,17 +45,38 @@ def on_cashbook_month(req):
                                   "cashbook": rows}})
 
 def on_archive_upload(req):
-    # The real endpoint is a multipart file upload; the simulator accepts JSON
-    # metadata only — tests cannot assert on the bytes anyway.
+    # Real shape: a multipart/form-data attachment upload. The file part is
+    # stored in the blob store; the response points back at it.
     err = _require_auth(req)
     if err:
         return err
     company, err = _require_company(req)
     if err:
         return err
-    body = _body_of(req)
-    doc = {"id": _next_id("archive"), "name": body.get("name", ""),
-           "attachment_url": "https://sim.invalid/attachment/" + _next_id("archive"),
+    ct = req["headers"].get("content-type", "")
+    filename = "attachment"
+    data = None
+    if ct[:10] == "multipart/":
+        parts, perr = parse_multipart(ct, req["raw_body"])
+        if perr != None:
+            return _api_error(400, "VALIDATION_ERROR", "Malformed multipart body.")
+        for p in parts:
+            if p["filename"] != None:
+                data = p["data"]
+                fn = p["filename"]
+                dot = fn.rfind(".")
+                filename = "att_" + _next_id("archive") + (fn[dot:] if dot >= 0 else "")
+    if data == None:
+        # JSON fallback (metadata-only): accepted for simple tests.
+        body = _body_of(req)
+        if body == None:
+            return _bad_body()
+        filename = "att_" + _next_id("archive")
+        data = ""
+    doc = {"id": _next_id("archive"), "name": filename,
+           "attachment_url": "https://sim.invalid/attachment/" + filename,
            "company_id": str(company.get("id"))}
+    if data != "":
+        store_blob("fic-archive").put(filename, data, "application/octet-stream")
     store_collection("archive").insert(doc)
     return respond(201, {"data": _strip_internal(doc)})
