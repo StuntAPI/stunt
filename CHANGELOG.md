@@ -6,6 +6,29 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.34.0] — 2026-08-15
+
+### Adapters
+
+- **Eight P2 slices.** paypal (fixed a 500 on every refund — non-iterable
+  string in the cents parser; authorization lifecycle with
+  ORDER_NOT_APPROVED / AMOUNT_EXCEEDS_AUTHORIZATION / terminal 422s, refund
+  PENDING→COMPLETED with refunded_amount bookkeeping), jira (real field
+  storage with per-field 400s, full JQL — IN/NOT IN/`~`/IS EMPTY with
+  AND/OR precedence and ORDER BY, workflow-constrained transitions with
+  resolution semantics, comment CRUD), github (PR PATCH/merge/reviews,
+  issue comments + labels, state validation), shopify (order
+  create/cancel/close state machine, financial_status derived from the
+  transaction history, line-item fulfillment, customer CRUD, product
+  field-merge), psd2 (payment initiation with consentId validation and
+  RCVD→ACTC→ACSC/RJCT lifecycle, consent-bound account access, SCA
+  intermediate states — plus fixed float-coercion bugs that had made token
+  expiry dead code), revenuecat (real RC subscriber schema, entitlement
+  expiry math, receipt validation, lifecycle webhooks), plaid (sync
+  modify/remove with cursor math, link_token-bound sessions, institutions
+  + sandbox endpoints), square (autocomplete semantics, ListPayments/
+  ListPaymentRefunds, refund ceilings + currency match, orders/calculate).
+
 ### Added
 
 - **`json_safe_decode(s)` builtin** — total JSON decode for handlers
