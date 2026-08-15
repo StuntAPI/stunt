@@ -136,10 +136,16 @@ func TestBraintreeStyleAdapter(t *testing.T) {
 		t.Fatalf("txnManual status = %v, want authorized", txnManual["status"])
 	}
 
-	// Refund from authorized must fail (settled only).
+	// Refund from authorized must fail (settled only), with Braintree's code.
 	body, status = btPostJSON(t, txns+"/"+txnManual["id"].(string)+"/refund", "Bearer bt-token", map[string]any{})
 	if status != 422 {
 		t.Fatalf("refund from authorized -> %d, want 422; body %s", status, body)
+	}
+	var refundErr map[string]any
+	if err := json.Unmarshal([]byte(body), &refundErr); err == nil {
+		if code, _ := refundErr["error"].(map[string]any)["code"].(string); code != "91507" {
+			t.Fatalf("refund-from-authorized code = %v, want 91507", refundErr["error"])
+		}
 	}
 
 	// Void from authorized works; voiding again fails.
@@ -157,6 +163,12 @@ func TestBraintreeStyleAdapter(t *testing.T) {
 	body, status = btPostJSON(t, txns+"/"+txnVoid["id"].(string)+"/void", "Bearer bt-token", map[string]any{})
 	if status != 422 {
 		t.Fatalf("void already-voided -> %d, want 422; body %s", status, body)
+	}
+	var voidErr map[string]any
+	if err := json.Unmarshal([]byte(body), &voidErr); err == nil {
+		if code, _ := voidErr["error"].(map[string]any)["code"].(string); code != "91506" {
+			t.Fatalf("void-not-authorized code = %v, want 91506", voidErr["error"])
+		}
 	}
 
 	// Settle with a non-positive amount → 422.

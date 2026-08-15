@@ -74,6 +74,8 @@ def on_deploy_script(req):
                 script_content = p["data"]
                 main_module = p["name"]
             elif p["name"] == "metadata":
+                if p.get("data", "").find('"') < 0:
+                    return _cf_err(400, 10001, "metadata part must be a JSON object")
                 meta = json.decode(p["data"])
                 if meta != None:
                     mm = meta.get("main_module", None)

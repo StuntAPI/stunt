@@ -92,7 +92,7 @@ def on_report_campaigns(req):
                     "impressions": tot_impressions,
                     "taps": tot_taps,
                     "installs": tot_installs,
-                    "spend": {"amount": str(tot_spend), "currency": "USD"},
+                    "spend": {"amount": _asa_num_str(tot_spend), "currency": "USD"},
                 },
             },
         },

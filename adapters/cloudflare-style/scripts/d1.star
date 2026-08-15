@@ -404,6 +404,10 @@ def _exec_select(db, toks, params, cur):
             i += 1
     if i >= len(toks):
         return None, "D1_ERROR: expected FROM"
+    if not star and len(cols) == 0:
+        # Real SQLite rejects "SELECT FROM t"; without this the unprojected
+        # rows would leak the internal _rid.
+        return None, "D1_ERROR: expected column list"
     i += 1
     if i >= len(toks) or toks[i]["t"] != "word":
         return None, "D1_ERROR: missing table name"

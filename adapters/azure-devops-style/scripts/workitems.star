@@ -111,6 +111,8 @@ def on_create_workitem(req):
     # Process the patch-document operations (JSON array bodies arrive
     # wrapped as {_batch: [...]} by the engine).
     ops = _body_ops(body)
+    if ops == None:
+        return _wit_fault(400, "The request body must be a JSON patch document (array of operations).", "InvalidArgument")
     for op in ops:
         if op == None:
             continue
@@ -169,7 +171,10 @@ def on_update_workitem(req):
         relations = []
     changed = 0
 
-    for op in _body_ops(body):
+    ops2 = _body_ops(body)
+    if ops2 == None:
+        return _wit_fault(400, "The request body must be a JSON patch document (array of operations).", "InvalidArgument")
+    for op in ops2:
         if op == None:
             continue
         o = op.get("op", "")
@@ -185,6 +190,8 @@ def on_update_workitem(req):
                     fields[field] = value
                     changed = changed + 1
             elif o == "remove":
+                if field in ("System.Title", "System.State", "System.WorkItemType"):
+                    return _wit_fault(400, "The field '" + field + "' cannot be removed.", "PatchOperationFailedException")
                 fields = _dict_delete(fields, field)
                 changed = changed + 1
             elif o == "test":
@@ -242,6 +249,8 @@ def on_wiql(req):
     if body == None:
         body = {}
     query = body.get("query", "")
+    if type(query) != "string":
+        return _wit_fault(400, "The query must be a WIQL string.", "InvalidArgument")
     if query == None:
         query = ""
 
@@ -429,8 +438,11 @@ def _body_ops(body):
     batch = body.get("_batch", None)
     if batch != None:
         ops = batch
+    if type(ops) == "dict":
+        # A single-operation object is legal for many clients; wrap it.
+        return [ops]
     if type(ops) != "list":
-        return []
+        return None
     return ops
 
 # _norm_work_item_type normalizes a work item type route param: accepts

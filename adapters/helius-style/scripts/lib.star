@@ -380,8 +380,12 @@ def _signature_status(txc, doc):
         doc["state"] = state
         txc.update(doc["id"], doc)
         if state == "confirmed":
-            # Real Helius webhooks deliver when the transaction confirms.
-            tx = doc.get("tx", {})
+            # Real Helius webhooks deliver when the transaction confirms;
+            # stamp the delivery copy only — the stored doc keeps the send
+            # time so later reads agree with getTransaction's blockTime.
+            tx = {}
+            for k in doc.get("tx", {}):
+                tx[k] = doc["tx"][k]
             tx["timestamp"] = clock.now_unix()
             _webhook_emit(tx)
 

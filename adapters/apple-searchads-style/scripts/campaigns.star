@@ -141,6 +141,10 @@ def on_create_ad(req):
         return respond(401, _err("Missing or invalid authorization"))
 
     campaign_id = req["params"]["campaign_id"]
+    _seed_campaigns()
+    cc = store_collection("campaigns")
+    if _asa_find_campaign(cc, campaign_id) == None:
+        return respond(404, _err("Campaign not found"))
     body = req["body"]
     if body == None:
         body = {}

@@ -138,3 +138,12 @@ authentication is configured on the subscription (basic auth, bearer token, or
 custom headers on the real consumer inputs). stunt does not invent a signature —
 deliveries carry the real envelope with no signature headers. Secure your
 receiver with a secret path segment or an auth check of your own.
+
+## Concurrency note
+
+Transitions persist before webhook emission, and id-scoped routes carry
+`concurrency_key`. Two remaining narrow windows exist by design: list/bulk
+surfaces (advanced_search, runs list, RPC) can race a keyed single-resource
+read on the same record and in principle double-emit the transition webhook;
+and GraphQL mutations (braintree) key on a body id the engine cannot lock —
+the REST surface is the concurrency-safe one.

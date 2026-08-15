@@ -922,6 +922,10 @@ def _emit_if_subscribed(event_type, payload):
     hc = store_collection("webhooks")
     hooks = hc.list()
     if len(hooks) == 0:
+        # No REST-registered hook: a config.webhook_url sink still gets the
+        # callout, signed with the shared mock secret (README contract).
+        if events_target() != None:
+            _signed_emit(event_type, payload, "")
         return
     # events_register re-points delivery to the LATEST hook; sign with that
     # hook's secret, not the oldest matching one.

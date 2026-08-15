@@ -313,6 +313,10 @@ def _resolve_commit_id(req, repo):
     version = repo.get("defaultBranch", "refs/heads/main")
     vd = _get_query(req, "versionDescriptor", "")
     if vd != None and vd != "" and vd[:1] == "{":
+        # json.decode raises on malformed input (surfacing as a 500); reject
+        # unlikely-shaped descriptors up front instead.
+        if vd.find('"') < 0 or vd[0:1] != "{" or vd[-1:] != "}":
+            return _git_fault(400, "Invalid versionDescriptor", "InvalidArgument", 0)
         parsed = json.decode(vd)
         vt = parsed.get("versionType", "branch")
         version = parsed.get("version", "")

@@ -271,3 +271,12 @@ guard, simulated authorization expiry, full/partial/over refunds, the
 nonexistent-transaction 404, `advanced_search` (status `in` + amount
 range), plan/subscription create-list-get, `Active -> Canceled`,
 `Active -> Expired`, and the cancel-non-Active failure path.
+
+## Concurrency note
+
+Transitions persist before webhook emission, and id-scoped routes carry
+`concurrency_key`. Two remaining narrow windows exist by design: list/bulk
+surfaces (advanced_search, runs list, RPC) can race a keyed single-resource
+read on the same record and in principle double-emit the transition webhook;
+and GraphQL mutations (braintree) key on a body id the engine cannot lock —
+the REST surface is the concurrency-safe one.

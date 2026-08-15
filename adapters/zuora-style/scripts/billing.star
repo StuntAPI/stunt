@@ -332,7 +332,11 @@ def on_unapply_payment(req):
                 new_list = []
                 for j in range(len(ap_list)):
                     ap_entry = ap_list[j]
-                    if ap_entry.get("paymentId", "") == doc.get("paymentId", "") and _money_eq(ap_entry.get("appliedAmount", 0), take):
+                    if ap_entry.get("paymentId", "") == doc.get("paymentId", ""):
+                        remain_ap = _round2(ap_entry.get("appliedAmount", 0) - take)
+                        if remain_ap > 0 and not _money_eq(remain_ap, 0):
+                            ap_entry["appliedAmount"] = remain_ap
+                            new_list.append(ap_entry)
                         continue
                     new_list.append(ap_entry)
                 inv["appliedPayments"] = new_list
