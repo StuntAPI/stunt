@@ -69,7 +69,7 @@ def on_create_account(req):
     body = _get_body(req)
 
     account_id = _next_id("account")
-    account_number = "ACC-SYNTH-" + str(_to_int(account_id) - 90000 + 100).upper()
+    account_number = "ACC-SYNTH-" + str(_to_int(account_id) - 9 * 10000 + 100).upper()
 
     doc = {
         "id": account_id,

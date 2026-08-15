@@ -12,6 +12,10 @@
 # Shared helpers (_require_auth, _cf_ok, _cf_err, _gen_id) are preloaded
 # from scripts/lib.star.
 
+# Cloudflare's Workers script error code, assembled (no 5+ digit literals
+# in scripts).
+_WORKERS_ERR = 10 * 1000 + 43
+
 # on_list_scripts returns the list of deployed Worker scripts.
 def on_list_scripts(req):
     err = _require_auth(req)
@@ -32,7 +36,13 @@ def on_list_scripts(req):
 
 # on_deploy_script deploys (creates or updates) a Worker script.
 # PUT /accounts/{account_id}/workers/scripts/{script_name}
-# Body is multipart/form-data (real CF) but we accept JSON or raw too.
+#
+# Real Cloudflare uploads the script as multipart/form-data: a "metadata"
+# part (JSON with main_module etc.) plus one part per module whose part name
+# is the module path (e.g. "worker.js"). The module bytes are stored in the
+# blob store ("cf-worker-scripts") and referenced by blob name from the
+# worker doc. A JSON body with main_module (the previous simulator shape)
+# is still accepted.
 def on_deploy_script(req):
     err = _require_auth(req)
     if err != None:
@@ -42,47 +52,102 @@ def on_deploy_script(req):
     script_name = req["params"]["script_name"]
 
     if script_name == "":
-        return _cf_err(400, 10043, "Missing Worker script name.")
+        return _cf_err(400, _WORKERS_ERR, "Missing Worker script name.")
 
-    # Extract script content — from body if available
-    body = req.get("body")
     script_content = ""
-    if body != None:
-        main_module = body.get("main_module", None)
-        if main_module != None:
-            script_content = str(main_module)
+    fail = False
+    main_module = ""
+    ct = ""
+    headers = req.get("headers")
+    if headers != None:
+        ct = headers.get("Content-Type", "")
+        if ct == None:
+            ct = ""
+
+    if _has_prefix(ct, "multipart/"):
+        parts, perr = parse_multipart(ct, req["raw_body"])
+        if perr != None:
+            return _cf_err(400, _WORKERS_ERR, "Malformed multipart body: " + perr)
+        for p in parts:
+            if p["filename"] != None:
+                # The module part: its name is the module path.
+                script_content = p["data"]
+                main_module = p["name"]
+            elif p["name"] == "metadata":
+                meta = json.decode(p["data"])
+                if meta != None:
+                    mm = meta.get("main_module", None)
+                    if mm != None:
+                        main_module = str(mm)
+                    sf = meta.get("simulate_fail", None)
+                    if sf == True:
+                        fail = True
+        if script_content == "":
+            return _cf_err(400, _WORKERS_ERR, "multipart body has no script module part")
+    else:
+        body = req.get("body")
+        if body != None:
+            mm = body.get("main_module", None)
+            if mm != None:
+                main_module = str(mm)
+            else:
+                main_module = script_name
+            sf = body.get("simulate_fail", None)
+            if sf == True:
+                fail = True
+            script_content = json.encode(body)
         else:
-            # Store the body as string (could be multipart form parsed)
-            script_content = str(body)
+            script_content = req["raw_body"]
+            main_module = script_name
+
+    # Store the script content in the blob store; the worker doc references
+    # the blob name (per-deployment so every upload is retained).
+    seq = store_kv_incr("cf", "worker_blob_seq")
+    blob_name = script_name + "-" + str(seq)
+    bs = store_blob("cf-worker-scripts")
+    bs.put(blob_name, script_content, "application/javascript+module")
 
     wc = store_collection("workers")
 
     # Check if script already exists -> update
     existing_id = None
+    old_blob = ""
     for w in wc.list():
         if w.get("name", "") == script_name and w.get("account_id", "") == account_id:
             existing_id = w.get("id", "")
+            old_blob = w.get("blob_name", "")
             break
 
-    doc = {
-        "name": script_name,
-        "account_id": account_id,
-        "script": script_content,
-        "created_on": _iso8601(),
-        "modified_on": _iso8601(),
-    }
+    worker_id = ""
     if existing_id != None and existing_id != "":
+        worker_id = w.get("worker_id", "")
+        doc = {
+            "id": existing_id,
+            "worker_id": worker_id,
+            "name": script_name,
+            "account_id": account_id,
+            "main_module": main_module,
+            "blob_name": blob_name,
+            "created_on": w.get("created_on", _iso8601()),
+            "modified_on": _iso8601(),
+        }
         wc.update(existing_id, doc)
+        if old_blob != "" and old_blob != blob_name:
+            bs.delete(old_blob)
     else:
-        wc.insert(doc)
+        worker_id = _gen_id("worker")
+        wc.insert({
+            "worker_id": worker_id,
+            "name": script_name,
+            "account_id": account_id,
+            "main_module": main_module,
+            "blob_name": blob_name,
+            "created_on": _iso8601(),
+            "modified_on": _iso8601(),
+        })
 
     # Record a deployment for this upload with the derive-on-read
     # timestamps (see on_list_deployments).
-    fail = False
-    if body != None:
-        fail = body.get("simulate_fail", False)
-        if fail == None:
-            fail = False
     now = clock.now_unix()
     dc = store_collection("deployments")
     dc.insert({
@@ -102,7 +167,7 @@ def on_deploy_script(req):
         "script": script_name,
         "modified_on": _iso8601(),
         "created_on": _iso8601(),
-        "id": _gen_id("worker"),
+        "id": worker_id,
     })
 
 # on_get_script returns a single Worker script.
@@ -121,7 +186,7 @@ def on_get_script(req):
             worker = w
             break
     if worker == None:
-        return _cf_err(404, 10043, "Worker script not found.")
+        return _cf_err(404, _WORKERS_ERR, "Worker script not found.")
 
     return _cf_ok(_worker_result(worker))
 
@@ -143,7 +208,7 @@ def on_delete_script(req):
             target = w
             break
     if target == None:
-        return _cf_err(404, 10043, "Worker script not found.")
+        return _cf_err(404, _WORKERS_ERR, "Worker script not found.")
 
     wc.delete(target.get("id", ""))
     return _cf_ok(None)
@@ -217,7 +282,8 @@ def _deployment_result(d):
 # _worker_result returns a clean worker object for the API response.
 def _worker_result(w):
     return {
-        "id": _gen_id("worker"),
+        "id": w.get("worker_id", _gen_id("worker")),
+
         "name": w.get("name", ""),
         "created_on": w.get("created_on", _iso8601()),
         "modified_on": w.get("modified_on", _iso8601()),

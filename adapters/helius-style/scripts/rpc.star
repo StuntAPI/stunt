@@ -1,7 +1,8 @@
 # JSON-RPC handler — Solana-style RPC methods.
 #
 # POST /?api-key=<key>
-#   JSON-RPC: getBalance, getLatestBlockhash, getSignatureStatuses, sendTransaction
+#   JSON-RPC: getBalance, getLatestBlockhash, getSignatureStatuses,
+#   sendTransaction, getTransaction, getTokenAccountsByOwner
 #   → Solana-style JSON-RPC responses
 #
 # TRANSACTION LIFECYCLE (derive-on-read): a transaction sent via
@@ -11,13 +12,15 @@
 # -> finalized (>=3s) — Solana's real confirmationStatus vocabulary. Each
 # derived transition is persisted back to the stored transaction, and the
 # FIRST arrival at "confirmed" fires the enhanced webhook exactly once
-# (real Helius webhooks deliver on confirmation). SIMULATOR EXTENSION: pass
-# {"simulate_fail": true} in the sendTransaction config object (params[1])
-# to land the transaction with an on-chain error (err / status Err).
-
-# _TX_ERR is the Solana-style error object reported for a failed
-# (simulate_fail) transaction.
-_TX_ERR = {"InstructionError": [0, {"Custom": 600}]}
+# (real Helius webhooks deliver on confirmation). SIMULATOR EXTENSIONS in
+# the sendTransaction config object (params[1]):
+#   {"simulate_fail": true}          -> land with an on-chain error (err)
+#   {"simulate_type": "SWAP"}        -> store a SWAP/JUPITER parsed tx
+#   {"simulate_address": "<pubkey>"} -> fee payer / sender account to use
+#
+# Shared helpers (_tx_doc, _transfer_tx, _swap_tx, _tx_by_signature,
+# _tx_confirmation_state, _signature_status, _tx_meta, _SYS_PROGRAM,
+# _TOKEN_PROGRAM) are preloaded from lib.star.
 
 def on_rpc(req):
     if not _has_api_key(req):
@@ -39,7 +42,7 @@ def on_rpc(req):
     error = None
 
     if method == "getBalance":
-        addr = _rpc_param(params, 0, "11111111111111111111111111111111")
+        addr = _rpc_param(params, 0, "1" * 32)
         result = {
             "context": {"slot": _slot(0), "apiVersion": "1.18.0"},
             "value": _balance_for_address(addr),
@@ -50,7 +53,7 @@ def on_rpc(req):
             "context": {"slot": _slot(seq), "apiVersion": "1.18.0"},
             "value": {
                 "blockhash": _gen_blockhash(seq),
-                "lastValidBlockHeight": 200000000 + seq,
+                "lastValidBlockHeight": 2000 * 1000 * 100 + seq,
             },
         }
     elif method == "getSignatureStatuses":
@@ -77,38 +80,105 @@ def on_rpc(req):
         seq = store_kv_incr("helius", "tx_seq")
         result = _gen_signature(seq)
         now = clock.now_unix()
-        # The enhanced parsed-transaction payload, stored for the webhook
-        # that fires once the transaction first reaches "confirmed".
-        tx = {
-            "signature": result,
-            "timestamp": now,
-            "slot": _slot(seq),
-            "type": "TRANSFER",
-            "source": "SYSTEM_PROGRAM",
-            "description": "Transfer 0.5 SOL",
-            "fee": 5000,
-            "feePayer": _hex_addr(seq + 100),
-            "nativeTransfers": [
-                {
-                    "fromUserAccount": _hex_addr(seq + 200),
-                    "toUserAccount": _hex_addr(seq + 300),
-                    "amount": 5000 * 1000 * 100,
+        cfg = _rpc_param(params, 1, None)
+        fail = _cfg_flag(cfg, "simulate_fail")
+        fee_payer = _cfg_str(cfg, "simulate_address", _hex_addr(seq + 100))
+        tx_type = _cfg_str(cfg, "simulate_type", "TRANSFER")
+        if tx_type != "SWAP":
+            tx_type = "TRANSFER"
+        if tx_type == "SWAP":
+            tx = _swap_tx(fee_payer, result, seq, now)
+        else:
+            tx = _transfer_tx(fee_payer, result, seq, now)
+        store_collection("transactions").insert(
+            _tx_doc(result, seq, tx, fail, 1, 2, 3)
+        )
+    elif method == "getTransaction":
+        sig = _rpc_param(params, 0, "")
+        txc = store_collection("transactions")
+        doc = _tx_by_signature(txc, sig)
+        if doc == None or _tx_confirmation_state(doc) == "unlanded":
+            # Real RPC: result is null for an unknown / not-yet-landed sig.
+            result = None
+        else:
+            tx = doc.get("tx", {})
+            payer = tx.get("feePayer", "")
+            account_keys = []
+            for a in _tx_accounts(tx):
+                account_keys.append({"pubkey": a, "signer": a == payer, "writable": True})
+            instructions = []
+            for nt in tx.get("nativeTransfers", []):
+                instructions.append({
+                    "program": "system",
+                    "programId": _SYS_PROGRAM,
+                    "accounts": [nt.get("fromUserAccount", ""), nt.get("toUserAccount", "")],
+                    "args": {"lamports": nt.get("amount", 0)},
+                })
+            for tt in tx.get("tokenTransfers", []):
+                instructions.append({
+                    "program": "spl-token",
+                    "programId": _TOKEN_PROGRAM,
+                    "accounts": [tt.get("fromTokenAccount", ""), tt.get("toTokenAccount", "")],
+                    "args": {"mint": tt.get("mint", ""), "tokenAmount": tt.get("tokenAmount", None)},
+                })
+            if len(instructions) == 0:
+                instructions.append({
+                    "program": "system",
+                    "programId": _SYS_PROGRAM,
+                    "accounts": [],
+                    "args": {},
+                })
+            result = {
+                "blockTime": tx.get("timestamp", 0),
+                "meta": _tx_meta(doc),
+                "slot": _slot(doc.get("seq", 1)),
+                "transaction": {
+                    "message": {
+                        "accountKeys": account_keys,
+                        "instructions": instructions,
+                    },
+                    "signatures": [doc.get("signature", "")],
                 },
-            ],
-            "tokenTransfers": [],
-            "accountData": [],
-            "events": {},
+            }
+    elif method == "getTokenAccountsByOwner":
+        owner = _rpc_param(params, 0, "")
+        filt = _rpc_param(params, 1, None)
+        mint_filter = ""
+        if filt != None and type(filt) == "dict":
+            mint_filter = filt.get("mint", "")
+            if mint_filter == None:
+                mint_filter = ""
+        value = []
+        base = _balance_for_address(owner)
+        tokens = _seed_tokens(owner)
+        for i in range(len(tokens)):
+            t = tokens[i]
+            if mint_filter != "" and t["mint"] != mint_filter:
+                continue
+            value.append({
+                "address": _hex_addr(base + 9000 + i),
+                "lamports": 2 * 1000 * 1000,
+                "owner": owner,
+                "mint": t["mint"],
+                "data": {
+                    "program": "spl-token",
+                    "space": 165,
+                    "parsed": {
+                        "type": "account",
+                        "info": {
+                            "mint": t["mint"],
+                            "owner": owner,
+                            "isNative": False,
+                            "tokenAmount": _token_amount(_parse_int(t["amount"], 0), t["decimals"]),
+                            "state": "initialized",
+                        },
+                    },
+                },
+            })
+        result = {
+            "context": {"slot": _slot(0), "apiVersion": "1.18.0"},
+            "value": value,
         }
-        store_collection("transactions").insert({
-            "signature": result,
-            "seq": seq,
-            "state": "unlanded",
-            "_processed_at": now + 1,
-            "_confirmed_at": now + 2,
-            "_finalized_at": now + 3,
-            "_fail": _cfg_flag(_rpc_param(params, 1, None), "simulate_fail"),
-            "tx": tx,
-        })
     else:
         error = {"code": -32601, "message": "Method not found: " + method}
 
@@ -143,56 +213,12 @@ def _cfg_flag(cfg, key):
         return False
     return v
 
-# _tx_by_signature finds the stored transaction doc for a signature.
-def _tx_by_signature(txc, sig):
-    for doc in txc.list():
-        if doc.get("signature", "") == sig:
-            return doc
-    return None
-
-# _tx_confirmation_state derives the current Solana confirmationStatus from
-# the clock: unlanded (<1s) -> processed (1-2s) -> confirmed (2-3s)
-# -> finalized (>=3s).
-def _tx_confirmation_state(doc):
-    now = clock.now_unix()
-    if now >= doc.get("_finalized_at", 0):
-        return "finalized"
-    if now >= doc.get("_confirmed_at", 0):
-        return "confirmed"
-    if now >= doc.get("_processed_at", 0):
-        return "processed"
-    return "unlanded"
-
-# _signature_status builds the real getSignatureStatuses value item for a
-# stored transaction, persisting the derived transition (and firing the
-# enhanced webhook exactly once, on first confirmation).
-def _signature_status(txc, doc):
-    state = _tx_confirmation_state(doc)
-    if state != doc.get("state", ""):
-        doc["state"] = state
-        txc.update(doc["id"], doc)
-        if state == "confirmed":
-            # Real Helius webhooks deliver when the transaction confirms.
-            tx = doc.get("tx", {})
-            tx["timestamp"] = clock.now_unix()
-            _webhook_emit(tx)
-
-    confirmations = 0
-    if state == "confirmed":
-        confirmations = 31
-    elif state == "finalized":
-        confirmations = None
-
-    err = None
-    status_obj = {"Ok": None}
-    if doc.get("_fail", False):
-        err = _TX_ERR
-        status_obj = {"Err": _TX_ERR}
-
-    return {
-        "slot": _slot(doc.get("seq", 1)),
-        "confirmations": confirmations,
-        "err": err,
-        "status": status_obj,
-        "confirmationStatus": state,
-    }
+# _cfg_str reads a string option from a JSON-RPC config object, falling back
+# to the default for None / empty / missing values.
+def _cfg_str(cfg, key, default):
+    if cfg == None:
+        return default
+    v = cfg.get(key, "")
+    if v == None or v == "":
+        return default
+    return v

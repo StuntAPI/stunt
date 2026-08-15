@@ -22,6 +22,16 @@ def on_report_campaigns(req):
     if end_time == None or end_time == "":
         return respond(400, _err("endTime is required"))
 
+    # The campaigns report groups by campaign only; the real API rejects
+    # other groupBy keys for this endpoint.
+    group_by = body.get("groupBy", None)
+    if group_by != None:
+        if type(group_by) != "list":
+            return respond(400, _err("groupBy must be a list"))
+        for g in group_by:
+            if g != "campaign":
+                return respond(400, _err("Unsupported groupBy for the campaigns report: " + str(g)))
+
     _seed_campaigns()
 
     cc = store_collection("campaigns")
@@ -56,16 +66,33 @@ def on_report_campaigns(req):
     )
     rows = _asa_apply_order(rows, sel.get("orderBy", None), _report_order_field)
 
+    # grandTotals aggregate the returned rows (the real response carries
+    # totals for the metrics in scope).
+    tot_impressions = 0
+    tot_taps = 0
+    tot_installs = 0
+    tot_spend = 0
+    for r in rows:
+        tot_impressions = tot_impressions + r.get("impressions", 0)
+        tot_taps = tot_taps + r.get("taps", 0)
+        tot_installs = tot_installs + r.get("installs", 0)
+        spend = r.get("spend", None)
+        if spend != None and type(spend) == "dict":
+            amt = _asa_to_float(spend.get("amount", "0"))
+            tot_spend = tot_spend + amt
+
     return respond(200, {
         "data": {
             "reportingDataResponse": {
                 "row": rows,
+                "startTime": start_time,
+                "endTime": end_time,
                 "totalCount": len(rows),
                 "grandTotals": {
-                    "impressions": 0,
-                    "taps": 0,
-                    "installs": 0,
-                    "spend": {"amount": "0", "currency": "USD"},
+                    "impressions": tot_impressions,
+                    "taps": tot_taps,
+                    "installs": tot_installs,
+                    "spend": {"amount": str(tot_spend), "currency": "USD"},
                 },
             },
         },

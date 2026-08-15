@@ -115,7 +115,7 @@ def _now():
 # _next_id returns a monotonically-increasing numeric ID.
 def _next_id(obj_type):
     n = store_kv_incr("zuora", obj_type + "_seq")
-    return str(90000 + n)
+    return str(9 * 10000 + n)
 
 # _get_query safely returns a query parameter value.
 def _get_query(req, key, default_val):
@@ -445,6 +445,372 @@ def _lower(s):
             result = result + ch
     return result
 
+# ============================================================================
+# SYNTHETIC CALENDAR (derive-on-read async pattern)
+# ============================================================================
+# The simulator runs on a synthetic calendar anchored at 2024-01-01 (matching
+# the seed fixtures): the first request stores the real unix time as the
+# anchor, and _today() advances from 2024-01-01 in lock-step with real elapsed
+# time (1 real day == 1 synthetic day).
+#
+# Term-boundary transitions use the derive-on-read pattern: end-of-term
+# cancellations stay Active with a pending request until _today() passes the
+# effective date; _advance_subscription() — called on every subscription read
+# — flips the status to Canceled, persists the transition, and fires the signed
+# SubscriptionCancelled callout exactly once.
+
+# _date_to_days converts a "YYYY-MM-DD" string to days since 1970-01-01
+# (proleptic Gregorian civil-days algorithm).
+def _date_to_days(s):
+    y = _to_int(s[0:4])
+    m = _to_int(s[5:7])
+    d = _to_int(s[8:10])
+    if m <= 2:
+        y = y - 1
+    era = y // 400
+    yoe = y - era * 400
+    mp = (m + 9) % 12
+    doy = (153 * mp + 2) // 5 + d - 1
+    doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
+    return era * (146 * 1000 + 97) + doe - (7194 * 100 + 68)
+
+# _days_to_date converts days since 1970-01-01 back to a "YYYY-MM-DD" string.
+def _days_to_date(z):
+    z = z + (7194 * 100 + 68)
+    era = z // (146 * 1000 + 97)
+    doe = z - era * (146 * 1000 + 97)
+    yoe = (doe - doe // (146 * 10) + doe // (365 * 100 + 24) - doe // (146 * 1000 + 96)) // 365
+    y = yoe + era * 400
+    doy = doe - (365 * yoe + yoe // 4 - yoe // 100)
+    mp = (5 * doy + 2) // 153
+    d = doy - (153 * mp + 2) // 5 + 1
+    m = mp + 3
+    if mp >= 10:
+        m = mp - 9
+    if m <= 2:
+        y = y + 1
+    return _pad(y, 4) + "-" + _pad(m, 2) + "-" + _pad(d, 2)
+
+# _pad zero-pads a non-negative number to the given width (floats from JSON
+# bodies are coerced to int first).
+def _pad(n, width):
+    if type(n) != type(0):
+        n = int(n)
+    s = str(n)
+    while len(s) < width:
+        s = "0" + s
+    return s
+
+# _add_days returns date_str shifted by n days (n may be negative).
+def _add_days(date_str, n):
+    return _days_to_date(_date_to_days(date_str) + n)
+
+# _today returns the synthetic current date. The KV anchor (set on first use)
+# maps real unix time onto the synthetic calendar starting at 2024-01-01.
+def _today():
+    anchor = store_kv_get("zuora", "clock_anchor")
+    if anchor == None:
+        anchor = str(clock.now_unix())
+        store_kv_set("zuora", "clock_anchor", anchor)
+    elapsed = clock.now_unix() - _to_int(anchor)
+    if elapsed < 0:
+        elapsed = 0
+    return _days_to_date(_CLOCK_BASE_DAYS + elapsed // (864 * 100))
+
+# ============================================================================
+# PRODUCT CATALOG (rate plan pricing)
+# ============================================================================
+# Billing amounts are computed from a seeded rate-plan catalog so invoices,
+# billing previews, and cancellation credits all derive from the rate plans
+# instead of hardcoded numbers. Entries are "name|price|uom|quantity|period".
+
+# _seed_catalog inserts the static mock catalog once (guarded by a KV flag).
+def _seed_catalog():
+    if store_kv_get("zuora", "catalog_seeded") == "yes":
+        return
+    store_kv_set("zuora", "catalog_seeded", "yes")
+    store_kv_set("zuora", "cat:rateplan-standard", "Standard Plan|99|Each|1|Month")
+    store_kv_set("zuora", "cat:rateplan-growth", "Growth Plan|249|Each|1|Month")
+    store_kv_set("zuora", "cat:rateplan-enterprise", "Enterprise Plan|499|Each|1|Month")
+
+# _catalog_plan looks up a product rate plan by id and returns
+# {productRatePlanName, price, uom, quantity, billingPeriod} or None.
+def _catalog_plan(plan_id):
+    _seed_catalog()
+    raw = store_kv_get("zuora", "cat:" + plan_id)
+    if raw == None:
+        return None
+    parts = _split(raw, "|")
+    price = _zuora_try_num(parts[1])
+    if price == None:
+        price = 0.0
+    qty = _zuora_try_num(parts[3])
+    if qty == None or qty <= 0:
+        qty = 1
+    return {
+        "productRatePlanName": parts[0],
+        "price": price,
+        "uom": parts[2],
+        "quantity": qty,
+        "billingPeriod": parts[4],
+    }
+
+# _plan_charges builds the charge list for one subscribeToRatePlans entry.
+# `cat` is the catalog plan (None only when the entry carries a full price
+# override). chargeOverrides (Zuora's pricing override surface) win over the
+# catalog: price / pricing[0].price and quantity are honored.
+def _plan_charges(entry, cat):
+    name = entry.get("productRatePlanName", "")
+    if name == None:
+        name = ""
+    price = 0.0
+    qty = 1
+    uom = "Each"
+    if cat != None:
+        if name == "":
+            name = cat["productRatePlanName"]
+        price = cat["price"]
+        qty = cat["quantity"]
+        uom = cat["uom"]
+    overrides = entry.get("chargeOverrides", [])
+    if overrides == None:
+        overrides = []
+    for i in range(len(overrides)):
+        o = overrides[i]
+        if o == None:
+            continue
+        pr = o.get("price", None)
+        if pr == None:
+            pricing = o.get("pricing", [])
+            if pricing != None and len(pricing) > 0:
+                pr = pricing[0].get("price", None)
+        if pr != None:
+            n = _zuora_try_num(pr)
+            if n != None and n >= 0:
+                price = n
+        q = o.get("quantity", None)
+        if q != None:
+            n = _zuora_try_num(q)
+            if n != None and n > 0:
+                qty = n
+    if name == "":
+        name = entry.get("productRatePlanId", "Rate Plan")
+    return [{
+        "chargeName": name,
+        "chargeModel": "Flat Fee",
+        "chargeType": "Recurring",
+        "uom": uom,
+        "quantity": qty,
+        "listPrice": price,
+        "price": price,
+    }]
+
+# _plan_charge_list returns a plan's charges. Plans persisted before charge
+# tracking (e.g. the seed fixtures) get their charges derived from the
+# catalog by productRatePlanId.
+def _plan_charge_list(plan):
+    charges = plan.get("charges", None)
+    if charges != None and len(charges) > 0:
+        return charges
+    prp_id = plan.get("productRatePlanId", "")
+    if prp_id == "":
+        return []
+    cat = _catalog_plan(prp_id)
+    if cat == None:
+        return []
+    return _plan_charges(plan, cat)
+
+# _charges_total returns the pre-tax total of a charge list.
+def _charges_total(charges):
+    total = 0.0
+    for i in range(len(charges)):
+        ch = charges[i]
+        total = total + ch.get("price", 0) * ch.get("quantity", 0)
+    return _round2(total)
+
+# ============================================================================
+# MONEY
+# ============================================================================
+
+# Default mock tax rate (10% of the pre-tax charge amount).
+_TAX_RATE = 0.1
+
+# _round2 rounds to 2 decimal places (half away from zero).
+def _round2(x):
+    neg = x < 0
+    if neg:
+        x = -x
+    cents = int(x * 100 + 0.5)
+    out = cents / 100.0
+    if neg:
+        out = -out
+    return out
+
+# _money_eq compares two amounts for equality at cent precision.
+def _money_eq(a, b):
+    d = a - b
+    if d < 0:
+        d = -d
+    return d < 0.005
+
+# ============================================================================
+# SHARED FINDERS
+# ============================================================================
+
+# _find_account returns the account doc matching accountId or accountNumber,
+# or None.
+def _find_account(key):
+    col = store_collection("accounts")
+    for a in col.list():
+        if a.get("accountId", "") == key or a.get("accountNumber", "") == key:
+            return a
+    return None
+
+# _find_invoice returns the invoice doc matching invoiceId or invoiceNumber,
+# or None.
+def _find_invoice(key):
+    col = store_collection("invoices")
+    for d in col.list():
+        if d.get("invoiceId", "") == key or d.get("invoiceNumber", "") == key:
+            return d
+    return None
+
+# _find_subscription returns the subscription doc matching subscriptionId or
+# subscriptionNumber, or None.
+def _find_subscription(key):
+    col = store_collection("subscriptions")
+    for d in col.list():
+        if d.get("subscriptionId", "") == key or d.get("subscriptionNumber", "") == key:
+            return d
+    return None
+
+# _advance_subscription derives end-of-term cancellations on read: when a
+# pending cancellation's effective date has passed (synthetic clock), the
+# subscription flips to Canceled, the transition is persisted, and the signed
+# SubscriptionCancelled callout fires exactly once. Returns the (possibly
+# updated) doc.
+def _advance_subscription(doc):
+    if doc.get("cancellationRequested", False) != True:
+        return doc
+    if doc.get("status", "") != "Active":
+        return doc
+    eff = doc.get("cancellationEffectiveDate", "")
+    if eff == "":
+        return doc
+    if _date_to_days(_today()) < _date_to_days(eff):
+        return doc
+    doc["status"] = "Canceled"
+    doc["cancelledAt"] = _today()
+    doc["cancellationRequested"] = False
+    col = store_collection("subscriptions")
+    col.update(doc.get("id", ""), doc)
+    _emit_if_subscribed("SubscriptionCancelled", _callout(
+        "Subscription",
+        "SubscriptionCancelled",
+        "Subscription",
+        doc.get("subscriptionId", ""),
+        {
+            "SubscriptionNumber": doc.get("subscriptionNumber", ""),
+            "AccountNumber": doc.get("accountNumber", ""),
+            "Status": "Canceled",
+            "CancellationPolicy": doc.get("cancellationPolicy", "EndOfTerm"),
+        },
+    ))
+    return doc
+
+# _deep_merge merges src into dst in place: dicts merge recursively (loop-
+# based, no recursion), all other values replace. Returns dst.
+def _deep_merge(dst, src):
+    stack = [[dst, src]]
+    while len(stack) > 0:
+        pair = stack[len(stack) - 1]
+        stack = stack[:len(stack) - 1]
+        target = pair[0]
+        overlay = pair[1]
+        for k in overlay:
+            v = overlay[k]
+            if k in target and type(target[k]) == type({}) and type(v) == type({}):
+                stack.append([target[k], v])
+            else:
+                target[k] = v
+    return dst
+
+# ============================================================================
+# INVOICE GENERATION
+# ============================================================================
+# Subscription creation generates the first invoice from the subscription's
+# rate plan charges: one invoice item per charge, 10% tax, Net-30 due date,
+# balance == amount, status Posted. The account balance is incremented.
+
+# _create_invoice_for_subscription materializes and persists the first invoice
+# for a (newly created or amended) subscription doc, updates the account
+# balance, and returns the invoice doc.
+def _create_invoice_for_subscription(sub_doc, account):
+    items = []
+    plans = sub_doc.get("subscriptionPlans", [])
+    if plans == None:
+        plans = []
+    for i in range(len(plans)):
+        plan = plans[i]
+        charges = plan.get("charges", [])
+        if charges == None:
+            charges = []
+        for j in range(len(charges)):
+            ch = charges[j]
+            amt = _round2(ch.get("price", 0) * ch.get("quantity", 0))
+            tax = _round2(amt * _TAX_RATE)
+            items.append({
+                "chargeName": ch.get("chargeName", ""),
+                "quantity": ch.get("quantity", 0),
+                "uom": ch.get("uom", "Each"),
+                "chargeAmount": amt,
+                "taxAmount": tax,
+                "amountWithoutTax": amt,
+                "productRatePlanId": plan.get("productRatePlanId", ""),
+            })
+
+    without_tax = 0.0
+    tax_total = 0.0
+    for i in range(len(items)):
+        without_tax = without_tax + items[i]["chargeAmount"]
+        tax_total = tax_total + items[i]["taxAmount"]
+    without_tax = _round2(without_tax)
+    tax_total = _round2(tax_total)
+    amount = _round2(without_tax + tax_total)
+
+    invoice_id = _next_id("invoice")
+    invoice_number = "INV-SYNTH-" + str(_to_int(invoice_id) - 9 * 10000 + 100)
+    invoice_date = sub_doc.get("contractEffectiveDate", "2024-01-01")
+
+    doc = {
+        "id": invoice_id,
+        "invoiceId": invoice_id,
+        "invoiceNumber": invoice_number,
+        "accountId": account.get("accountId", ""),
+        "accountNumber": account.get("accountNumber", ""),
+        "subscriptionId": sub_doc.get("subscriptionId", ""),
+        "subscriptionNumber": sub_doc.get("subscriptionNumber", ""),
+        "amount": amount,
+        "amountWithoutTax": without_tax,
+        "taxAmount": tax_total,
+        "balance": amount,
+        "status": "Posted",
+        "invoiceDate": invoice_date,
+        "dueDate": _add_days(invoice_date, 30),
+        "currency": account.get("currency", "USD"),
+        "invoiceItems": items,
+        "appliedPayments": [],
+    }
+
+    ic = store_collection("invoices")
+    ic.insert(doc)
+
+    ac = store_collection("accounts")
+    account["balance"] = _round2(account.get("balance", 0) + amount)
+    ac.update(account.get("id", ""), account)
+
+    return doc
+
 # _parse_zoql parses a ZOQL query string and returns the object type and
 # optional WHERE clause components.
 # Format: "select <fields> from <Object> [where <conditions>]"
@@ -569,3 +935,7 @@ def _emit_if_subscribed(event_type, payload):
         if len(types) == 0 or event_type in types or "*" in types:
             _signed_emit(event_type, payload, h.get("secret", ""))
             return
+
+# Synthetic-calendar epoch (2024-01-01) in civil days. Assigned at the end of
+# the file so _date_to_days is already defined at preload time.
+_CLOCK_BASE_DAYS = _date_to_days("2024-01-01")

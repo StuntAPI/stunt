@@ -154,6 +154,26 @@ func TestHeliusStyleAdapter(t *testing.T) {
 	}
 	failSig, _ := failSendResp["result"].(string)
 
+	// SWAP transaction, attributed to testAddr via the simulate_address
+	// config flag — it must land in the address's parsed history below.
+	body, status = heliusPost(t, rpcURL, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      8,
+		"method":  "sendTransaction",
+		"params":  []any{"base64encodedtxdata-swap", map[string]any{"simulate_type": "SWAP", "simulate_address": testAddr}},
+	})
+	if status != 200 {
+		t.Fatalf("sendTransaction (swap) -> status %d, want 200; body %s", status, body)
+	}
+	var swapSendResp map[string]any
+	if err := json.Unmarshal([]byte(body), &swapSendResp); err != nil {
+		t.Fatalf("unmarshal sendTransaction (swap): %v (body %s)", err, body)
+	}
+	swapSig, _ := swapSendResp["result"].(string)
+	if swapSig == "" {
+		t.Fatalf("swap signature = %v, want non-empty", swapSendResp["result"])
+	}
+
 	// Immediately after submission the signature has no status yet (null).
 	body, status = heliusPost(t, rpcURL, map[string]any{
 		"jsonrpc": "2.0",
@@ -223,6 +243,300 @@ func TestHeliusStyleAdapter(t *testing.T) {
 	}
 	if failTx["err"] == nil {
 		t.Fatalf("failed tx err = nil, want InstructionError")
+	}
+
+	// ===== Enhanced Transactions API: GET /v0/addresses/{addr}/transactions =====
+	//
+	// Parsed transaction history for the address: a deterministic seeded
+	// history PLUS every transaction submitted via sendTransaction that has
+	// landed, newest first.
+
+	body, status = heliusGet(t, base+"/v0/addresses/"+testAddr+"/transactions?api-key="+apiKey)
+	if status != 200 {
+		t.Fatalf("get transactions -> status %d, want 200; body %s", status, body)
+	}
+	var txList []any
+	if err := json.Unmarshal([]byte(body), &txList); err != nil {
+		t.Fatalf("unmarshal transactions: %v (body %s)", err, body)
+	}
+	if len(txList) < 9 { // 8 seeded + the landed SWAP
+		t.Fatalf("len(transactions) = %d, want >= 9", len(txList))
+	}
+	totalSwaps := 0
+	lastTs := int64(1) << 62
+	for _, raw := range txList {
+		tx, ok := raw.(map[string]any)
+		if !ok {
+			t.Fatalf("transaction = %v, want object", raw)
+		}
+		if tx["signature"] == nil || tx["signature"] == "" {
+			t.Fatalf("transaction signature = %v, want non-empty", tx["signature"])
+		}
+		txType, _ := tx["type"].(string)
+		if txType != "TRANSFER" && txType != "SWAP" {
+			t.Fatalf("transaction type = %q, want TRANSFER or SWAP", txType)
+		}
+		if tx["feePayer"] == nil || tx["feePayer"] == "" {
+			t.Fatalf("transaction feePayer = %v, want non-empty", tx["feePayer"])
+		}
+		fee, ok := tx["fee"].(float64)
+		if !ok || fee <= 0 {
+			t.Fatalf("transaction fee = %v, want > 0", tx["fee"])
+		}
+		if tx["events"] == nil {
+			t.Fatalf("transaction events = %v, want non-nil", tx["events"])
+		}
+		if txType == "SWAP" {
+			totalSwaps++
+		}
+		// Newest first.
+		ts, _ := tx["timestamp"].(float64)
+		if int64(ts) > lastTs {
+			t.Fatalf("transactions not newest-first: %d after %d", int64(ts), lastTs)
+		}
+		lastTs = int64(ts)
+	}
+	if totalSwaps < 3 { // 2 seeded + the sent SWAP
+		t.Fatalf("SWAP transactions = %d, want >= 3", totalSwaps)
+	}
+	// The sent SWAP must be present with its events.swap payload.
+	var swapTx map[string]any
+	for _, raw := range txList {
+		tx := raw.(map[string]any)
+		if tx["signature"] == swapSig {
+			swapTx = tx
+		}
+	}
+	if swapTx == nil {
+		t.Fatalf("sent SWAP %s missing from address history", swapSig)
+	}
+	if swapTx["type"] != "SWAP" || swapTx["source"] != "JUPITER" {
+		t.Fatalf("sent tx type/source = %v/%v, want SWAP/JUPITER", swapTx["type"], swapTx["source"])
+	}
+	events, _ := swapTx["events"].(map[string]any)
+	swapEvent, _ := events["swap"].(map[string]any)
+	if swapEvent == nil {
+		t.Fatalf("events.swap = %v, want object", events["swap"])
+	}
+	tokOut, _ := swapEvent["tokenOutput"].(map[string]any)
+	if tokOut == nil {
+		t.Fatalf("events.swap.tokenOutput = %v, want object", swapEvent["tokenOutput"])
+	}
+	tokAmt, _ := tokOut["tokenAmount"].(map[string]any)
+	if tokAmt == nil || tokAmt["amount"] == nil || tokAmt["decimals"] == nil {
+		t.Fatalf("tokenOutput.tokenAmount = %v, want {amount, decimals}", tokOut["tokenAmount"])
+	}
+
+	// type filter: only SWAPs, same count as the unfiltered list.
+	body, status = heliusGet(t, base+"/v0/addresses/"+testAddr+"/transactions?api-key="+apiKey+"&type=SWAP")
+	if status != 200 {
+		t.Fatalf("get transactions (type=SWAP) -> status %d, want 200; body %s", status, body)
+	}
+	var swapOnly []map[string]any
+	if err := json.Unmarshal([]byte(body), &swapOnly); err != nil {
+		t.Fatalf("unmarshal swap-only transactions: %v (body %s)", err, body)
+	}
+	if len(swapOnly) != totalSwaps {
+		t.Fatalf("type=SWAP returned %d, want %d", len(swapOnly), totalSwaps)
+	}
+	for _, tx := range swapOnly {
+		if tx["type"] != "SWAP" {
+			t.Fatalf("type=SWAP returned type %v", tx["type"])
+		}
+	}
+
+	// before-cursor pagination: page 2 starts strictly after page 1 and the
+	// pages are disjoint.
+	body, status = heliusGet(t, base+"/v0/addresses/"+testAddr+"/transactions?api-key="+apiKey+"&limit=3")
+	if status != 200 {
+		t.Fatalf("get transactions (limit=3) -> status %d, want 200; body %s", status, body)
+	}
+	var page1 []map[string]any
+	if err := json.Unmarshal([]byte(body), &page1); err != nil {
+		t.Fatalf("unmarshal page1: %v (body %s)", err, body)
+	}
+	if len(page1) != 3 {
+		t.Fatalf("len(page1) = %d, want 3", len(page1))
+	}
+	page1Sigs := map[string]bool{}
+	for _, tx := range page1 {
+		page1Sigs[tx["signature"].(string)] = true
+	}
+	body, status = heliusGet(t, base+"/v0/addresses/"+testAddr+"/transactions?api-key="+apiKey+"&limit=3&before="+page1[2]["signature"].(string))
+	if status != 200 {
+		t.Fatalf("get transactions (page 2) -> status %d, want 200; body %s", status, body)
+	}
+	var page2 []map[string]any
+	if err := json.Unmarshal([]byte(body), &page2); err != nil {
+		t.Fatalf("unmarshal page2: %v (body %s)", err, body)
+	}
+	if len(page2) == 0 {
+		t.Fatalf("len(page2) = 0, want > 0")
+	}
+	for _, tx := range page2 {
+		if page1Sigs[tx["signature"].(string)] {
+			t.Fatalf("page 2 repeats page-1 signature %v", tx["signature"])
+		}
+	}
+
+	// ===== JSON-RPC getTransaction =====
+
+	body, status = heliusPost(t, rpcURL, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      9,
+		"method":  "getTransaction",
+		"params":  []string{page1[0]["signature"].(string)},
+	})
+	if status != 200 {
+		t.Fatalf("getTransaction -> status %d, want 200; body %s", status, body)
+	}
+	var gtxResp map[string]any
+	if err := json.Unmarshal([]byte(body), &gtxResp); err != nil {
+		t.Fatalf("unmarshal getTransaction: %v (body %s)", err, body)
+	}
+	gtx, ok := gtxResp["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("getTransaction result = %v, want object", gtxResp["result"])
+	}
+	if gtx["blockTime"] == nil || gtx["slot"] == nil {
+		t.Fatalf("getTransaction blockTime/slot = %v/%v, want non-nil", gtx["blockTime"], gtx["slot"])
+	}
+	meta, _ := gtx["meta"].(map[string]any)
+	if meta == nil {
+		t.Fatalf("getTransaction meta = %v, want object", gtx["meta"])
+	}
+	preBal, _ := meta["preBalances"].([]any)
+	postBal, _ := meta["postBalances"].([]any)
+	if len(preBal) == 0 || len(postBal) == 0 || len(preBal) != len(postBal) {
+		t.Fatalf("meta balances: pre=%v post=%v, want equal non-empty arrays", preBal, postBal)
+	}
+	gtxTx, _ := gtx["transaction"].(map[string]any)
+	if gtxTx == nil {
+		t.Fatalf("getTransaction transaction = %v, want object", gtx["transaction"])
+	}
+	sigs, _ := gtxTx["signatures"].([]any)
+	if len(sigs) != 1 || sigs[0] != page1[0]["signature"] {
+		t.Fatalf("transaction.signatures = %v, want [%v]", sigs, page1[0]["signature"])
+	}
+
+	// Unknown signature: result must be null (real RPC behavior).
+	body, status = heliusPost(t, rpcURL, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      10,
+		"method":  "getTransaction",
+		"params":  []string{"unknownsignature"},
+	})
+	if status != 200 {
+		t.Fatalf("getTransaction (unknown) -> status %d, want 200; body %s", status, body)
+	}
+	var gtxNull map[string]any
+	if err := json.Unmarshal([]byte(body), &gtxNull); err != nil {
+		t.Fatalf("unmarshal getTransaction (unknown): %v (body %s)", err, body)
+	}
+	if gtxNull["result"] != nil {
+		t.Fatalf("getTransaction (unknown) result = %v, want null", gtxNull["result"])
+	}
+
+	// ===== JSON-RPC getTokenAccountsByOwner =====
+
+	body, status = heliusPost(t, rpcURL, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      11,
+		"method":  "getTokenAccountsByOwner",
+		"params":  []any{testAddr, map[string]any{"programId": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9S996qYXbpM4Vvk"}, map[string]any{"encoding": "jsonParsed"}},
+	})
+	if status != 200 {
+		t.Fatalf("getTokenAccountsByOwner -> status %d, want 200; body %s", status, body)
+	}
+	var tacctResp map[string]any
+	if err := json.Unmarshal([]byte(body), &tacctResp); err != nil {
+		t.Fatalf("unmarshal getTokenAccountsByOwner: %v (body %s)", err, body)
+	}
+	tacct, ok := tacctResp["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("getTokenAccountsByOwner result = %v, want object", tacctResp["result"])
+	}
+	taccounts, ok := tacct["value"].([]any)
+	if !ok || len(taccounts) != 2 {
+		t.Fatalf("value = %v, want 2 token accounts", tacct["value"])
+	}
+	firstAcct := taccounts[0].(map[string]any)
+	if firstAcct["address"] == nil || firstAcct["mint"] == nil || firstAcct["lamports"] == nil {
+		t.Fatalf("token account = %v, want address/mint/lamports", firstAcct)
+	}
+	firstMint, _ := firstAcct["mint"].(string)
+	data, _ := firstAcct["data"].(map[string]any)
+	parsed, _ := data["parsed"].(map[string]any)
+	info, _ := parsed["info"].(map[string]any)
+	if info == nil {
+		t.Fatalf("data.parsed.info = %v, want object (jsonParsed shape)", data)
+	}
+	tokAmount, _ := info["tokenAmount"].(map[string]any)
+	if tokAmount == nil || tokAmount["amount"] == nil || tokAmount["decimals"] == nil {
+		t.Fatalf("tokenAmount = %v, want {amount, decimals}", info["tokenAmount"])
+	}
+
+	// Mint filter narrows to the one matching account.
+	body, status = heliusPost(t, rpcURL, map[string]any{
+		"jsonrpc": "2.0",
+		"id":      12,
+		"method":  "getTokenAccountsByOwner",
+		"params":  []any{testAddr, map[string]any{"mint": firstMint}, map[string]any{"encoding": "jsonParsed"}},
+	})
+	if status != 200 {
+		t.Fatalf("getTokenAccountsByOwner (mint) -> status %d, want 200; body %s", status, body)
+	}
+	var tacctMintResp map[string]any
+	if err := json.Unmarshal([]byte(body), &tacctMintResp); err != nil {
+		t.Fatalf("unmarshal getTokenAccountsByOwner (mint): %v (body %s)", err, body)
+	}
+	tacctMint := tacctMintResp["result"].(map[string]any)
+	mintAccounts, _ := tacctMint["value"].([]any)
+	if len(mintAccounts) != 1 {
+		t.Fatalf("mint-filtered value = %v, want 1 account", tacctMint["value"])
+	}
+	if mintAccounts[0].(map[string]any)["mint"] != firstMint {
+		t.Fatalf("mint-filtered account mint = %v, want %v", mintAccounts[0].(map[string]any)["mint"], firstMint)
+	}
+
+	// ===== POST /v0/transactions (parse) =====
+
+	body, status = heliusPost(t, base+"/v0/transactions?api-key="+apiKey, map[string]any{
+		"transactions": []string{"base64encodedrawtxdata0000000000000000000000000000000000000000"},
+	})
+	if status != 200 {
+		t.Fatalf("parse transactions -> status %d, want 200; body %s", status, body)
+	}
+	var parsedList []map[string]any
+	if err := json.Unmarshal([]byte(body), &parsedList); err != nil {
+		t.Fatalf("unmarshal parsed transactions: %v (body %s)", err, body)
+	}
+	if len(parsedList) != 1 {
+		t.Fatalf("len(parsed) = %d, want 1", len(parsedList))
+	}
+	if parsedList[0]["type"] != "TRANSFER" || parsedList[0]["feePayer"] == nil {
+		t.Fatalf("parsed tx = %v, want TRANSFER with feePayer", parsedList[0])
+	}
+
+	// Validation failure path: empty transactions array -> 400.
+	body, status = heliusPost(t, base+"/v0/transactions?api-key="+apiKey, map[string]any{
+		"transactions": []string{},
+	})
+	if status != 400 {
+		t.Fatalf("parse transactions (empty) -> status %d, want 400; body %s", status, body)
+	}
+	var parseErr map[string]any
+	if err := json.Unmarshal([]byte(body), &parseErr); err != nil {
+		t.Fatalf("unmarshal parse error: %v (body %s)", err, body)
+	}
+	if parseErr["error"] == nil {
+		t.Fatalf("parse error body = %v, want error field", parseErr)
+	}
+
+	// GET transactions without api-key: 401.
+	_, status = heliusGet(t, base+"/v0/addresses/"+testAddr+"/transactions")
+	if status != 401 {
+		t.Fatalf("get transactions without api-key -> status %d, want 401", status)
 	}
 
 	// ===== 401 without api-key =====

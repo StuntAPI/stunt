@@ -4,11 +4,16 @@
 #
 # Recognized operations:
 #   - createCustomer
-#   - chargePaymentMethod / chargeCreditCard
-#   - authorizePaymentMethod
-#   - refundTransaction
-#   - voidTransaction
-#   - searchTransactions
+#   - chargePaymentMethod / chargeCreditCard   (created submitted_for_settlement,
+#                                               settles +3s derive-on-read)
+#   - authorizePaymentMethod / authorizeCreditCard (created authorized)
+#   - refundTransaction                        (settled transactions only)
+#   - voidTransaction                          (authorized transactions only)
+#   - searchTransactions                       (Braintree search-criteria vocabulary)
+#
+# All state-machine semantics are shared with the REST surface via
+# scripts/lib.star (_new_transaction, _apply_void, _apply_refund,
+# _search_filters).
 
 # on_graphql dispatches GraphQL operations by pattern-matching the query string.
 def on_graphql(req):
@@ -28,9 +33,9 @@ def on_graphql(req):
     if _contains(query, "createCustomer") or _contains(query, "createCustomerInput"):
         return _gql_create_customer(req, body)
     if _contains(query, "chargePaymentMethod") or _contains(query, "chargeCreditCard"):
-        return _gql_charge(req, body, "submitted_for_settlement")
+        return _gql_charge(req, body, True)
     if _contains(query, "authorizePaymentMethod") or _contains(query, "authorizeCreditCard"):
-        return _gql_charge(req, body, "authorized")
+        return _gql_charge(req, body, False)
     if _contains(query, "refundTransaction") or _contains(query, "refund"):
         return _gql_refund(req, body)
     if _contains(query, "voidTransaction") or _contains(query, "void "):
@@ -57,7 +62,7 @@ def _gql_create_customer(req, body):
         "firstName": input.get("firstName", "Test"),
         "lastName": input.get("lastName", "Customer"),
         "email": input.get("email", "test@example.com"),
-        "createdAt": "2024-06-15T12:30:00.000Z",
+        "createdAt": clock.now_rfc3339(),
     }
     c = store_collection("customers")
     c.insert(doc)
@@ -70,8 +75,10 @@ def _gql_create_customer(req, body):
         },
     })
 
-# _gql_charge handles chargePaymentMethod / chargeCreditCard.
-def _gql_charge(req, body, status):
+# _gql_charge handles chargePaymentMethod / chargeCreditCard (submitted for
+# settlement immediately, settles +3s) and authorizePaymentMethod /
+# authorizeCreditCard (authorized, awaiting capture/void).
+def _gql_charge(req, body, immediate_submit):
     vars_ = body.get("variables", {})
     if vars_ == None:
         vars_ = {}
@@ -79,37 +86,24 @@ def _gql_charge(req, body, status):
     input = vars_.get("input", vars_)
     if input == None:
         input = {}
+    if type(input) != "dict":
+        input = {}
+    if input.get("amount", None) == None:
+        input = dict(input)
+        input["amount"] = "10.00"
 
-    amount = input.get("amount", "10.00")
-    txn_id = _txn_id()
-
-    doc = {
-        "id": txn_id,
-        "status": status,
-        "type": "sale",
-        "amount": amount,
-        "currency": "USD",
-        "customer": {},
-        "creditCard": {
-            "last4": "1111",
-            "cardType": "Visa",
-            "expirationDate": "03/2030",
-        },
-        "createdAt": "2024-06-15T12:30:00.000Z",
-    }
-    c = store_collection("transactions")
-    c.insert(doc)
-
-    # Webhook: a charge settles immediately in the simulator -> the real
-    # Braintree settlement kind. (authorizePaymentMethod has no real webhook
-    # kind — authorization alone triggers no notification — so none is sent.)
-    if status == "submitted_for_settlement":
-        _emit_if_subscribed("transaction_settled", {"transaction": _txn_public(doc)})
+    doc, einfo = _new_transaction(input, immediate_submit)
+    if einfo != None:
+        return _bt_graphql_error(einfo["message"])
 
     # The GraphQL field name depends on the mutation; we use chargePaymentMethod.
     key = "chargePaymentMethod"
     if _contains(body.get("query", ""), "chargeCreditCard"):
         key = "chargeCreditCard"
+    if _contains(body.get("query", ""), "authorizeCreditCard"):
+        key = "authorizeCreditCard"
+    if _contains(body.get("query", ""), "authorizePaymentMethod"):
+        key = "authorizePaymentMethod"
 
     return respond(200, {
         "data": {
@@ -119,7 +113,8 @@ def _gql_charge(req, body, status):
         },
     })
 
-# _gql_refund handles refundTransaction.
+# _gql_refund handles refundTransaction (settled transactions only, with the
+# same over-refund guard as the REST surface).
 def _gql_refund(req, body):
     vars_ = body.get("variables", {})
     if vars_ == None:
@@ -133,30 +128,13 @@ def _gql_refund(req, body):
     if original_id == None:
         original_id = ""
 
-    # Find the original transaction.
-    c = store_collection("transactions")
-    docs = c.list()
+    original = _find_transaction(original_id)
+    if original == None:
+        return _bt_graphql_error("Transaction not found: " + str(original_id))
 
-    original = None
-    for doc in docs:
-        if doc.get("id", "") == original_id:
-            original = doc
-            break
-
-    refund_id = _txn_id()
-    refund_doc = {
-        "id": refund_id,
-        "status": "settled",
-        "type": "credit",
-        "amount": original.get("amount", "0.00") if original != None else input.get("amount", "0.00"),
-        "currency": "USD",
-        "customer": {},
-        "creditCard": original.get("creditCard", {}) if original != None else {},
-        "createdAt": "2024-06-15T12:30:00.000Z",
-    }
-    c.insert(refund_doc)
-
-    _emit_if_subscribed("refund_opened", {"transaction": _txn_public(refund_doc)})
+    refund_doc, einfo = _apply_refund(original, input.get("amount", None))
+    if einfo != None:
+        return _bt_graphql_error(einfo["message"])
 
     return respond(200, {
         "data": {
@@ -166,7 +144,7 @@ def _gql_refund(req, body):
         },
     })
 
-# _gql_void handles voidTransaction.
+# _gql_void handles voidTransaction (authorized transactions only).
 def _gql_void(req, body):
     vars_ = body.get("variables", {})
     if vars_ == None:
@@ -180,34 +158,48 @@ def _gql_void(req, body):
     if txn_id == None:
         txn_id = ""
 
-    # Update the transaction status to voided.
-    c = store_collection("transactions")
-    docs = c.list()
-    for doc in docs:
-        if doc.get("id", "") == txn_id:
-            doc["status"] = "voided"
-            c.update(doc.get("id", ""), doc)
-            break
+    doc = _find_transaction(txn_id)
+    if doc == None:
+        return _bt_graphql_error("Transaction not found: " + str(txn_id))
+
+    doc, einfo = _apply_void(doc)
+    if einfo != None:
+        return _bt_graphql_error(einfo["message"])
 
     return respond(200, {
         "data": {
             "voidTransaction": {
-                "transaction": {
-                    "id": txn_id,
-                    "status": "voided",
-                },
+                "transaction": _txn_public(doc),
             },
         },
     })
 
-# _gql_search handles searchTransactions.
+# _gql_search handles searchTransactions with the same search-criteria
+# vocabulary as the REST advanced_search.
 def _gql_search(req, body):
+    vars_ = body.get("variables", {})
+    if vars_ == None:
+        vars_ = {}
+
+    input = vars_.get("input", vars_)
+    if input == None:
+        input = {}
+    search = vars_.get("search", input.get("search", None))
+    if search == None or type(search) != "dict":
+        search = {}
+
     c = store_collection("transactions")
-    docs = c.list()
+    items = []
+    for doc in c.list():
+        items.append(_txn_public(_advance_transaction(doc)))
+
+    f = _search_filters(search)
+    if len(f) > 0:
+        items = query_select(items, f, None, "", None, None, None)
 
     edges = []
-    for doc in docs:
-        edges.append({"node": _txn_public(doc)})
+    for it in items:
+        edges.append({"node": it})
 
     return respond(200, {
         "data": {

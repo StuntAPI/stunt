@@ -38,6 +38,9 @@ def on_query(req):
     elif obj_lower == "subscription":
         col = store_collection("subscriptions")
         for d in col.list():
+            # Derive-on-read: advance pending end-of-term cancellations so ZOQL
+            # results reflect the synthetic calendar.
+            d = _advance_subscription(d)
             records.append(_project(d, fields, "Subscription"))
     elif obj_lower == "invoice":
         col = store_collection("invoices")
