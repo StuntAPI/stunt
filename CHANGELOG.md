@@ -6,6 +6,46 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **`json_safe_decode(s)` builtin** — total JSON decode for handlers
+  validating untrusted JSON (JWT claims, multipart metadata): returns the
+  value or `None` instead of raising. Numbers decode as ints when integral,
+  matching the stdlib `json.decode`.
+
+## [0.33.0] — 2026-08-15
+
+### Adapters
+
+- **Real inbound JWT verification (stunt-nu5).** Six auth adapters now
+  verify inbound JWTs cryptographically and serve real JWKS from fixed
+  synthetic key material: signin-with-apple (ES256 id_tokens +
+  client_secret verification, `/auth/keys` JWKS), apple-apns (ES256
+  provider-token signature + expiry, 403 ExpiredProviderToken /
+  InvalidProviderToken), aws-cognito (real RS256 tokens with kid and claim
+  sets, pool-path JWKS, inbound signature/iss/exp/token_use), entra-id
+  (minted tokens carry aud/iat/exp and are signature-verified with kid/iss/
+  aud cross-checks), google-style + google-iam (RS256 id_tokens on openid
+  scope, `/oauth2/v3/certs` JWKS, JWT-bearer grants cryptographically
+  verified). Malformed tokens 4xx cleanly.
+- **Eight P2 slices.** stripe: decline/SCA magic test cards (real
+  decline_codes, requires_action + 3DS confirmation), refund state machine
+  with fleet-wide over-refund guard, `GET /v1/events`. drive: real `q`
+  grammar, OAuth2 with validated tokens, live changes feed.
+  appstoreconnect: appStoreVersions lifecycle (PREPARE_FOR_SUBMISSION →
+  READY_FOR_SALE), app PATCH, bundleId dedupe. anaplan: chunked file
+  upload/download, imports that apply uploaded data, exports symmetric.
+  azure-servicebus: peek-lock receive with per-delivery rotating LockTokens
+  (complete/renew/abandon/defer, 410 lock-lost), topics + subscription
+  fan-out. marketo: custom-field upserts with per-record sync status, bulk
+  extract with downloadable results, /leads/describe. firebase:
+  token-bound getAccountInfo, securetoken refresh, Firestore runQuery,
+  documentId + nested paths, FCM topic/condition routing. gdocs: structural
+  document model with the real batchUpdate vocabulary (utf16-aware
+  insertText, deleteContentRange, paragraph/text styles, bullets, page
+  breaks, images; unknown requests 400). jumio verified complete from the
+  async slice.
+
 ## [0.32.0] — 2026-08-15
 
 ### Adapters
