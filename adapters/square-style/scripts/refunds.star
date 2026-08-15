@@ -51,6 +51,11 @@ def on_create_refund(req):
     if amount_money == None or type(amount_money) != "dict" or amount_money.get("amount", None) == None:
         amount_money = _money(remaining, currency)
 
+    # A refund's currency must match the payment's; a foreign-currency
+    # amount would silently corrupt the refunded-amount bookkeeping.
+    if _currency_of(amount_money) != currency:
+        return _sq_err_field(400, "INVALID_REQUEST_ERROR", "INVALID_REQUEST", "Refund currency must match the payment currency", "amount_money.currency")
+
     amount = _amount_of(amount_money, 0)
     if amount <= 0:
         return _sq_err_field(400, "INVALID_REQUEST_ERROR", "INVALID_REQUEST", "Refund amount must be greater than 0", "amount_money.amount")

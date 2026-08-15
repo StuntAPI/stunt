@@ -159,9 +159,9 @@ def _require_tpp(req):
     if doc == None:
         return _psd2_err(401, "ERROR", "TOKEN_INVALID", "Missing or invalid access token")
 
-    expires_at = doc.get("expires_at", 0)
-    if type(expires_at) != "int":
-        expires_at = _to_int(str(expires_at))
+    # _num: ints stored in a collection round-trip as floats; str() of a
+    # float renders in exponent form and _to_int would zero it.
+    expires_at = _num(doc.get("expires_at", 0))
     if expires_at > 0 and clock.now_unix() > expires_at:
         return _psd2_err(401, "ERROR", "TOKEN_EXPIRED", "The access token has expired")
 
@@ -284,9 +284,7 @@ def _consent_covers(consent, kind, iban):
 def _advance_auth(doc, ac):
     if doc.get("scaStatus", "") != "scaReceived":
         return doc
-    finalise_at = doc.get("_finalise_at", 0)
-    if type(finalise_at) != "int":
-        finalise_at = _to_int(str(finalise_at))
+    finalise_at = _num(doc.get("_finalise_at", 0))
     if clock.now_unix() < finalise_at:
         return doc
 

@@ -18,7 +18,7 @@ def on_token(req):
         return _sq_err(400, "INVALID_REQUEST_ERROR", "MISSING_REQUIRED_PARAMETER", "grant_type is required")
 
     n = store_kv_incr("square", "token_seq")
-    access_token = "EAAA" + str(5000000000 + n) + "_mock_access_token"
+    access_token = "EAAA" + str((5*1000*1000*1000) + n) + "_mock_access_token"
 
     # Store the token for validation, with a 30-day TTL enforced by
     # _require_auth (expiry computed at runtime — never a hardcoded epoch).
@@ -33,5 +33,5 @@ def on_token(req):
         "access_token": access_token,
         "token_type": "Bearer",
         "expires_at": clock.unix_to_rfc3339(expires_at),
-        "merchant_id": "ML" + str(6000000000 + n),
+        "merchant_id": "ML" + str((6*1000*1000*1000) + n),
     })

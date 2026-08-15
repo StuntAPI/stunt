@@ -210,18 +210,6 @@ def _refresh_subscriber(doc):
             sub["_exp_emitted"] = True
             dead_products.append(pid)
             changed = True
-            _emit_event({
-                "type": "EXPIRATION",
-                "app_user_id": doc.get("app_user_id", ""),
-                "original_app_user_id": doc.get("original_app_user_id", ""),
-                "product_id": pid,
-                "entitlement_id": sub.get("_entitlement_id", ""),
-                "period_type": sub.get("period_type", "NORMAL"),
-                "store": sub.get("store", "app_store"),
-                "expired_at": clock.now_rfc3339(),
-                "expiration_at_ms": exp * 1000,
-                "environment": "SANDBOX",
-            })
     if len(dead_products) == 0:
         return doc
     ents = doc.get("entitlements", {})
@@ -232,8 +220,23 @@ def _refresh_subscriber(doc):
             continue
         kept[eid] = ent
     doc["entitlements"] = kept
+    # Persist BEFORE emitting: a crash mid-loop must not re-emit.
     c = store_collection("subscribers")
     c.update(doc.get("app_user_id", ""), doc)
+    for pid in dead_products:
+        sub = subs[pid]
+        _emit_event({
+            "type": "EXPIRATION",
+            "app_user_id": doc.get("app_user_id", ""),
+            "original_app_user_id": doc.get("original_app_user_id", ""),
+            "product_id": pid,
+            "entitlement_id": sub.get("_entitlement_id", ""),
+            "period_type": sub.get("period_type", "NORMAL"),
+            "store": sub.get("store", "app_store"),
+            "expired_at": clock.now_rfc3339(),
+            "expiration_at_ms": _num(sub.get("_expires_at", 0)) * 1000,
+            "environment": "SANDBOX",
+        })
     return doc
 
 # ============================================================================

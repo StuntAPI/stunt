@@ -79,7 +79,7 @@ def on_create_issue(req):
         "title": title,
         "body": body.get("body", ""),
         "state": "open",
-        "user": {"login": "stunt-dev", "id": 1000002, "type": "Bot"},
+        "user": {"login": "stunt-dev", "id": _BOT_ID, "type": "Bot"},
         "labels": labels,
         "created_at": _now(),
         "updated_at": _now(),

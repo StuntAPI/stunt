@@ -67,7 +67,7 @@ def on_create_pull(req):
         "body": body.get("body", ""),
         "state": "open",
         "draft": body.get("draft", False),
-        "user": {"login": "stunt-dev", "id": 1000002, "type": "Bot"},
+        "user": {"login": "stunt-dev", "id": _BOT_ID, "type": "Bot"},
         "head": {"ref": body.get("head", ""), "sha": "aaaa1111bbbb2222"},
         "base": {"ref": body.get("base", "main"), "sha": "cccc3333dddd4444"},
         "created_at": _now(),
