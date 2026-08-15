@@ -212,6 +212,20 @@ def _list_page(req, docs):
 For opaque-cursor providers (HubSpot `after`, OData `@odata.nextLink`), pass `next_cursor` straight
 through as the next page token.
 
+### Safe JSON decode (`json_safe_decode`)
+
+Starlark has no try/except, and `json.decode` raises an evaluation error on malformed input that
+surfaces as a 500. Handlers validating untrusted JSON (JWT claims decoded from base64url, multipart
+metadata parts) use the total function instead:
+
+```python
+claims = json_safe_decode(txt)   # dict/list/string/int/float/bool/None value, or None on malformed input
+if type(claims) != "dict":
+    return _auth_fault()         # clean 4xx, never a 500
+```
+
+Numbers decode as ints when integral, matching the stdlib `json.decode`.
+
 ### Multipart builtin (`parse_multipart`)
 
 `parse_multipart` decodes a `multipart/form-data` request so document/file-upload endpoints accept
