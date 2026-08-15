@@ -139,12 +139,12 @@ def _jwt_json(token, seg):
     if not _b64url_ok(parts[0]) or not _b64url_ok(parts[1]) or not _b64url_ok(parts[2]):
         return None
     txt = crypto.base64url_decode(parts[seg])
-    if txt == "" or txt[:1] != "{" or txt[-1:] != "}" or txt.find('"') < 0:
+    if txt == "" or txt[:1] != "{":
         return None
-    for i in range(len(txt)):
-        if ord(txt[i]) < 0x20:
-            return None
-    return json.decode(txt)
+    out = json_safe_decode(txt)
+    if type(out) != "dict":
+        return None
+    return out
 
 # _claim_int coerces a claim value to int (JSON numbers decode as int).
 # Returns None when absent/None.
@@ -180,7 +180,7 @@ def _require_jwt(req):
     if token == None:
         if expired:
             return None, respond(403, {"reason": "ExpiredProviderToken"})
-        return None, respond(403, {"reason": "BadDeviceToken"})
+        return None, respond(403, {"reason": "InvalidProviderToken"})
     return token, None
 
 # _verify_provider_token validates a bearer token value end-to-end.

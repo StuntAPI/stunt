@@ -224,11 +224,11 @@ def _seed():
         "id": "8a819c8645a0aa8e0005c715c7ad49b9",
         "name": "Supply Chain Planning",
         "active": True,
-        "size": 1048576,
+        "size": (1024*1024),
     })
     wc.insert({
         "id": "8a819c8645b1bb9f0006c825d8be50c0",
         "name": "Financial Forecasting",
         "active": True,
-        "size": 2097152,
+        "size": (2*1024*1024),
     })

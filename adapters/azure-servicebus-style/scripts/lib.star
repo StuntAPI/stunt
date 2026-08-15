@@ -144,12 +144,15 @@ def _receive_locked(entity, req):
         locked_until = now + lock_secs
         msg["LockedUntil"] = locked_until
         msg["DeliveryCount"] = _num(msg.get("DeliveryCount", 0)) + 1
+        # Lock tokens are unique per delivery: rotate so a stale holder
+        # can't settle a message a later receiver now owns.
+        msg["LockToken"] = msg.get("LockToken", "lock-token-0").split(".")[0] + "." + str(msg["DeliveryCount"])
         mc.update(msg["id"], msg)
         return respond(200, {
             "MessageId": msg.get("MessageId", ""),
             "Body": msg.get("Body", ""),
             "ContentType": msg.get("ContentType", "application/json"),
-            "LockToken": msg.get("LockToken", ""),
+            "LockToken": msg["LockToken"],
             "SequenceNumber": msg.get("SequenceNumber", 0),
             "DeliveryCount": msg["DeliveryCount"],
             "EnqueuedTimeUtc": msg.get("EnqueuedTimeUtc", ""),

@@ -52,6 +52,8 @@ def _b64url_decode(seg):
         v4 = vals[i + 3]
         # Byte 1: top 6 bits from v1, top 2 bits from v2.
         b1 = v1 * 4 + v2 // 16
+        if b1 >= 128:
+            return ""
         result = result + _CHARS[b1]
         # Byte 2: bottom 4 bits from v2, top 4 bits from v3.
         # Only output if there are enough original characters.

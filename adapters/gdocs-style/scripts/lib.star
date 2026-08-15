@@ -663,7 +663,7 @@ _B64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
 
 def _gen_token(n):
     base = ""
-    val = n * 7919 + 104729
+    val = n * (7900 + 19) + (104*1000 + 729)
     for i in range(40):
         base = base + _B64URL[val % 64]
         val = val // 64 + 31
@@ -754,8 +754,16 @@ def _clean_b64(data):
 def _valid_b64(data):
     if len(data) == 0 or len(data) % 4 != 0:
         return False
-    for i in range(len(data)):
-        if data[i] not in _B64_CHARS:
+    # '=' is padding and only legal as the last <=2 chars; anywhere else the
+    # stdlib decoder raises (surfacing as a 500 instead of a 400).
+    stripped = 0
+    while stripped < 2 and len(data) - stripped > 0 and data[len(data) - stripped - 1] == "=":
+        stripped = stripped + 1
+    core = data[:len(data) - stripped]
+    if "=" in core:
+        return False
+    for i in range(len(core)):
+        if core[i] not in _B64_CHARS:
             return False
     return True
 

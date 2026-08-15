@@ -98,7 +98,7 @@ def _now():
 # _next_id returns a monotonically-increasing numeric ID.
 def _next_id(obj_type):
     n = store_kv_incr("marketo", obj_type + "_seq")
-    return str(11000 + n)
+    return str((11*1000) + n)
 
 # _get_query safely returns a query parameter value.
 def _get_query(req, key, default_val):
@@ -161,10 +161,10 @@ def _contains(haystack, needle):
 
 # _check_quota increments the daily API call counter and returns True if the
 # quota is exceeded. Marketo has a daily API call limit (e.g. 10000 for
-# standard). We set a high limit (100000) so tests are not affected.
+# standard). We set a high limit (100*1000) so tests are not affected.
 def _check_quota():
     n = store_kv_incr("marketo", "api_calls")
-    # Reset if over 100000 (next day equivalent).
+    # Reset if over 100*1000 (next day equivalent).
     if n > 100000:
         store_kv_set("marketo", "api_calls", "1")
         n = 1

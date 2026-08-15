@@ -187,12 +187,12 @@ def _jwt_json(token, seg):
     if not _b64url_ok(parts[0]) or not _b64url_ok(parts[1]) or not _b64url_ok(parts[2]):
         return None
     txt = crypto.base64url_decode(parts[seg])
-    if txt == "" or txt[:1] != "{" or txt[-1:] != "}" or txt.find('"') < 0:
+    if txt == "" or txt[:1] != "{":
         return None
-    for i in range(len(txt)):
-        if ord(txt[i]) < 0x20:
-            return None
-    return json.decode(txt)
+    out = json_safe_decode(txt)
+    if type(out) != "dict":
+        return None
+    return out
 
 # _claim_int coerces a claim value to int (JSON numbers decode as int).
 # Returns None when absent/None.

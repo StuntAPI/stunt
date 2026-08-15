@@ -116,8 +116,8 @@ def _create_path(req, project, path):
         "project": project,
         "collection": path,
         "fields": fields,
-        "createTime": "2024-06-15T10:00:00.000000000Z",
-        "updateTime": "2024-06-15T10:00:00.000000000Z",
+        "createTime": clock.now_rfc3339(),
+        "updateTime": clock.now_rfc3339(),
     }
     dc.insert(doc)
     return respond(200, _document_entity(doc, project))
@@ -220,7 +220,7 @@ def _upsert_path(req, project, path, doc_id):
         for k in fields:
             merged[k] = fields[k]
         existing["fields"] = merged
-        existing["updateTime"] = "2024-06-15T11:00:00.000000000Z"
+        existing["updateTime"] = clock.now_rfc3339()
         dc.delete(doc_id)
         dc.insert(existing)
         return respond(200, _document_entity(existing, project))
@@ -231,8 +231,8 @@ def _upsert_path(req, project, path, doc_id):
         "project": project,
         "collection": path,
         "fields": fields,
-        "createTime": "2024-06-15T10:00:00.000000000Z",
-        "updateTime": "2024-06-15T10:00:00.000000000Z",
+        "createTime": clock.now_rfc3339(),
+        "updateTime": clock.now_rfc3339(),
     }
     dc.insert(doc)
     return respond(200, _document_entity(doc, project))
@@ -262,6 +262,8 @@ def on_run_query(req):
     from_list = sq.get("from", None)
     if from_list == None or len(from_list) == 0:
         return _err(400, 400, "structuredQuery.from is required", "INVALID_ARGUMENT")
+    if type(from_list[0]) != "dict":
+        return _err(400, 400, "from[0] must be an object", "INVALID_ARGUMENT")
     collection_id = from_list[0].get("collectionId", "")
 
     # Build one row per document with UNWRAPPED field values so query_select
@@ -330,7 +332,7 @@ def on_run_query(req):
             continue
         out.append({
             "document": _document_entity(doc, project),
-            "readTime": "2024-06-15T10:00:00.000000000Z",
+            "readTime": clock.now_rfc3339(),
         })
     return respond(200, out)
 
@@ -374,6 +376,6 @@ def _document_entity(doc, project):
     return {
         "name": name,
         "fields": doc.get("fields", {}),
-        "createTime": doc.get("createTime", "2024-06-15T10:00:00.000000000Z"),
-        "updateTime": doc.get("updateTime", "2024-06-15T10:00:00.000000000Z"),
+        "createTime": doc.get("createTime", clock.now_rfc3339()),
+        "updateTime": doc.get("updateTime", clock.now_rfc3339()),
     }

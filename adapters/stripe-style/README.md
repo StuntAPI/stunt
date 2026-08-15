@@ -485,3 +485,10 @@ services:
 ```
 
 Then `stunt up` and make requests to the served address.
+
+## Concurrency note
+
+`POST /v1/refunds` (no path id to key on) is not serialized per charge the
+way `/v1/charges/{id}/refund` is; under concurrent refunds of the same
+charge the over-refund guard can be raced. Prefer the charge-scoped route
+in concurrency-sensitive tests.

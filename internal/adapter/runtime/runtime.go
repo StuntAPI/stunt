@@ -51,6 +51,7 @@ package runtime
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime"
@@ -109,6 +110,9 @@ func BuildAllBuiltins(opts BuiltinOptions) sk.StringDict {
 		dict[k] = v
 	}
 	for k, v := range buildQueryBuiltins() {
+		dict[k] = v
+	}
+	for k, v := range buildSafeDecodeBuiltins() {
 		dict[k] = v
 	}
 	return dict
@@ -274,6 +278,37 @@ func buildMultipartBuiltins() sk.StringDict {
 				parts = append(parts, dict)
 			}
 			return sk.Tuple{sk.NewList(parts), sk.None}, nil
+		}),
+	}
+}
+
+// buildSafeDecodeBuiltins registers json_safe_decode. Starlark has no
+// try/except, and json.decode raises an evaluation error on malformed input
+// that surfaces as a 500 — handlers validating untrusted JSON (JWT claims,
+// multipart metadata parts) need a total function:
+//
+//	json_safe_decode(s) -> value or None
+func buildSafeDecodeBuiltins() sk.StringDict {
+	return sk.StringDict{
+		"json_safe_decode": sk.NewBuiltin("json_safe_decode", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			var s string
+			if err := sk.UnpackArgs("json_safe_decode", args, kwargs, "data", &s); err != nil {
+				return nil, err
+			}
+			// UseNumber + int-when-integral so numeric claims decode as
+			// Starlark ints exactly like the stdlib json.decode does.
+			dec := json.NewDecoder(strings.NewReader(s))
+			dec.UseNumber()
+			var v any
+			if err := dec.Decode(&v); err != nil {
+				return sk.None, nil
+			}
+			v = _numbersToInts(v)
+			out, err := starlark.GoToStarlark(v)
+			if err != nil {
+				return sk.None, nil
+			}
+			return out, nil
 		}),
 	}
 }
@@ -896,4 +931,28 @@ func starlarkValueToString(v sk.Value) string {
 	default:
 		return v.String()
 	}
+}
+
+// _numbersToInts converts json.Number leaves to int64 when integral, else
+// float64, recursing through maps and slices.
+func _numbersToInts(v any) any {
+	switch x := v.(type) {
+	case json.Number:
+		if i, err := x.Int64(); err == nil {
+			return i
+		}
+		f, _ := x.Float64()
+		return f
+	case map[string]any:
+		for k, val := range x {
+			x[k] = _numbersToInts(val)
+		}
+		return x
+	case []any:
+		for i, val := range x {
+			x[i] = _numbersToInts(val)
+		}
+		return x
+	}
+	return v
 }

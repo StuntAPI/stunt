@@ -263,7 +263,9 @@ def _parse_update_body(req):
             meta = parts[0]["data"]
         if meta == None:
             return [None, [], "multipart body has no metadata part"]
-        body = json.decode(meta)
+        body = json_safe_decode(meta)
+        if type(body) != "dict":
+            return _g_err(400, "The metadata part must be a JSON object.", "INVALID_ARGUMENT")
         if body == None or type(body) != "dict":
             return [None, [], "metadata part is not a JSON object"]
         return [body.get("requests"), image_parts, None]
