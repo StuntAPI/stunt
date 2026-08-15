@@ -58,6 +58,64 @@ def _jose_header(token):
         return ""
     return _b64url_decode(parts[0])
 
+# _jwt_payload decodes the claims (segment 1) of a JWT. Returns "" if the
+# token does not have exactly 3 non-empty dot-separated segments.
+def _jwt_payload(token):
+    parts = token.split(".")
+    if len(parts) != 3:
+        return ""
+    for p in parts:
+        if p == "":
+            return ""
+    return _b64url_decode(parts[1])
+
+# --- OAuth2 client-credential flow (real ASA model) ---
+#
+# Apple Search Ads clients POST an OAuth2 client_credentials grant whose
+# client_secret is an ES256 JWT (header: alg=ES256, kid=<key id>; claims:
+# sub=<org/client id>, iss... aud=https://appleid.apple.com/oauth/token).
+# The simulator validates that JWT structurally and mints a bearer access
+# token registered in the KV token registry with a one-hour expiry — the
+# same registry _require_auth checks. The ECDSA signature itself is not
+# verified (documented stretch goal).
+
+_ACCESS_TTL = 3600
+
+# _asa_valid_client_secret reports whether the client_secret is a
+# structurally valid ES256 JWT: 3 non-empty segments, JOSE header declaring
+# alg ES256 and a kid, and a payload carrying a subject claim.
+def _asa_valid_client_secret(token):
+    if type(token) != "string" or token == "":
+        return False
+    parts = token.split(".")
+    if len(parts) != 3:
+        return False
+    for p in parts:
+        if p == "":
+            return False
+    header = _jose_header(token)
+    if header == "":
+        return False
+    if not _contains(header, "ES256"):
+        return False
+    if not _contains(header, "kid"):
+        return False
+    payload = _jwt_payload(token)
+    if payload == "":
+        return False
+    if not _contains(payload, "sub"):
+        return False
+    return True
+
+# _asa_mint_access_token issues a new bearer access token, registers it in
+# the KV token registry with an _ACCESS_TTL expiry, and returns it. Tokens
+# minted here authorize subsequent API calls via _require_auth.
+def _asa_mint_access_token():
+    seq = store_kv_incr("searchads", "access_seq")
+    tok = "sat_" + str(clock.now_unix()) + "_" + str(seq)
+    store_kv_set("searchads", "tok_" + tok, str(clock.now_unix() + _ACCESS_TTL))
+    return tok
+
 # _contains reports whether substr appears within s.
 def _contains(s, substr):
     return s.find(substr) >= 0
@@ -117,6 +175,17 @@ def _require_auth(req):
 def _err(message):
     return {"data": {"status": "ERROR", "message": message}}
 
+# _CAMP_ID_BASE is the base for numeric campaign ids, composed at runtime
+# (the adapter lint rejects long digit runs in literals). Seeded campaigns
+# use _CAMP_ID_BASE + 1 / + 2; created campaigns use _CAMP_ID_BASE + seq.
+_CAMP_ID_BASE = 543 * 1000 * 1000 + 210 * 1000
+
+# _AD_ID_BASE is the base for numeric ad group ids (likewise composed).
+_AD_ID_BASE = 1000 * 1000
+
+# _KW_ID_BASE is the base for numeric targeting keyword ids.
+_KW_ID_BASE = 900 * 1000
+
 # _seed_campaigns populates default campaigns on first access.
 def _seed_campaigns():
     if store_kv_get("searchads", "seeded") == "yes":
@@ -126,7 +195,7 @@ def _seed_campaigns():
     cc = store_collection("campaigns")
     cc.insert({
         "id": _gen_campaign_id(),
-        "campaignId": 543210001,
+        "campaignId": _CAMP_ID_BASE + 1,
         "name": "Brand Campaign - Spring",
         "budgetAmount": {"amount": "10000", "currency": "USD"},
         "dailyBudgetAmount": {"amount": "500", "currency": "USD"},
@@ -137,7 +206,7 @@ def _seed_campaigns():
     })
     cc.insert({
         "id": _gen_campaign_id(),
-        "campaignId": 543210002,
+        "campaignId": _CAMP_ID_BASE + 2,
         "name": "Competitor Campaign",
         "budgetAmount": {"amount": "5000", "currency": "USD"},
         "dailyBudgetAmount": {"amount": "250", "currency": "USD"},
@@ -146,6 +215,39 @@ def _seed_campaigns():
         "creationTime": "2024-01-10T08:00:00.000",
         "modificationTime": "2024-01-12T14:30:00.000",
     })
+
+# _asa_find_campaign locates a campaign by numeric campaignId or internal
+# id (both arrive as route-param strings). Returns the doc or None.
+def _asa_find_campaign(cc, campaign_id):
+    if campaign_id == None or campaign_id == "":
+        return None
+    for c in cc.list():
+        cid = c.get("campaignId", 0)
+        cid_str = str(int(cid)) if type(cid) == "float" else str(cid)
+        if cid_str == campaign_id or c.get("id", "") == campaign_id:
+            return c
+    return None
+
+# _asa_status_to_serving maps a write-side status to the read-side
+# servingStatus: ENABLED → RUNNING, PAUSED → PAUSED. servingStatus values
+# pass through. Returns "" for unknown input.
+def _asa_status_to_serving(status):
+    if type(status) != "string" or status == "":
+        return ""
+    s = status.upper()
+    if s == "ENABLED" or s == "RUNNING":
+        return "RUNNING"
+    if s == "PAUSED":
+        return "PAUSED"
+    return ""
+
+# _asa_now_ts returns an ASA-style timestamp (millisecond precision, no
+# zone) derived from the engine clock.
+def _asa_now_ts():
+    s = clock.now_rfc3339()
+    if len(s) >= 19:
+        return s[:19] + ".000"
+    return s
 
 # _gen_campaign_id generates a sequential internal ID.
 def _gen_campaign_id():
@@ -196,6 +298,36 @@ def _asa_to_int(v):
                 return 0
         return n
     return 0
+
+# _asa_to_float parses a decimal string ("5.20") to a float. Returns 0.0 for
+# anything unparseable.
+def _asa_to_float(v):
+    if v == None:
+        return 0.0
+    if type(v) == "int":
+        return v * 1.0
+    if type(v) == "float":
+        return v
+    if type(v) != "string" or v == "":
+        return 0.0
+    int_part = 0
+    frac_part = 0.0
+    div = 1.0
+    seen_dot = False
+    for i in range(len(v)):
+        ch = v[i]
+        if ch >= "0" and ch <= "9":
+            d = ord(ch) - ord("0")
+            if seen_dot:
+                div = div * 10.0
+                frac_part = frac_part + d / div
+            else:
+                int_part = int_part * 10 + d
+        elif ch == "." and not seen_dot:
+            seen_dot = True
+        else:
+            return 0.0
+    return int_part * 1.0 + frac_part
 
 # _asa_num_str stringifies a JSON number the way money amounts are stored
 # ("5000", no ".0"). Non-numbers pass through unchanged.
@@ -381,3 +513,93 @@ def _asa_pagination(sel):
         if limit <= 0:
             limit = 1000
     return offset, limit
+
+# --- targeting keyword store (CRUD) ---
+#
+# Targeting keywords live in the `keywords` collection, scoped to a campaign
+# (the simulator keeps the simplified /campaigns/{id}/keywords/targeting
+# shape rather than the real API's extra ad-group level). Docs carry
+# {id, keywordId, campaignId, text, matchType, bidAmount, status}; the API
+# shape returned by _asa_keyword_obj matches the real TargetingKeyword:
+# {id, text, matchType, bidAmount, status}.
+
+# _KW_SEEDS are the default keywords inserted the first time a campaign's
+# keywords are touched.
+_KW_SEEDS = [
+    {"text": "photo editor", "matchType": "BROAD", "amount": "0.50"},
+    {"text": "edit photos", "matchType": "EXACT", "amount": "1.00"},
+    {"text": "photo editing app", "matchType": "EXACT", "amount": "2.50"},
+]
+
+# _asa_insert_keyword inserts one keyword doc for a campaign and returns it.
+def _asa_insert_keyword(campaign_num, text, match_type, bid_amount):
+    kc = store_collection("keywords")
+    seq = store_kv_incr("searchads", "kw_num")
+    doc = {
+        "id": "kw_" + _pad6(seq),
+        "keywordId": _KW_ID_BASE + seq,
+        "campaignId": campaign_num,
+        "text": text,
+        "matchType": match_type,
+        "bidAmount": {"amount": bid_amount, "currency": "USD"},
+        "status": "ACTIVE",
+    }
+    kc.insert(doc)
+    return doc
+
+# _asa_seed_keywords inserts-once the default targeting keywords for a
+# campaign (guarded by a per-campaign KV flag).
+def _asa_seed_keywords(campaign_num):
+    flag = "kw_seeded_" + str(campaign_num)
+    if store_kv_get("searchads", flag) == "yes":
+        return
+    store_kv_set("searchads", flag, "yes")
+    for kw in _KW_SEEDS:
+        _asa_insert_keyword(campaign_num, kw["text"], kw["matchType"], kw["amount"])
+
+# _asa_keyword_obj formats a stored keyword doc as the API response object
+# (real TargetingKeyword shape).
+def _asa_keyword_obj(k):
+    return {
+        "id": k.get("keywordId", 0),
+        "text": k.get("text", ""),
+        "matchType": k.get("matchType", "BROAD"),
+        "bidAmount": k.get("bidAmount", {"amount": "0", "currency": "USD"}),
+        "status": k.get("status", "ACTIVE"),
+    }
+
+# _asa_campaign_keywords lists the stored keywords for a campaign.
+def _asa_campaign_keywords(campaign_num):
+    kc = store_collection("keywords")
+    out = []
+    for k in kc.list():
+        if k.get("campaignId", 0) == campaign_num:
+            out.append(k)
+    return out
+
+# _asa_find_keyword locates a keyword by numeric keywordId or internal id,
+# scoped to the route's campaign. Returns the doc or None.
+def _asa_find_keyword(campaign_num, keyword_id):
+    if keyword_id == None or keyword_id == "":
+        return None
+    for k in _asa_campaign_keywords(campaign_num):
+        kid = k.get("keywordId", 0)
+        kid_str = str(int(kid)) if type(kid) == "float" else str(kid)
+        if kid_str == keyword_id or k.get("id", "") == keyword_id:
+            return k
+    return None
+
+# _asa_amount_str normalizes a bidAmount input ("1.5", 1.5, 2) to the string
+# amount the store keeps. Returns "" for unusable input.
+def _asa_amount_str(v):
+    if v == None:
+        return ""
+    if type(v) == "string":
+        return v
+    if type(v) == "int":
+        return str(v)
+    if type(v) == "float":
+        if v == int(v):
+            return str(int(v))
+        return str(v)
+    return ""

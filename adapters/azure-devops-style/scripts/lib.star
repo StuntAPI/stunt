@@ -56,6 +56,15 @@ def _require_auth(req):
         return None, _auth_fault()
     return token, None
 
+# _as_int coerces a value that may have round-tripped through the JSON-backed
+# store as a float back to an int (ids stay clean in URLs and str()).
+def _as_int(v):
+    if type(v) == "int":
+        return v
+    if type(v) == "float":
+        return int(v)
+    return _to_int(v)
+
 # _to_int parses a decimal string to int.
 def _to_int(s):
     if s == None or s == "":
@@ -84,6 +93,43 @@ def _get_query(req, key, default_val):
         return default_val
     return val
 
+# _now_iso returns the current UTC time in RFC3339 form (ADO date fields).
+def _now_iso():
+    return clock.now_rfc3339()
+
+_HEXDIGITS = "0123" + "45" + "6789abcdef"
+
+# _hex40 renders n as a 40-char lowercase hex string (git object id shape).
+def _hex40(n):
+    s = ""
+    v = n
+    for _ in range(40):
+        s = _HEXDIGITS[v % 16] + s
+        v = v // 16
+    return s
+
+# _new_object_id mints a synthetic 40-hex git object id from a monotonic
+# per-kind sequence (commit_<n>, blob_<n>).
+def _new_object_id(kind):
+    return _hex40(store_kv_incr("azure-devops", kind + "_seq") + 1)
+
+# _repo_by_id returns the repo doc for a repository id, or None.
+def _repo_by_id(repo_id):
+    rc = store_collection("repos")
+    return rc.get(repo_id)
+
+# _ref_key is the collection id for a repo ref (repo id + "|" + ref name).
+def _ref_key(repo_id, ref_name):
+    return repo_id + "|" + ref_name
+
+# _dict_delete returns d minus key k (Starlark dicts have no del).
+def _dict_delete(d, k):
+    out = {}
+    for key in d:
+        if key != k:
+            out[key] = d[key]
+    return out
+
 # _list_page reads Azure DevOps OData $top (page size) / $skip (offset cursor)
 # query params, slices the already-filtered docs via the paginate() builtin,
 # and returns (page, continuation_token) where continuation_token is a token
@@ -105,6 +151,9 @@ def _seed():
     if store_kv_get("azure-devops", "seeded") == "yes":
         return
     store_kv_set("azure-devops", "seeded", "yes")
+
+    repo1_id = "11111111-0000-0000-0000-000000000001"
+    project1_id = "00000000-0000-0000-0000-000000000001"
 
     pc = store_collection("projects")
     pc.insert({
@@ -128,11 +177,11 @@ def _seed():
 
     rc = store_collection("repos")
     rc.insert({
-        "id": "11111111-0000-0000-0000-000000000001",
+        "id": repo1_id,
         "name": "MyFirstProject",
-        "url": "https://dev.azure.com/mock-org/MyFirstProject/_apis/git/repositories/11111111-0000-0000-0000-000000000001",
+        "url": "https://dev.azure.com/mock-org/MyFirstProject/_apis/git/repositories/" + repo1_id,
         "project": {
-            "id": "00000000-0000-0000-0000-000000000001",
+            "id": project1_id,
             "name": "MyFirstProject",
         },
         "defaultBranch": "refs/heads/main",
@@ -162,6 +211,41 @@ def _seed():
             "System.Description": "This is a sample bug for testing.",
         },
         "url": "https://dev.azure.com/mock-org/MyFirstProject/_apis/wit/workItems/1",
+    })
+
+    # Initial git state: one seeded commit on refs/heads/main carrying a
+    # readme.md blob, so items/commits reflect real content from the start.
+    blob_id = _new_object_id("blob")
+    bc = store_collection("gitblobs")
+    bc.insert({"id": blob_id, "content": "# MyFirstProject\n\nSeeded readme for local testing.\n"})
+
+    commit_id = _new_object_id("commit")
+    cc = store_collection("commits")
+    cc.insert({
+        "id": commit_id,
+        "repo_id": repo1_id,
+        "comment": "Initial commit",
+        "author": {"name": "Test User", "email": "test@example.com", "date": "2024-01-01T00:00:00.000Z"},
+        "parent": None,
+        "push_id": 0,
+        "tree": {"readme.md": blob_id},
+    })
+
+    fc = store_collection("refs")
+    fc.insert({"id": _ref_key(repo1_id, "refs/heads/main"), "object_id": commit_id})
+
+    # One CI pipeline.
+    plc = store_collection("pipelines")
+    plc.insert({
+        "id": "1",
+        "pipeline_id": 1,
+        "name": "MyFirstProject-CI",
+        "folder": "\\",
+        "configuration": {
+            "type": "yaml",
+            "path": "/azure-pipelines.yml",
+            "repository": {"type": "azureReposGit", "name": "MyFirstProject", "id": repo1_id},
+        },
     })
 
 # _find_project returns the project doc by name, or None.

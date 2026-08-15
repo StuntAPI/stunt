@@ -6,7 +6,7 @@
 # data is synthetic. See DISCLAIMER.
 id: azure-devops-style
 name: "Azure DevOps REST API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Azure DevOps REST API"
@@ -21,6 +21,29 @@ endpoints:
     method: GET
     handler: scripts/projects.star#on_list_projects
 
+  # --- Pipelines ---
+  - route: /{org}/{project}/_apis/pipelines
+    method: GET
+    handler: scripts/pipelines.star#on_list_pipelines
+
+  - route: /{org}/{project}/_apis/pipelines/{pipelineId}
+    method: GET
+    handler: scripts/pipelines.star#on_get_pipeline
+
+  - route: /{org}/{project}/_apis/pipelines/{pipelineId}/runs
+    method: GET
+    handler: scripts/pipelines.star#on_list_runs
+    concurrency_key: pipelineId # advancing runs is read-modify-write
+
+  - route: /{org}/{project}/_apis/pipelines/{pipelineId}/runs
+    method: POST
+    handler: scripts/pipelines.star#on_queue_run
+
+  - route: /{org}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}
+    method: GET
+    handler: scripts/pipelines.star#on_get_run
+    concurrency_key: runId # deriving state is read-modify-write
+
   # --- Git repositories (project-level) ---
   - route: /{org}/{project}/_apis/git/repositories
     method: GET
@@ -31,25 +54,46 @@ endpoints:
     method: GET
     handler: scripts/git.star#on_get_item
 
+  # --- Git commits ---
+  - route: /{org}/{project}/_apis/git/repositories/{repoId}/commits
+    method: GET
+    handler: scripts/git.star#on_list_commits
+
   # --- Git push (commits) ---
   - route: /{org}/{project}/_apis/git/repositories/{repoId}/pushes
     method: POST
     handler: scripts/git.star#on_push
+    concurrency_key: repoId # advancing the ref/tree is read-modify-write
 
   # --- Work tracking: iterations ---
   - route: /{org}/{project}/_apis/work/teamsettings/iterations
     method: GET
     handler: scripts/work.star#on_iterations
 
-  # --- Work items: get by id ---
+  # --- Work items: list by ids ---
+  - route: /{org}/{project}/_apis/wit/workitems
+    method: GET
+    handler: scripts/workitems.star#on_list_workitems
+
+  # --- Work items: get by id / update (patch document) ---
   - route: /{org}/{project}/_apis/wit/workitems/{id}
     method: GET
     handler: scripts/workitems.star#on_get_workitem
 
-  # --- Work items: create ---
-  - route: /{org}/{project}/_apis/wit/workitems
+  - route: /{org}/{project}/_apis/wit/workitems/{id}
+    method: PATCH
+    handler: scripts/workitems.star#on_update_workitem
+    concurrency_key: id # rev bump is read-modify-write
+
+  # --- Work items: create (typed route, patch-document body) ---
+  - route: /{org}/{project}/_apis/wit/workitems/{type}
     method: POST
     handler: scripts/workitems.star#on_create_workitem
+
+  # --- WIQL ---
+  - route: /{org}/{project}/_apis/wit/wiql
+    method: POST
+    handler: scripts/workitems.star#on_wiql
 
   # --- Service hooks (webhook subscriptions) ---
   - route: /{org}/_apis/hooks/subscriptions
@@ -65,6 +109,16 @@ resources:
   - name: workitems
     kind: collection
   - name: subscriptions
+    kind: collection
+  - name: pipelines
+    kind: collection
+  - name: runs
+    kind: collection
+  - name: commits
+    kind: collection
+  - name: gitblobs
+    kind: collection
+  - name: refs
     kind: collection
 
 # Auth scheme metadata.

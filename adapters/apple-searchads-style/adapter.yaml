@@ -16,7 +16,12 @@ api:
 # NOTE: literal routes must come BEFORE parameterized routes so they are
 # matched first (the dispatch engine checks in declaration order).
 endpoints:
-  # --- Campaigns (find + create) ---
+  # --- OAuth2 (client-secret JWT → bearer) ---
+  - route: /api/oauth2/token
+    method: POST
+    handler: scripts/oauth.star#on_token
+
+  # --- Campaigns (find + create + update) ---
   - route: /api/v4/campaigns/find
     method: POST
     handler: scripts/campaigns.star#on_find_campaigns
@@ -31,12 +36,32 @@ endpoints:
   - route: /api/v4/campaigns/{campaign_id}
     method: GET
     handler: scripts/campaigns.star#on_get_campaign
+  - route: /api/v4/campaigns/{campaign_id}
+    method: PUT
+    handler: scripts/campaigns.star#on_update_campaign
+    concurrency_key: campaign_id # read-modify-write on the campaign doc
   - route: /api/v4/campaigns/{campaign_id}/ads
     method: POST
     handler: scripts/campaigns.star#on_create_ad
+  # Literal keyword routes come BEFORE the {keyword_id} param route.
   - route: /api/v4/campaigns/{campaign_id}/keywords/targeting/find
     method: POST
     handler: scripts/keywords.star#on_find_keywords
+  - route: /api/v4/campaigns/{campaign_id}/keywords/targeting/bulk
+    method: PUT
+    handler: scripts/keywords.star#on_bulk_update_keywords
+    concurrency_key: campaign_id # bulk read-modify-write on keyword docs
+  - route: /api/v4/campaigns/{campaign_id}/keywords/targeting
+    method: POST
+    handler: scripts/keywords.star#on_create_keyword
+  - route: /api/v4/campaigns/{campaign_id}/keywords/targeting/{keyword_id}
+    method: PUT
+    handler: scripts/keywords.star#on_update_keyword
+    concurrency_key: campaign_id # read-modify-write on the keyword doc
+  - route: /api/v4/campaigns/{campaign_id}/keywords/targeting/{keyword_id}
+    method: DELETE
+    handler: scripts/keywords.star#on_delete_keyword
+    concurrency_key: campaign_id
 
 # Backing stores — collections for stateful data.
 resources:

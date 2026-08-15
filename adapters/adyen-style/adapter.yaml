@@ -18,23 +18,47 @@ endpoints:
   - route: /v68/payments
     method: POST
     handler: scripts/payments.star#on_create_payment
+  # Literal /payments/details must precede the parametrised modification
+  # routes below.
+  - route: /v68/payments/details
+    method: POST
+    handler: scripts/payments.star#on_payment_details
   - route: /v68/payments
     method: GET
     handler: scripts/payments.star#on_list_payments
 
+  # --- Payment methods (Checkout) ---
+  - route: /v68/paymentMethods
+    method: POST
+    handler: scripts/payment_methods.star#on_payment_methods
+
+  # --- Payment links (Checkout) ---
+  - route: /v68/paymentLinks
+    method: POST
+    handler: scripts/payment_links.star#on_create_payment_link
+  - route: /v68/paymentLinks/{linkId}
+    method: GET
+    handler: scripts/payment_links.star#on_get_payment_link
+
   # --- Payment lifecycle (modifications) ---
+  # concurrency_key serialises read-modify-write handlers against the same
+  # payment (balance checks + state transitions).
   - route: /v68/payments/{paymentPspReference}/captures
     method: POST
     handler: scripts/payments.star#on_capture
+    concurrency_key: paymentPspReference
   - route: /v68/payments/{paymentPspReference}/refunds
     method: POST
     handler: scripts/payments.star#on_refund
+    concurrency_key: paymentPspReference
   - route: /v68/payments/{paymentPspReference}/reversals
     method: POST
     handler: scripts/payments.star#on_reversal
+    concurrency_key: paymentPspReference
   - route: /v68/payments/{paymentPspReference}/cancels
     method: POST
     handler: scripts/payments.star#on_cancel
+    concurrency_key: paymentPspReference
 
   # --- Notifications (Adyen sends HMAC-signed notifications to merchant) ---
   # This endpoint simulates the merchant-side notification receiver that
@@ -60,6 +84,8 @@ resources:
   - name: payments
     kind: collection
   - name: modifications
+    kind: collection
+  - name: payment_links
     kind: collection
   - name: webhooks
     kind: collection

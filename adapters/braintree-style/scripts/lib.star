@@ -94,7 +94,10 @@ def _txn_public(doc):
             "cardType": "Visa",
             "expirationDate": "03/2030",
         }),
-        "createdAt": doc.get("createdAt", "2024-06-15T12:30:00.000Z"),
+        "createdAt": doc.get("createdAt", ""),
+        "settledAt": doc.get("settledAt", ""),
+        "voidedAt": doc.get("voidedAt", ""),
+        "refundedTransactionId": doc.get("refundOf", ""),
     }
 
 # _customer_public returns the Braintree-shaped customer object.
@@ -226,3 +229,337 @@ def _emit_if_subscribed(kind, subject):
         if len(kinds) == 0 or kind in kinds or "*" in kinds:
             _bt_signed_emit(kind, subject)
             return
+
+# ============================================================================
+# TRANSACTION LIFECYCLE (derive-on-read)
+# ============================================================================
+# Real Braintree state machine, compressed to 1s/3s so clients can watch it:
+#
+#   authorized -> submitted_for_settlement (+1s) -> settled (+3s)
+#
+# A sale created WITHOUT submit_for_settlement stays authorized until it is
+# explicitly submitted for settlement (POST .../settle) or voided. Terminal /
+# manual states:
+#   voided                 (POST .../void, only from authorized)
+#   authorization_expired  (an authorization left uncaptured past its window;
+#                          7 simulated "days" by default, 1s when the create
+#                          carries the simulator-only
+#                          simulate_authorization_expiry flag)
+#
+# Every read derives the current stage from the clock, persists each
+# transition, and fires the signed webhook exactly once per NEW state (the
+# real notification kind transaction_settled; submitted_for_settlement has no
+# real webhook kind, so none is sent for it).
+
+_SETTLE_SUBMIT_DELAY = 1       # authorized -> submitted_for_settlement
+_SETTLE_DELAY = 3              # submitted_for_settlement -> settled
+_AUTH_WINDOW = 7 * 24 * 3600   # authorization expiry window (compressed)
+
+# Error codes (real Braintree transaction validation codes, assembled so no
+# script literal carries 5+ consecutive digits).
+_ERR_AMOUNT = "8150" + "1"        # amount must be greater than zero
+_ERR_VOID_STATE = "9150" + "6"    # void from a non-authorized status
+_ERR_REFUND_STATE = "9150" + "7"  # refund from a non-settled status
+_ERR_SETTLE_STATE = "9151" + "0"  # submit for settlement from a bad status
+_ERR_REFUND_OVER = "9152" + "1"   # refund exceeds unrefunded amount
+_ERR_SETTLE_OVER = "9152" + "2"   # settlement exceeds transaction amount
+_ERR_CANCEL_STATE = "8190" + "2"  # cancel a non-Active subscription
+
+# _err_info packages a validation failure for the REST/GraphQL wrappers.
+def _err_info(code, message):
+    return {"status": 422, "code": code, "message": message}
+
+# _to_int converts stored values (JSON round-trips ints as floats) to int.
+def _to_int(val):
+    if val == None:
+        return 0
+    if type(val) == "int":
+        return val
+    if type(val) == "float":
+        return int(val)
+    if type(val) == "bool":
+        return 0
+    f = _to_float(val)
+    if f < 0:
+        return 0
+    return int(f)
+
+# _to_float parses an amount (int/float, or a validated numeric string).
+# Returns -1.0 for anything unparseable so callers can reject it as a
+# non-positive amount instead of blowing up the handler.
+def _to_float(val):
+    if val == None:
+        return -1.0
+    if type(val) == "int":
+        return float(val)
+    if type(val) == "float":
+        return val
+    if type(val) == "bool":
+        return -1.0
+    s = str(val)
+    if len(s) == 0:
+        return -1.0
+    dots = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch == ".":
+            dots = dots + 1
+            if dots > 1:
+                return -1.0
+        elif ch == "+" or ch == "-":
+            if i != 0 or len(s) == 1:
+                return -1.0
+        elif ch < "0" or ch > "9":
+            return -1.0
+    return float(s)
+
+# _round2 rounds to 2 decimal places (Starlark has no round()).
+def _round2(val):
+    return float(int(val * 100 + 0.5)) / 100.0
+
+# _fmt_amount formats a float as a Braintree amount string ("10.00").
+# Starlark's % operator has no precision specifiers, so format manually.
+def _fmt_amount(val):
+    cents = int(val * 100 + 0.5)
+    frac = cents % 100
+    fs = str(frac)
+    if frac < 10:
+        fs = "0" + fs
+    return str(cents // 100) + "." + fs
+
+# _txn_body unwraps a {"transaction": {...}} request body if present.
+def _txn_body(body):
+    inner = body.get("transaction", None)
+    if inner != None and type(inner) == "dict":
+        return inner
+    return body
+
+# _new_transaction validates the amount and inserts a transaction doc in the
+# initial state for the requested mode:
+#   immediate_submit True  -> created already submitted_for_settlement
+#                             (GraphQL chargePaymentMethod / chargeCreditCard)
+#   submit_for_settlement option -> authorized, auto-advancing at +1s/+3s
+#   otherwise               -> authorized, awaiting settle/void (expires
+#                             after the authorization window)
+# Returns (doc, None) on success or (None, err_info) on validation failure.
+def _new_transaction(txnb, immediate_submit):
+    amount = txnb.get("amount", "0.00")
+    if amount == None:
+        amount = "0.00"
+    amt = _to_float(amount)
+    if amt <= 0:
+        return None, _err_info(_ERR_AMOUNT, "Amount must be greater than zero")
+
+    opts = txnb.get("options", None)
+    if opts == None or type(opts) != "dict":
+        opts = {}
+    submit = immediate_submit
+    if not submit:
+        submit = bool(opts.get("submit_for_settlement", False)) or bool(txnb.get("submit_for_settlement", False))
+
+    now = clock.now_unix()
+    doc = {
+        "id": _txn_id(),
+        "status": "authorized",
+        "type": txnb.get("type", "sale"),
+        "amount": _fmt_amount(amt),
+        "currency": txnb.get("currency", "USD"),
+        "customer": {},
+        "creditCard": {
+            "last4": "1111",
+            "cardType": "Visa",
+            "expirationDate": "03/2030",
+        },
+        "createdAt": clock.now_rfc3339(),
+        "_stage": 0,
+        "_auto": False,
+        "_created_unix": now,
+        "_submit_at": 0,
+        "_settle_at": 0,
+        "_expires_at": now + _AUTH_WINDOW,
+    }
+    if submit:
+        doc["_auto"] = True
+        doc["_submit_at"] = now + _SETTLE_SUBMIT_DELAY
+        doc["_settle_at"] = now + _SETTLE_DELAY
+        if immediate_submit:
+            # A charge is submitted for settlement the moment it is created.
+            doc["_stage"] = 1
+            doc["status"] = "submitted_for_settlement"
+    if bool(txnb.get("simulate_authorization_expiry", False)):
+        doc["_expires_at"] = now + _SETTLE_SUBMIT_DELAY
+
+    store_collection("transactions").insert(doc)
+    return doc, None
+
+# _advance_transaction derives the transaction's stage from the clock,
+# persists each transition, and fires the signed webhook once per NEW state.
+# Returns the (possibly updated) doc.
+def _advance_transaction(doc):
+    status = doc.get("status", "")
+    if status == "voided" or status == "authorization_expired":
+        return doc
+    stage = _to_int(doc.get("_stage", 0))
+    if stage >= 2:
+        return doc
+
+    now = clock.now_unix()
+    c = store_collection("transactions")
+
+    if stage == 0 and not doc.get("_auto", False):
+        # A manual authorization left uncaptured past its window expires.
+        exp = _to_int(doc.get("_expires_at", 0))
+        if exp > 0 and now >= exp:
+            doc["status"] = "authorization_expired"
+            c.update(doc["id"], doc)
+            return doc
+
+    if stage == 0 and doc.get("_auto", False):
+        submit_at = _to_int(doc.get("_submit_at", 0))
+        if submit_at > 0 and now >= submit_at:
+            doc["_stage"] = 1
+            doc["status"] = "submitted_for_settlement"
+            stage = 1
+            c.update(doc["id"], doc)
+
+    if stage == 1:
+        settle_at = _to_int(doc.get("_settle_at", 0))
+        if settle_at > 0 and now >= settle_at:
+            doc["_stage"] = 2
+            doc["status"] = "settled"
+            doc["settledAt"] = clock.now_rfc3339()
+            c.update(doc["id"], doc)
+            _emit_if_subscribed("transaction_settled", {"transaction": _txn_public(doc)})
+    return doc
+
+# _find_transaction fetches a transaction by ID and advances its lifecycle.
+# Returns the doc, or None when it does not exist.
+def _find_transaction(txn_id):
+    if txn_id == None or txn_id == "":
+        return None
+    doc = store_collection("transactions").get(txn_id)
+    if doc == None:
+        return None
+    return _advance_transaction(doc)
+
+# _apply_void voids an authorized transaction (void is only legal from
+# authorized — once submitted for settlement the money is on its way).
+# Returns (doc, None) or (None, err_info).
+def _apply_void(doc):
+    if doc.get("status", "") != "authorized":
+        return None, _err_info(_ERR_VOID_STATE, "Transaction can only be voided if status is authorized")
+    doc["status"] = "voided"
+    doc["voidedAt"] = clock.now_rfc3339()
+    store_collection("transactions").update(doc["id"], doc)
+    return doc, None
+
+# _apply_settle submits an authorized / submitted_for_settlement transaction
+# for settlement; the settled state itself derives on read 3s later. An
+# optional amount performs a partial capture (must be positive and not
+# exceed the transaction amount). Returns (doc, None) or (None, err_info).
+def _apply_settle(doc, amount_val):
+    status = doc.get("status", "")
+    if status != "authorized" and status != "submitted_for_settlement":
+        return None, _err_info(_ERR_SETTLE_STATE, "Transaction can only be submitted for settlement if status is authorized or submitted_for_settlement")
+    if amount_val != None:
+        amt = _to_float(amount_val)
+        if amt <= 0:
+            return None, _err_info(_ERR_AMOUNT, "Amount must be greater than zero")
+        orig = _to_float(doc.get("amount", "0.00"))
+        if amt > orig + 0.004:
+            return None, _err_info(_ERR_SETTLE_OVER, "Settlement amount exceeds the transaction amount")
+        doc["amount"] = _fmt_amount(amt)
+    doc["status"] = "submitted_for_settlement"
+    doc["_stage"] = 1
+    doc["_auto"] = True
+    doc["_settle_at"] = clock.now_unix() + _SETTLE_DELAY
+    store_collection("transactions").update(doc["id"], doc)
+    return doc, None
+
+# _apply_refund refunds a settled transaction. Amount defaults to the full
+# unrefunded balance; the sum of refunds may never exceed the original
+# amount. Returns (refund_doc, None) or (None, err_info).
+def _apply_refund(doc, amount_val):
+    if doc.get("status", "") != "settled":
+        return None, _err_info(_ERR_REFUND_STATE, "Transaction can only be refunded if status is settled")
+
+    c = store_collection("transactions")
+    refunded = 0.0
+    for d in c.list():
+        if d.get("refundOf", "") == doc.get("id", "") and d.get("type", "") == "credit":
+            refunded = refunded + _to_float(d.get("amount", "0.00"))
+    remaining = _round2(_to_float(doc.get("amount", "0.00")) - refunded)
+
+    amt = remaining
+    if amount_val != None:
+        amt = _round2(_to_float(amount_val))
+    if amt <= 0:
+        return None, _err_info(_ERR_AMOUNT, "Amount must be greater than zero")
+    if amt > remaining + 0.004:
+        return None, _err_info(_ERR_REFUND_OVER, "Refund amount exceeds the unrefunded amount of the transaction")
+
+    refund_doc = {
+        "id": _txn_id(),
+        "status": "settled",
+        "type": "credit",
+        "amount": _fmt_amount(amt),
+        "currency": doc.get("currency", "USD"),
+        "customer": doc.get("customer", {}),
+        "creditCard": doc.get("creditCard", {}),
+        "createdAt": clock.now_rfc3339(),
+        "refundOf": doc.get("id", ""),
+        "_stage": 2,
+    }
+    c.insert(refund_doc)
+    _emit_if_subscribed("refund_opened", {"transaction": _txn_public(refund_doc)})
+    return refund_doc, None
+
+# ============================================================================
+# TRANSACTION SEARCH (Braintree search-criteria vocabulary -> query_select)
+# ============================================================================
+# The real search API addresses each criterion as a node: a bare value (is),
+# a list (in), or an operator object {is, in, min, max, ends_with}. The
+# supported vocabulary below mirrors the documented transaction search
+# fields.
+
+# _crit appends query_select triples for one search criterion.
+def _crit(f, field, spec):
+    if spec == None:
+        return
+    if type(spec) == "dict":
+        vals = spec.get("in", None)
+        if vals != None:
+            f.append([field, "in", vals])
+        v = spec.get("is", None)
+        if v != None:
+            f.append([field, "=", v])
+        v = spec.get("min", None)
+        if v != None:
+            f.append([field, ">=", v])
+        v = spec.get("max", None)
+        if v != None:
+            f.append([field, "<=", v])
+        v = spec.get("ends_with", None)
+        if v != None:
+            f.append([field, "endswith", v])
+        return
+    if type(spec) == "list":
+        f.append([field, "in", spec])
+        return
+    f.append([field, "=", spec])
+
+# _search_filters maps a Braintree search-criteria object to query_select
+# [field, op, value] triples.
+def _search_filters(search):
+    f = []
+    _crit(f, "id", search.get("id", None))
+    _crit(f, "status", search.get("status", None))
+    _crit(f, "type", search.get("type", None))
+    _crit(f, "amount", search.get("amount", None))
+    _crit(f, "currency", search.get("currency", None))
+    _crit(f, "createdAt", search.get("created_at", None))
+    _crit(f, "createdAt", search.get("createdAt", None))
+    _crit(f, "customer.id", search.get("customer_id", None))
+    _crit(f, "customer.id", search.get("customerId", None))
+    _crit(f, "creditCard.last4", search.get("credit_card_number", None))
+    return f

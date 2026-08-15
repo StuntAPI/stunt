@@ -32,13 +32,70 @@ endpoints:
     handler: scripts/zones.star#on_delete_zone
   - route: /zones/{zone_id}/dns_records
     method: GET
-    handler: scripts/zones.star#on_list_dns_records
+    handler: scripts/dns.star#on_list_dns_records
+  - route: /zones/{zone_id}/dns_records
+    method: POST
+    handler: scripts/dns.star#on_create_dns_record
+    concurrency_key: zone_id
+  - route: /zones/{zone_id}/dns_records/{dns_record_id}
+    method: GET
+    handler: scripts/dns.star#on_get_dns_record
+  - route: /zones/{zone_id}/dns_records/{dns_record_id}
+    method: PUT
+    handler: scripts/dns.star#on_update_dns_record
+    concurrency_key: zone_id
+  - route: /zones/{zone_id}/dns_records/{dns_record_id}
+    method: PATCH
+    handler: scripts/dns.star#on_patch_dns_record
+    concurrency_key: zone_id
+  - route: /zones/{zone_id}/dns_records/{dns_record_id}
+    method: DELETE
+    handler: scripts/dns.star#on_delete_dns_record
+    concurrency_key: zone_id
   - route: /zones/{zone_id}/firewall/rules
     method: GET
-    handler: scripts/zones.star#on_list_firewall_rules
+    handler: scripts/rules.star#on_list_firewall_rules
+  - route: /zones/{zone_id}/firewall/rules
+    method: POST
+    handler: scripts/rules.star#on_create_firewall_rules
+    concurrency_key: zone_id
+  - route: /zones/{zone_id}/firewall/rules/{rule_id}
+    method: GET
+    handler: scripts/rules.star#on_get_firewall_rule
+  - route: /zones/{zone_id}/firewall/rules/{rule_id}
+    method: PUT
+    handler: scripts/rules.star#on_update_firewall_rule
+    concurrency_key: zone_id
+  - route: /zones/{zone_id}/firewall/rules/{rule_id}
+    method: PATCH
+    handler: scripts/rules.star#on_patch_firewall_rule
+    concurrency_key: zone_id
+  - route: /zones/{zone_id}/firewall/rules/{rule_id}
+    method: DELETE
+    handler: scripts/rules.star#on_delete_firewall_rule
+    concurrency_key: zone_id
   - route: /zones/{zone_id}/page_rules
     method: GET
-    handler: scripts/zones.star#on_list_page_rules
+    handler: scripts/rules.star#on_list_page_rules
+  - route: /zones/{zone_id}/page_rules
+    method: POST
+    handler: scripts/rules.star#on_create_page_rule
+    concurrency_key: zone_id
+  - route: /zones/{zone_id}/page_rules/{rule_id}
+    method: GET
+    handler: scripts/rules.star#on_get_page_rule
+  - route: /zones/{zone_id}/page_rules/{rule_id}
+    method: PUT
+    handler: scripts/rules.star#on_update_page_rule
+    concurrency_key: zone_id
+  - route: /zones/{zone_id}/page_rules/{rule_id}
+    method: PATCH
+    handler: scripts/rules.star#on_patch_page_rule
+    concurrency_key: zone_id
+  - route: /zones/{zone_id}/page_rules/{rule_id}
+    method: DELETE
+    handler: scripts/rules.star#on_delete_page_rule
+    concurrency_key: zone_id
   - route: /zones/{zone_id}/purge_cache
     method: POST
     handler: scripts/zones.star#on_purge_cache
@@ -50,6 +107,7 @@ endpoints:
   - route: /accounts/{account_id}/workers/scripts/{script_name}
     method: PUT
     handler: scripts/workers.star#on_deploy_script
+    concurrency_key: account_id
   - route: /accounts/{account_id}/workers/scripts/{script_name}
     method: GET
     handler: scripts/workers.star#on_get_script
@@ -84,6 +142,7 @@ endpoints:
   - route: /accounts/{account_id}/d1/database/{database_id}/query
     method: POST
     handler: scripts/d1.star#on_query_database
+    concurrency_key: database_id
 
 # Backing stores — collections for stateful data.
 resources:
@@ -96,6 +155,16 @@ resources:
   - name: buckets
     kind: collection
   - name: databases
+    kind: collection
+  - name: dns_records
+    kind: collection
+  - name: firewall_rules
+    kind: collection
+  - name: page_rules
+    kind: collection
+  - name: d1_tables
+    kind: collection
+  - name: d1_rows
     kind: collection
 
 # Auth scheme: scoped API token (Bearer) or global key (X-Auth-Email +
@@ -120,7 +189,13 @@ rules:
 
 # Resources notes:
 # - zones: {id, name, account{id,name}, status, name_servers, type}
-# - workers: {name, account_id, created_on, modified_on}
+# - workers: {worker_id, name, account_id, main_module, blob_name, created_on, modified_on}
 # - deployments: {id, account_id, script_name, status, strategy, versions, created_on}
 # - buckets: {name, creation_date}
 # - databases: {uuid, name, created_at}
+# - dns_records: {record_id, zone_id, zone_name, name, type, content, proxied, ttl, priority?}
+# - firewall_rules: {rule_id, zone_id, action, expression, description, paused, filter_id}
+# - page_rules: {rule_id, zone_id, targets, actions, priority, status}
+# - d1_tables: {db, table, columns}
+# - d1_rows: {db, table, rowid, vals{col: value}}
+# - blob store "cf-worker-scripts": Worker script module contents

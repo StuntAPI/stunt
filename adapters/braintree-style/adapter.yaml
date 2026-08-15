@@ -6,7 +6,7 @@
 # is synthetic. See DISCLAIMER.
 id: braintree-style
 name: "Braintree GraphQL + REST API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Braintree GraphQL + REST API"
@@ -17,6 +17,10 @@ identity:
   token_scheme: bearer
 
 # Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+# concurrency_key serializes handlers that read-modify-write the same
+# transaction/subscription ({id} path param).
 endpoints:
   # --- GraphQL (primary API) ---
   - route: /graphql
@@ -24,21 +28,56 @@ endpoints:
     handler: scripts/graphql.star#on_graphql
 
   # --- REST (alternative) ---
+  - route: /merchants/{merchantId}/transactions/advanced_search
+    method: POST
+    handler: scripts/rest.star#on_advanced_search
   - route: /merchants/{merchantId}/transactions
     method: POST
     handler: scripts/rest.star#on_create_transaction
   - route: /merchants/{merchantId}/transactions/{id}
     method: GET
     handler: scripts/rest.star#on_get_transaction
+    concurrency_key: id
+  - route: /merchants/{merchantId}/transactions/{id}/settle
+    method: POST
+    handler: scripts/rest.star#on_settle_transaction
+    concurrency_key: id
+  - route: /merchants/{merchantId}/transactions/{id}/void
+    method: POST
+    handler: scripts/rest.star#on_void_transaction
+    concurrency_key: id
   - route: /merchants/{merchantId}/transactions/{id}/refund
     method: POST
     handler: scripts/rest.star#on_refund_transaction
+    concurrency_key: id
   - route: /merchants/{merchantId}/payment_methods
     method: POST
     handler: scripts/rest.star#on_create_payment_method
   - route: /merchants/{merchantId}/client_token
     method: POST
     handler: scripts/rest.star#on_client_token
+
+  # --- Plans + subscriptions (recurring billing) ---
+  - route: /merchants/{merchantId}/plans
+    method: POST
+    handler: scripts/subscriptions.star#on_create_plan
+  - route: /merchants/{merchantId}/plans
+    method: GET
+    handler: scripts/subscriptions.star#on_list_plans
+  - route: /merchants/{merchantId}/plans/{id}
+    method: GET
+    handler: scripts/subscriptions.star#on_get_plan
+  - route: /merchants/{merchantId}/subscriptions
+    method: POST
+    handler: scripts/subscriptions.star#on_create_subscription
+  - route: /merchants/{merchantId}/subscriptions/{id}
+    method: GET
+    handler: scripts/subscriptions.star#on_get_subscription
+    concurrency_key: id
+  - route: /merchants/{merchantId}/subscriptions/{id}/cancel
+    method: POST
+    handler: scripts/subscriptions.star#on_cancel_subscription
+    concurrency_key: id
 
   # --- Webhooks (inbound) ---
   - route: /webhooks
@@ -50,6 +89,10 @@ resources:
   - name: transactions
     kind: collection
   - name: customers
+    kind: collection
+  - name: plans
+    kind: collection
+  - name: subscriptions
     kind: collection
   - name: webhooks
     kind: collection

@@ -27,6 +27,13 @@ endpoints:
     handler: scripts/enhanced.star#on_parse_transactions
 
   # --- Parameterized routes ---
+  # Enhanced Transactions API (flagship): parsed transactions for an
+  # address, cursor-paginated. concurrency_key serializes the per-address
+  # read-modify-write (seed-once + confirmation-state persistence).
+  - route: /v0/addresses/{address}/transactions
+    method: GET
+    handler: scripts/enhanced.star#on_get_address_transactions
+    concurrency_key: address
   - route: /v0/addresses/{address}/balances
     method: GET
     handler: scripts/enhanced.star#on_get_balances

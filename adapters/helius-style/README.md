@@ -12,8 +12,9 @@ API styles + complex Solana data shapes.
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/?api-key=<key>` | POST | JSON-RPC (getBalance, getLatestBlockhash, getSignatureStatuses, sendTransaction) |
-| `/v0/transactions` | POST | Parse base64 transactions |
+| `/?api-key=<key>` | POST | JSON-RPC (getBalance, getLatestBlockhash, getSignatureStatuses, sendTransaction, getTransaction, getTokenAccountsByOwner) |
+| `/v0/transactions` | POST | Parse encoded transactions (1-100 per request) |
+| `/v0/addresses/{addr}/transactions` | GET | Enhanced Transactions API — parsed transaction history (see below) |
 | `/v0/addresses/{addr}/balances` | GET | Token balances |
 | `/v0/addresses/{addr}/nfts` | GET | NFT holdings |
 | `/v0/names` | POST | Domain names |
@@ -26,6 +27,50 @@ API styles + complex Solana data shapes.
 ## Auth
 
 API key via query param (`?api-key=<key>`).
+
+## Enhanced Transactions API (flagship)
+
+`GET /v0/addresses/{address}/transactions?api-key=<key>` returns the address's
+parsed transaction history as a bare JSON array, newest first, with the real
+Helius query parameters:
+
+| Param | Description |
+|---|---|
+| `before` | signature cursor — page backwards, starting after this transaction |
+| `until` | signature cursor — stop before this transaction |
+| `limit` | page size (default 100, max 100) |
+| `type` | comma-separated list of types (`SWAP`, `TRANSFER`, …) |
+| `source` | program/app source (`SYSTEM_PROGRAM`, `SPL_TOKEN`, `JUPITER`, …) |
+
+```bash
+curl "http://localhost:8080/v0/addresses/7xKX…/transactions?api-key=your-key&limit=10&type=SWAP"
+```
+
+Each item is the real parsed-transaction vocabulary — `signature`,
+`timestamp`, `slot`, `fee`, `feePayer`, `nativeTransfers`,
+`tokenTransfers` (with `mint` + `tokenAmount {amount, decimals, uiAmount}`),
+`accountData`, `events`, `type`, `source`, `description`. `SWAP`
+transactions carry the `events.swap` object (`tokenInput` / `tokenOutput`
+with `tokenAmount`s, `tokenFees`, `nativeFees`).
+
+The history is backed by the shared transaction collection:
+
+- a deterministic history (TRANSFER/SYSTEM_PROGRAM, TRANSFER/SPL_TOKEN and
+  SWAP/JUPITER, all finalized) is seeded once per address on first query;
+- every transaction submitted via `sendTransaction` appears here as soon as
+  it lands, so the Enhanced API, `getSignatureStatuses` and webhooks all
+  observe the same lifecycle.
+
+## JSON-RPC
+
+| Method | Behavior |
+|---|---|
+| `getBalance` | `{context: {slot}, value: <lamports>}` for the address |
+| `getLatestBlockhash` | blockhash + `lastValidBlockHeight` |
+| `sendTransaction` | returns a signature; see the lifecycle below |
+| `getSignatureStatuses` | derive-on-read confirmation statuses |
+| `getTransaction` | full Solana shape by signature: `blockTime`, `slot`, `transaction.message` (accountKeys + instructions) and `meta` with `fee`, `preBalances`/`postBalances` (moved by the parsed native transfers, fee paid by the fee payer), `pre/postTokenBalances`, `logMessages`, `status: {Ok\|Err}` — `null` for an unknown signature |
+| `getTokenAccountsByOwner` | `jsonParsed` subset: `{address, lamports, owner, mint, data: {program: spl-token, parsed: {info: {mint, owner, tokenAmount}}}}`; filter by `{"mint": ...}` |
 
 ## API version
 
@@ -102,6 +147,15 @@ to land the transaction with an on-chain error — `err`/`status.Err` is set to
 an `InstructionError` while confirmation still progresses, exactly like a real
 failed Solana transaction.
 
+**Simulator extensions in the config object** (`params[1]`):
+
+- `{"simulate_fail": true}` — land with an on-chain error.
+- `{"simulate_type": "SWAP"}` — store a SWAP/JUPITER parsed transaction
+  (with `events.swap` and `tokenTransfers`) instead of the default TRANSFER.
+- `{"simulate_address": "<pubkey>"}` — attribute the transaction to a known
+  address (fee payer / transfer sender) so it shows up in that address's
+  Enhanced Transactions history.
+
 ## Deterministic
 
 Balances, NFTs, and token holdings are deterministic based on the address hash.
@@ -109,3 +163,12 @@ Balances, NFTs, and token holdings are deterministic based on the address hash.
 ---
 
 *Synthetic. No real Helius data. See [DISCLAIMER](DISCLAIMER).*
+
+## Concurrency note
+
+Transitions persist before webhook emission, and id-scoped routes carry
+`concurrency_key`. Two remaining narrow windows exist by design: list/bulk
+surfaces (advanced_search, runs list, RPC) can race a keyed single-resource
+read on the same record and in principle double-emit the transition webhook;
+and GraphQL mutations (braintree) key on a body id the engine cannot lock —
+the REST surface is the concurrency-safe one.

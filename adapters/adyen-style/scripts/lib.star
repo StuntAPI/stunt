@@ -70,31 +70,41 @@ def _mod_psp_reference(prefix):
     n = store_kv_incr("adyen", "mod_seq")
     return prefix + str(8000000000000 + n)
 
-# _determine_result_code models Adyen's deterministic test outcomes.
-#
-# Adyen test card numbers:
-#   4111... → Authorised
-#   4000...0002 → Refused (generic refused)
-#   4000...0069 → Received (authorized but requires additional action)
-#
-# We keep it simple and deterministic for testing.
-def _determine_result_code(payment_method):
+# _payment_flow models Adyen's deterministic test outcomes as a flow, not just
+# a result code:
+#   "refused"  – test card ending 0002 refuses outright
+#   "threeds"  – test cards ending 0069 / 0081 start the native 3DS2 flow:
+#                the /payments response is IdentifyShopper with
+#                action.type=threeDS2 + action.paymentData; completion goes
+#                through POST /payments/details (see payments.star)
+#   "auth"     – everything else authorises instantly
+def _payment_flow(payment_method):
+    number = _card_number(payment_method)
+
+    # Refused test card.
+    if _ends_with(number, "0002"):
+        return "refused"
+
+    # 3DS2 test cards.
+    if _ends_with(number, "0069") or _ends_with(number, "0081"):
+        return "threeds"
+
+    # Default: instant authorisation.
+    return "auth"
+
+# _threeds_challenge reports whether this 3DS test card requires a challenge
+# round after the fingerprint (Adyen's ...0081-style challenge test cards).
+def _threeds_challenge(payment_method):
+    return _ends_with(_card_number(payment_method), "0081")
+
+# _card_number safely extracts paymentMethod.number as a string.
+def _card_number(payment_method):
     number = ""
     if payment_method != None:
         number = payment_method.get("number", "")
         if number == None:
             number = ""
-
-    # Refused test card.
-    if _ends_with(number, "0002"):
-        return "Refused"
-
-    # Received (requires action).
-    if _ends_with(number, "0069"):
-        return "Received"
-
-    # Default: Authorised.
-    return "Authorised"
+    return number
 
 # _ends_with checks if str s ends with suffix.
 def _ends_with(s, suffix):
@@ -109,26 +119,86 @@ def _card_summary(number):
     return number[-4:]
 
 # _payment_public returns the Adyen-shaped payment response.
+# A payment awaiting 3DS2 completion (lifecycle Pending3DS) returns the
+# pending resultCode + action (type threeDS2, subtype fingerprint/challenge,
+# paymentData) and NO pspReference — the pspReference only exists once the
+# flow reaches a terminal result, matching the real Checkout API.
 def _payment_public(doc):
     result_code = doc.get("resultCode", "Authorised")
+    pending = doc.get("lifecycle", "") == "Pending3DS"
+
     result = {
-        "pspReference": doc["id"],
         "resultCode": result_code,
         "additionalData": doc.get("additionalData", {}),
     }
+
+    if not pending:
+        result["pspReference"] = doc["id"]
 
     # For Refused, include refusalReason.
     if result_code == "Refused":
         result["refusalReason"] = doc.get("refusalReason", "Refused")
 
-    # For Received, include action.
-    if result_code == "Received":
-        result["action"] = doc.get("action", {
-            "type": "threeDS2",
-            "paymentData": doc["id"],
-        })
+    # For pending 3DS, include the action object.
+    if pending:
+        action = doc.get("action", None)
+        if action == None:
+            action = {
+                "type": "threeDS2",
+                "subtype": "fingerprint",
+                "paymentData": doc.get("paymentData", ""),
+            }
+        result["action"] = action
 
     return result
+
+# --- paymentData tokens (3DS2 flow) ---
+# POST /payments/details carries the opaque paymentData token minted by the
+# action object. Tokens are stored in the KV namespace ("pd_<token>" →
+# payment pspReference) and cleared once the flow reaches a terminal result.
+
+def _new_payment_data(psp):
+    token = "PD" + str(store_kv_incr("adyen", "pd_seq"))
+    store_kv_set("adyen", "pd_" + token, psp)
+    return token
+
+def _payment_data_psp(token):
+    if token == None or token == "":
+        return None
+    v = store_kv_get("adyen", "pd_" + token)
+    if v == None or v == "":
+        return None
+    return v
+
+def _clear_payment_data(token):
+    if token != None and token != "":
+        store_kv_set("adyen", "pd_" + token, "")
+
+# --- amount coercion helpers ---
+# JSON round-trips decode integers as Starlark floats; amounts live in both
+# int and float form depending on where they came from.
+
+def _num(v):
+    if v == None:
+        return 0.0
+    if type(v) == "int":
+        return float(v)
+    if type(v) == "float":
+        return v
+    return float(_to_int(v))
+
+def _amt_value(amount):
+    if amount == None:
+        return 0.0
+    return _num(amount.get("value", 0))
+
+def _amt_currency(amount):
+    if amount == None:
+        return ""
+    cur = amount.get("currency", "")
+    if cur == None:
+        return ""
+    return cur
 
 # _modification_public returns the Adyen-shaped modification response.
 # Shape: { pspReference, status:"received", paymentPspReference }

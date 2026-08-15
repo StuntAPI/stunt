@@ -34,12 +34,15 @@ endpoints:
   - route: /v1/subscriptions/{subscriptionKey}/cancel
     method: POST
     handler: scripts/subscriptions.star#on_cancel_subscription
+    concurrency_key: subscriptionKey
   - route: /v1/subscriptions/{subscriptionKey}
     method: PUT
     handler: scripts/subscriptions.star#on_update_subscription
+    concurrency_key: subscriptionKey
   - route: /v1/subscriptions/{subscriptionKey}
     method: GET
     handler: scripts/subscriptions.star#on_get_subscription
+    concurrency_key: subscriptionKey # derive-on-read transition persists a status change
 
   # --- Usage (metered billing) ---
   - route: /v1/usage
@@ -58,6 +61,16 @@ endpoints:
   - route: /v1/payments
     method: GET
     handler: scripts/billing.star#on_list_payments
+  - route: /v1/payments
+    method: POST
+    handler: scripts/billing.star#on_create_payment
+  - route: /v1/payments/{paymentId}/unapply
+    method: POST
+    handler: scripts/billing.star#on_unapply_payment
+    concurrency_key: paymentId
+  - route: /v1/payments/{paymentId}
+    method: GET
+    handler: scripts/billing.star#on_get_payment
 
   # --- Payment methods ---
   - route: /v1/payment-methods/credit-cards

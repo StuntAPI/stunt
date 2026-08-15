@@ -191,3 +191,43 @@ def _gen_uuid():
 # _iso8601 returns a synthetic ISO 8601 timestamp.
 def _iso8601():
     return "2024-01-01T00:00:00.000000Z"
+
+# ====================================================================
+# Zone helpers (shared by zones.star, dns.star and rules.star)
+# ====================================================================
+
+# _default_account_id returns a fixed synthetic account ID.
+def _default_account_id():
+    return "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+# _ensure_seed_zones seeds the zones collection with a default zone if empty.
+def _ensure_seed_zones():
+    zc = store_collection("zones")
+    if len(zc.list()) > 0:
+        return
+    seeded = store_kv_get("cf", "zones_seeded")
+    if seeded == "1":
+        return
+    zc.insert({
+        "zone_id": "023e105f4ecef8ad9ca31a8372d0c353",
+        "name": "stunt.dev",
+        "status": "active",
+        "account": {
+            "id": _default_account_id(),
+            "name": "stunt-account",
+        },
+        "name_servers": ["stunt.dev.ns1.stunt.dev", "stunt.dev.ns2.stunt.dev"],
+        "type": "full",
+        "created_on": _iso8601(),
+        "modified_on": _iso8601(),
+    })
+    store_kv_set("cf", "zones_seeded", "1")
+
+# _find_zone returns the zone doc for zone_id (seeding first), or None.
+def _find_zone(zone_id):
+    _ensure_seed_zones()
+    zc = store_collection("zones")
+    for z in zc.list():
+        if z.get("zone_id", "") == zone_id:
+            return z
+    return None
