@@ -1,0 +1,90 @@
+# stunt adapter — SmartBill-style API v1 simulator (unofficial)
+# Docs: https://stuntapi.com/stunt
+#
+# Mimics the *structure* of a SmartBill-style Romanian invoicing API for
+# LOCAL TESTING ONLY. It does not call the real API. All data is synthetic.
+# See DISCLAIMER.
+id: smartbill-style
+name: "SmartBill-style invoicing API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "SmartBill API"
+  version: "v1"
+
+endpoints:
+  # company (the credentials' companies; the key-validation probe)
+  - route: /v1/company
+    method: GET
+    handler: scripts/smartbill.star#on_company
+  # simulator bootstrap: register a cif to read/write (the real API assumes
+  # the company exists behind the credentials).
+  - route: /sim/company
+    method: POST
+    handler: scripts/smartbill.star#on_company_create
+  # invoices (sales)
+  - route: /v1/invoice
+    method: POST
+    handler: scripts/smartbill.star#on_invoice_create
+  - route: /v1/invoice
+    method: GET
+    handler: scripts/smartbill.star#on_invoice_get
+  - route: /v1/invoice/list
+    method: GET
+    handler: scripts/smartbill.star#on_invoice_list
+  - route: /v1/invoice/cancel
+    method: PUT
+    handler: scripts/smartbill.star#on_invoice_cancel
+  # invoice payments
+  - route: /v1/invoice/payment
+    method: POST
+    handler: scripts/smartbill.star#on_invoice_payment_add
+  - route: /v1/invoice/payment
+    method: DELETE
+    handler: scripts/smartbill.star#on_invoice_payment_delete
+  # estimates (proforma)
+  - route: /v1/estimate
+    method: POST
+    handler: scripts/smartbill.star#on_estimate_create
+  - route: /v1/estimate/list
+    method: GET
+    handler: scripts/smartbill.star#on_estimate_list
+  - route: /v1/estimate/cancel
+    method: PUT
+    handler: scripts/smartbill.star#on_estimate_cancel
+  # purchase invoices — the spend side
+  - route: /v1/purchase
+    method: POST
+    handler: scripts/smartbill.star#on_purchase_create
+  - route: /v1/purchase/list
+    method: GET
+    handler: scripts/smartbill.star#on_purchase_list
+  # stocks
+  - route: /v1/stocks
+    method: GET
+    handler: scripts/smartbill.star#on_stocks_list
+  - route: /v1/stocks/movement
+    method: POST
+    handler: scripts/smartbill.star#on_stocks_movement
+  # messages (recorded, not delivered)
+  - route: /v1/message/email
+    method: POST
+    handler: scripts/smartbill.star#on_message_email
+
+resources:
+  - name: sb_companies
+    kind: collection
+  - name: sb_invoices
+    kind: collection
+  - name: sb_estimates
+    kind: collection
+  - name: sb_purchases
+    kind: collection
+  - name: sb_payments
+    kind: collection
+  - name: sb_stocks
+    kind: collection
+  - name: sb_stock_movements
+    kind: collection
+  - name: sb_messages
+    kind: collection

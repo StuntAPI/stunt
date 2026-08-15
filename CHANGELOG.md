@@ -6,6 +6,19 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+
+- **`smartbill-style` adapter** — a SmartBill-style Romanian invoicing API
+  v1 simulator: invoices (create/get/list/cancel), proforma estimates,
+  invoice payments, purchase invoices as the spend surface (product lines
+  carry the book classification), stocks and stock movements, messages.
+  Models the v1 conventions: Basic auth with genuine 401s, bare-JSON
+  envelopes (empty body on create, like the real API), plain page/pageSize
+  pagination with totalPages, cif scoping where a foreign cif is an
+  indistinguishable 404, and decimal-string money and quantities. Includes a
+  pure-Starlark base64 decoder (for runtimes without the crypto builtin) and
+  a conformance test.
+
 ## [0.34.0] — 2026-08-15
 
 ### Adapters

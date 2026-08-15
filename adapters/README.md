@@ -36,6 +36,7 @@ The unbranded, generic adapter scaffold (`stunt adapter new`) is unaffected by t
 | `adapters/blog-style` | a generic GraphQL blog API (users, posts, comments, nested relations) — GraphQL reference example | Collection + Starlark |
 | `adapters/escrow-style` | an Escrow.com-style transaction API (2017-09-01 lifecycle: create, agree, fund) | Collection + Starlark |
 | `adapters/fattureincloud-style` | a Fatture in Cloud-style invoicing/bookkeeping API v2 (entities, received/issued documents, suppliers, clients, products, taxes, cashbook) | Collection + Starlark |
+| `adapters/smartbill-style` | a SmartBill-style Romanian invoicing API (invoices, estimates, payments, purchase invoices, stocks) | Collection + Starlark |
 
 Each adapter is **broader than a minimal demo** but remains an MVP: enough endpoints to be a useful
 local stand-in and to exercise the stunt primitives end to end. See each adapter's own README.
