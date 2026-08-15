@@ -387,12 +387,13 @@ def _create_role(req):
         policy_doc = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
 
     rc = store_collection("roles")
+    created = clock.now_rfc3339()
     rc.insert({
         "roleName": role_name,
         "roleId": role_id,
         "arn": arn,
         "path": "/",
-        "createDate": "2024-01-01T00:00:00Z",
+        "createDate": created,
         "assumeRolePolicyDocument": policy_doc,
     })
 
@@ -403,7 +404,7 @@ def _create_role(req):
     xml = xml + "      <RoleName>" + _xml_escape(role_name) + "</RoleName>\n"
     xml = xml + "      <RoleId>" + _xml_escape(role_id) + "</RoleId>\n"
     xml = xml + "      <Arn>" + _xml_escape(arn) + "</Arn>\n"
-    xml = xml + "      <CreateDate>2024-01-01T00:00:00Z</CreateDate>\n"
+    xml = xml + "      <CreateDate>" + _xml_escape(created) + "</CreateDate>\n"
     xml = xml + "      <AssumeRolePolicyDocument>" + _xml_escape(policy_doc) + "</AssumeRolePolicyDocument>\n"
     xml = xml + "      <MaxSessionDuration>3600</MaxSessionDuration>\n"
     xml = xml + "    </Role>\n"
@@ -466,6 +467,7 @@ def _create_access_key(req):
 
     access_key = _gen_long_access_key()
     secret_key = _gen_secret_key()
+    created = clock.now_rfc3339()
 
     akc = store_collection("access_keys")
     akc.insert({
@@ -481,7 +483,7 @@ def _create_access_key(req):
     xml = xml + "      <AccessKeyId>" + _xml_escape(access_key) + "</AccessKeyId>\n"
     xml = xml + "      <Status>Active</Status>\n"
     xml = xml + "      <SecretAccessKey>" + _xml_escape(secret_key) + "</SecretAccessKey>\n"
-    xml = xml + "      <CreateDate>2024-01-01T00:00:00Z</CreateDate>\n"
+    xml = xml + "      <CreateDate>" + _xml_escape(created) + "</CreateDate>\n"
     xml = xml + "    </AccessKey>\n"
     xml = xml + "  </CreateAccessKeyResult>\n"
     xml = xml + "  <ResponseMetadata>\n"
@@ -504,22 +506,16 @@ def _iam_page(req, docs):
     marker = _get_param(req, "Marker")
     return paginate(docs, max_items, marker)
 
-# _expiration_time returns a synthetic ISO 8601 expiration timestamp.
-# AWS STS temp creds expire after DurationSeconds (default 3600 = 1 hour).
+# _expiration_time returns the temp-credential expiration as an ISO 8601
+# timestamp derived from the engine clock: now + DurationSeconds (real STS
+# semantics; default 3600 = 1 hour).
 def _expiration_time(duration_str):
     if duration_str == None or duration_str == "":
         duration_str = "3600"
-    # Parse duration to int (best-effort)
     dur = _parse_int(duration_str)
     if dur == 0:
         dur = 3600
-    # Synthesize a future timestamp. We use a fixed base + duration.
-    # Format: 2024-01-01T01:00:00Z (base + dur hours, simplified).
-    hours = dur // 3600
-    if hours < 1:
-        hours = 1
-    h_str = _pad2(hours)
-    return "2024-01-01T" + h_str + ":00:00Z"
+    return clock.unix_to_rfc3339(clock.now_unix() + dur)
 
 # _parse_int parses a decimal string to int. Returns 0 on failure.
 def _parse_int(s):
@@ -533,12 +529,6 @@ def _parse_int(s):
         else:
             return 0
     return n
-
-# _pad2 zero-pads a number to 2 digits.
-def _pad2(n):
-    if n < 10:
-        return "0" + str(n)
-    return str(n)
 
 # _extract_account pulls the account ID (12 digits) from an ARN.
 # arn:aws:iam::123456789012:role/MyRole -> 123456789012
@@ -565,7 +555,7 @@ def _ensure_seed_roles():
         "roleId": "AROAEXAMPLESEED0",
         "arn": "arn:aws:iam::123456789012:role/stunt-role",
         "path": "/",
-        "createDate": "2024-01-01T00:00:00Z",
+        "createDate": clock.now_rfc3339(),
         "assumeRolePolicyDocument": '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}',
     })
     store_kv_set("sts", "roles_seeded", "1")
@@ -583,7 +573,7 @@ def _ensure_seed_users():
         "userId": "AIDAEXAMPLEUSER0",
         "arn": "arn:aws:iam::123456789012:user/stunt-admin",
         "path": "/",
-        "createDate": "2024-01-01T00:00:00Z",
+        "createDate": clock.now_rfc3339(),
     })
     store_kv_set("sts", "users_seeded", "1")
 

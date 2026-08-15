@@ -342,6 +342,15 @@ func TestInstagramStyleAdapter(t *testing.T) {
 	if firstMedia["id"] != mediaID {
 		t.Fatalf("media[0] id = %v, want %v", firstMedia["id"], mediaID)
 	}
+	// The publish timestamp is clock-derived in the Graph media format
+	// (RFC3339 with a colon-less numeric offset).
+	tsStr, ok := firstMedia["timestamp"].(string)
+	if !ok || tsStr == "" {
+		t.Fatalf("media[0] timestamp = %v, want non-empty string", firstMedia["timestamp"])
+	}
+	if _, err := time.Parse("2006-01-02T15:04:05-0700", tsStr); err != nil {
+		t.Fatalf("media[0] timestamp = %q, unparsable as Graph stamp: %v", tsStr, err)
+	}
 
 	// ===== Token-VALIDATION policy: unknown bearer → 401 =====
 

@@ -3,6 +3,9 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -545,6 +548,87 @@ func TestGitHubStyleSignatureVerifies(t *testing.T) {
 
 	raw, hdr := sink.awaitDelivery(t, time.Second)
 	verifyGitHubSig(t, raw, hdr, secret, "issues")
+}
+
+// TestGitHubStyleWebhookReceiver drives the local receiver surface
+// (POST /webhooks/receive): an X-Hub-Signature-256 computed in Go over the
+// verbatim body with the hook's registered per-hook secret gets 200, while a
+// missing, tampered, or wrong-secret signature gets GitHub's 401 envelope.
+func TestGitHubStyleWebhookReceiver(t *testing.T) {
+	const token = "ghp_signature_test"
+	const hookSecret = "receiver-hook-secret"
+	base := ghBoot(t, "")
+
+	// Register a hook carrying its own secret (GitHub's per-hook model).
+	if _, status := ghPostBearer(t, base+"/repos/octocat/hello-world/hooks", token, map[string]any{
+		"config": map[string]any{
+			"url":          "https://example.com/hook",
+			"content_type": "json",
+			"secret":       hookSecret,
+		},
+		"events": []string{"push"},
+	}); status != 201 {
+		t.Fatalf("POST hooks -> %d, want 201", status)
+	}
+
+	raw := []byte(`{"zen":"Design for failure.","event":"push"}`)
+
+	post := func(sig string) (string, int) {
+		req, _ := http.NewRequest("POST", base+"/webhooks/receive", bytes.NewReader(raw))
+		req.Header.Set("Content-Type", "application/json")
+		if sig != "" {
+			req.Header.Set("X-Hub-Signature-256", sig)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return string(b), resp.StatusCode
+	}
+
+	mac := hmac.New(sha256.New, []byte(hookSecret))
+	mac.Write(raw)
+	good := "sha256=" + hex.EncodeToString(mac.Sum(nil))
+
+	// Correct per-hook signature → 200.
+	if _, code := post(good); code != 200 {
+		t.Fatalf("receiver with correct signature -> %d, want 200", code)
+	}
+
+	// Missing signature → 401 (GitHub envelope).
+	body, code := post("")
+	if code != 401 {
+		t.Fatalf("receiver without signature -> %d, want 401; body %s", code, body)
+	}
+	var e map[string]any
+	if err := json.Unmarshal([]byte(body), &e); err != nil {
+		t.Fatalf("unmarshal 401: %v (body %s)", err, body)
+	}
+	if e["message"] != "Invalid signature" {
+		t.Fatalf("401 envelope = %v, want message Invalid signature", e)
+	}
+
+	// Tampered signature (right shape, wrong MAC) → 401.
+	if _, code := post("sha256=" + strings.Repeat("0", 64)); code != 401 {
+		t.Fatalf("receiver with tampered signature -> %d, want 401", code)
+	}
+
+	// Signature computed with an unknown secret → 401.
+	wrong := hmac.New(sha256.New, []byte("not-a-registered-secret"))
+	wrong.Write(raw)
+	if _, code := post("sha256=" + hex.EncodeToString(wrong.Sum(nil))); code != 401 {
+		t.Fatalf("receiver with wrong-secret signature -> %d, want 401", code)
+	}
+
+	// The documented fallback secret also verifies (hooks registered without
+	// a secret deliver MACed with it).
+	fb := hmac.New(sha256.New, []byte("stunt_mock_github_webhook_secret_2026"))
+	fb.Write(raw)
+	if _, code := post("sha256=" + hex.EncodeToString(fb.Sum(nil))); code != 200 {
+		t.Fatalf("receiver with fallback-secret signature -> %d, want 200", code)
+	}
 }
 
 // TestGitHubStyleActionsRunLifecycle proves the derive-on-read run state

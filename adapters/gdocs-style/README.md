@@ -126,3 +126,12 @@ Simplifications (documented deviations from the real API):
 - pressing Enter (inserting `\n`) continues the paragraph's bullet and named
   style into the new paragraph;
 - tables, headers/footers, suggestions and `writeControl` are not modeled.
+
+## Clock
+
+Revision `modifiedTime` values are derived from the engine clock
+(`clock.now_rfc3339()`), in the Docs format — RFC3339 with milliseconds, e.g.
+`2026-08-15T10:00:00.000Z`. Document creation records revision `1`, and every
+batchUpdate appends a new revision, so `GET
+/v1/documents/{documentId}/revisions` reflects the document's real edit
+history. No hardcoded calendar dates; assertions should parse the value.

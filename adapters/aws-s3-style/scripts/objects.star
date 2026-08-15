@@ -13,32 +13,32 @@
 # Shared helpers (_require_auth, _xml_*, _check_*) are preloaded from
 # scripts/lib.star.
 
-# _etag generates a synthetic ETag-like hex string from a KV counter.
-def _etag():
-    n = store_kv_incr("s3", "etag_seq")
-    hex = ""
-    v = n
-    for i in range(32):
-        rem = v % 16
-        if rem < 10:
-            hex = chr(ord("a") + rem) + hex
-        else:
-            hex = chr(ord("a") + rem - 10) + hex
-        v = v // 16
-        if v == 0:
-            # pad with '0'
-            for j in range(32 - len(hex)):
-                hex = "0" + hex
-            break
-    return hex
+# _etag derives the object ETag from the content itself: the SHA-256 hex
+# digest of the raw body (real S3 uses the MD5 digest for non-multipart
+# uploads; the crypto module has no MD5, so the stronger digest is used —
+# documented deviation). Returned/stored unquoted; rendered quoted.
+def _etag(raw):
+    return crypto.sha256(raw)
 
-# _now_rfc1123 returns a synthetic RFC 1123 timestamp (S3 Last-Modified).
-def _now_rfc1123():
-    return "Mon, 01 Jan 2024 00:00:00 GMT"
+# _obj_last_modified_rfc1123 renders the stored upload time as an RFC
+# 1123 Last-Modified header value (falls back to the current clock for
+# legacy docs stored without a timestamp).
+def _obj_last_modified_rfc1123(obj):
+    u = obj.get("lastModifiedUnix")
+    if u == None or u == 0:
+        u = clock.now_unix()
+    return _unix_to_rfc1123(u)
 
-# _iso8601 returns a synthetic ISO 8601 timestamp for XML responses.
-def _iso8601():
-    return "2024-01-01T00:00:00.000Z"
+# _obj_last_modified_iso renders the stored upload time in S3 XML millis
+# form (legacy docs fall back to the stored string, else the clock).
+def _obj_last_modified_iso(obj):
+    u = obj.get("lastModifiedUnix")
+    if u == None or u == 0:
+        lm = obj.get("lastModified", "")
+        if lm != None and lm != "":
+            return lm
+        return _unix_to_iso8601(clock.now_unix())
+    return _unix_to_iso8601(u)
 
 # on_put_object stores an object in the given bucket+key.
 def on_put_object(req):
@@ -74,7 +74,10 @@ def on_put_object(req):
         ct = "application/octet-stream"
 
     size = len(raw)
-    etag = _etag()
+    # Content-derived ETag (SHA-256 of the verbatim bytes) and the real
+    # upload time from the engine clock.
+    etag = _etag(raw)
+    now_unix = clock.now_unix()
 
     oc = store_collection("objects")
     # Reuse the existing blob id on overwrite; otherwise mint a path-safe one
@@ -96,7 +99,8 @@ def on_put_object(req):
         "bid": bid,
         "contentType": ct,
         "etag": etag,
-        "lastModified": _iso8601(),
+        "lastModified": _unix_to_iso8601(now_unix),
+        "lastModifiedUnix": now_unix,
         "size": size,
     }
     if obj_id != None and obj_id != "":
@@ -140,7 +144,7 @@ def on_get_object(req):
     return respond(200, content, {
         "Content-Type": ct,
         "ETag": '"' + etag + '"',
-        "Last-Modified": _now_rfc1123(),
+        "Last-Modified": _obj_last_modified_rfc1123(obj),
         "Content-Length": str(len(content)),
         "x-amz-request-id": _req_id(),
     })
@@ -176,7 +180,7 @@ def on_head_object(req):
     return respond(200, "", {
         "Content-Type": ct,
         "ETag": '"' + etag + '"',
-        "Last-Modified": _now_rfc1123(),
+        "Last-Modified": _obj_last_modified_rfc1123(obj),
         "Content-Length": _to_int_str(size),
         "x-amz-request-id": _req_id(),
     })
@@ -442,7 +446,7 @@ def _list_objects_v2(bucket, req):
         key = o.get("key", "")
         etag = o.get("etag", "")
         size = o.get("size", 0)
-        lm = o.get("lastModified", "")
+        lm = _obj_last_modified_iso(o)
         xml = xml + "<Contents>"
         xml = xml + "<Key>" + enc(key) + "</Key>"
         xml = xml + "<LastModified>" + _xml_escape(lm) + "</LastModified>"

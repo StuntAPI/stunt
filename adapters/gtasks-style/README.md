@@ -50,3 +50,12 @@ locally.
 Task lists and tasks are **stateful**. A default task list is seeded. Created
 tasks persist and are retrievable. The `move` endpoint updates parent and
 position.
+
+## Clock
+
+Every `updated` stamp (seed list, created lists/tasks, updates and moves) is
+derived from the engine clock (`clock.now_rfc3339()`) in the Google Tasks
+format — RFC3339 with milliseconds, e.g. `2026-08-15T10:00:00.000Z`. No
+hardcoded calendar dates. `updatedMin` filtering therefore behaves like the
+real API against stamps minted near request time; assertions should parse the
+value rather than compare literals.

@@ -37,6 +37,10 @@
     "server_modified": {
       "type": "string",
       "description": "ISO-8601 server-side modification timestamp"
+    },
+    "content_hash": {
+      "type": "string",
+      "description": "Dropbox-scheme content hash: hex(SHA-256 of the concatenated raw SHA-256 digests of each 4 MiB block) (files only)"
     }
   },
   "required": [".tag", "id", "name", "path_lower", "path_display", "server_modified"]

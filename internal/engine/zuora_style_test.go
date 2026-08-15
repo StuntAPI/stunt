@@ -843,3 +843,83 @@ func zuoraLegacyPostJSON(t *testing.T, rawurl, apiKey, apiSecret string, payload
 // Guard: suppress unused imports.
 var _ = fmt.Sprintf
 var _ = strings.Contains
+
+// TestZuoraStyleClockDefaultDates verifies that a subscription created
+// without a contractEffectiveDate defaults to the clock-anchored synthetic
+// "today", and the generated invoice's dueDate is invoiceDate + Net-30.
+func TestZuoraStyleClockDefaultDates(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "zuora-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"zuora": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["zuora"]
+	bearerToken := "Bearer zuora-bearer-token"
+
+	// No contractEffectiveDate: the simulator derives it from the clock.
+	body, status := zuoraAuthPostJSON(t, base+"/v1/subscriptions", bearerToken, map[string]any{
+		"accountKey":  "ACC-A",
+		"termType":    "TERMED",
+		"initialTerm": 12,
+		"subscribeToRatePlans": []map[string]any{
+			{"productRatePlanId": "rateplan-standard"},
+		},
+	})
+	if status != 200 {
+		t.Fatalf("create subscription (default CED) -> %d, want 200; body %s", status, body)
+	}
+	var subResp map[string]any
+	if err := json.Unmarshal([]byte(body), &subResp); err != nil {
+		t.Fatalf("unmarshal subscription: %v (body %s)", err, body)
+	}
+	invoiceNumber, _ := subResp["invoiceNumber"].(string)
+	if invoiceNumber == "" {
+		t.Fatalf("invoiceNumber = %v, want non-empty (first invoice generated)", subResp["invoiceNumber"])
+	}
+
+	body, status = zuoraAuthGet(t, base+"/v1/invoices/"+invoiceNumber, bearerToken)
+	if status != 200 {
+		t.Fatalf("get invoice -> %d, want 200; body %s", status, body)
+	}
+	var invResp map[string]any
+	if err := json.Unmarshal([]byte(body), &invResp); err != nil {
+		t.Fatalf("unmarshal invoice: %v (body %s)", err, body)
+	}
+	invoiceDate, _ := invResp["invoiceDate"].(string)
+	if invoiceDate == "" {
+		t.Fatalf("invoiceDate = %v, want non-empty", invResp["invoiceDate"])
+	}
+	// The synthetic calendar is anchored at first use; the default CED must
+	// land on that anchor day (clock-derived, not a fixed 2024-01-01 string
+	// buried in the handler — the anchor advances with real elapsed time).
+	if len(invoiceDate) != len("2006-01-02") {
+		t.Fatalf("invoiceDate = %q, want YYYY-MM-DD", invoiceDate)
+	}
+	invDate, err := time.Parse("2006-01-02", invoiceDate)
+	if err != nil {
+		t.Fatalf("invoiceDate %q unparseable: %v", invoiceDate, err)
+	}
+	wantDue := invDate.AddDate(0, 0, 30).Format("2006-01-02")
+	if invResp["dueDate"] != wantDue {
+		t.Fatalf("dueDate = %v, want %s (invoiceDate + Net-30)", invResp["dueDate"], wantDue)
+	}
+}

@@ -75,6 +75,34 @@ def _emit_if_subscribed(repo_key, event_type, payload):
             _signed_emit(event_type, payload, h.get("secret", ""))
             return
 
+# _hub_secrets returns every secret an inbound delivery could legitimately be
+# MACed with: each registered hook's own config.secret (GitHub's per-hook
+# model) plus the fallback mock secret for hooks registered without one.
+def _hub_secrets():
+    secrets = [_WEBHOOK_SECRET]
+    hc = store_collection("hooks")
+    for h in hc.list():
+        s = h.get("secret", "")
+        if s != None and s != "":
+            secrets.append(s)
+    return secrets
+
+# _verify_hub_signature checks an X-Hub-Signature-256 header value
+# ("sha256=" + 64 hex chars) against HMAC-SHA256(secret, raw_body) for every
+# known hook secret. The MAC input is the VERBATIM request bytes.
+_HUB_SIG_LEN = 7 + 64
+
+def _verify_hub_signature(sig, raw):
+    if sig == None or len(sig) != _HUB_SIG_LEN:
+        return False
+    if not sig.startswith("sha256="):
+        return False
+    got = sig[7:]
+    for s in _hub_secrets():
+        if crypto.hmac_sha256(s, raw) == got:
+            return True
+    return False
+
 # _gh_event_payload builds the GitHub webhook payload envelope for issue/PR
 # events: {"action", "<subject>": {...}, "repository", "sender"}. subject is
 # the payload key ("issue" or "pull_request") matching the event type.

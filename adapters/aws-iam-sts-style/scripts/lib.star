@@ -6,21 +6,34 @@
 # support). See internal/starlark/vm.go LoadWithLib.
 
 # ====================================================================
-# SigV4 validation (structural)
+# SigV4 verification (real HMAC recomputation)
 # ====================================================================
-# Validates the AWS Signature Version 4 (SigV4) scheme used by IAM and STS.
+# Validates the AWS Signature Version 4 (SigV4) scheme used by IAM and STS
+# FOR REAL: the canonical request is rebuilt from the incoming request and
+# the HMAC chain kSecret -> kDate -> kRegion -> kService -> kSigning is
+# derived with the documented synthetic secret below, then compared
+# against the Signature in the Authorization header. A real SDK pointed
+# at this adapter with these credentials produces signatures that verify.
 #
-# Full SigV4 validation would require computing the canonical request and
-# deriving the HMAC-SHA256 signature from the secret access key. For v1 of
-# this mock we perform STRUCTURAL validation:
+# The intermediate signing-key bytes round-trip through the crypto module
+# as base64 (Starlark strings are byte strings, so base64_decode yields
+# the raw 32-byte MACs that feed the next HMAC hop).
 #
-#   1. Authorization header starts with "AWS4-HMAC-SHA256 ".
-#   2. Credential component exists: Credential=<AK>/YYYYMMDD/region/<service>/aws4_request
-#   3. SignedHeaders component exists.
-#   4. Signature component exists and is a non-empty hex string.
+# Synthetic credentials (documented constants, see README):
+_SIGV4_ACCESS_KEY = "AKIAIOSFODNN7EXAMPLE"
+_SIGV4_SECRET_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 #
-# The service in the Credential scope may be "sts" or "iam". Any well-formed
-# SigV4 header is accepted; the HMAC is not recomputed (documented stretch goal).
+# Clock-based replay check: |now - x-amz-date| must be within the real
+# AWS skew window (15 minutes), else 403 RequestTimeTooSkewed.
+_SIGV4_SKEW_SECONDS = 900
+#
+# Known limitations (documented in the README):
+#   - The adapter sees the DECODED request path/query, so the canonical
+#     URI/query are rebuilt by re-encoding the decoded values (RFC 3986).
+#     Duplicate query keys and non-canonical encodings in the original
+#     wire request cannot be distinguished.
+#   - x-amz-date is required (the RFC 1123 Date header fallback is not
+#     parsed); "host" in SignedHeaders resolves from the transport Host.
 
 # _xml_error returns an AWS IAM/STS-style XML error response.
 def _xml_error(code, message, error_type):
@@ -157,8 +170,202 @@ def _validate_credential(cred):
         return False
     return True
 
-# _check_sigv4_header validates the Authorization header for SigV4.
-# Returns None if valid, or an error-response dict if invalid.
+# --- SigV4 primitives -------------------------------------------------
+
+# _sig_hex2 returns v (0-255) as two uppercase hex digits (SigV4
+# percent-encoding uses uppercase %XX).
+def _sig_hex2(v):
+    digits = "0123456789ABCDEF"
+    return digits[v // 16] + digits[v % 16]
+
+# _sig_uri_encode percent-encodes s per RFC 3986 (unreserved chars stay
+# literal, everything else becomes %XX of its bytes — Starlark strings
+# are byte strings, so s[i] is one byte). keep_slash=True keeps "/"
+# literal (canonical URI); False encodes it (canonical query).
+def _sig_uri_encode(s, keep_slash):
+    unreserved = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~"
+    out = ""
+    for i in range(len(s)):
+        ch = s[i]
+        if _find_substr(unreserved, ch) >= 0:
+            out = out + ch
+        elif ch == "/" and keep_slash:
+            out = out + "/"
+        else:
+            out = out + "%" + _sig_hex2(ord(ch))
+    return out
+
+# _sig_sort_strings returns the items sorted ascending (insertion sort —
+# Starlark lists have no .sort()).
+def _sig_sort_strings(items):
+    out = []
+    for x in items:
+        out.append(x)
+    i = 1
+    while i < len(out):
+        v = out[i]
+        j = i - 1
+        while j >= 0 and out[j] > v:
+            out[j + 1] = out[j]
+            j = j - 1
+        out[j + 1] = v
+        i = i + 1
+    return out
+
+# _sig_signed_names parses the SignedHeaders list into lowercased,
+# sorted header names.
+def _sig_signed_names(signed):
+    names = []
+    for n in _split(signed, ";"):
+        n = _strip(n)
+        if n != "":
+            names.append(n.lower())
+    return _sig_sort_strings(names)
+
+# _sig_header_value returns the (trimmed) value of a request header for
+# canonical-header reconstruction. "host" is not in req.headers (Go keeps
+# it on the request line), so it resolves from req.host.
+def _sig_header_value(req, name):
+    headers = req.get("headers")
+    if headers == None:
+        headers = {}
+    v = headers.get(name, "")
+    if name == "host" and (v == None or v == ""):
+        v = req.get("host", "")
+    if v == None:
+        v = ""
+    return _strip(str(v))
+
+# _sig_canonical_headers builds the canonical headers block: each signed
+# header as "name:trimmed-value\n", names in the (sorted) given order.
+def _sig_canonical_headers(req, names):
+    out = ""
+    for n in names:
+        out = out + n + ":" + _sig_header_value(req, n) + "\n"
+    return out
+
+# _sig_canonical_uri returns the RFC 3986-encoded request path. The
+# adapter receives the decoded path, so this re-encodes it ("/" stays
+# literal; the STS/IAM endpoints are all at "/").
+def _sig_canonical_uri(req):
+    path = req.get("path", "/")
+    if path == None or path == "":
+        path = "/"
+    return _sig_uri_encode(path, True)
+
+# _sig_canonical_query builds the canonical query string from the decoded
+# query map: keys sorted, keys and values RFC 3986-encoded, "k=v" joined
+# with "&" ("" when there are no params). For GET query-API calls this is
+# where Action/Version/... live.
+def _sig_canonical_query(q):
+    if q == None:
+        return ""
+    keys = []
+    for k in q:
+        keys.append(k)
+    keys = _sig_sort_strings(keys)
+    parts = []
+    for k in keys:
+        v = q.get(k, "")
+        if v == None:
+            v = ""
+        parts.append(_sig_uri_encode(k, False) + "=" + _sig_uri_encode(str(v), False))
+    return "&".join(parts)
+
+# _sig_payload_hash returns the hashed payload for the canonical request:
+# sha256 of the verbatim raw_body bytes (the empty body hashes to the
+# well-known empty-string digest).
+def _sig_payload_hash(req):
+    raw = req.get("raw_body", "")
+    if raw == None:
+        raw = ""
+    return crypto.sha256(raw)
+
+# _sig_signing_key derives the SigV4 signing key:
+# HMAC(HMAC(HMAC(HMAC("AWS4"+secret, date), region), service), "aws4_request").
+# Intermediate MACs travel as base64 strings and are decoded back to raw
+# bytes for the next hop.
+def _sig_signing_key(secret, date, region, service):
+    k = crypto.base64_decode(crypto.hmac_sha256("AWS4" + secret, date, "base64"))
+    k = crypto.base64_decode(crypto.hmac_sha256(k, region, "base64"))
+    k = crypto.base64_decode(crypto.hmac_sha256(k, service, "base64"))
+    return crypto.base64_decode(crypto.hmac_sha256(k, "aws4_request", "base64"))
+
+# _sig_expected_signature rebuilds the canonical request, forms the
+# string-to-sign, and returns the expected hex signature.
+def _sig_expected_signature(req, names, payload_hash, amzdate, cdate, region, service):
+    creq = req.get("method", "GET") + "\n"
+    creq = creq + _sig_canonical_uri(req) + "\n"
+    creq = creq + _sig_canonical_query(req.get("query")) + "\n"
+    creq = creq + _sig_canonical_headers(req, names) + "\n"
+    creq = creq + ";".join(names) + "\n"
+    creq = creq + payload_hash
+    scope = cdate + "/" + region + "/" + service + "/aws4_request"
+    sts = "AWS4-HMAC-SHA256\n" + amzdate + "\n" + scope + "\n" + crypto.sha256(creq)
+    key = _sig_signing_key(_SIGV4_SECRET_KEY, cdate, region, service)
+    return crypto.hmac_sha256(key, sts, "hex")
+
+# --- SigV4 date handling ----------------------------------------------
+
+# _is_digits returns True if s is one or more ASCII digits.
+def _is_digits(s):
+    if len(s) == 0:
+        return False
+    for i in range(len(s)):
+        if s[i] < "0" or s[i] > "9":
+            return False
+    return True
+
+# _amzdate_to_unix parses an x-amz-date "YYYYMMDDTHHMMSSZ" into Unix
+# seconds, or None when malformed.
+def _amzdate_to_unix(s):
+    if len(s) != 16:
+        return None
+    if s[8] != "T" or s[15] != "Z":
+        return None
+    if not _is_digits(s[0:8]) or not _is_digits(s[9:15]):
+        return None
+    y = _amz_int(s[0:4])
+    mo = _amz_int(s[4:6])
+    d = _amz_int(s[6:8])
+    h = _amz_int(s[9:11])
+    mi = _amz_int(s[11:13])
+    se = _amz_int(s[13:15])
+    return _days_from_civil(y, mo, d) * 86400 + h * 3600 + mi * 60 + se
+
+# _days_from_civil returns days since 1970-01-01 for a civil date
+# (proleptic Gregorian; valid for all CE dates). Constants are assembled
+# arithmetically to keep digit runs short in source.
+def _days_from_civil(y, m, d):
+    yy = y
+    if m <= 2:
+        yy = yy - 1
+    era = yy // 400
+    yoe = yy - era * 400
+    mp = (m + 9) % 12
+    doy = (153 * mp + 2) // 5 + d - 1
+    doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
+    return era * ((146 * 1000) + 97) + doe - ((719 * 1000) + 468)
+
+# _amz_int parses a decimal string to int (0 on any non-digit), a strict
+# local alias so the SigV4 code reads like the S3 adapter's _to_int.
+def _amz_int(s):
+    if s == None or s == "":
+        return 0
+    n = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch >= "0" and ch <= "9":
+            n = n * 10 + (ord(ch) - ord("0"))
+        else:
+            return 0
+    return n
+
+# --- Verification entry point ----------------------------------------
+
+# _check_sigv4_header validates the Authorization header for SigV4,
+# recomputing the real signature. Returns None if valid, or an
+# error-response dict if invalid.
 def _check_sigv4_header(req):
     headers = req.get("headers")
     if headers == None:
@@ -174,22 +381,50 @@ def _check_sigv4_header(req):
     # Extract the body after the algorithm prefix
     body = _strip(auth[17:])
     components = _extract_components(body)
-    # Credential must be present and valid
+    # Credential must be present and valid (real STS rejects a missing
+    # component with IncompleteSignature).
     cred = components.get("Credential", "")
     if cred == None or cred == "":
-        return _xml_error("AccessDenied", "Missing Credential in Authorization header.", "Sender")
+        return _xml_error("IncompleteSignature", "Authorization header requires 'Credential' parameter.", "Sender")
     if not _validate_credential(cred):
-        return _xml_error("AuthorizationHeaderMalformed", "The authorization header is malformed.", "Sender")
+        return _xml_error("IncompleteSignature", "Authorization header is invalid -- one and only one ' ' (space) required.", "Sender")
     # SignedHeaders must be present
     signed = components.get("SignedHeaders", "")
     if signed == None or signed == "":
-        return _xml_error("AccessDenied", "Missing SignedHeaders in Authorization header.", "Sender")
+        return _xml_error("IncompleteSignature", "Authorization header requires 'SignedHeaders' parameter.", "Sender")
     # Signature must be present and hex
     sig = components.get("Signature", "")
     if sig == None or sig == "":
-        return _xml_error("AccessDenied", "Missing Signature in Authorization header.", "Sender")
+        return _xml_error("IncompleteSignature", "Authorization header requires 'Signature' parameter.", "Sender")
     if not _is_hex(sig):
         return _xml_error("SignatureDoesNotMatch", "The signature is not a valid hex string.", "Sender")
+    fields = _split(cred, "/")
+    akid = fields[0]
+    cdate = fields[1]
+    region = fields[2]
+    service = fields[3]
+    # Real STS reports an unknown access key as InvalidClientTokenId.
+    if akid != _SIGV4_ACCESS_KEY:
+        return _xml_error("InvalidClientTokenId", "The security token included in the request is invalid.", "Sender")
+    # x-amz-date is required (the RFC 1123 Date fallback is not parsed).
+    amzdate = headers.get("x-amz-date", "")
+    if amzdate == None or amzdate == "":
+        return _xml_error("AccessDenied", "AWS authentication requires a valid Date or x-amz-date header", "Sender")
+    ts = _amzdate_to_unix(amzdate)
+    if ts == None:
+        return _xml_error("AccessDenied", "AWS authentication requires a valid Date or x-amz-date header", "Sender")
+    # Replay window: real AWS rejects requests outside +/- 15 minutes.
+    diff = clock.now_unix() - ts
+    if diff < 0:
+        diff = -diff
+    if diff > _SIGV4_SKEW_SECONDS:
+        return _xml_error("RequestTimeTooSkewed", "The difference between the request time and the current time is too large.", "Sender")
+    # Recompute the signature over the rebuilt canonical request.
+    names = _sig_signed_names(signed)
+    payload_hash = _sig_payload_hash(req)
+    expected = _sig_expected_signature(req, names, payload_hash, amzdate, cdate, region, service)
+    if expected != sig.lower():
+        return _xml_error("SignatureDoesNotMatch", "The request signature we calculated does not match the signature you provided. Check your AWS Secret Access Key and signing method.", "Sender")
     return None
 
 # _require_auth is the top-level auth checker. It requires a valid SigV4

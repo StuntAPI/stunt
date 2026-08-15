@@ -91,6 +91,15 @@ OAuth2 authorization-code flow mints user-bound tokens. API routes require a
 or expired token returns `401 {"error": {"message": "Missing or invalid access
 token", "code": 190}}` — the Graph API error envelope.
 
+## Clock
+
+The media `timestamp` written at publish time is derived from the engine
+clock (`clock.now_rfc3339()`) in the Graph API media format — RFC3339 with a
+numeric UTC offset and no colon, e.g. `2026-08-15T10:00:00+0000`. Container
+processing (`IN_PROGRESS` → `FINISHED`/`ERROR` after ~3s) and token
+`expires_at` are likewise clock-derived. No hardcoded calendar dates;
+assertions should parse the value.
+
 ## Usage
 
 Point a `stunt.yaml` service at this directory:

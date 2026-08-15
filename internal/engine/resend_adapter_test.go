@@ -296,3 +296,68 @@ func resendGet(t *testing.T, url, apiKey string) (string, int) {
 	b, _ := io.ReadAll(resp.Body)
 	return string(b), resp.StatusCode
 }
+
+// TestResendStyleLiveTimestamps verifies created_at is a live clock
+// timestamp (RFC 3339) rather than a fixed synthetic date.
+func TestResendStyleLiveTimestamps(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "resend-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"resend": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["resend"]
+
+	start := time.Now().UTC()
+	body, status := resendPostJSON(t, base+"/emails", "re_live_ts_key", map[string]any{
+		"from":    "live@example.com",
+		"to":      "sink@example.com",
+		"subject": "clock adoption",
+	})
+	if status != 200 {
+		t.Fatalf("send -> %d, want 200; body %s", status, body)
+	}
+	var sendResp map[string]any
+	if err := json.Unmarshal([]byte(body), &sendResp); err != nil {
+		t.Fatalf("unmarshal send: %v (body %s)", err, body)
+	}
+	emailID, _ := sendResp["id"].(string)
+	if emailID == "" {
+		t.Fatalf("id = %v, want non-empty", sendResp["id"])
+	}
+
+	body, status = resendGet(t, base+"/emails/"+emailID, "re_live_ts_key")
+	if status != 200 {
+		t.Fatalf("get email -> %d, want 200; body %s", status, body)
+	}
+	var email map[string]any
+	if err := json.Unmarshal([]byte(body), &email); err != nil {
+		t.Fatalf("unmarshal email: %v (body %s)", err, body)
+	}
+	createdAt, _ := email["created_at"].(string)
+	ts, err := time.Parse(time.RFC3339, createdAt)
+	if err != nil {
+		t.Fatalf("created_at %q is not RFC 3339: %v", createdAt, err)
+	}
+	if ts.Before(start.Add(-time.Minute)) || ts.After(time.Now().Add(time.Minute)) {
+		t.Fatalf("created_at %v not live (start %v)", ts, start)
+	}
+}

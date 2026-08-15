@@ -121,9 +121,11 @@ def on_create_subscription(req):
         itn = 12
     itn = int(itn)
 
-    ced = body.get("contractEffectiveDate", "2024-01-01")
+    # Default contractEffectiveDate is today on the simulator's synthetic
+    # calendar (clock-anchored), not a fixed date.
+    ced = body.get("contractEffectiveDate", _today())
     if ced == None or ced == "":
-        ced = "2024-01-01"
+        ced = _today()
 
     end_date = body.get("termEndDate", None)
     if end_date == None or end_date == "":
@@ -285,7 +287,7 @@ def on_update_subscription(req):
     elif "initialTerm" in body and doc.get("termType", "TERMED") == "TERMED":
         itn = _zuora_try_num(body.get("initialTerm"))
         if itn != None and itn > 0:
-            doc["endDate"] = _add_days(doc.get("contractEffectiveDate", "2024-01-01"), int(itn) * 30)
+            doc["endDate"] = _add_days(doc.get("contractEffectiveDate", _today()), int(itn) * 30)
     if "contractEffectiveDate" in body and body.get("contractEffectiveDate") != None:
         doc["contractEffectiveDate"] = body.get("contractEffectiveDate")
 
@@ -452,7 +454,7 @@ def _cancellation_credit(doc, today):
     today_days = _date_to_days(today)
     if end_days <= today_days:
         return None
-    start_days = _date_to_days(doc.get("startDate", doc.get("contractEffectiveDate", "2024-01-01")))
+    start_days = _date_to_days(doc.get("startDate", doc.get("contractEffectiveDate", _today())))
     total_days = end_days - start_days
     if total_days <= 0:
         return None

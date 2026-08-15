@@ -109,6 +109,7 @@ func TestGTasksStyleAdapter(t *testing.T) {
 	if resp["status"] != "needsAction" {
 		t.Fatalf("task status = %v, want needsAction", resp["status"])
 	}
+	assertRecentGTasksStamp(t, resp["updated"], "created task updated")
 
 	// ===== Get task → STATEFUL round-trip =====
 
@@ -157,6 +158,7 @@ func TestGTasksStyleAdapter(t *testing.T) {
 	if resp["status"] != "completed" {
 		t.Fatalf("updated task status = %v, want completed", resp["status"])
 	}
+	assertRecentGTasksStamp(t, resp["updated"], "updated task updated")
 
 	// ===== List tasks → includes our task =====
 
@@ -183,6 +185,25 @@ func TestGTasksStyleAdapter(t *testing.T) {
 // None returns a JSON null value.
 func None() any {
 	return nil
+}
+
+// assertRecentGTasksStamp checks that v is a Google Tasks-format RFC3339
+// timestamp (millisecond precision) minted within the last 15 minutes —
+// the adapter derives updated stamps from the engine clock, never a
+// hardcoded date.
+func assertRecentGTasksStamp(t *testing.T, v any, what string) {
+	t.Helper()
+	s, ok := v.(string)
+	if !ok || s == "" {
+		t.Fatalf("%s = %v, want non-empty timestamp string", what, v)
+	}
+	ts, err := time.Parse("2006-01-02T15:04:05.000Z", s)
+	if err != nil {
+		t.Fatalf("%s = %q, unparsable as Google Tasks stamp: %v", what, s, err)
+	}
+	if d := time.Since(ts); d < -time.Minute || d > 15*time.Minute {
+		t.Fatalf("%s = %q, want within 15min of now (age %s)", what, s, d)
+	}
 }
 
 // === GTasks test helpers ===

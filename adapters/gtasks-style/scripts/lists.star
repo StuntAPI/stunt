@@ -43,7 +43,7 @@ def on_create_tasklist(req):
     tl = {
         "id": list_id,
         "title": title,
-        "updated": "2024-01-01T00:00:00.000Z",
+        "updated": _now_ms(),
         "selfLink": "https://www.googleapis.com/tasks/v1/users/@me/lists/" + list_id,
     }
 

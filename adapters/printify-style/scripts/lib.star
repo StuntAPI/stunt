@@ -202,7 +202,7 @@ def _emit_if_subscribed(event_type, shop_id, data):
 def _new_order(body):
     seq = store_kv_incr("printify", "order_seq")
     oid = _order_id(seq)
-    ts = 1700000000 + seq
+    ts = clock.now_unix()
     line_items = body.get("line_items", [])
     addr = body.get("shipping_address", body.get("address_to", {}))
     return {

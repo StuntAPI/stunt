@@ -91,9 +91,11 @@ def _request_id():
     n = store_kv_incr("marketo", "req_seq")
     return "synthetic#" + str(n)
 
-# _now returns a synthetic timestamp.
+# _now returns the current time as an RFC 3339 UTC timestamp (live clock —
+# createdAt/updatedAt reflect request time; seeded records are stamped once
+# at seed time and stay stable).
 def _now():
-    return "2024-01-01T00:00:00Z"
+    return clock.now_rfc3339()
 
 # _next_id returns a monotonically-increasing numeric ID.
 def _next_id(obj_type):

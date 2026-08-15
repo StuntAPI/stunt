@@ -68,7 +68,7 @@ def on_list_events(req):
 
     result = {
         "kind": "calendar#events",
-        "etag": '"mock-events-etag"',
+        "etag": _etag(page),
         "summary": cal_id,
         "items": page,
     }
@@ -148,7 +148,6 @@ def on_create_event(req):
         "organizer": organizer,
         "recurrence": recurrence,
         "sequence": 0,
-        "etag": '"mock-etag-' + str(seq + 1) + '"',
         "reminders": body.get("reminders", {"useDefault": True}),
         "visibility": body.get("visibility", "default"),
         "kind": "calendar#event",
@@ -270,7 +269,7 @@ def on_list_instances(req):
 
     result = {
         "kind": "calendar#events",
-        "etag": '"mock-instances-etag"',
+        "etag": _etag(page),
         "summary": doc.get("summary", ""),
         "items": page,
     }
@@ -312,7 +311,6 @@ def on_quick_add(req):
         "organizer": {"email": "mock-user@gmail.com"},
         "recurrence": [],
         "sequence": 0,
-        "etag": '"mock-etag-' + str(seq + 1) + '"',
         "reminders": {"useDefault": True},
         "visibility": "default",
         "kind": "calendar#event",
@@ -362,7 +360,6 @@ def on_import(req):
         "organizer": body.get("organizer", {"email": "mock-user@gmail.com"}),
         "recurrence": body.get("recurrence", []),
         "sequence": 0,
-        "etag": '"mock-etag-' + str(seq + 1) + '"',
         "reminders": body.get("reminders", {"useDefault": True}),
         "visibility": body.get("visibility", "default"),
         "kind": "calendar#event",
@@ -497,6 +494,8 @@ def _expand_recurring(doc):
         event["start"] = _shift_datetime(doc.get("start", {}), i, freq)
         event["end"] = _shift_datetime(doc.get("end", {}), i, freq)
         event["recurringEventId"] = doc["id"]
+        # Re-derive the etag from the instance's own content.
+        event["etag"] = _etag(event)
         instances.append(event)
 
     return instances

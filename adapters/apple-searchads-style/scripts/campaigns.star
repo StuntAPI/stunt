@@ -63,8 +63,8 @@ def on_create_campaign(req):
         "dailyBudgetAmount": body.get("dailyBudgetAmount", {"amount": "100", "currency": "USD"}),
         "servingStatus": body.get("servingStatus", "PAUSED"),
         "servingStateReasons": [],
-        "creationTime": "2024-01-15T10:00:00.000",
-        "modificationTime": "2024-01-15T10:00:00.000",
+        "creationTime": _asa_now_ts(),
+        "modificationTime": _asa_now_ts(),
     })
 
     doc = cc.get(internal_id)

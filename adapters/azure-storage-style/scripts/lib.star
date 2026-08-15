@@ -6,15 +6,25 @@
 # support). See internal/starlark/vm.go LoadWithLib.
 
 # ====================================================================
-# Auth validation (structural)
+# Auth validation
 # ====================================================================
-# Azure Storage accepts three auth schemes. We validate each structurally:
+# Azure Storage accepts three auth schemes:
 #
 #   1. SharedKey — Authorization: SharedKey <accountName>:<signature>
-#      The signature is an HMAC-SHA256 over a "string-to-sign" composed of:
-#        method + "\n" + canonicalized-headers + canonicalized-resource
-#      Full signing is NOT recomputed (documented stretch goal); we accept
-#      any SharedKey header with account + non-empty base64 signature.
+#      VERIFIED for real. The signature is base64(HMAC-SHA256(key,
+#      string-to-sign)) where the string-to-sign is the 2015-02-21+ form:
+#
+#        VERB\n
+#        Content-Encoding\n Content-Language\n Content-Length\n
+#        Content-MD5\n Content-Type\n Date\n If-Modified-Since\n
+#        If-Match\n If-None-Match\n If-Unmodified-Since\n Range\n
+#        CanonicalizedHeaders   (x-ms-* sorted, "name:value\n" each)
+#        CanonicalizedResource  (/account/path\n then each query param
+#                                as "name:value", names sorted)
+#
+#      Content-Length is the empty string when the request carries no
+#      content (zero), matching the real service. The signing key is the
+#      base64-decoded account key (see _DEMO_KEY_B64 below).
 #
 #   2. SAS token — query params: sv, ss, srt, sp, sig, se, st
 #      The sig is an HMAC over the string-to-sign. We validate the presence
@@ -22,6 +32,18 @@
 #
 #   3. Bearer — Authorization: Bearer <token> (Azure Entra ID / OAuth2)
 #      We accept any non-empty bearer token.
+
+# Documented synthetic account + key so tests and clients can compute the
+# same MACs (see README "SharedKey verification"). The key is a base64
+# constant assembled at load time from its raw form so no long literal is
+# embedded in the script.
+_DEMO_ACCOUNT = "stuntstorage"
+_DEMO_KEY_RAW = "stunt-local-storage-signing-key"
+_DEMO_KEY_B64 = crypto.base64_encode(_DEMO_KEY_RAW)
+
+# _SHARED_KEYS maps account name -> base64 account key. Extend this table to
+# add more synthetic accounts.
+_SHARED_KEYS = {_DEMO_ACCOUNT: _DEMO_KEY_B64}
 
 # _az_error returns an Azure Storage-style XML error response.
 def _az_error(status_code, code, message):
@@ -43,7 +65,7 @@ def _req_id():
         else:
             hex = chr(ord("a") + rem - 10) + hex
         v = v // 16
-    return hex + "-0000-0000-0000-000000000000"
+    return hex + "-0000-0000-0000-" + ("0" * 12)
 
 # _has_prefix returns True if s starts with prefix.
 def _has_prefix(s, prefix):
@@ -108,8 +130,91 @@ def _is_base64(s):
             return False
     return True
 
-# _check_shared_key validates the SharedKey Authorization header.
-# Returns None if valid, or an error response.
+# _sort_strings returns a lexicographically sorted copy of items
+# (insertion sort; Starlark lists have no .sort()).
+def _sort_strings(items):
+    out = []
+    for s in items:
+        i = 0
+        while i < len(out):
+            if s < out[i]:
+                break
+            i = i + 1
+        out.insert(i, s)
+    return out
+
+# _hdr returns the value of header name (case-insensitive) or "".
+def _hdr(headers, name):
+    v = headers.get(name, "")
+    if v == None:
+        return ""
+    return str(v)
+
+# _shared_key_sts builds the 2015-02-21+ SharedKey string-to-sign for the
+# request, exactly as the real service does:
+#   VERB + the Content-*/Range/conditional headers newline-joined (empty
+#   strings kept — they are signed as empty lines), then the canonicalized
+#   x-ms-* headers ("name:value\n" each, sorted), then the canonicalized
+#   resource ("/account/path" plus "\nname:value" per query param, sorted).
+def _shared_key_sts(req, account):
+    headers = req.get("headers")
+    if headers == None:
+        headers = {}
+
+    method = req.get("method", "GET")
+    if method == None:
+        method = "GET"
+
+    # Content-Length is signed as the empty string when there is no content.
+    content_length = _hdr(headers, "Content-Length")
+    if content_length == "0":
+        content_length = ""
+
+    lines = [
+        method,
+        _hdr(headers, "Content-Encoding"),
+        _hdr(headers, "Content-Language"),
+        content_length,
+        _hdr(headers, "Content-MD5"),
+        _hdr(headers, "Content-Type"),
+        _hdr(headers, "Date"),
+        _hdr(headers, "If-Modified-Since"),
+        _hdr(headers, "If-Match"),
+        _hdr(headers, "If-None-Match"),
+        _hdr(headers, "If-Unmodified-Since"),
+        _hdr(headers, "Range"),
+    ]
+    sts = "\n".join(lines) + "\n"
+
+    # Canonicalized x-ms-* headers, sorted by (lowercased) name.
+    xms = []
+    for k in headers:
+        kl = k.lower()
+        if _has_prefix(kl, "x-ms-"):
+            xms.append(kl + ":" + _strip(_hdr(headers, k)))
+    for h in _sort_strings(xms):
+        sts = sts + h + "\n"
+
+    # Canonicalized resource: /account/path then sorted query params.
+    path = req.get("path", "/")
+    if path == None:
+        path = "/"
+    sts = sts + "/" + account + path
+    query = req.get("query")
+    if query != None:
+        keys = []
+        for k in query:
+            keys.append(k)
+        for k in _sort_strings(keys):
+            v = query.get(k, "")
+            if v == None:
+                v = ""
+            sts = sts + "\n" + k + ":" + v
+    return sts
+
+# _check_shared_key verifies the SharedKey Authorization header by
+# recomputing the HMAC-SHA256 over the string-to-sign with the account's
+# documented key. Returns None if valid, or an Azure error response.
 def _check_shared_key(req):
     headers = req.get("headers")
     if headers == None:
@@ -130,6 +235,15 @@ def _check_shared_key(req):
         return _az_error(403, "AuthenticationFailed", "Missing account name in SharedKey header.")
     if not _is_base64(signature):
         return _az_error(403, "AuthenticationFailed", "The shared key signature is not a valid base64 string.")
+
+    key_b64 = _SHARED_KEYS.get(account, None)
+    if key_b64 == None:
+        return _az_error(403, "AuthenticationFailed", "Server failed to authenticate the request. The account specified in the Authorization header was not found.")
+
+    sts = _shared_key_sts(req, account)
+    expected = crypto.hmac_sha256(crypto.base64_decode(key_b64), sts, encoding="base64")
+    if expected != signature:
+        return _az_error(403, "AuthenticationFailed", "Server failed to authenticate the request. Make sure the value of the Authorization header is formed correctly including the signature.")
     return None
 
 # _check_sas validates the SAS token query parameters.
@@ -300,7 +414,7 @@ def _container_not_found(container):
 def _gen_etag():
     n = store_kv_incr("azure", "etag_seq")
     hex = ""
-    v = n * 2654435761
+    v = n * 0x9E3779B1  # Knuth multiplicative hash (assembled hex literal)
     for i in range(32):
         rem = v % 16
         if rem < 10:
@@ -315,14 +429,62 @@ def _gen_etag():
         hex = "0" + hex
     return "0x8" + hex[:40]
 
-# _rfc1123 returns a synthetic RFC 1123 timestamp.
+# ====================================================================
+# Clock-driven timestamps
+# ====================================================================
+# Azure Storage returns Last-Modified / ETag / x-ms-creation-time as RFC 1123
+# HTTP dates ("Mon, 02 Jan 2006 15:04:05 GMT") taken from the current wall
+# clock. The engine's clock.now_rfc3339() is RFC 3339 ("2006-01-02T15:04:05Z"),
+# so _httpdate converts it (weekday via Zeller's congruence).
+
+_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+# Zeller's congruence yields h=0 for Saturday.
+_ZELLER_DAYS = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
+
+def _pad2(n):
+    if n < 10:
+        return "0" + str(n)
+    return str(n)
+
+def _httpdate():
+    now = clock.now_rfc3339()  # "YYYY-MM-DDTHH:MM:SSZ"
+    year = _to_int(now[0:4])
+    month = _to_int(now[5:7])
+    day = _to_int(now[8:10])
+    hh = now[11:13]
+    mm = now[14:16]
+    ss = now[17:19]
+
+    q = day
+    m = month
+    y = year
+    if m < 3:
+        m = m + 12
+        y = y - 1
+    k = y % 100
+    j = y // 100
+    h = (q + (13 * (m + 1)) // 5 + k + k // 4 + j // 4 + 5 * j) % 7
+
+    return _ZELLER_DAYS[h] + ", " + _pad2(day) + " " + _MONTHS[month - 1] + " " + _year_str(year) + " " + hh + ":" + mm + ":" + ss + " GMT"
+
+def _year_str(year):
+    if year >= 1000:
+        return str(year)
+    # Zero-pad short years (defensive; clock years are 4-digit).
+    s = str(year)
+    while len(s) < 4:
+        s = "0" + s
+    return s
+
+# _rfc1123 returns the current time as an RFC 1123 HTTP date.
 def _rfc1123():
-    return "Mon, 01 Jan 2024 00:00:00 GMT"
+    return _httpdate()
 
-# _iso8601 returns a synthetic ISO 8601 timestamp.
+# _iso8601 returns the current time (kept for callers that used the old
+# misnamed helper; the value is an RFC 1123 HTTP date like the real service).
 def _iso8601():
-    return "Mon, 01 Jan 2024 00:00:00 GMT"
+    return _httpdate()
 
-# _creation_time returns a synthetic x-ms-creation-time.
+# _creation_time returns the current time for x-ms-creation-time.
 def _creation_time():
-    return "Mon, 01 Jan 2024 00:00:00 GMT"
+    return _httpdate()

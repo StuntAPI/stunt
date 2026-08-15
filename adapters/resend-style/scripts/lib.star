@@ -36,9 +36,10 @@ def _next_email_id():
     n = store_kv_incr("resend", "email_seq")
     return "re_" + str(n)
 
-# _now_ts returns a synthetic Unix timestamp (stable across calls).
-def _now_ts():
-    return 1700000000
+# _now returns the current time as an RFC 3339 UTC timestamp — the wire
+# format Resend uses for created_at fields (live clock, not a fixed date).
+def _now():
+    return clock.now_rfc3339()
 
 # === Pagination ===
 

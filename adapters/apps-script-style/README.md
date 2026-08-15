@@ -47,3 +47,11 @@ removes it (its content goes with it). The `:run` endpoint simulates function
 execution for known patterns (functions whose names contain `hello`/`greet`,
 `add` with 2+ parameters, or `status`; anything else echoes the parameters
 back).
+
+## Clock
+
+`createTime` / `updateTime` on projects (seed, create, content update) and
+`version.createTime` on deployments are derived from the engine clock
+(`clock.now_rfc3339()`) in the Apps Script format — RFC3339 with
+milliseconds, e.g. `2026-08-15T10:00:00.000Z`. No hardcoded calendar dates;
+assertions should parse the value.

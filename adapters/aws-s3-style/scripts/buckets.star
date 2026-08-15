@@ -49,7 +49,7 @@ def on_create_bucket(req):
 
     bc.insert({
         "name": bucket,
-        "created": "2024-01-01T00:00:00.000Z",
+        "created": _unix_to_iso8601(clock.now_unix()),
         "region": region,
     })
 

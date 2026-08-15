@@ -76,9 +76,10 @@ def _oauth_error(error, description):
         "error_description": description,
     })
 
-# _epoch_ms returns a synthetic epoch-millis timestamp.
+# _epoch_ms returns the current time as epoch milliseconds (Salesforce's
+# issued_at wire format) from the live clock.
 def _epoch_ms():
-    return "1704067200000"
+    return str(clock.now_unix() * 1000)
 
 # _pad_b62 encodes n in base-62, left-padded to width chars.
 _B62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"

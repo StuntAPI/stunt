@@ -33,6 +33,7 @@ endpoints:
   - route: /{container}
     method: PUT
     handler: scripts/containers.star#on_create_container
+    concurrency_key: container
   - route: /{container}
     method: GET
     handler: scripts/blobs.star#on_container_get
@@ -42,6 +43,7 @@ endpoints:
   - route: /{container}
     method: DELETE
     handler: scripts/containers.star#on_delete_container
+    concurrency_key: container
 
   # --- Blob operations ---
   # Upload:   PUT /{container}/{blob} (x-ms-blob-type: BlockBlob)
@@ -51,6 +53,7 @@ endpoints:
   - route: /{container}/{blob}
     method: PUT
     handler: scripts/blobs.star#on_put_blob
+    concurrency_key: blob
   - route: /{container}/{blob}
     method: GET
     handler: scripts/blobs.star#on_get_blob
@@ -60,6 +63,7 @@ endpoints:
   - route: /{container}/{blob}
     method: DELETE
     handler: scripts/blobs.star#on_delete_blob
+    concurrency_key: blob
 
 # Backing stores — collections for stateful data.
 resources:

@@ -24,6 +24,7 @@ def on_create_applicant(req):
 
     seq = store_kv_incr("onfido", "applicant_seq")
     applicant_id = _gen_id("app", seq)
+    created_at = clock.now_rfc3339()
 
     ac = store_collection("applicants")
     ac.insert({
@@ -32,7 +33,7 @@ def on_create_applicant(req):
         "last_name": last_name,
         "dob": dob,
         "email": body.get("email", None),
-        "created_at": "2024-01-15T10:00:00.000Z",
+        "created_at": created_at,
         "href": "/v3.6/applicants/" + applicant_id,
     })
 
@@ -42,7 +43,7 @@ def on_create_applicant(req):
         "last_name": last_name,
         "dob": dob,
         "email": body.get("email", None),
-        "created_at": "2024-01-15T10:00:00.000Z",
+        "created_at": created_at,
         "href": "/v3.6/applicants/" + applicant_id,
     })
 

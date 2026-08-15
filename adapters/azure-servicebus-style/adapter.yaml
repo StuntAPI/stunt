@@ -26,6 +26,7 @@ endpoints:
   - route: /{queue}/messages/head
     method: DELETE
     handler: scripts/servicebus.star#on_receive_message
+    concurrency_key: queue
 
   # --- Service Bus: peek-lock settlement by lock token ---
   - route: /{queue}/messages/{lockToken}/{action}
@@ -90,6 +91,7 @@ endpoints:
   - route: /{account}/{queue}/messages
     method: POST
     handler: scripts/storage.star#on_send_storage_message
+    concurrency_key: queue
 
   # --- Storage queue: receive message (visibility timeout) ---
   - route: /{account}/{queue}/messages

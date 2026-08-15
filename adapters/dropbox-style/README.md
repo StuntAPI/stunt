@@ -113,3 +113,33 @@ services:
 ```
 
 Then `stunt up` and make requests to the served address.
+
+## Clock and content hashes
+
+`server_modified` timestamps are **live**: `clock.now_rfc3339()` (RFC 3339
+UTC) at request time. `client_modified` echoes the client-declared value
+from the upload request (`Dropbox-API-Arg` header or JSON body) and
+defaults to the upload time. Seeded entries are stamped once at seed time
+and stay stable.
+
+File metadata carries `content_hash` computed with Dropbox's own scheme
+(the value behind the `Dropbox-API-Content-Hash` header of the real API):
+the content is split into 4 MiB blocks, each block is SHA-256-hashed, the
+raw 32-byte digests are concatenated, and that byte string is SHA-256-
+hashed again, hex-encoded. The hash is content-derived — the same bytes
+always hash identically regardless of id or upload order. Equivalent Go:
+
+```go
+func contentHash(b []byte) string {
+	h := sha256.New()
+	for i := 0; i == 0 || i < len(b); i += 4 << 20 {
+		end := i + (4 << 20)
+		if end > len(b) {
+			end = len(b)
+		}
+		d := sha256.Sum256(b[i:end])
+		h.Write(d[:])
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+```

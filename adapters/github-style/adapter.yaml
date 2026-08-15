@@ -106,10 +106,16 @@ endpoints:
     handler: scripts/actions.star#on_get_run
     concurrency_key: run_id
 
-  # --- Webhooks (register) ---
+  # --- Webhooks (register + local receiver) ---
   - route: /repos/{owner}/{repo}/hooks
     method: POST
     handler: scripts/hooks.star#on_create_hook
+  # Local receiver surface for testing client signature verification
+  # (GitHub itself delivers to the external hook URL; this stand-in verifies
+  # X-Hub-Signature-256 against the registered hook secrets).
+  - route: /webhooks/receive
+    method: POST
+    handler: scripts/hooks.star#on_receive_webhook
 
   # --- GraphQL ---
   - route: /graphql

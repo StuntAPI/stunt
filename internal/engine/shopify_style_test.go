@@ -1255,3 +1255,54 @@ func jsonMustLineID(t *testing.T, orderBody string) any {
 	}
 	return out.Order.LineItems[0].ID
 }
+
+// TestShopifyStyleLiveTimestamps verifies created_at/updated_at are live
+// clock timestamps (RFC 3339) rather than a fixed synthetic date.
+func TestShopifyStyleLiveTimestamps(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "shopify-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"shopify": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["shopify"]
+
+	start := time.Now().UTC()
+	body, status := shopifyPostJSON(t, base+"/admin/api/2024-10/products.json", "shpat_test_token", map[string]any{
+		"product": map[string]any{
+			"title": "Clock Test Product",
+		},
+	})
+	if status != 201 {
+		t.Fatalf("create product -> %d, want 201; body %s", status, body)
+	}
+	product := jsonMustKey(t, body, "product", "").(map[string]any)
+	for _, field := range []string{"created_at", "updated_at"} {
+		raw, _ := product[field].(string)
+		ts, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			t.Fatalf("product %s = %q is not RFC 3339: %v", field, raw, err)
+		}
+		if ts.Before(start.Add(-time.Minute)) || ts.After(time.Now().Add(time.Minute)) {
+			t.Fatalf("product %s = %v not live (start %v)", field, ts, start)
+		}
+	}
+}

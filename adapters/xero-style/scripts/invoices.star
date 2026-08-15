@@ -106,8 +106,8 @@ def on_put_invoices(req):
             "Type": inv_in.get("Type", "ACCREC"),
             "Status": inv_in.get("Status", "DRAFT"),
             "Contact": inv_in.get("Contact", {}),
-            "Date": inv_in.get("Date", "2024-06-15T00:00:00"),
-            "DueDate": inv_in.get("DueDate", "2024-07-15T00:00:00"),
+            "Date": inv_in.get("Date", _now_dt()),
+            "DueDate": inv_in.get("DueDate", _plus_days_dt(_DEFAULT_TERMS_DAYS)),
             "LineItems": line_items,
             "Total": total,
             "AmountDue": total,
@@ -199,7 +199,7 @@ def on_post_payment(req):
         "PaymentID": payment_id,
         "Invoice": {"InvoiceID": invoice_id},
         "Amount": amount,
-        "Date": body.get("Date", "2024-06-15T00:00:00"),
+        "Date": body.get("Date", _now_dt()),
     }
 
     return _envelope("Payments", [payment])
