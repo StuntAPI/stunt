@@ -8,6 +8,22 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Added
 
+- **`fattureincloud-style` adapter** — a Fatture in Cloud-style bookkeeping API
+  v2 simulator: entities (companies), received and issued documents (full CRUD
+  + metodata categories), suppliers, clients, products (full CRUD), taxes,
+  cashbook, webhooks, archive. Models the v2 conventions client code gets
+  wrong against thinner sims: Laravel pagination envelopes (`last_page` must
+  be followed), `{data}` wrappers, company-id scoping where a foreign id is an
+  indistinguishable 404, genuine 401s for missing bearers, and amounts as
+  decimal strings (`"9800.00"`). Conformance test included.
+- **`escrow-style` adapter** — an Escrow.com-style transaction API simulator
+  (public 2017-09-01 surface): create with parties/items/schedules and a
+  caller-controlled or defaulted fee split, per-party agreement via PATCH
+  action, secured-state transitions, lookup by id or caller reference, webhook
+  registration, and a clearly-namespaced `/sim/transaction/{id}/fund`
+  affordance standing in for the hosted payment page no API can drive.
+  Conformance test included.
+
 - **`json_safe_decode(s)` builtin** — total JSON decode for handlers
   validating untrusted JSON (JWT claims, multipart metadata): returns the
   value or `None` instead of raising. Numbers decode as ints when integral,

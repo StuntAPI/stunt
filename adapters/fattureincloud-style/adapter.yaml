@@ -1,0 +1,167 @@
+# stunt adapter — Fatture in Cloud-style API v2 simulator (unofficial)
+# Docs: https://stuntapi.com/stunt
+#
+# Mimics the *structure* of a Fatture in Cloud-style invoicing/bookkeeping API
+# for LOCAL TESTING ONLY. It does not call the real API. All data is synthetic.
+# See DISCLAIMER.
+id: fattureincloud-style
+name: "Fatture in Cloud-style API v2 simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Fatture in Cloud API v2"
+  version: "2.0.29"
+
+endpoints:
+  # --- Companies (entities) ---
+  - route: /entities
+    method: GET
+    handler: scripts/entities.star#on_entities_list
+  - route: /entities
+    method: POST
+    handler: scripts/entities.star#on_entities_create
+  - route: /entities/{company_id}/info
+    method: GET
+    handler: scripts/entities.star#on_entity_info_get
+  - route: /entities/{company_id}/info
+    method: PUT
+    handler: scripts/entities.star#on_entity_info_put
+
+  # --- Received documents (supplier side — the spend side) ---
+  - route: /entities/{company_id}/received_documents
+    method: GET
+    handler: scripts/documents.star#on_received_documents_list
+  - route: /entities/{company_id}/received_documents
+    method: POST
+    handler: scripts/documents.star#on_received_documents_create
+  - route: /entities/{company_id}/received_documents/info
+    method: GET
+    handler: scripts/documents.star#on_received_documents_info
+  - route: /entities/{company_id}/received_documents/{id}
+    method: GET
+    handler: scripts/documents.star#on_received_document_get
+  - route: /entities/{company_id}/received_documents/{id}
+    method: PUT
+    handler: scripts/documents.star#on_received_document_modify
+  - route: /entities/{company_id}/received_documents/{id}
+    method: DELETE
+    handler: scripts/documents.star#on_received_document_delete
+
+  # --- Issued documents (sales side, same shape) ---
+  - route: /entities/{company_id}/issued_documents
+    method: GET
+    handler: scripts/documents.star#on_issued_documents_list
+  - route: /entities/{company_id}/issued_documents
+    method: POST
+    handler: scripts/documents.star#on_issued_documents_create
+  - route: /entities/{company_id}/issued_documents/info
+    method: GET
+    handler: scripts/documents.star#on_issued_documents_info
+  - route: /entities/{company_id}/issued_documents/{id}
+    method: GET
+    handler: scripts/documents.star#on_issued_document_get
+  - route: /entities/{company_id}/issued_documents/{id}
+    method: PUT
+    handler: scripts/documents.star#on_issued_document_modify
+  - route: /entities/{company_id}/issued_documents/{id}
+    method: DELETE
+    handler: scripts/documents.star#on_issued_document_delete
+
+  # --- Suppliers ---
+  - route: /entities/{company_id}/suppliers
+    method: GET
+    handler: scripts/contacts.star#on_suppliers_list
+  - route: /entities/{company_id}/suppliers
+    method: POST
+    handler: scripts/contacts.star#on_suppliers_create
+  - route: /entities/{company_id}/suppliers/{id}
+    method: GET
+    handler: scripts/contacts.star#on_supplier_get
+  - route: /entities/{company_id}/suppliers/{id}
+    method: PUT
+    handler: scripts/contacts.star#on_supplier_modify
+  - route: /entities/{company_id}/suppliers/{id}
+    method: DELETE
+    handler: scripts/contacts.star#on_supplier_delete
+
+  # --- Clients ---
+  - route: /entities/{company_id}/clients
+    method: GET
+    handler: scripts/contacts.star#on_clients_list
+  - route: /entities/{company_id}/clients
+    method: POST
+    handler: scripts/contacts.star#on_clients_create
+  - route: /entities/{company_id}/clients/{id}
+    method: GET
+    handler: scripts/contacts.star#on_client_get
+  - route: /entities/{company_id}/clients/{id}
+    method: PUT
+    handler: scripts/contacts.star#on_client_modify
+  - route: /entities/{company_id}/clients/{id}
+    method: DELETE
+    handler: scripts/contacts.star#on_client_delete
+
+  # --- Products ---
+  - route: /entities/{company_id}/products
+    method: GET
+    handler: scripts/products.star#on_products_list
+  - route: /entities/{company_id}/products
+    method: POST
+    handler: scripts/products.star#on_products_create
+  - route: /entities/{company_id}/products/{id}
+    method: GET
+    handler: scripts/products.star#on_product_get
+  - route: /entities/{company_id}/products/{id}
+    method: PUT
+    handler: scripts/products.star#on_product_modify
+  - route: /entities/{company_id}/products/{id}
+    method: DELETE
+    handler: scripts/products.star#on_product_delete
+
+  # --- Taxes / cashbook / archive ---
+  - route: /entities/{company_id}/taxes
+    method: GET
+    handler: scripts/misc.star#on_taxes_list
+  - route: /entities/{company_id}/cashbook/{year}/{month}
+    method: GET
+    handler: scripts/misc.star#on_cashbook_month
+  - route: /entities/{company_id}/archive
+    method: POST
+    handler: scripts/misc.star#on_archive_upload
+
+  # --- Webhooks (account level) ---
+  - route: /webhooks
+    method: GET
+    handler: scripts/webhooks.star#on_webhooks_list
+  - route: /webhooks
+    method: POST
+    handler: scripts/webhooks.star#on_webhooks_create
+  - route: /webhooks/{id}
+    method: GET
+    handler: scripts/webhooks.star#on_webhook_get
+  - route: /webhooks/{id}
+    method: PUT
+    handler: scripts/webhooks.star#on_webhook_modify
+  - route: /webhooks/{id}
+    method: DELETE
+    handler: scripts/webhooks.star#on_webhook_delete
+
+resources:
+  - name: companies
+    kind: collection
+  - name: received_documents
+    kind: collection
+  - name: issued_documents
+    kind: collection
+  - name: suppliers
+    kind: collection
+  - name: clients
+    kind: collection
+  - name: products
+    kind: collection
+  - name: cashbook
+    kind: collection
+  - name: archive
+    kind: collection
+  - name: webhooks
+    kind: collection
