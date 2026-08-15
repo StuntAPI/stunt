@@ -85,6 +85,8 @@ func TestAppsScriptStyleAdapter(t *testing.T) {
 	if _, ok := first["title"].(string); !ok {
 		t.Fatalf("title = %v, want string", first["title"])
 	}
+	assertRecentAppsScriptStamp(t, first["createTime"], "seed project createTime")
+	assertRecentAppsScriptStamp(t, first["updateTime"], "seed project updateTime")
 
 	// ===== Get content → SERVER_JS file =====
 
@@ -181,6 +183,25 @@ func TestAppsScriptStyleAdapter(t *testing.T) {
 }
 
 // === Apps Script test helpers ===
+
+// assertRecentAppsScriptStamp checks that v is an Apps Script-format
+// timestamp (RFC3339 with milliseconds) minted within the last 15 minutes —
+// the adapter derives createTime/updateTime from the engine clock, never a
+// hardcoded date.
+func assertRecentAppsScriptStamp(t *testing.T, v any, what string) {
+	t.Helper()
+	s, ok := v.(string)
+	if !ok || s == "" {
+		t.Fatalf("%s = %v, want non-empty timestamp string", what, v)
+	}
+	ts, err := time.Parse("2006-01-02T15:04:05.000Z", s)
+	if err != nil {
+		t.Fatalf("%s = %q, unparsable as Apps Script stamp: %v", what, s, err)
+	}
+	if d := time.Since(ts); d < -time.Minute || d > 15*time.Minute {
+		t.Fatalf("%s = %q, want within 15min of now (age %s)", what, s, d)
+	}
+}
 
 func appsScriptGet(t *testing.T, rawurl, token string) (string, int) {
 	t.Helper()

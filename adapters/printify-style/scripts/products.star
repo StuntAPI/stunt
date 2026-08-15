@@ -64,7 +64,7 @@ def on_create_product(req):
 
     seq = store_kv_incr("printify", "product_seq")
     product_id = _product_id(seq)
-    ts = 1700000000 + seq
+    ts = clock.now_unix()
 
     product = {
         "id": product_id,
@@ -124,7 +124,7 @@ def on_update_product(req):
         doc[k] = body[k]
 
     seq = store_kv_incr("printify", "update_seq")
-    doc["updated_at"] = 1700001000 + seq
+    doc["updated_at"] = clock.now_unix()
     c.update(product_id, doc)
 
     # Emit signed webhook (fire-and-forget; only if a hook subscribes to the

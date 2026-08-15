@@ -2,6 +2,8 @@ package engine
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -338,5 +340,121 @@ func TestDropboxStyleAdapter(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode != 404 {
 		t.Fatalf("GET unmatched route -> status %d, want 404", resp.StatusCode)
+	}
+}
+
+// dropboxContentHash mirrors the adapter's content hash: Dropbox's own
+// scheme of SHA-256 over the concatenated per-4MiB-block SHA-256 digests.
+func dropboxContentHash(b []byte) string {
+	const block = 4 << 20
+	h := sha256.New()
+	for i := 0; i == 0 || i < len(b); i += block {
+		end := i + block
+		if end > len(b) {
+			end = len(b)
+		}
+		d := sha256.Sum256(b[i:end])
+		h.Write(d[:])
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// TestDropboxStyleContentHashAndClock verifies that uploads carry a
+// content-derived hash in Dropbox's multi-block sha256 scheme (same bytes
+// -> same hash, different bytes -> different hash — never a counter) and
+// that server_modified is a live clock timestamp while client_modified
+// echoes the client-declared value.
+func TestDropboxStyleContentHashAndClock(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "dropbox-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"dropbox": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["dropbox"]
+
+	start := time.Now().UTC()
+
+	contentA := "clock-adoption content A"
+	body, status := postJSON(t, base+"/2/files/upload", map[string]any{
+		"path":            "/hash-a.txt",
+		"content":         contentA,
+		"client_modified": "2020-02-03T04:05:06Z",
+	})
+	if status != 200 {
+		t.Fatalf("upload A -> %d, want 200; body %s", status, body)
+	}
+	var fileA map[string]any
+	if err := json.Unmarshal([]byte(body), &fileA); err != nil {
+		t.Fatalf("unmarshal file A: %v (body %s)", err, body)
+	}
+	if got := fileA["content_hash"]; got != dropboxContentHash([]byte(contentA)) {
+		t.Fatalf("content_hash A = %v, want Go-computed %s", got, dropboxContentHash([]byte(contentA)))
+	}
+	if fileA["client_modified"] != "2020-02-03T04:05:06Z" {
+		t.Fatalf("client_modified = %v, want the client-declared value echoed", fileA["client_modified"])
+	}
+	sm, _ := fileA["server_modified"].(string)
+	ts, err := time.Parse(time.RFC3339, sm)
+	if err != nil {
+		t.Fatalf("server_modified %q is not RFC 3339: %v", sm, err)
+	}
+	if ts.Before(start.Add(-time.Minute)) || ts.After(time.Now().Add(time.Minute)) {
+		t.Fatalf("server_modified %v not live (start %v)", ts, start)
+	}
+
+	// Different content -> the OTHER Go-computed hash (content-derived, and
+	// distinct from A's — a counter would collide here).
+	contentB := "clock-adoption content B (different bytes)"
+	body, status = postJSON(t, base+"/2/files/upload", map[string]any{
+		"path":    "/hash-b.txt",
+		"content": contentB,
+	})
+	if status != 200 {
+		t.Fatalf("upload B -> %d, want 200; body %s", status, body)
+	}
+	var fileB map[string]any
+	if err := json.Unmarshal([]byte(body), &fileB); err != nil {
+		t.Fatalf("unmarshal file B: %v (body %s)", err, body)
+	}
+	if got := fileB["content_hash"]; got != dropboxContentHash([]byte(contentB)) {
+		t.Fatalf("content_hash B = %v, want Go-computed %s", got, dropboxContentHash([]byte(contentB)))
+	}
+	if fileB["content_hash"] == fileA["content_hash"] {
+		t.Fatalf("distinct contents produced identical content_hash %v", fileA["content_hash"])
+	}
+
+	// Same content again -> same hash (deterministic in content alone).
+	body, status = postJSON(t, base+"/2/files/upload", map[string]any{
+		"path":    "/hash-a-again.txt",
+		"content": contentA,
+	})
+	if status != 200 {
+		t.Fatalf("upload A again -> %d, want 200; body %s", status, body)
+	}
+	var fileA2 map[string]any
+	if err := json.Unmarshal([]byte(body), &fileA2); err != nil {
+		t.Fatalf("unmarshal file A2: %v (body %s)", err, body)
+	}
+	if fileA2["content_hash"] != fileA["content_hash"] {
+		t.Fatalf("same content, different hash: %v vs %v", fileA2["content_hash"], fileA["content_hash"])
 	}
 }

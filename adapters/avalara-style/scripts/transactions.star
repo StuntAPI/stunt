@@ -20,7 +20,9 @@ def on_create_transaction(req):
 
     company_code = body.get("companyCode", "DEFAULT")
     type_ = body.get("type", "SalesInvoice")
-    date = body.get("date", "2024-06-15")
+    # AvaTax defaults a transaction's date to today when omitted — derive
+    # it from the live clock (RFC 3339 UTC "YYYY-MM-DD" prefix).
+    date = body.get("date", clock.now_rfc3339()[:10])
     customer_code = body.get("customerCode", "CUST001")
 
     addresses = body.get("addresses", {})

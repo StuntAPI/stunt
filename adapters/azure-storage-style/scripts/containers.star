@@ -29,7 +29,7 @@ def on_list_containers(req):
         xml = xml + "    <Container>\n"
         xml = xml + "      <Name>" + _xml_escape(c.get("name", "")) + "</Name>\n"
         xml = xml + "      <Properties>\n"
-        xml = xml + "        <Last-Modified>" + _xml_escape(c.get("lastModified", "Mon, 01 Jan 2024 00:00:00 GMT")) + "</Last-Modified>\n"
+        xml = xml + "        <Last-Modified>" + _xml_escape(c.get("lastModified", _rfc1123())) + "</Last-Modified>\n"
         xml = xml + "        <Etag>" + _xml_escape(c.get("etag", "")) + "</Etag>\n"
         pa = c.get("publicAccess", "")
         if pa == None:

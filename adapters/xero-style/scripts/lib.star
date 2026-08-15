@@ -132,6 +132,22 @@ def _guid(n):
     # Format as 8-4-4-4-12.
     return s[0:8] + "-" + s[8:12] + "-" + s[12:16] + "-" + s[16:20] + "-" + s[20:32]
 
+# _now_dt returns the current instant as an RFC3339 timestamp. Clock-derived
+# (never a frozen literal): the default Date on newly written invoices,
+# payments and other dated entities.
+def _now_dt():
+    return clock.now_rfc3339()
+
+# _plus_days_dt returns the instant n days from now as RFC3339. The default
+# DueDate on new invoices is _plus_days_dt(30) (Xero's 30-day terms default).
+_DAY_SECS = 24 * 3600
+
+def _plus_days_dt(n):
+    return clock.unix_to_rfc3339(clock.now_unix() + n * _DAY_SECS)
+
+# Default payment terms (days) applied when an invoice carries no DueDate.
+_DEFAULT_TERMS_DAYS = 30
+
 # _xero_id returns the Id field for the Xero envelope.
 def _xero_id():
     n = store_kv_incr("xero", "envelope_seq")
@@ -233,8 +249,8 @@ def _invoice_public(doc):
         "Type": doc.get("Type", "ACCREC"),
         "Status": doc.get("Status", "DRAFT"),
         "Contact": doc.get("Contact", {}),
-        "Date": doc.get("Date", "2024-06-15T00:00:00"),
-        "DueDate": doc.get("DueDate", "2024-07-15T00:00:00"),
+        "Date": doc.get("Date", _now_dt()),
+        "DueDate": doc.get("DueDate", _plus_days_dt(_DEFAULT_TERMS_DAYS)),
         "LineItems": doc.get("LineItems", []),
         "Total": doc.get("Total", "0.00"),
         "AmountDue": doc.get("AmountDue", "0.00"),
@@ -247,7 +263,7 @@ def _payment_public(doc):
         "PaymentID": doc.get("PaymentID", ""),
         "Invoice": doc.get("Invoice", {}),
         "Amount": doc.get("Amount", "0.00"),
-        "Date": doc.get("Date", "2024-06-15T00:00:00"),
+        "Date": doc.get("Date", _now_dt()),
     }
 
 # ====================================================================

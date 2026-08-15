@@ -47,22 +47,43 @@ Requests without Bearer return `401`. Requests without `xero-tenant-id` return `
 
 ## Webhooks
 
-Xero webhook signature scheme:
+Inbound webhook receiver (`POST /webhooks`) — Xero's signature scheme,
+verified **for real**:
+
 ```
 x-xero-signature: base64(HMAC-SHA256(webhook_key, raw_request_body))
 ```
-The `webhook_key` is configured in the Xero app. The signature is computed
-over the **raw** request body (not parsed JSON).
 
-For this simulator the documented mock `webhook_key` is the static string
-`stunt-xero-webhook-key`, so a conforming client sends:
+The `webhook_key` is configured in the Xero app. The signature is computed
+over the **raw** request bytes (verbatim, never re-serialized JSON).
+
+For this simulator the synthetic `webhook_key` is the documented constant
+`stunt-xero-webhook-key` (public + low-entropy; local stunt only — never
+reuse outside the simulator), so a conforming client sends:
 
 ```
 x-xero-signature: base64(HMAC-SHA256("stunt-xero-webhook-key", raw_request_body))
 ```
 
-A missing header returns `401`. Any non-empty signature value is accepted as
-valid for local testing.
+Verification in Go:
+
+```go
+mac := hmac.New(sha256.New, []byte("stunt-xero-webhook-key"))
+mac.Write(rawBody) // the verbatim request bytes
+expected := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+if !hmac.Equal([]byte(expected), []byte(r.Header.Get("x-xero-signature"))) {
+    http.Error(w, "Unauthorized", http.StatusUnauthorized) // 401
+}
+```
+
+Behavior:
+
+- Correct signature → `200 {"status":"OK"}`.
+- Missing header, or a signature that does not match the MAC of the raw
+  body → `401 Unauthorized` with Xero's error envelope
+  (`{"ErrorNumber":"Unauthorized","Type":"Unauthorized","Message":...}`).
+  Xero requires 401 on verification failure; any other status is treated as
+  retryable and eventually disables the webhook.
 
 ## Endpoints
 
@@ -114,6 +135,14 @@ curl "http://localhost:8080/api.xro/2.0/Invoices?page=1&pageSize=50" \
   -H "xero-tenant-id: a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 # → { "Id": "...", "Status": "OK", "Invoices": [...], "nextPage": "2" }
 ```
+
+## Dates
+
+Dates on newly written entities are **clock-derived**, never frozen
+literals: an invoice created without a `Date` gets the current instant
+(RFC3339), and one created without a `DueDate` gets now + 30 days (Xero's
+default terms). Payments recorded without a `Date` likewise default to the
+current instant.
 
 ## Response shapes
 

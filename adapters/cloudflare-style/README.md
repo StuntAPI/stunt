@@ -228,3 +228,11 @@ Authorization: Bearer stunt-api-token-123
 {"success": true, ..., "result": [{"results": [...], "success": true,
   "meta": {"changes": 0, "rows_read": 3, ...}}]}
 ```
+
+## Clock
+
+`created_on` / `modified_on` (zones, DNS records, workers, rules, R2, D1)
+are **live**: they come from the engine clock (`clock.now_rfc3339()`,
+RFC 3339 UTC) at request time. Seeded resources are stamped once at seed
+time and then stay stable. DNS `ttl` fields keep Cloudflare's DNS semantics
+(1 = auto, 60–86400 seconds) and are unrelated to the wall clock.

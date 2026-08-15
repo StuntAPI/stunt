@@ -89,7 +89,7 @@ def on_send_order(req):
 
     doc["status"] = "fulfilled"
     seq = store_kv_incr("printify", "send_seq")
-    doc["updated_at"] = 1700001000 + seq
+    doc["updated_at"] = clock.now_unix()
     c.update(order_id, doc)
 
     # Emit signed webhooks (fire-and-forget; each only if a hook subscribes

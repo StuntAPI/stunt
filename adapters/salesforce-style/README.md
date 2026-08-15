@@ -131,3 +131,12 @@ Then `stunt up` and point your Salesforce client at the served address.
 Salesforce enforces governor limits (100 SOQL queries per transaction, 10,000 DML
 rows, etc.). This mock does NOT hard-fail on these — they are documented for
 reference. Real integrations must design for these limits.
+
+## Clock
+
+Record timestamps (`CreatedDate`, `LastModifiedDate`, …) are **live**: they
+come from the engine clock (`clock.now_rfc3339()`, RFC 3339 UTC) at request
+time. OAuth `issued_at` is epoch milliseconds from the same clock. SOQL
+date literals in queries (e.g. `CreatedDate >= 2024-01-01T00:00:00Z`) are
+compared lexically against the stored timestamps, as in the real API.
+Seeded records are stamped once at seed time and then stay stable.

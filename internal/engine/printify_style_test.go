@@ -162,6 +162,8 @@ func TestPrintifyStyleAdapter(t *testing.T) {
 	if product["title"] != "My Custom T-Shirt" {
 		t.Fatalf("product title = %v, want My Custom T-Shirt", product["title"])
 	}
+	assertRecentPrintifyStamp(t, product["created_at"], "created product created_at")
+	assertRecentPrintifyStamp(t, product["updated_at"], "created product updated_at")
 
 	// ===== Retrieve product =====
 
@@ -193,6 +195,7 @@ func TestPrintifyStyleAdapter(t *testing.T) {
 	if updated["title"] != "Updated T-Shirt Title" {
 		t.Fatalf("updated title = %v, want Updated T-Shirt Title", updated["title"])
 	}
+	assertRecentPrintifyStamp(t, updated["updated_at"], "updated product updated_at")
 
 	// ===== List products =====
 
@@ -311,6 +314,21 @@ func TestPrintifyStyleAdapter(t *testing.T) {
 }
 
 // === Helpers ===
+
+// assertRecentPrintifyStamp checks that v is a Unix-seconds timestamp (JSON
+// number) minted within the last 15 minutes — the adapter derives
+// created_at/updated_at from the engine clock, never a hardcoded epoch.
+func assertRecentPrintifyStamp(t *testing.T, v any, what string) {
+	t.Helper()
+	f, ok := v.(float64)
+	if !ok {
+		t.Fatalf("%s = %v, want numeric epoch seconds", what, v)
+	}
+	ts := time.Unix(int64(f), 0)
+	if d := time.Since(ts); d < -time.Minute || d > 15*time.Minute {
+		t.Fatalf("%s = %v, want within 15min of now (age %s)", what, v, d)
+	}
+}
 
 func printifyGet(t *testing.T, target, token string) (string, int) {
 	t.Helper()

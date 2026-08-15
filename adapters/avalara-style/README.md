@@ -103,3 +103,10 @@ Each line's `details` array shows the per-jurisdiction breakdown (rate + tax).
 // Error
 { "error": { "code": "AuthenticationRequired", "message": "...", "target": "", "details": [] } }
 ```
+
+## Clock
+
+A transaction's `date` defaults to today (live clock, `clock.now_rfc3339()`
+UTC date prefix) when the create request omits it — matching AvaTax, which
+stamps the current date on undated transactions. Requests that carry an
+explicit `date` keep it verbatim.

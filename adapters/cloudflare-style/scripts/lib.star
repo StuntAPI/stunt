@@ -188,9 +188,11 @@ def _gen_uuid():
     h = hex[:32]
     return h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:32]
 
-# _iso8601 returns a synthetic ISO 8601 timestamp.
+# _iso8601 returns the current time as an ISO 8601 (RFC 3339 UTC)
+# timestamp — created_on/modified_on reflect request time; seeded docs are
+# stamped once at seed time and stay stable.
 def _iso8601():
-    return "2024-01-01T00:00:00.000000Z"
+    return clock.now_rfc3339()
 
 # ====================================================================
 # Zone helpers (shared by zones.star, dns.star and rules.star)

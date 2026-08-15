@@ -272,3 +272,61 @@ func avGet(t *testing.T, rawurl, auth string) (string, int) {
 	b, _ := io.ReadAll(resp.Body)
 	return string(b), resp.StatusCode
 }
+
+// TestAvalaraStyleClockDefaultDate verifies that a transaction created
+// without a date defaults to today (live clock), matching AvaTax.
+func TestAvalaraStyleClockDefaultDate(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "avalara-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"avalara": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["avalara"]
+
+	body, status := avPostJSON(t, base+"/v2/transactions/create", "Bearer av-token", map[string]any{
+		"companyCode":  "DEFAULT",
+		"type":         "SalesInvoice",
+		"customerCode": "CUST-CLOCK",
+		"addresses": map[string]any{
+			"singleLocation": map[string]any{
+				"line1":   "1 Market St",
+				"city":    "San Francisco",
+				"region":  "CA",
+				"country": "US",
+			},
+		},
+		"lines": []map[string]any{
+			{"number": "1", "quantity": 1, "amount": "10.00", "taxCode": "P0000000"},
+		},
+	})
+	if status != 200 {
+		t.Fatalf("transactions/create (no date) -> %d, want 200; body %s", status, body)
+	}
+	var txnResp map[string]any
+	if err := json.Unmarshal([]byte(body), &txnResp); err != nil {
+		t.Fatalf("unmarshal txn: %v (body %s)", err, body)
+	}
+	wantDate := time.Now().UTC().Format("2006-01-02")
+	if txnResp["date"] != wantDate {
+		t.Fatalf("transaction date = %v, want today %s (clock-derived default)", txnResp["date"], wantDate)
+	}
+}

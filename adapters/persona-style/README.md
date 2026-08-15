@@ -53,6 +53,50 @@ a stunt-only flag.
 Persona sends webhook events signed with `Persona-Signature: t=<ts>,v1=<hmac>`.
 POST to `/api/inquiry/v1/webhooks` to simulate receiving a webhook event.
 
+## Webhook verification
+
+Both directions use Persona's scheme:
+
+```
+Persona-Signature: t=<unix>,v1=<hex(HMAC-SHA256(secret, t + "." + raw_body))>
+```
+
+- **Outbound** (signed delivery): at an inquiry's terminal transition the
+  adapter emits an `inquiry.completed` (or `inquiry.declined`) event signed
+  exactly the way Persona signs its webhooks.
+- **Inbound** (receiver): `POST /api/inquiry/v1/webhooks` is the local
+  stand-in for YOUR webhook endpoint. It verifies for real, in order:
+  1. the header parses into `t=` and `v1=` (else 401 `invalid_signature`);
+  2. `t` is a unix timestamp no more than **5 minutes** away from
+     `clock.now_unix()` — replay protection (else 401 `invalid_timestamp`);
+  3. `v1` equals HMAC-SHA256 over `t + "." + raw_body`, where `raw_body` is
+     the exact bytes on the wire (`req.raw_body`, never a re-serialized copy)
+     and `t` is the header's timestamp string verbatim (else 401
+     `invalid_signature`).
+
+  Rejections use Persona's JSON:API error envelope
+  (`{"errors": [{"status": "401", ...}]}`).
+
+The signing secret is the fixed synthetic constant documented here and in
+`scripts/lib.star`:
+
+```
+stunt_persona_mock_signing_key
+```
+
+Public + low-entropy: local stunt only. Tests and receivers compute the same
+MAC with it:
+
+```go
+t := strconv.FormatInt(time.Now().Unix(), 10)
+mac := hmac.New(sha256.New, []byte("stunt_persona_mock_signing_key"))
+mac.Write([]byte(t + "." + string(rawBody))) // t verbatim + verbatim request bytes
+expected := "t=" + t + ",v1=" + hex.EncodeToString(mac.Sum(nil))
+if !hmac.Equal([]byte(expected), []byte(r.Header.Get("Persona-Signature"))) {
+    // 401
+}
+```
+
 ---
 
 *Synthetic. No real Persona data. See [DISCLAIMER](DISCLAIMER).*

@@ -3,43 +3,165 @@
 # Azure Service Bus and Storage Queue APIs use Shared Access Signature (SAS)
 # tokens for auth. A SAS token looks like:
 #   SharedAccessSignature sr=<resource>&sig=<signature>&se=<expiry>&skn=<keyname>
-# The signature is an HMAC-SHA256 over the string-to-sign (resource + expiry).
-# Here we do STRUCTURAL validation only: the token must contain "sr=" and
-# "sig=" and "se=" parameters. We also accept Bearer tokens.
+# The signature is base64url(HMAC-SHA256(key, resource + "\n" + expiry)).
+# We VERIFY the token for real against a documented synthetic key (see
+# README "SAS verification"): a wrong signature yields 401 InvalidSignature,
+# an expired se yields 401 ExpiredToken, and a malformed token yields
+# 401 MalformedToken — the real ASB condition codes. Bearer tokens are also
+# accepted.
 
-# _check_auth validates either a SAS token or a Bearer token.
-# Returns the token string if valid, or None if missing/invalid.
-def _check_auth(req):
-    auth = req["headers"].get("Authorization", "")
-    if auth == None or auth == "":
-        return None
-    # Bearer token
-    if auth[:7] == "Bearer ":
-        return auth[7:]
-    # SAS token (SharedAccessSignature sr=...&sig=...&se=...&skn=...)
-    if auth[:22] == "SharedAccessSignature ":
-        sas = auth[21:]
-        if _contains(sas, "sr=") and _contains(sas, "sig=") and _contains(sas, "se="):
-            return auth
-        return None
-    return None
+# Documented synthetic SAS key (see README) so tests and clients can compute
+# the same MACs.
+_SAS_KEY_NAME = "stuntkey"
+_SAS_KEY_SECRET = "stunt-servicebus-signing-key"
+# RootManageSharedAccessKey is the key name every real namespace ships by
+# default; accept it (same synthetic secret) so SDK defaults work.
+_SAS_KEYS = {
+    _SAS_KEY_NAME: _SAS_KEY_SECRET,
+    "RootManage" + "SharedAccessKey": _SAS_KEY_SECRET,
+}
 
-# _require_auth returns (token, None) if auth is valid, or
-# (None, error_response) if missing.
-def _require_auth(req):
-    token = _check_auth(req)
-    if token == None:
-        return None, respond(401, {
-            "error": {
-                "code": "Unauthorized",
-                "message": "The specified SAS token or Bearer token is missing or invalid.",
-            },
-        })
-    return token, None
+# _split divides s on sep, returning a list.
+def _split(s, sep):
+    parts = []
+    current = ""
+    for i in range(len(s)):
+        if sep != "" and s[i:i+len(sep)] == sep:
+            parts.append(current)
+            current = ""
+        else:
+            current = current + s[i]
+    parts.append(current)
+    return parts
+
+# _find_substr returns the index of the first occurrence of needle in s,
+# or -1 if not found.
+def _find_substr(s, needle):
+    if len(needle) == 0:
+        return 0
+    for i in range(len(s) - len(needle) + 1):
+        match = True
+        for j in range(len(needle)):
+            if s[i+j] != needle[j]:
+                match = False
+                break
+        if match:
+            return i
+    return -1
 
 # _contains reports whether substr appears within s.
 def _contains(s, substr):
     return s.find(substr) >= 0
+
+# _is_digits returns True if s is a non-empty string of decimal digits.
+def _is_digits(s):
+    if len(s) == 0:
+        return False
+    for i in range(len(s)):
+        ch = s[i]
+        if ch < "0" or ch > "9":
+            return False
+    return True
+
+# _hex_val maps a hex digit character to its value, or -1.
+def _hex_val(ch):
+    if ch >= "0" and ch <= "9":
+        return ord(ch) - ord("0")
+    if ch >= "a" and ch <= "f":
+        return ord(ch) - ord("a") + 10
+    if ch >= "A" and ch <= "F":
+        return ord(ch) - ord("A") + 10
+    return -1
+
+# _percent_decode decodes %XX escapes (and "+" as space) so a URL-encoded
+# sr= resource can be signed over its decoded form, like the real service.
+def _percent_decode(s):
+    out = ""
+    i = 0
+    while i < len(s):
+        ch = s[i]
+        if ch == "%" and i + 2 < len(s):
+            hi = _hex_val(s[i+1])
+            lo = _hex_val(s[i+2])
+            if hi >= 0 and lo >= 0:
+                out = out + chr(hi * 16 + lo)
+                i = i + 3
+                continue
+        if ch == "+":
+            out = out + " "
+        else:
+            out = out + ch
+        i = i + 1
+    return out
+
+# _strip_eq removes trailing "=" padding (real tokens are unpadded base64url).
+def _strip_eq(s):
+    while len(s) > 0 and s[len(s)-1] == "=":
+        s = s[:len(s)-1]
+    return s
+
+# _parse_sas splits "k1=v1&k2=v2&..." into a dict.
+def _parse_sas(sas):
+    fields = {}
+    for part in _split(sas, "&"):
+        eq = _find_substr(part, "=")
+        if eq <= 0:
+            continue
+        fields[part[:eq]] = part[eq+1:]
+    return fields
+
+# _verify_sas checks a SharedAccessSignature token (everything after the
+# scheme). Returns (token, None) when valid, or (None, error_response).
+def _verify_sas(sas):
+    fields = _parse_sas(sas)
+    sr = fields.get("sr", "")
+    sig = fields.get("sig", "")
+    se = fields.get("se", "")
+    skn = fields.get("skn", "")
+    if sr == "" or sig == "" or se == "" or skn == "":
+        return None, _az_err(401, "MalformedToken", "The specified SAS token is malformed: it must contain sr, sig, se, and skn.")
+    if not _is_digits(se):
+        return None, _az_err(401, "MalformedToken", "The specified SAS token has a malformed se (expiry) value.")
+
+    expiry = _to_int(se)
+    if expiry <= clock.now_unix():
+        return None, _az_err(401, "ExpiredToken", "The specified SAS token has expired.")
+
+    secret = _SAS_KEYS.get(skn, None)
+    if secret == None:
+        return None, _az_err(401, "InvalidSignature", "The key name in the specified SAS token is unknown: " + skn + ".")
+
+    string_to_sign = _percent_decode(sr) + "\n" + se
+    expected = crypto.hmac_sha256(secret, string_to_sign, encoding="base64url")
+    if _strip_eq(sig) != expected:
+        return None, _az_err(401, "InvalidSignature", "The signature on the specified SAS token is invalid.")
+    return sas, None
+
+# _check_auth validates either a SAS token or a Bearer token.
+# Returns (token, None) if valid, or (None, error_response).
+def _check_auth(req):
+    headers = req.get("headers")
+    if headers == None:
+        headers = {}
+    auth = headers.get("Authorization", "")
+    if auth == None:
+        auth = ""
+    if auth == "":
+        return None, _az_err(401, "Unauthorized", "Missing Authorization: a SharedAccessSignature token or Bearer token is required.")
+    # Bearer token
+    if auth[:7] == "Bearer ":
+        if len(auth) > 7:
+            return auth[7:], None
+        return None, _az_err(401, "MalformedToken", "The specified Bearer token is empty.")
+    # SAS token (SharedAccessSignature sr=...&sig=...&se=...&skn=...)
+    if auth[:22] == "SharedAccessSignature ":
+        return _verify_sas(auth[22:])
+    return None, _az_err(401, "MalformedToken", "The Authorization header scheme is not supported; use SharedAccessSignature or Bearer.")
+
+# _require_auth returns (token, None) if auth is valid, or
+# (None, error_response) if missing.
+def _require_auth(req):
+    return _check_auth(req)
 
 # _to_int parses a decimal string to int.
 def _to_int(s):

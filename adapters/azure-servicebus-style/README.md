@@ -23,12 +23,52 @@ when the lock expires) and **topic/subscription fan-out**.
 ## Auth
 
 - **SAS Token:** `Authorization: SharedAccessSignature sr=<resource>&sig=<signature>&se=<expiry>&skn=<keyname>`
-  - `sr` — resource URI (e.g., `https://mybus.servicebus.windows.net/myqueue`)
-  - `sig` — HMAC-SHA256 signature over `<sr>\n<se>` (Base64Url encoded)
+  - `sr` — resource URI (e.g., `https://mybus.servicebus.windows.net/myqueue`); percent-escapes are decoded before signing
+  - `sig` — HMAC-SHA256 signature over `<sr>\n<se>` (base64url encoded)
   - `se` — expiry timestamp (Unix epoch)
   - `skn` — key name
-  - Structural validation only: the token must contain `sr=`, `sig=`, and `se=`.
-- **Bearer:** `Authorization: Bearer <token>` also accepted.
+  - **Verified for real** (see [SAS verification](#sas-verification)).
+- **Bearer:** `Authorization: Bearer <token>` also accepted (any non-empty token).
+
+## SAS verification
+
+The token's `sig` is recomputed and compared, and `se` is checked against the
+engine clock:
+
+```
+stringToSign = <sr, percent-decoded> + "\n" + <se>
+sig          = base64url( HMAC-SHA256( secret(skn), stringToSign ) )   // unpadded
+```
+
+Failures return the real Azure Service Bus condition codes (HTTP 401):
+
+| Condition | Status | `error.code` |
+|-----------|--------|--------------|
+| Missing `sr`/`sig`/`se`/`skn`, non-numeric `se`, or unknown scheme | 401 | `MalformedToken` |
+| `se` <= now (`clock.now_unix()`) | 401 | `ExpiredToken` |
+| Signature mismatch or unknown `skn` | 401 | `InvalidSignature` |
+| No Authorization header at all | 401 | `Unauthorized` |
+
+### Synthetic credentials (documented)
+
+| Key name (`skn`) | Secret |
+|------------------|--------|
+| `stuntkey` | `stunt-servicebus-signing-key` |
+
+Tests and clients derive the same MACs from these constants (the adapter's
+Go tests sign with `crypto/hmac` + `encoding/base64` in Go). The key table
+lives in `scripts/lib.star` (`_SAS_KEYS`).
+
+### Signing example (Go)
+
+```go
+se := time.Now().Add(time.Hour).Unix()
+sts := sr + "\n" + strconv.FormatInt(se, 10)
+mac := hmac.New(sha256.New, []byte("stunt-servicebus-signing-key"))
+mac.Write([]byte(sts))
+auth := fmt.Sprintf("SharedAccessSignature sr=%s&sig=%s&se=%d&skn=%s",
+    sr, base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), se, "stuntkey")
+```
 
 ## Endpoints
 

@@ -11,10 +11,11 @@ def _next_id():
     # Atomic increment via store_kv_incr (race-free under concurrent requests).
     return "id_" + str(store_kv_incr("dropbox", "id_seq"))
 
-# _now returns a synthetic ISO-8601 timestamp. The value is fixed for
-# determinism in local testing.
+# _now returns the current time as an ISO-8601 (RFC 3339 UTC) timestamp
+# from the live clock — server_modified always reflects upload/mutation
+# time, like the real API.
 def _now():
-    return "2024-01-15T12:00:00Z"
+    return clock.now_rfc3339()
 
 # _name_from_path extracts the file/folder name from a full path.
 # "/Homework/answers.txt" -> "answers.txt"
@@ -98,6 +99,16 @@ def on_upload(req):
     b = store_blob("dropbox")
     b.put(file_id, content)
 
+    # client_modified: the client-declared modification time from the
+    # upload request (Dropbox-API-Arg header or convenience JSON body) when
+    # provided; otherwise the upload time. server_modified is always the
+    # server's live clock.
+    client_modified = body.get("client_modified", "")
+    if client_modified == None or client_modified == "":
+        client_modified = _api_arg(req).get("client_modified", "")
+    if client_modified == None or client_modified == "":
+        client_modified = _now()
+
     name = _name_from_path(path)
     doc = {
         ".tag": "file",
@@ -106,8 +117,9 @@ def on_upload(req):
         "path_lower": path.lower(),
         "path_display": path,
         "size": len(content),
-        "client_modified": _now(),
+        "client_modified": client_modified,
         "server_modified": _now(),
+        "content_hash": _content_hash(content),
     }
     c = store_collection("entries")
     c.insert(doc)

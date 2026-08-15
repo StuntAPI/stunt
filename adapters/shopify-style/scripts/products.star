@@ -66,8 +66,8 @@ def on_create_product(req):
             built_variants.append(_variant_view(v, pid))
     else:
         built_variants.append({
-            "id": pid + 1,
-            "product_id": pid,
+            "id": _num_id(pid) + 1,
+            "product_id": _num_id(pid),
             "title": "Default Title",
             "price": "0.00",
             "sku": "",

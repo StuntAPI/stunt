@@ -47,6 +47,14 @@ def _to_int(s):
             return 0
     return n
 
+# _ig_now returns the current time in the Graph API media-timestamp format
+# (RFC3339 with a numeric UTC offset, e.g. "...T00:00:00+0000" — no colon in
+# the offset, matching Instagram's real media nodes). Derived from the
+# engine clock, so published media timestamps track real elapsed time.
+def _ig_now():
+    rfc = clock.now_rfc3339()
+    return rfc[:-1] + "+0000"
+
 # _get_query safely returns a query parameter value.
 def _get_query(req, key, default_val):
     q = req.get("query")

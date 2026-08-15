@@ -28,16 +28,22 @@ endpoints:
   - route: /{bucket}
     method: PUT
     handler: scripts/buckets.star#on_create_bucket
+    concurrency_key: bucket
   # Delete bucket: DELETE /{bucket} (must be empty, per S3 semantics)
   - route: /{bucket}
     method: DELETE
     handler: scripts/buckets.star#on_delete_bucket
+    concurrency_key: bucket
 
   # --- Object operations ---
   # Upload object: PUT /{bucket}/{key}
+  # concurrency_key serialises the read-modify-write (find existing doc +
+  # blob id, then insert/update) against concurrent writers of the same
+  # bucket.
   - route: /{bucket}/{key}
     method: PUT
     handler: scripts/objects.star#on_put_object
+    concurrency_key: bucket
   # Download object: GET /{bucket}/{key}
   - route: /{bucket}/{key}
     method: GET
@@ -47,9 +53,11 @@ endpoints:
     method: HEAD
     handler: scripts/objects.star#on_head_object
   # Delete object: DELETE /{bucket}/{key}
+  # concurrency_key serialises doc+blob deletion against overwriters.
   - route: /{bucket}/{key}
     method: DELETE
     handler: scripts/objects.star#on_delete_object
+    concurrency_key: bucket
 
 # Backing stores — collections for stateful data.
 resources:
@@ -58,7 +66,9 @@ resources:
   - name: objects
     kind: collection
 
-# Auth scheme: SigV4 (AWS4-HMAC-SHA256). Structural validation only for v1.
+# Auth scheme: SigV4 (AWS4-HMAC-SHA256), verified for real (canonical
+# request rebuilt + HMAC chain recomputed with the documented synthetic
+# credentials; see README).
 identity:
   token_scheme: custom
 

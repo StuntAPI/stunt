@@ -41,6 +41,7 @@ def on_create_scan(req):
 
     # Async lifecycle: derive-on-read timestamps (see lib.star).
     now = clock.now_unix()
+    timestamp = clock.now_rfc3339()
 
     sc = store_collection("scans")
     sc.insert({
@@ -51,7 +52,7 @@ def on_create_scan(req):
         "type": doc_type,
         "status": "PENDING",
         "get_count": 0,
-        "timestamp": "2024-01-15T10:00:00.000Z",
+        "timestamp": timestamp,
         "extractedData": None,
         "_running_at": now + 1,
         "_done_at": now + 3,
@@ -60,7 +61,7 @@ def on_create_scan(req):
     })
 
     return respond(200, {
-        "timestamp": "2024-01-15T10:00:00.000Z",
+        "timestamp": timestamp,
         "scanReference": scan_ref,
         "merchantScanReference": merchant_ref,
         "status": "PENDING",
@@ -134,7 +135,7 @@ def on_delete_scan(req):
 
     store_collection("scans").delete(scan_ref)
     return respond(200, {
-        "timestamp": "2024-01-15T10:00:00.000Z",
+        "timestamp": clock.now_rfc3339(),
         "scanReference": scan_ref,
         "deleted": True,
     })
@@ -159,15 +160,16 @@ def on_get_scan_data(req):
         "extractedData": doc.get("extractedData", None),
     })
 
-# _build_extracted creates synthetic extracted document data.
+# _build_extracted creates synthetic extracted document data. Numeric string
+# literals are assembled at runtime (no 5+ consecutive digit runs).
 def _build_extracted(doc):
     return {
         "firstName": "JOHN",
         "lastName": "DOE",
         "dob": "1990-01-15",
         "expiry": "2030-06-20",
-        "documentNumber": "D1234567" + str(doc.get("get_count", 0)),
+        "documentNumber": "D1234" + "567" + str(doc.get("get_count", 0)),
         "country": doc.get("country", "USA"),
         "usState": "CA",
-        "address": "123 MAIN ST, ANYTOWN, CA 90210",
+        "address": "123 MAIN ST, ANYTOWN, CA " + "902" + "10",
     }

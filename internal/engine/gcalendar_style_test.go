@@ -120,6 +120,10 @@ func TestGCalendarStyleAdapter(t *testing.T) {
 	if !ok || len(attendees) != 2 {
 		t.Fatalf("attendees = %v, want 2", created["attendees"])
 	}
+	createdEtag, ok := created["etag"].(string)
+	if !ok || len(createdEtag) < 2 || createdEtag[0] != '"' || createdEtag[len(createdEtag)-1] != '"' {
+		t.Fatalf("created etag = %v, want quoted string", created["etag"])
+	}
 
 	// ===== List events (with timeMin) =====
 
@@ -160,6 +164,29 @@ func TestGCalendarStyleAdapter(t *testing.T) {
 	}
 	if ev["id"] != eventID {
 		t.Fatalf("event id = %v, want %s", ev["id"], eventID)
+	}
+
+	// ===== quickAdd → clock-derived default start (~30min ahead) =====
+
+	body, status = gcalDo(t, "POST", base+"/calendar/v3/calendars/"+calID+"/events/quickAdd?text=Coffee+with+the+team", token, nil)
+	if status != 200 {
+		t.Fatalf("quickAdd -> status %d, want 200; body %s", status, body)
+	}
+	var quick map[string]any
+	if err := json.Unmarshal([]byte(body), &quick); err != nil {
+		t.Fatalf("unmarshal quickAdd: %v (body %s)", err, body)
+	}
+	startMap, ok := quick["start"].(map[string]any)
+	if !ok {
+		t.Fatalf("quickAdd start = %v, want object", quick["start"])
+	}
+	startDT, _ := startMap["dateTime"].(string)
+	startTS, err := time.Parse(time.RFC3339, startDT)
+	if err != nil {
+		t.Fatalf("quickAdd start.dateTime = %q, unparsable RFC3339: %v", startDT, err)
+	}
+	if lead := time.Until(startTS); lead < 25*time.Minute || lead > 35*time.Minute {
+		t.Fatalf("quickAdd start.dateTime = %q, want ~30min ahead (lead %s)", startDT, lead)
 	}
 
 	// ===== DELETE event =====

@@ -3,6 +3,9 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -13,6 +16,11 @@ import (
 	"stuntapi.com/stunt/internal/manifest"
 )
 
+// xeroWebhookKey is the adapter's documented synthetic webhook_key (see
+// adapters/xero-style/README.md); tests compute the same MAC the receiver
+// verifies: base64(HMAC-SHA256(key, raw_body)).
+const xeroWebhookKey = "stunt-xero-webhook-key"
+
 // TestXeroStyleAdapter exercises the Xero Accounting API:
 //   - connections → tenant list
 //   - contacts list (requires xero-tenant-id)
@@ -21,7 +29,8 @@ import (
 //   - 400 without xero-tenant-id
 //   - invoices create + get
 //   - payment
-//   - webhook HMAC doc endpoint
+//   - webhook HMAC verification (correct signature → 200; missing, tampered
+//     or wrong-key signature → 401 Xero envelope)
 func TestXeroStyleAdapter(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "xero-style")
 	absAdapterDir, err := filepath.Abs(adapterDir)
@@ -204,17 +213,57 @@ func TestXeroStyleAdapter(t *testing.T) {
 		t.Fatalf("webhook without signature -> %d, want 401; body %s", status, body)
 	}
 
-	// With signature header → 200.
-	req, _ := http.NewRequest("POST", base+"/webhooks", bytes.NewReader([]byte(`{"events":[]}`)))
+	// With a CORRECT signature (computed in Go over the verbatim body) → 200.
+	raw := []byte(`{"events":[],"eventType":"Invoice.Created"}`)
+	mac := hmac.New(sha256.New, []byte(xeroWebhookKey))
+	mac.Write(raw)
+	goodSig := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	req, _ := http.NewRequest("POST", base+"/webhooks", bytes.NewReader(raw))
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-xero-signature", "dGhpcy1pcy1hLXNpZ25hdHVyZQ==")
+	req.Header.Set("x-xero-signature", goodSig)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	resp.Body.Close()
 	if resp.StatusCode != 200 {
-		t.Fatalf("webhook with signature -> %d, want 200", resp.StatusCode)
+		t.Fatalf("webhook with correct signature -> %d, want 200", resp.StatusCode)
+	}
+
+	// Tampered body (signature no longer matches the raw bytes) → 401.
+	req, _ = http.NewRequest("POST", base+"/webhooks", bytes.NewReader(append(raw, ' ')))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-xero-signature", goodSig)
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != 401 {
+		t.Fatalf("webhook with tampered body -> %d, want 401", resp.StatusCode)
+	}
+
+	// Wrong key → 401 with Xero's error envelope.
+	badMac := hmac.New(sha256.New, []byte("not-the-configured-key"))
+	badMac.Write(raw)
+	req, _ = http.NewRequest("POST", base+"/webhooks", bytes.NewReader(raw))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-xero-signature", base64.StdEncoding.EncodeToString(badMac.Sum(nil)))
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 401 {
+		t.Fatalf("webhook with wrong-key signature -> %d, want 401; body %s", resp.StatusCode, b)
+	}
+	var werr map[string]any
+	if err := json.Unmarshal(b, &werr); err != nil {
+		t.Fatalf("unmarshal webhook 401: %v (body %s)", err, b)
+	}
+	if werr["Type"] != "Unauthorized" {
+		t.Fatalf("webhook 401 envelope = %v, want Type Unauthorized", werr)
 	}
 }
 

@@ -1021,3 +1021,29 @@ func cfPutRaw(t *testing.T, rawurl, auth, contentType string, body []byte) (stri
 	b, _ := io.ReadAll(resp.Body)
 	return string(b), resp.StatusCode
 }
+
+// TestCloudflareStyleLiveTimestamps verifies created_on/modified_on are
+// live clock timestamps (RFC 3339) rather than a fixed synthetic date.
+func TestCloudflareStyleLiveTimestamps(t *testing.T) {
+	base := cfServe(t)
+
+	start := time.Now().UTC()
+	body, status := cfPost(t, base+"/zones", "Bearer stunt-api-token-123", []byte(`{"name":"clock-test.example","account":{"id":"a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"},"type":"full"}`))
+	if status != 200 {
+		t.Fatalf("create zone -> %d, want 200; body %s", status, body)
+	}
+	zone, ok := cfResult(t, body).(map[string]any)
+	if !ok {
+		t.Fatalf("zone result not an object: %s", body)
+	}
+	for _, field := range []string{"created_on", "modified_on"} {
+		raw, _ := zone[field].(string)
+		ts, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			t.Fatalf("zone %s = %q is not RFC 3339: %v", field, raw, err)
+		}
+		if ts.Before(start.Add(-time.Minute)) || ts.After(time.Now().Add(time.Minute)) {
+			t.Fatalf("zone %s = %v not live (start %v)", field, ts, start)
+		}
+	}
+}

@@ -71,6 +71,42 @@ field (it implies failure, so `simulate_fail` is not needed alongside it);
 `simulate_fail` alone defaults to `MANIPULATED_DOCUMENT`. The `/data` 409
 body repeats the `rejectionReason`.
 
+## Webhook verification
+
+Both directions use Jumio's scheme:
+
+```
+X-Jumio-Webhook-Signature: <hex(HMAC-SHA256(secret, raw_body))>
+```
+
+- **Outbound** (signed delivery): at a scan's terminal transition the adapter
+  emits a `scan.completed` (or `scan.failed`) event signed exactly the way
+  Jumio signs its webhooks.
+- **Inbound** (receiver): `POST /netverify/v2/webhooks` is the local stand-in
+  for YOUR webhook endpoint. It verifies the MAC for real — recomputing
+  HMAC-SHA256 over the exact bytes on the wire (`req.raw_body`, never a
+  re-serialized copy) — and returns **401** (`{"httpStatus": 401, ...}`) when
+  the header is missing or the signature does not match.
+
+The signing secret is the fixed synthetic constant documented here and in
+`scripts/lib.star`:
+
+```
+stunt_jumio_mock_signing_key
+```
+
+Public + low-entropy: local stunt only. Tests and receivers compute the same
+MAC with it:
+
+```go
+mac := hmac.New(sha256.New, []byte("stunt_jumio_mock_signing_key"))
+mac.Write(rawBody) // verbatim request bytes
+expected := hex.EncodeToString(mac.Sum(nil))
+if !hmac.Equal([]byte(expected), []byte(r.Header.Get("X-Jumio-Webhook-Signature"))) {
+    // 401
+}
+```
+
 ---
 
 *Synthetic. No real Jumio data. See [DISCLAIMER](DISCLAIMER).*

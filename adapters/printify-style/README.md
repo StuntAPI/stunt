@@ -112,6 +112,14 @@ if !hmac.Equal([]byte(expected), []byte(r.Header.Get("X-Potify-Signature"))) {
 }
 ```
 
+## Clock
+
+`created_at` / `updated_at` on orders and products (create, update,
+send-for-fulfillment) and webhook-envelope `created_at` are derived from the
+engine clock (`clock.now_unix()` — Printify uses epoch seconds). No hardcoded
+epoch constants; assertions should compare against the test's own clock with
+a tolerance rather than a literal.
+
 ## Auth
 
 Accepts any non-empty **Bearer** key (a dev key — no validation).

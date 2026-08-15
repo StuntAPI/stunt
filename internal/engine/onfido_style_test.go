@@ -3,10 +3,14 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -200,21 +204,56 @@ func TestOnfidoStyleAdapter(t *testing.T) {
 		t.Fatalf("failing check result = %v, want consider", checkFail["result"])
 	}
 
-	// ===== Webhook receiver =====
+	// ===== Webhook receiver: real X-SHA2-Signature verification =====
 
-	body, status = onfidoWebhook(t, base+"/v3.6/webhooks", "abc123hmac456", map[string]any{
+	// The synthetic signing token documented in the adapter README.
+	const onfidoWebhookSecret = "stunt_onfido_mock_signing_key"
+
+	whBody, err := json.Marshal(map[string]any{
 		"payload": map[string]any{
 			"resource_type": "check",
 			"action":        "check.completed",
 			"object":        map[string]any{"id": checkID},
 		},
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mac := hmac.New(sha256.New, []byte(onfidoWebhookSecret))
+	mac.Write(whBody)
+	goodSig := hex.EncodeToString(mac.Sum(nil))
+
+	// Correct signature over the exact bytes → 200.
+	body, status = onfidoWebhook(t, base+"/v3.6/webhooks", goodSig, whBody)
 	if status != 200 {
-		t.Fatalf("webhook -> status %d, want 200; body %s", status, body)
+		t.Fatalf("webhook with correct signature -> status %d, want 200; body %s", status, body)
+	}
+
+	// Tampered body (signature was computed over different bytes) → 401.
+	tampered := append([]byte{}, whBody...)
+	tampered = append(tampered, ' ')
+	body, status = onfidoWebhook(t, base+"/v3.6/webhooks", goodSig, tampered)
+	if status != 401 {
+		t.Fatalf("webhook with tampered body -> status %d, want 401; body %s", status, body)
+	}
+	if !strings.Contains(body, "authorization_error") {
+		t.Fatalf("tampered body 401 should be an authorization_error, got: %s", body)
+	}
+
+	// Tampered signature (right shape, wrong MAC) → 401.
+	badSig := []byte(goodSig)
+	if badSig[0] == '0' {
+		badSig[0] = '1'
+	} else {
+		badSig[0] = '0'
+	}
+	body, status = onfidoWebhook(t, base+"/v3.6/webhooks", string(badSig), whBody)
+	if status != 401 {
+		t.Fatalf("webhook with tampered signature -> status %d, want 401; body %s", status, body)
 	}
 
 	// Webhook without signature → 401.
-	body, status = onfidoWebhook(t, base+"/v3.6/webhooks", "", map[string]any{})
+	body, status = onfidoWebhook(t, base+"/v3.6/webhooks", "", []byte("{}"))
 	if status != 401 {
 		t.Fatalf("webhook without signature -> status %d, want 401; body %s", status, body)
 	}
@@ -271,10 +310,9 @@ func onfidoNoAuth(t *testing.T, rawurl string) (string, int) {
 	return string(b), resp.StatusCode
 }
 
-func onfidoWebhook(t *testing.T, rawurl, signature string, body any) (string, int) {
+func onfidoWebhook(t *testing.T, rawurl, signature string, body []byte) (string, int) {
 	t.Helper()
-	data, _ := json.Marshal(body)
-	req, _ := http.NewRequest("POST", rawurl, bytes.NewReader(data))
+	req, _ := http.NewRequest("POST", rawurl, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	if signature != "" {
 		req.Header.Set("X-SHA2-Signature", signature)

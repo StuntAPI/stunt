@@ -35,6 +35,7 @@ def on_create_check(req):
 
     # Async lifecycle: derive-on-read timestamps (see lib.star).
     now = clock.now_unix()
+    created_at = clock.now_rfc3339()
 
     cc = store_collection("checks")
     cc.insert({
@@ -44,7 +45,7 @@ def on_create_check(req):
         "status": "in_progress",
         "result": None,
         "get_count": 0,
-        "created_at": "2024-01-15T10:00:15.000Z",
+        "created_at": created_at,
         "href": "/v3.6/checks/" + check_id,
         "_running_at": now + 1,
         "_done_at": now + 3,
@@ -57,7 +58,7 @@ def on_create_check(req):
         "report_names": report_names,
         "status": "in_progress",
         "result": None,
-        "created_at": "2024-01-15T10:00:15.000Z",
+        "created_at": created_at,
         "href": "/v3.6/checks/" + check_id,
     })
 

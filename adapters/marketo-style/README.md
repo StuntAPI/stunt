@@ -137,3 +137,11 @@ services:
 ```
 
 Then `stunt up` and point your Marketo client at the served address.
+
+## Clock
+
+`createdAt` / `updatedAt` / `activityDate` timestamps are **live**: they
+come from the engine clock (`clock.now_rfc3339()`, RFC 3339 UTC) at request
+time. OAuth token `expires_in`/`expires_at` and bulk export `expiresAt`
+are real TTLs computed from the same clock (1h tokens, 7-day exports).
+Seeded records are stamped once at seed time and then stay stable.

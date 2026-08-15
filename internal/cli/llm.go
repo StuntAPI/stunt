@@ -49,7 +49,7 @@ and an instance manager. ` + "`stunt ui`" + ` opens it; every command below has 
   demo                one-shot stateful Stripe-style demo
   doctor              CA + manifest + adapter + port health check
   clean               wipe state, CA, hosts block (keeps manifest + adapters)
-  catalog search|show discover adapters (--json)  # all 91 embedded, works offline
+  catalog search|show discover adapters (--json)  # all 93 embedded, works offline
   adapter new|add|lint|test|list   build/validate adapters (lint MUST pass)
   hosts sync|clean    manage /etc/hosts (subdomain TLS mode)
   proxy start         TLS reverse proxy (subdomain mode)

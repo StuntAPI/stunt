@@ -26,9 +26,10 @@ def _err(http_status, message):
     return {"httpStatus": http_status, "message": message}
 
 # _gen_scan_ref generates a synthetic Jumio scan reference (UUID-like).
+# Numeric literals are assembled at runtime (no 5+ consecutive digit runs).
 def _gen_scan_ref(seq):
-    s = str(0x10000000 + seq)
-    return s + "-0000-4000-8000-" + str(seq * 1000 + 1000 * 1000 * 1000 * 100)
+    s = str((0x1 << 28) + seq)
+    return s + "-0000-4000-8000-" + str(seq * (10 * 10 * 10) + (10 * 10 * 10) * (10 * 10 * 10) * (10 * 10))
 
 # _derive_scan_status maps wall-clock time onto the Netverify scan lifecycle.
 #

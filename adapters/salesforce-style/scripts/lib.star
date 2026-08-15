@@ -46,9 +46,11 @@ def _sf_error(status, message, code):
         "fields": [],
     }])
 
-# _now returns a synthetic timestamp.
+# _now returns the current time as an ISO-8601 timestamp (live clock —
+# CreatedDate/LastModifiedDate reflect request time; seeded records are
+# stamped once at seed time and stay stable).
 def _now():
-    return "2024-01-01T00:00:00.000+0000"
+    return clock.now_rfc3339()
 
 # _next_id generates a Salesforce-style ID: 3-char key prefix + a 15-char
 # alphanumeric suffix. Uses the KV counter to ensure uniqueness.

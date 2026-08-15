@@ -95,7 +95,13 @@ The simulator runs on a synthetic calendar anchored at **2024-01-01** (matching
 the seed fixtures): the first request records the real unix time, and the
 synthetic "today" advances in lock-step with real elapsed time. All term
 arithmetic (invoice due dates = invoice date + Net-30, term ends, cancellation
-effective dates) uses this calendar.
+effective dates) uses this calendar. When a request does not carry a
+`contractEffectiveDate`, the default is the calendar's "today" (clock-derived),
+and invoice `dueDate` is always `invoiceDate + Net-30` computed from it.
+
+Wall-clock timestamps (`createdOn` on accounts/webhooks, usage-record
+`StartDateTime` defaults) are live: `clock.now_rfc3339()` (RFC 3339 UTC) at
+request time. Seeded docs are stamped once at seed time and stay stable.
 
 ## Payment semantics
 

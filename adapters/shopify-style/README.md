@@ -156,3 +156,10 @@ curl -H "X-Shopify-Access-Token: shpat_test" \
 
 Products, orders, and customers are seeded on first access with realistic
 shapes. New records created via POST persist for the server's lifetime.
+
+## Clock
+
+All `created_at` / `updated_at` timestamps are **live**: they come from the
+engine clock (`clock.now_rfc3339()`, RFC 3339 UTC) at request time. Seeded
+records are stamped once at seed time and then stay stable, so relative
+ordering of seed vs. newly-created data is preserved.

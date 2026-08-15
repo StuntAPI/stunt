@@ -108,9 +108,11 @@ def _zuora_unauth():
         "reasons": [{"code": "90000010", "message": "Authentication required"}],
     })
 
-# _now returns a synthetic timestamp.
+# _now returns the current time as an RFC 3339 UTC timestamp (live clock —
+# createdOn reflects request time; seeded docs are stamped once at seed
+# time and stay stable).
 def _now():
-    return "2024-01-01T00:00:00Z"
+    return clock.now_rfc3339()
 
 # _next_id returns a monotonically-increasing numeric ID.
 def _next_id(obj_type):
@@ -780,7 +782,7 @@ def _create_invoice_for_subscription(sub_doc, account):
 
     invoice_id = _next_id("invoice")
     invoice_number = "INV-SYNTH-" + str(_to_int(invoice_id) - 9 * 10000 + 100)
-    invoice_date = sub_doc.get("contractEffectiveDate", "2024-01-01")
+    invoice_date = sub_doc.get("contractEffectiveDate", _today())
 
     doc = {
         "id": invoice_id,

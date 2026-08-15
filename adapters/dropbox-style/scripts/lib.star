@@ -90,6 +90,35 @@ def _require_auth(req):
         })
     return None
 
+# === Content hash (Dropbox sha256 scheme) ===
+#
+# Dropbox's content_hash is NOT a plain sha256 of the file: the content is
+# split into 4 MiB (4*1024*1024) blocks, each block is SHA-256-hashed, the
+# raw 32-byte digests are concatenated, and that byte string is SHA-256-
+# hashed again and hex-encoded. For files under one block this equals
+# hex(sha256(sha256_raw(content))). See Dropbox docs: content_hash.
+#
+# In Go:
+#   h := sha256.New()
+#   for each 4MiB block b { d := sha256.Sum256(b); h.Write(d[:]) }
+#   contentHash := hex.EncodeToString(h.Sum(nil))
+_HASH_BLOCK = 4 * 1024 * 1024
+
+# _content_hash computes the Dropbox-scheme content hash of a byte string
+# (content-derived: same bytes -> same hash, different bytes -> different
+# hash; never a counter or position-based value).
+def _content_hash(content):
+    concat = ""
+    i = 0
+    while True:
+        block = content[i:i + _HASH_BLOCK]
+        digest = crypto.sha256(block, encoding="base64url")
+        concat = concat + crypto.base64url_decode(digest)
+        i = i + _HASH_BLOCK
+        if i >= len(content):
+            break
+    return crypto.sha256(concat)
+
 # === List pagination ===
 
 # _list_page applies Dropbox-style paging to a full list of resources.

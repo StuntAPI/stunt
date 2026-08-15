@@ -28,6 +28,13 @@ account or hitting the network.
 State persists in a SQLite-backed collection, so emails sent in one request are
 retrievable in subsequent requests within the same `stunt up` session.
 
+## Clock
+
+Timestamps are **live**: `created_at` on emails and webhooks comes from the
+engine clock (`clock.now_rfc3339()`, RFC 3339 UTC) at request time, and the
+delivery lifecycle (and Svix `svix-timestamp` headers) are driven by
+`clock.now_unix()`.
+
 ## Delivery lifecycle (async status machine)
 
 Real Resend accepts a send, emits `email.sent` when the message is handed to

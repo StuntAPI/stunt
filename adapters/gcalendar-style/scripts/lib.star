@@ -89,36 +89,6 @@ def _to_int(s):
 def _seq(name):
     return store_kv_incr("gcalendar", name)
 
-# _now_iso returns the current time in RFC3339 format.
-# Starlark has no time module, so we use a fixed base timestamp and
-# increment from the event counter for determinism.
-def _now_iso(seq):
-    # Fixed base: 2025-01-01T09:00:00Z. Offset by seq * 30 minutes.
-    base_minute = 57710400 + seq * 30  # minutes since 2023-01-01T00:00:00Z
-    return _minutes_to_iso(base_minute)
-
-# _minutes_to_iso converts minutes since 2023-01-01T00:00:00Z to an RFC3339
-# string. This is a simplified date calculator.
-def _minutes_to_iso(total_minutes):
-    days = total_minutes // 1440
-    rem_minutes = total_minutes % 1440
-    hours = rem_minutes // 60
-    mins = rem_minutes % 60
-
-    # Compute date from days since 2023-01-01.
-    year = 2023
-    month = 1
-    day = 1 + days
-    # Simplified: just keep day within a reasonable range for mock purposes.
-    while day > 28:
-        day = day - 28
-        month = month + 1
-    while month > 12:
-        month = month - 12
-        year = year + 1
-
-    return _pad4(year) + "-" + _pad2(month) + "-" + _pad2(day) + "T" + _pad2(hours) + ":" + _pad2(mins) + ":00Z"
-
 def _pad2(n):
     if n < 10:
         return "0" + str(n)
@@ -130,11 +100,29 @@ def _pad4(n):
         s = "0" + s
     return s
 
-# _default_datetime returns a default ISO datetime for event start/end.
+# _default_datetime returns a default ISO datetime pair for an event
+# without explicit times: start 30 minutes from now, end one hour after
+# that. Derived from the engine clock, so defaults land near the request.
 def _default_datetime(seq):
-    start = _minutes_to_iso(57710400 + seq * 30)
-    end = _minutes_to_iso(57710400 + seq * 30 + 60)
+    base = clock.now_unix() + 1800
+    start = clock.unix_to_rfc3339(base)
+    end = clock.unix_to_rfc3339(base + 3600)
     return start, end
+
+# === ETags ===
+
+# _etag derives a Google-style quoted ETag from a resource's serialized
+# representation (content-derived, like the real API: the value changes
+# whenever the content changes). dicts get any existing "etag" key stripped
+# first so the tag never feeds its own hash.
+def _etag(value):
+    if type(value) == "dict":
+        core = {}
+        for k in value:
+            if k != "etag":
+                core[k] = value[k]
+        value = core
+    return '"' + crypto.sha256(json.encode(value))[:22] + '"'
 
 # === Pagination ===
 
@@ -192,7 +180,6 @@ def _seed():
         "organizer": {"email": "mock-user@gmail.com"},
         "recurrence": [],
         "kind": "calendar#event",
-        "etag": '"mock-etag-' + str(seq) + '"',
         "sequence": 0,
         "reminders": {"useDefault": True},
         "visibility": "default",
@@ -206,11 +193,11 @@ def _resolve_cal_id(cal_id):
     return cal_id
 
 # _event_public strips internal fields from a stored event doc and returns
-# the public Google Calendar event shape.
+# the public Google Calendar event shape. The etag is derived from the
+# returned content, so it changes whenever the event changes.
 def _event_public(doc):
-    return {
+    pub = {
         "kind": "calendar#event",
-        "etag": doc.get("etag", '"mock-etag"'),
         "id": doc["id"],
         "iCalUID": doc.get("iCalUID", doc["id"] + "@google.com"),
         "status": doc.get("status", "confirmed"),
@@ -228,3 +215,5 @@ def _event_public(doc):
         "reminders": doc.get("reminders", {"useDefault": True}),
         "visibility": doc.get("visibility", "default"),
     }
+    pub["etag"] = _etag(pub)
+    return pub

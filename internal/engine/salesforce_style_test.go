@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -546,4 +547,93 @@ func TestSalesforceStyleSOQL(t *testing.T) {
 	// ORDER BY ASC + LIMIT + OFFSET.
 	got = soql("SELECT Name FROM Account WHERE Name LIKE 'Zq%' ORDER BY Name LIMIT 2 OFFSET 1")
 	must(got, []string{"ZqGlobex", "ZqHooli"}, "order name limit offset")
+}
+
+// TestSalesforceStyleLiveTimestamps verifies record CreatedDate and OAuth
+// issued_at are live clock values rather than fixed synthetic dates.
+func TestSalesforceStyleLiveTimestamps(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "salesforce-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"salesforce": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["salesforce"]
+
+	// OAuth issued_at: epoch milliseconds within a minute of the test clock.
+	start := time.Now().UTC()
+	body, status := sfPostForm(t, base+"/services/oauth2/token", url.Values{
+		"grant_type":    {"password"},
+		"client_id":     {"test-consumer-key"},
+		"client_secret": {"test-consumer-secret"},
+		"username":      {"test@example.com"},
+		"password":      {"testpassword"},
+	})
+	if status != 200 {
+		t.Fatalf("oauth token -> %d, want 200; body %s", status, body)
+	}
+	var tokenResp map[string]any
+	if err := json.Unmarshal([]byte(body), &tokenResp); err != nil {
+		t.Fatalf("unmarshal token resp: %v (body %s)", err, body)
+	}
+	issuedAt, err := strconv.ParseInt(tokenResp["issued_at"].(string), 10, 64)
+	if err != nil {
+		t.Fatalf("issued_at %v not epoch millis: %v", tokenResp["issued_at"], err)
+	}
+	issued := time.UnixMilli(issuedAt)
+	if issued.Before(start.Add(-time.Minute)) || issued.After(time.Now().Add(time.Minute)) {
+		t.Fatalf("issued_at %v not live (start %v)", issued, start)
+	}
+	accessToken := tokenResp["access_token"].(string)
+
+	// Record CreatedDate: RFC 3339 within a minute of the test clock.
+	body, status = sfAuthPostJSON(t, base+"/services/data/v60.0/sobjects/Account", accessToken, map[string]any{
+		"Name": "Clock Test Account",
+	})
+	if status != 201 {
+		t.Fatalf("create account -> %d, want 201; body %s", status, body)
+	}
+	var createResp map[string]any
+	if err := json.Unmarshal([]byte(body), &createResp); err != nil {
+		t.Fatalf("unmarshal create: %v (body %s)", err, body)
+	}
+	accountID, _ := createResp["id"].(string)
+	if accountID == "" {
+		t.Fatalf("account id = %v, want non-empty", createResp["id"])
+	}
+
+	body, status = sfAuthGet(t, base+"/services/data/v60.0/sobjects/Account/"+accountID, accessToken)
+	if status != 200 {
+		t.Fatalf("get account -> %d, want 200; body %s", status, body)
+	}
+	var account map[string]any
+	if err := json.Unmarshal([]byte(body), &account); err != nil {
+		t.Fatalf("unmarshal account: %v (body %s)", err, body)
+	}
+	createdDate, _ := account["CreatedDate"].(string)
+	ts, err := time.Parse(time.RFC3339, createdDate)
+	if err != nil {
+		t.Fatalf("CreatedDate %q is not RFC 3339: %v", createdDate, err)
+	}
+	if ts.Before(start.Add(-time.Minute)) || ts.After(time.Now().Add(time.Minute)) {
+		t.Fatalf("CreatedDate %v not live (start %v)", ts, start)
+	}
 }

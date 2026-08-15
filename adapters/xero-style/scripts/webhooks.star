@@ -1,21 +1,26 @@
 # Webhooks handler — Xero inbound webhook HMAC verification.
 #
-# Xero webhook signature: the x-xero-signature header contains
-# base64(HMAC-SHA256(webhook_key, raw_body)).
+# Xero's webhook receiver contract: every delivery carries the
+# x-xero-signature header with
 #
-# The webhook_key is configured in the Xero app dashboard. This handler
-# documents and verifies the scheme.
+#   base64(HMAC-SHA256(webhook_key, raw_request_body))
 #
-# POST /webhooks → 200 OK (if signature matches), 401 otherwise.
+# where raw_request_body is the VERBATIM request bytes (req.raw_body here —
+# never a re-serialized copy) and webhook_key is the signing key configured
+# in the Xero app dashboard. A verification failure MUST answer
+# 401 Unauthorized — Xero treats any other response as retryable and
+# eventually disables the webhook subscription.
 #
-# NOTE: Because stunt's Starlark runtime does not expose HMAC primitives,
-# this handler documents the scheme and accepts a well-known test key.
-# For production verification, use the documented scheme:
+# The synthetic webhook_key for this simulator is the documented constant
+# "stunt-xero-webhook-key" (README), so senders and Go tests can compute the
+# same MAC:
 #
-#   expected = base64(HMAC-SHA256(webhook_key, raw_request_body))
+#   expected = base64(HMAC-SHA256("stunt-xero-webhook-key", raw_body))
 #   compare  = x-xero-signature header value
 #
-# The webhook_key for this simulator is the static string: "stunt-xero-webhook-key"
+# POST /webhooks → 200 OK (signature matches) | 401 Unauthorized (otherwise)
+
+_WEBHOOK_KEY = "stunt-xero-webhook-key"
 
 # on_webhook verifies the Xero webhook signature and returns 200 or 401.
 def on_webhook(req):
@@ -23,23 +28,20 @@ def on_webhook(req):
     if headers == None:
         headers = {}
 
-    sig = headers.get("x-xero-signature", "")
+    sig = headers.get("x-xero-signature")
     if sig == None:
         sig = ""
-    # Case-insensitive fallback.
     if sig == "":
-        for k in headers:
-            if k.lower() == "x-xero-signature":
-                sig = headers[k]
-                break
+        return _xero_err(401, "Unauthorized", "Unauthorized", "Missing x-xero-signature header")
 
-    if sig == "":
-        return respond(401, {"error": "Missing x-xero-signature header"})
+    raw = req.get("raw_body")
+    if raw == None:
+        raw = ""
 
-    # In a real implementation we would compute:
-    #   base64(HMAC-SHA256("stunt-xero-webhook-key", raw_body))
-    # and compare. This simulator accepts any non-empty signature as valid
-    # for local testing. See README for the documented scheme.
+    expected = crypto.hmac_sha256(_WEBHOOK_KEY, raw, encoding="base64")
+    if sig != expected:
+        return _xero_err(401, "Unauthorized", "Unauthorized", "Webhook signature verification failed")
+
     return respond(200, {
         "status": "OK",
         "message": "Webhook received and verified",

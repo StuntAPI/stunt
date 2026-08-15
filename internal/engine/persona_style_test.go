@@ -3,10 +3,15 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -195,23 +200,87 @@ func TestPersonaStyleAdapter(t *testing.T) {
 	}
 	checkInquiryStatus(t, body, "pending")
 
-	// ===== Webhook receiver =====
+	// ===== Webhook receiver: real Persona-Signature verification =====
 
-	body, status = personaWebhook(t, base+"/api/inquiry/v1/webhooks",
-		"t=1705312800,v1=abc123def456",
-		map[string]any{
-			"type": "inquiry.completed",
-			"data": map[string]any{
-				"id": inquiryID,
-			},
-		})
+	// The synthetic signing secret documented in the adapter README.
+	const personaWebhookSecret = "stunt_persona_mock_signing_key"
+
+	// personaSign builds a Persona-Signature header value over the exact
+	// bytes, the way Persona (and the adapter's outbound emitter) does.
+	personaSign := func(t string, raw []byte) string {
+		mac := hmac.New(sha256.New, []byte(personaWebhookSecret))
+		mac.Write([]byte(t + "." + string(raw)))
+		return "t=" + t + ",v1=" + hex.EncodeToString(mac.Sum(nil))
+	}
+
+	whBody, err := json.Marshal(map[string]any{
+		"type": "inquiry.completed",
+		"data": map[string]any{
+			"id": inquiryID,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Fresh timestamp + correct MAC over t + "." + exact bytes → 200.
+	freshT := strconv.FormatInt(time.Now().Unix(), 10)
+	body, status = personaWebhook(t, base+"/api/inquiry/v1/webhooks", personaSign(freshT, whBody), whBody)
 	if status != 200 {
-		t.Fatalf("webhook -> status %d, want 200; body %s", status, body)
+		t.Fatalf("webhook with correct signature -> status %d, want 200; body %s", status, body)
+	}
+
+	// Stale timestamp (correctly signed, t = now - 10min) → 401 replay reject.
+	staleT := strconv.FormatInt(time.Now().Add(-10*time.Minute).Unix(), 10)
+	body, status = personaWebhook(t, base+"/api/inquiry/v1/webhooks", personaSign(staleT, whBody), whBody)
+	if status != 401 {
+		t.Fatalf("webhook with stale timestamp -> status %d, want 401; body %s", status, body)
+	}
+	if !strings.Contains(body, "invalid_timestamp") {
+		t.Fatalf("stale timestamp 401 should carry invalid_timestamp, got: %s", body)
+	}
+
+	// Future timestamp (t = now + 10min, correctly signed) → 401.
+	futureT := strconv.FormatInt(time.Now().Add(10*time.Minute).Unix(), 10)
+	body, status = personaWebhook(t, base+"/api/inquiry/v1/webhooks", personaSign(futureT, whBody), whBody)
+	if status != 401 {
+		t.Fatalf("webhook with future timestamp -> status %d, want 401; body %s", status, body)
+	}
+
+	// Tampered body (MAC computed over different bytes) → 401.
+	tampered := append([]byte{}, whBody...)
+	tampered = append(tampered, ' ')
+	body, status = personaWebhook(t, base+"/api/inquiry/v1/webhooks", personaSign(freshT, whBody), tampered)
+	if status != 401 {
+		t.Fatalf("webhook with tampered body -> status %d, want 401; body %s", status, body)
+	}
+	if !strings.Contains(body, "invalid_signature") {
+		t.Fatalf("tampered body 401 should carry invalid_signature, got: %s", body)
+	}
+
+	// Tampered v1 (fresh t, wrong MAC) → 401.
+	goodHeader := personaSign(freshT, whBody)
+	commaIdx := strings.Index(goodHeader, ",v1=")
+	if commaIdx < 0 {
+		t.Fatalf("could not split the v1 component: %s", goodHeader)
+	}
+	badHeader := goodHeader[:commaIdx] + ",v1=" + strings.Repeat("0", 64)
+	if badHeader == goodHeader {
+		t.Fatal("could not tamper the v1 component")
+	}
+	body, status = personaWebhook(t, base+"/api/inquiry/v1/webhooks", badHeader, whBody)
+	if status != 401 {
+		t.Fatalf("webhook with tampered signature -> status %d, want 401; body %s", status, body)
+	}
+
+	// Structurally invalid header → 401.
+	body, status = personaWebhook(t, base+"/api/inquiry/v1/webhooks", "garbage", whBody)
+	if status != 401 {
+		t.Fatalf("webhook with malformed header -> status %d, want 401; body %s", status, body)
 	}
 
 	// Webhook without signature → 401.
-	body, status = personaWebhook(t, base+"/api/inquiry/v1/webhooks", "",
-		map[string]any{"type": "inquiry.completed"})
+	body, status = personaWebhook(t, base+"/api/inquiry/v1/webhooks", "", []byte("{}"))
 	if status != 401 {
 		t.Fatalf("webhook without signature -> status %d, want 401; body %s", status, body)
 	}
@@ -299,10 +368,9 @@ func personaNoAuth(t *testing.T, rawurl string) (string, int) {
 	return string(b), resp.StatusCode
 }
 
-func personaWebhook(t *testing.T, rawurl, signature string, body any) (string, int) {
+func personaWebhook(t *testing.T, rawurl, signature string, body []byte) (string, int) {
 	t.Helper()
-	data, _ := json.Marshal(body)
-	req, err := http.NewRequest("POST", rawurl, bytes.NewReader(data))
+	req, err := http.NewRequest("POST", rawurl, bytes.NewReader(body))
 	if err != nil {
 		t.Fatal(err)
 	}

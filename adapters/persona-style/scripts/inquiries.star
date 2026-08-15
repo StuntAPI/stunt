@@ -32,6 +32,7 @@ def on_create_inquiry(req):
 
     # Async lifecycle: derive-on-read timestamps (see lib.star).
     now = clock.now_unix()
+    created_at = clock.now_rfc3339()
 
     ic = store_collection("inquiries")
     ic.insert({
@@ -41,7 +42,7 @@ def on_create_inquiry(req):
         "reference_id": reference_id,
         "status": "created",
         "get_count": 0,
-        "created_at": "2024-01-15T10:00:00.000Z",
+        "created_at": created_at,
         "_running_at": now + 1,
         "_done_at": now + 3,
         "_fail": body.get("simulate_fail", False) == True,
@@ -54,7 +55,7 @@ def on_create_inquiry(req):
             "status": "created",
             "reference_id": reference_id,
             "template_id": template_id,
-            "created_at": "2024-01-15T10:00:00.000Z",
+            "created_at": created_at,
         },
     }
     return respond(201, _jsonapi_ok(data))

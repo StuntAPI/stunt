@@ -684,3 +684,91 @@ func marketoAuthPostJSON(t *testing.T, rawurl, token string, payload map[string]
 // Guard: suppress unused imports.
 var _ = fmt.Sprintf
 var _ = url.QueryEscape
+
+// TestMarketoStyleLiveTimestamps verifies lead createdAt/updatedAt are
+// live clock timestamps (RFC 3339) rather than a fixed synthetic date.
+func TestMarketoStyleLiveTimestamps(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "marketo-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"marketo": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["marketo"]
+
+	body, status := marketoGet(t, base+"/identity/oauth/token"+
+		"?grant_type=client_credentials&client_id=test-id&client_secret=test-secret")
+	if status != 200 {
+		t.Fatalf("token mint -> %d, want 200; body %s", status, body)
+	}
+	var tokenResp map[string]any
+	if err := json.Unmarshal([]byte(body), &tokenResp); err != nil {
+		t.Fatalf("unmarshal token: %v (body %s)", err, body)
+	}
+	accessToken := tokenResp["access_token"].(string)
+
+	start := time.Now().UTC()
+	body, status = marketoAuthPostJSON(t, base+"/rest/v1/leads.json", accessToken, map[string]any{
+		"action": "createOnly",
+		"input": []map[string]any{
+			{"email": "clock-test@example.com", "firstName": "Clock", "lastName": "Test"},
+		},
+	})
+	if status != 200 {
+		t.Fatalf("sync lead -> %d, want 200; body %s", status, body)
+	}
+	var syncResp map[string]any
+	if err := json.Unmarshal([]byte(body), &syncResp); err != nil {
+		t.Fatalf("unmarshal sync: %v (body %s)", err, body)
+	}
+	syncResult, ok := syncResp["result"].([]any)
+	if !ok || len(syncResult) != 1 {
+		t.Fatalf("sync result = %v, want 1 entry", syncResp["result"])
+	}
+	leadID, _ := syncResult[0].(map[string]any)["id"].(string)
+	if leadID == "" {
+		t.Fatalf("lead id = %v, want non-empty", syncResult[0])
+	}
+
+	body, status = marketoAuthGet(t, base+"/rest/v1/leads/"+leadID+".json", accessToken)
+	if status != 200 {
+		t.Fatalf("get lead -> %d, want 200; body %s", status, body)
+	}
+	var leadResp map[string]any
+	if err := json.Unmarshal([]byte(body), &leadResp); err != nil {
+		t.Fatalf("unmarshal lead: %v (body %s)", err, body)
+	}
+	leadResult, ok := leadResp["result"].([]any)
+	if !ok || len(leadResult) != 1 {
+		t.Fatalf("lead result = %v, want 1 entry", leadResp["result"])
+	}
+	lead := leadResult[0].(map[string]any)
+	for _, field := range []string{"createdAt", "updatedAt"} {
+		raw, _ := lead[field].(string)
+		ts, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			t.Fatalf("lead %s = %q is not RFC 3339: %v", field, raw, err)
+		}
+		if ts.Before(start.Add(-time.Minute)) || ts.After(time.Now().Add(time.Minute)) {
+			t.Fatalf("lead %s = %v not live (start %v)", field, ts, start)
+		}
+	}
+}

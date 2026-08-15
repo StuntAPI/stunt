@@ -46,6 +46,13 @@ def _to_int(s):
 def _gen_id(prefix, seq):
     return prefix + "-" + str(seq)
 
+# _now_ms returns the current time in the Google Tasks timestamp format
+# (RFC3339 with milliseconds, e.g. "...T00:00:00.000Z"). Derived from the
+# engine clock, so created/updated stamps track real elapsed time.
+def _now_ms():
+    rfc = clock.now_rfc3339()
+    return rfc[:-1] + ".000Z"
+
 # _seed creates a default task list.
 def _seed():
     if store_kv_get("gtasks", "seeded") == "yes":
@@ -56,7 +63,7 @@ def _seed():
     lc.insert({
         "id": "MTA0NTQwNDI0NDQ4NDI1MDQ4OjIxMDI4NjYwNTpkZWZhdWx0",
         "title": "My Tasks",
-        "updated": "2024-01-01T00:00:00.000Z",
+        "updated": _now_ms(),
         "selfLink": "https://www.googleapis.com/tasks/v1/users/@me/lists/MTA0NTQwNDI0NDQ4NDI1MDQ4OjIxMDI4NjYwNTpkZWZhdWx0",
     })
 
