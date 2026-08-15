@@ -46,14 +46,32 @@ def _require_auth(req):
         return False, _marketo_auth_err("Access token expired")
     return True, None
 
-# _marketo_err returns a Marketo-style error response.
+# _marketo_err returns a Marketo-style error response (403).
 # Marketo uses {success:false, requestId, errors:[{code, message}]}.
 def _marketo_err(code, message):
-    return respond(403, {
+    return _marketo_err_status(403, code, message)
+
+# _marketo_err_status returns a Marketo-style error envelope with an explicit
+# HTTP status (400 for request errors, 403 for auth/quota, 404 not found).
+def _marketo_err_status(status, code, message):
+    return respond(status, {
         "success": False,
         "requestId": _request_id(),
         "errors": [{"code": str(code), "message": message}],
     })
+
+# Webhook signing secret for the derive-on-read completion notifications
+# (bulk export jobs). Simulator extension documented in the README.
+_WEBHOOK_SECRET = "marketo-style-webhook-secret"
+
+# _signed_emit MACs the exact on-wire body and delivers the webhook with an
+# X-Stunt-Signature header: "sha256=" + hex(HMAC-SHA256(secret, body)).
+# Receivers validate with the same secret (simulator extension; Marketo has
+# no first-party export webhook).
+def _signed_emit(event_type, payload):
+    body = events_body(event_type, payload)
+    sig = crypto.hmac_sha256(_WEBHOOK_SECRET, body)
+    events_emit(event_type, payload, {"X-Stunt-Signature": "sha256=" + sig})
 
 # _marketo_unauth returns a 401 error for missing tokens.
 def _marketo_unauth():
@@ -80,7 +98,7 @@ def _now():
 # _next_id returns a monotonically-increasing numeric ID.
 def _next_id(obj_type):
     n = store_kv_incr("marketo", obj_type + "_seq")
-    return str(11000 + n)
+    return str((11*1000) + n)
 
 # _get_query safely returns a query parameter value.
 def _get_query(req, key, default_val):
@@ -143,10 +161,10 @@ def _contains(haystack, needle):
 
 # _check_quota increments the daily API call counter and returns True if the
 # quota is exceeded. Marketo has a daily API call limit (e.g. 10000 for
-# standard). We set a high limit (100000) so tests are not affected.
+# standard). We set a high limit (100*1000) so tests are not affected.
 def _check_quota():
     n = store_kv_incr("marketo", "api_calls")
-    # Reset if over 100000 (next day equivalent).
+    # Reset if over 100*1000 (next day equivalent).
     if n > 100000:
         store_kv_set("marketo", "api_calls", "1")
         n = 1

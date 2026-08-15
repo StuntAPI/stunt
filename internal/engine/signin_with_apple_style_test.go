@@ -2,18 +2,72 @@ package engine
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"stuntapi.com/stunt/internal/manifest"
 )
+
+// siwaPrivateKeyPEM mirrors the adapter's documented fixed synthetic EC
+// P-256 keypair (see adapters/signin-with-apple-style/README.md): the public
+// half is served at GET /auth/keys, the private half signs client_secret
+// JWTs in tests exactly the way a real developer key would.
+const siwaPrivateKeyPEM = `-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgwp+ZPlH6FJFcHfYS
+Nd1ENT6RzZQUkTDz67JzlvlvoRShRANCAAREw7SM/k20F3w/oDzR9M6V6jHDK4Hi
+RkybQejVvpvgn2EoiMcG6uzUH+aAOgtE+0wCB2gWqc5DoeX6fHyFgDqT
+-----END PRIVATE KEY-----`
+
+// siwaMintClientSecret mints a REAL ES256-signed client_secret JWT with the
+// adapter's documented synthetic developer key (header/payload compact JSON,
+// raw r||s signature), valid for ttl seconds.
+func siwaMintClientSecret(t *testing.T, ttl int64) string {
+	t.Helper()
+	block, _ := pem.Decode([]byte(siwaPrivateKeyPEM))
+	if block == nil {
+		t.Fatal("bad test key PEM")
+	}
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		t.Fatalf("parse test key: %v", err)
+	}
+	priv, ok := key.(*ecdsa.PrivateKey)
+	if !ok {
+		t.Fatal("test key is not ECDSA")
+	}
+	now := time.Now().Unix()
+	header := `{"alg":"ES256","kid":"mock-siwa-key-1","typ":"JWT"}`
+	payload := `{"iss":"MOCKTEAMID","sub":"com.example.signin.service",` +
+		`"aud":"https://appleid.apple.com","iat":` + strconv.FormatInt(now, 10) +
+		`,"exp":` + strconv.FormatInt(now+ttl, 10) + `}`
+	h := base64.RawURLEncoding.EncodeToString([]byte(header))
+	p := base64.RawURLEncoding.EncodeToString([]byte(payload))
+	signingInput := h + "." + p
+	digest := sha256.Sum256([]byte(signingInput))
+	r, s, err := ecdsa.Sign(rand.Reader, priv, digest[:])
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	sig := make([]byte, 64)
+	r.FillBytes(sig[:32])
+	s.FillBytes(sig[32:])
+	return signingInput + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
 
 func TestSignInWithAppleStyleAdapter(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "signin-with-apple-style")
@@ -51,7 +105,7 @@ func TestSignInWithAppleStyleAdapter(t *testing.T) {
 	const redirectURI = "http://localhost:3000/callback"
 	const state = "test-state-xyz"
 	const clientID = "com.example.signin.service"
-	clientSecret := mintES256JWT(t) // structurally valid ES256 JWT
+	clientSecret := siwaMintClientSecret(t, 3600) // real ES256-signed JWT
 
 	// ===== GET /auth/authorize → 302 redirect =====
 	resp := siwaGetNoRedirect(t, base+"/auth/authorize?"+
@@ -207,6 +261,102 @@ func TestSignInWithAppleStyleAdapter(t *testing.T) {
 	}
 	if _, ok := firstKey["y"].(string); !ok {
 		t.Fatalf("JWKS key y = %v, want string", firstKey["y"])
+	}
+
+	// ===== The JWKS key REALLY verifies the minted id_token (ES256) =====
+
+	xBytes, err := base64.RawURLEncoding.DecodeString(firstKey["x"].(string))
+	if err != nil {
+		t.Fatalf("decode x: %v", err)
+	}
+	yBytes, err := base64.RawURLEncoding.DecodeString(firstKey["y"].(string))
+	if err != nil {
+		t.Fatalf("decode y: %v", err)
+	}
+	pub := &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     new(big.Int).SetBytes(xBytes),
+		Y:     new(big.Int).SetBytes(yBytes),
+	}
+	idSegments := strings.Split(idToken, ".")
+	sigBytes, err := base64.RawURLEncoding.DecodeString(idSegments[2])
+	if err != nil {
+		t.Fatalf("decode id_token signature: %v", err)
+	}
+	if len(sigBytes) != 64 {
+		t.Fatalf("id_token signature is %d bytes, want 64 (raw r||s)", len(sigBytes))
+	}
+	digest := sha256.Sum256([]byte(idSegments[0] + "." + idSegments[1]))
+	r := new(big.Int).SetBytes(sigBytes[:32])
+	s := new(big.Int).SetBytes(sigBytes[32:])
+	if !ecdsa.Verify(pub, digest[:], r, s) {
+		t.Fatal("id_token ES256 signature did not verify against the served JWKS key")
+	}
+	// exp claim must be minted ~1h in the future.
+	idClaims := decodeB64URL(t, idSegments[1])
+	if !strings.Contains(idClaims, `"exp":`) {
+		t.Fatalf("id_token claims missing exp: %s", idClaims)
+	}
+
+	// ===== Expired client_secret → 400 invalid_client =====
+
+	respExp := siwaGetNoRedirect(t, base+"/auth/authorize?"+
+		url.Values{"client_id": {clientID}, "redirect_uri": {redirectURI},
+			"response_type": {"code"}, "scope": {"email"}, "state": {"s-exp"}}.Encode())
+	codeExp := siwaExtractParam(respExp.Header.Get("Location"), "code")
+	respExp.Body.Close()
+	expBody, expStatus := siwaPostForm(t, base+"/auth/token", url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {codeExp},
+		"client_id":     {clientID},
+		"client_secret": {siwaMintClientSecret(t, -60)}, // expired 60s ago
+		"redirect_uri":  {redirectURI},
+	})
+	if expStatus != 400 {
+		t.Fatalf("expired client_secret -> status %d, want 400; body %s", expStatus, expBody)
+	}
+	if !strings.Contains(expBody, "invalid_client") {
+		t.Fatalf("expired client_secret -> body %q, want invalid_client", expBody)
+	}
+
+	// ===== Forged client_secret (wrong signing key) → 400 invalid_client =====
+
+	respForged := siwaGetNoRedirect(t, base+"/auth/authorize?"+
+		url.Values{"client_id": {clientID}, "redirect_uri": {redirectURI},
+			"response_type": {"code"}, "scope": {"email"}, "state": {"s-forged"}}.Encode())
+	codeForged := siwaExtractParam(respForged.Header.Get("Location"), "code")
+	respForged.Body.Close()
+	// A real ES256 JWT, but signed by a different (unregistered) key.
+	forgedKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().Unix()
+	fHeader := `{"alg":"ES256","kid":"mock-siwa-key-1","typ":"JWT"}`
+	fPayload := `{"iss":"MOCKTEAMID","aud":"https://appleid.apple.com","exp":` + strconv.FormatInt(now+3600, 10) + `}`
+	fh := base64.RawURLEncoding.EncodeToString([]byte(fHeader))
+	fp := base64.RawURLEncoding.EncodeToString([]byte(fPayload))
+	fDigest := sha256.Sum256([]byte(fh + "." + fp))
+	fr, fs, err := ecdsa.Sign(rand.Reader, forgedKey, fDigest[:])
+	if err != nil {
+		t.Fatal(err)
+	}
+	fSig := make([]byte, 64)
+	fr.FillBytes(fSig[:32])
+	fs.FillBytes(fSig[32:])
+	forgedSecret := fh + "." + fp + "." + base64.RawURLEncoding.EncodeToString(fSig)
+	forgedBody, forgedStatus := siwaPostForm(t, base+"/auth/token", url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {codeForged},
+		"client_id":     {clientID},
+		"client_secret": {forgedSecret},
+		"redirect_uri":  {redirectURI},
+	})
+	if forgedStatus != 400 {
+		t.Fatalf("forged client_secret -> status %d, want 400; body %s", forgedStatus, forgedBody)
+	}
+	if !strings.Contains(forgedBody, "invalid_client") {
+		t.Fatalf("forged client_secret -> body %q, want invalid_client", forgedBody)
 	}
 
 	// ===== New authorize + token exchange flow (second user) =====

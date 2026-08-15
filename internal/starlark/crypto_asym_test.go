@@ -229,8 +229,17 @@ func TestRSAPublicJWK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode e: %v", err)
 	}
-	if new(big.Int).SetBytes(nBytes).BitLen() == 0 {
-		t.Error("n is zero")
+	// Reconstruct against the ORIGINAL key, not just non-zero.
+	pubAny, err := parsePublicKeyPEM(pubPEM)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub2 := pubAny.(*rsa.PublicKey)
+	if new(big.Int).SetBytes(nBytes).Cmp(pub2.N) != 0 {
+		t.Error("n does not reconstruct the original modulus")
+	}
+	if new(big.Int).SetBytes(eBytes).Int64() != int64(pub2.E) {
+		t.Error("e does not reconstruct the original exponent")
 	}
 	if eInt := int(new(big.Int).SetBytes(eBytes).Int64()); eInt != 65537 {
 		t.Errorf("e = %d, want 65537", eInt)

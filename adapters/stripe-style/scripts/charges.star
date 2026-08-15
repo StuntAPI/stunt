@@ -2,9 +2,35 @@
 #
 # Each handler receives `req` with keys: method, path, headers, body, params.
 # Returns respond(status, body, headers).
-# Shared helpers (_bearer_token, _require_auth, _next_id) are in lib.star.
+# Shared helpers (_bearer_token, _require_auth, _next_id, _card_number_for,
+# _card_outcome, _card_decline_error, _sca_charge_error, _create_refund,
+# _refunds_for, _refunded_total, _over_refund_error, _apply_charge_refund)
+# are in lib.star.
 
-# POST /v1/charges — create a charge (status starts as "pending").
+# _charge_card_number resolves the card number a charge request pays with:
+# a card token (source=tok_*), a PaymentMethod (payment_method=pm_*), or an
+# inline card dict. Returns "" when no card number is known.
+def _charge_card_number(body):
+    src = body.get("source", None)
+    if src == None:
+        src = body.get("payment_method", None)
+    if src != None and type(src) == "string":
+        return _card_number_for(src)
+    card = body.get("card", None)
+    if card != None and type(card) == "dict":
+        n = card.get("number", "")
+        if n == None:
+            return ""
+        return n
+    return ""
+
+# POST /v1/charges — create a charge.
+#
+# No card instrument → status "pending" (capture-later flow, the simulator's
+# historical default). A card token/PaymentMethod resolves the test-card
+# behavior: decline cards → 402 card_error (the failed charge object is still
+# recorded, like real Stripe); SCA cards → 402 authentication_required (the
+# legacy Charges API cannot run 3DS); any other card → succeeded + captured.
 def on_create_charge(req):
     err = _require_auth(req)
     if err != None:
@@ -24,6 +50,32 @@ def on_create_charge(req):
     customer = body.get("customer", None)
     description = body.get("description", None)
 
+    status = "pending"
+    captured = False
+    number = _charge_card_number(body)
+    if number != "":
+        oc = _card_outcome(number)
+        if oc != None and oc["kind"] == "decline":
+            doc = {
+                "id": charge_id,
+                "object": "charge",
+                "amount": amount,
+                "currency": currency,
+                "customer": customer,
+                "description": description,
+                "status": "failed",
+                "captured": False,
+                "refunded": False,
+                "created": clock.now_unix(),
+            }
+            store_collection("charges").insert(doc)
+            _signed_emit("charge.failed", doc)
+            return _card_decline_error(oc, "charge", charge_id)
+        if oc != None:
+            return _sca_charge_error(charge_id)
+        status = "succeeded"
+        captured = True
+
     doc = {
         "id": charge_id,
         "object": "charge",
@@ -31,8 +83,8 @@ def on_create_charge(req):
         "currency": currency,
         "customer": customer,
         "description": description,
-        "status": "pending",
-        "captured": False,
+        "status": status,
+        "captured": captured,
         "refunded": False,
         "created": 1700000000,
     }
@@ -112,7 +164,12 @@ def on_capture_charge(req):
 
     return respond(200, doc)
 
-# POST /v1/charges/{id}/refund — refund a charge (set status refunded).
+# POST /v1/charges/{id}/refund — refund a charge (full or partial via amount).
+#
+# Creates a first-class refund (pending -> succeeded on its async lifecycle)
+# and returns the updated charge. The over-refund guard counts every
+# non-failed refund of this charge, so repeated calls cannot exceed the
+# original amount. amount omitted → refund the remaining unrefunded balance.
 def on_refund_charge(req):
     err = _require_auth(req)
     if err != None:
@@ -124,9 +181,24 @@ def on_refund_charge(req):
     if doc == None:
         return respond(404, {"error": {"message": "No such charge: " + id, "type": "invalid_request_error"}})
 
-    doc["status"] = "refunded"
-    doc["refunded"] = True
-    doc["amount_refunded"] = doc.get("amount", 0)
+    body = req["body"]
+    if body == None:
+        body = {}
+
+    base = _num(doc.get("amount", 0))
+    already = _refunded_total(_refunds_for("charge", id))
+    remaining = base - already
+    amount = _num(body.get("amount", 0))
+    if amount == 0:
+        amount = remaining
+    if amount > remaining or amount <= 0:
+        return _over_refund_error(amount, remaining)
+
+    sf = body.get("simulate_fail", False)
+    fail_mode = sf != None and sf
+    _create_refund(None, id, amount, doc.get("currency", "usd"), body.get("reason", "requested_by_customer"), fail_mode)
+
+    _apply_charge_refund(doc, already, amount)
     c.update(id, doc)
 
     # Emit webhook event (fire-and-forget).

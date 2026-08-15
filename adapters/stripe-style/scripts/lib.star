@@ -14,8 +14,24 @@ _WEBHOOK_SECRET = "whsec_stunt_mock_0123456789abcdef0123456789abcdef"
 # The same (event_type, payload) feeds events_body (signing input) and
 # events_emit (delivery), so the signature verifies against the bytes the sink
 # receives. Stripe signs "{timestamp}.{body}" and carries t=,v1= in the header.
+#
+# Every emitted event is ALSO recorded in the "events" collection with
+# Stripe's event-object shape, so GET /v1/events (scripts/events.star) lists
+# exactly the event types the webhook sink receives.
 def _signed_emit(event_type, payload):
     t = clock.now_unix()
+    ev = {
+        "id": _next_id("evt"),
+        "object": "event",
+        "api_version": "2025-01-27.acacia",
+        "created": t,
+        "type": event_type,
+        "data": {"object": payload},
+        "livemode": False,
+        "pending_webhooks": 0,
+        "request": {"id": None, "idempotency_key": None},
+    }
+    store_collection("events").insert(ev)
     body = events_body(event_type, payload)
     sig = crypto.hmac_sha256(_WEBHOOK_SECRET, str(t) + "." + body)
     events_emit(event_type, payload, {"Stripe-Signature": "t=" + str(t) + ",v1=" + sig})
@@ -245,3 +261,216 @@ def _idempotent_remember(req, ns, status, rid):
     if _idempotency_key(req) == "":
         return
     store_kv_set("stripe", "idem_" + _idempotency_scope(req, ns), str(status) + ":" + rid)
+
+# _num coerces a JSON-round-tripped number (int, float, or numeric string) to
+# int. Returns 0 for None, bools map to 0/1.
+def _num(v):
+    if v == None:
+        return 0
+    if type(v) == "bool":
+        if v:
+            return 1
+        return 0
+    if type(v) == "int":
+        return v
+    if type(v) == "float":
+        return int(v)
+    return _to_int(v)
+
+# ============================================================================
+# TEST-CARD BEHAVIOR (declines + SCA/3DS)
+# ============================================================================
+# Real Stripe reserves specific test card numbers for deterministic outcomes:
+# declines (with the real decline_code) and SCA cards that force 3DS
+# authentication. The digit strings are assembled at runtime from <=4-digit
+# chunks so no literal in this file ever contains 5+ consecutive digits.
+
+_DECLINE_CARDS = {
+    "4000" + "0000" + "0000" + "0002": {"code": "card_declined", "decline_code": "generic_decline", "message": "Your card was declined."},
+    "4000" + "0000" + "0000" + "9995": {"code": "card_declined", "decline_code": "insufficient_funds", "message": "Your card has insufficient funds."},
+    "4000" + "0000" + "0000" + "9987": {"code": "card_declined", "decline_code": "lost_card", "message": "Your card was declined."},
+    "4000" + "0000" + "0000" + "9988": {"code": "card_declined", "decline_code": "stolen_card", "message": "Your card was declined."},
+    "4000" + "0000" + "0000" + "0069": {"code": "expired_card", "decline_code": "expired_card", "message": "Your card has expired."},
+    "4000" + "0000" + "0000" + "0127": {"code": "incorrect_cvc", "decline_code": "incorrect_cvc", "message": "Your card's security code is incorrect."},
+}
+
+# SCA test cards: 3DS in-app SDK flow, and the two challenge/redirect cards.
+_SCA_SDK_CARD = "4000" + "0027" + "6000" + "3184"
+_SCA_REDIRECT_CARDS = [
+    "4000" + "0025" + "0000" + "3155",
+    "4000" + "0000" + "0000" + "3220",
+]
+
+# _card_outcome maps a card number to its simulated outcome, or None when the
+# card behaves normally (attaches + pays). Returns a dict with kind
+# "decline" (plus code/decline_code/message), "sca_sdk", or "sca_redirect".
+def _card_outcome(number):
+    if number == None:
+        return None
+    d = _DECLINE_CARDS.get(number)
+    if d != None:
+        out = {"kind": "decline"}
+        for k in d:
+            out[k] = d[k]
+        return out
+    if number == _SCA_SDK_CARD:
+        return {"kind": "sca_sdk"}
+    for i in range(len(_SCA_REDIRECT_CARDS)):
+        if number == _SCA_REDIRECT_CARDS[i]:
+            return {"kind": "sca_redirect"}
+    return None
+
+# _card_number_for resolves the underlying card number for a payment
+# instrument id: a card token (tok_*, from POST /v1/tokens) or a PaymentMethod
+# created with an explicit card[number]. Returns "" when unknown (the
+# instrument then behaves like a normal card).
+def _card_number_for(id):
+    if id == None:
+        return ""
+    t = store_collection("tokens").get(id)
+    if t != None:
+        return t.get("_number", "")
+    p = store_collection("payment_methods").get(id)
+    if p != None:
+        return p.get("_card_number", "")
+    return ""
+
+# _card_decline_error builds the 402 card_error response for a declined test
+# card, carrying the real error.code + decline_code. kind is "payment_intent"
+# or "charge" and names the resource id in the error body like real Stripe.
+def _card_decline_error(oc, kind, res_id):
+    e = {
+        "code": oc["code"],
+        "decline_code": oc["decline_code"],
+        "doc_url": "https://stripe.com/docs/error-codes/card-declined",
+        "message": oc["message"],
+        "type": "card_error",
+    }
+    if kind == "payment_intent":
+        e["payment_intent"] = res_id
+    else:
+        e["charge"] = res_id
+    return respond(402, {"error": e})
+
+# _sca_charge_error is the legacy-charges-API outcome for an SCA test card:
+# the Charges API cannot run 3DS, so the payment fails with the real
+# authentication_required decline_code.
+def _sca_charge_error(charge_id):
+    return respond(402, {"error": {
+        "charge": charge_id,
+        "code": "card_declined",
+        "decline_code": "authentication_required",
+        "doc_url": "https://stripe.com/docs/error-codes/card-declined",
+        "message": "This payment requires authentication to complete. Use the PaymentIntents API instead.",
+        "type": "card_error",
+    }})
+
+# ============================================================================
+# REFUND LIFECYCLE (derive-on-read state machine + over-refund guard)
+# ============================================================================
+# Real refunds start "pending" and settle asynchronously. stunt derives the
+# terminal state from the clock on every read (pending -> succeeded after 3s,
+# or -> failed when created with the simulator-only simulate_fail flag),
+# persists the transition, and emits refund.updated exactly once. The
+# over-refund guard counts every non-failed refund (pending included) of the
+# same payment/charge, like the real API.
+
+def _refund_public(doc):
+    return {
+        "id": doc["id"],
+        "object": "refund",
+        "amount": doc.get("amount", 0),
+        "currency": doc.get("currency", "usd"),
+        "payment_intent": doc.get("payment_intent", None),
+        "charge": doc.get("charge", None),
+        "reason": doc.get("reason", "requested_by_customer"),
+        "status": doc.get("status", "succeeded"),
+        "created": doc.get("created", 1700000000),
+    }
+
+# _refunds_for returns all refunds targeting one payment_intent or charge.
+def _refunds_for(field, val):
+    docs = store_collection("refunds").list()
+    return query_select(docs, [[field, "=", val]])
+
+# _refunded_total sums the amounts of every non-failed refund (pending
+# refunds count — Stripe reserves the unrefunded balance immediately).
+def _refunded_total(docs):
+    total = 0
+    for r in docs:
+        if r.get("status") != "failed":
+            total = total + _num(r.get("amount", 0))
+    return total
+
+# _usd renders integer cents as a "$dollars.cents" string for error messages.
+def _usd(cents):
+    if cents < 0:
+        cents = 0
+    d = cents // 100
+    c = cents % 100
+    cs = str(c)
+    if c < 10:
+        cs = "0" + cs
+    return "$" + str(d) + "." + cs
+
+# _over_refund_error is the real Stripe 400 for refunding more than the
+# unrefunded balance (or refunding an already fully refunded resource).
+def _over_refund_error(requested, remaining):
+    if remaining <= 0:
+        return respond(400, {"error": {"code": "charge_already_refunded", "message": "Charge has already been refunded.", "type": "invalid_request_error"}})
+    return respond(400, {"error": {"message": "Refund amount (" + _usd(requested) + ") is greater than unrefunded amount on charge (" + _usd(remaining) + ")", "param": "amount", "type": "invalid_request_error"}})
+
+# _create_refund inserts a pending refund doc stamped with its async schedule
+# and emits refund.created. fail_mode True drives the -> failed terminal.
+def _create_refund(pi_id, charge_id, amount, currency, reason, fail_mode):
+    now = clock.now_unix()
+    doc = {
+        "id": _next_id("re"),
+        "object": "refund",
+        "amount": amount,
+        "currency": currency,
+        "payment_intent": pi_id,
+        "charge": charge_id,
+        "reason": reason,
+        "status": "pending",
+        "created": now,
+        "_stage": 0,
+        "_done_at": now + 3,
+    }
+    if fail_mode:
+        doc["_fail_mode"] = "failed"
+    else:
+        doc["_fail_mode"] = ""
+    store_collection("refunds").insert(doc)
+    _signed_emit("refund.created", _refund_public(doc))
+    return doc
+
+# _advance_refund derives a refund's terminal state from the clock, persists
+# it, and emits refund.updated exactly once on the transition. Returns the doc.
+def _advance_refund(doc):
+    if _num(doc.get("_stage", 0)) >= 2:
+        return doc
+    now = clock.now_unix()
+    if now < _num(doc.get("_done_at", 0)):
+        return doc
+    if doc.get("_fail_mode", "") == "failed":
+        doc["status"] = "failed"
+    else:
+        doc["status"] = "succeeded"
+    doc["_stage"] = 2
+    store_collection("refunds").update(doc["id"], doc)
+    _signed_emit("refund.updated", _refund_public(doc))
+    return doc
+
+# _apply_charge_refund mutates a charge doc to reflect a refund of `amount`
+# added on top of `already` refunded cents (real Stripe: amount_refunded grows,
+# refunded/status flip only when the balance hits the full charge amount).
+def _apply_charge_refund(ch, already, amount):
+    base = _num(ch.get("amount", 0))
+    ch["amount_refunded"] = already + amount
+    if already + amount >= base:
+        ch["refunded"] = True
+        ch["status"] = "refunded"
+    else:
+        ch["refunded"] = False
+    return ch

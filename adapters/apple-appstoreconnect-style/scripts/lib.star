@@ -52,6 +52,8 @@ def _b64url_decode(seg):
         v4 = vals[i + 3]
         # Byte 1: top 6 bits from v1, top 2 bits from v2.
         b1 = v1 * 4 + v2 // 16
+        if b1 >= 128:
+            return ""
         result = result + _CHARS[b1]
         # Byte 2: bottom 4 bits from v2, top 4 bits from v3.
         # Only output if there are enough original characters.
@@ -325,6 +327,18 @@ def _to_int(s):
             return 0
     return n
 
+# _num coerces a JSON-round-tripped number (int or float) to int. Timestamps
+# stored in a collection come back as floats, so lifecycle comparisons must
+# go through this.
+def _num(v):
+    if v == None:
+        return 0
+    if type(v) == "int":
+        return v
+    if type(v) == "float":
+        return int(v)
+    return _to_int(str(v))
+
 # _reverse returns a new list with elements in reverse order.
 def _reverse(lst):
     out = []
@@ -379,3 +393,87 @@ def _page_links(self_path, next_cursor):
     if next_cursor != None:
         links["next"] = self_path + "?cursor=" + next_cursor
     return links
+
+# --- shared list query helpers ---
+#
+# _apply_build_query maps the real builds list params
+# (filter[processingState], filter[version], sort) over JSON:API build
+# entities. Shared by the per-app and per-version build listings.
+
+def _apply_build_query(req, data):
+    f = []
+
+    v = _get_query(req, "filter[processingState]")
+    if v != "":
+        f.append(["attributes.processingState", "=", v])
+    v = _get_query(req, "filter[version]")
+    if v != "":
+        f.append(["attributes.version", "=", v])
+
+    sort_field, desc = _asc_sort(req)
+    order_by = None
+    order_dir = ""
+    if sort_field == "version" or sort_field == "uploadedDate" or sort_field == "processingState":
+        order_by = "attributes." + sort_field
+        order_dir = "desc" if desc else "asc"
+
+    return query_select(data, f if len(f) > 0 else None, order_by, order_dir, None, None, None)
+
+# --- shared app/build lookups (used from apps.star and versions.star) ---
+
+# _find_app looks up an app by id. Returns the doc or None.
+def _find_app(app_id):
+    c = store_collection("apps")
+    return c.get(app_id)
+
+# _derive_build_state maps the clock onto Apple's real processingState
+# vocabulary: PROCESSING while Apple processes the upload, then VALID (or
+# INVALID for the simulate_fail path).
+def _derive_build_state(b):
+    if b.get("_done_at", None) == None:
+        return b.get("processingState", "VALID")
+    now = clock.now_unix()
+    if now < _num(b["_done_at"]):
+        return "PROCESSING"
+    if b.get("_fail", False):
+        return "INVALID"
+    return "VALID"
+
+# _advance_build derives the current processingState and persists the
+# transition back to the builds collection so polls, lists, and the
+# processingState filter agree. App Store Connect has no build webhooks, so
+# no events are emitted.
+def _advance_build(b, bc):
+    state = _derive_build_state(b)
+    if b.get("processingState", "") == state:
+        return state
+    b["processingState"] = state
+    bc.update(b.get("id", ""), b)
+    return state
+
+# _build_entity builds a JSON:API resource object from a stored build doc
+# (the internal underscore-prefixed lifecycle fields never appear). The
+# appStoreVersion relationship carries data: null until the build is attached
+# to a version (JSON:API's "no linkage" form).
+def _build_entity(doc):
+    version_data = None
+    if doc.get("appStoreVersion", None) != None:
+        version_data = {"type": "appStoreVersions", "id": doc["appStoreVersion"]}
+    return {
+        "id": doc["id"],
+        "type": "builds",
+        "attributes": {
+            "version": doc.get("version", "1"),
+            "uploadedDate": doc.get("uploadedDate", ""),
+            "processingState": doc.get("processingState", "PROCESSING"),
+            "usesNonExemptEncryption": False,
+        },
+        "relationships": {
+            "app": {
+                "data": {"type": "apps", "id": doc.get("app", "")},
+            },
+            "appStoreVersion": {
+                "data": version_data,
+            },
+        },
+    }

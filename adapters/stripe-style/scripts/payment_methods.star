@@ -24,15 +24,22 @@ def on_create_payment_method(req):
         body = {}
 
     pm_type = body.get("type", "card")
+    card = body.get("card", None)
     doc = {
         "id": _next_id("pm"),
         "object": "payment_method",
         "type": pm_type,
-        "card": body.get("card", {"brand": "visa", "last4": "4242", "exp_month": 12, "exp_year": 2030}),
+        "card": card if card != None else {"brand": "visa", "last4": "4242", "exp_month": 12, "exp_year": 2030},
         "billing_details": body.get("billing_details", {}),
         "customer": None,
         "created": 1700000000,
     }
+    # An explicit card[number] is stored privately (never returned in
+    # _pm_public) so PI confirm can resolve the decline/SCA test-card outcome.
+    if card != None and type(card) == "dict":
+        n = card.get("number", "")
+        if n != None and n != "":
+            doc["_card_number"] = n
     store_collection("payment_methods").insert(doc)
     return respond(201, _pm_public(doc))
 

@@ -33,8 +33,10 @@ def _mint_user():
     }
 
 # _issue_tokens mints an access token + refresh token for a user and stores
-# them. Returns the token response body.
-def _issue_tokens(user, scope):
+# them. aud is the client_id the tokens are issued to (recorded so inbound
+# verification can cross-check the token's aud claim). Returns the token
+# response body.
+def _issue_tokens(user, scope, aud):
     access_seq = store_kv_incr("entra", "access_seq")
     refresh_seq = store_kv_incr("entra", "refresh_seq")
 
@@ -47,11 +49,13 @@ def _issue_tokens(user, scope):
         token_doc[k] = user[k]
     token_doc["user_id"] = user_id
 
-    # Mint a JWT-shaped access token. Include the access_seq in the payload
-    # so each token is unique even for the same user (refresh mints a new one).
-    access = _mint_jwt(user_id, scope, user["displayName"], str(access_seq))
+    # Mint a real RS256 access token (verifiable against the JWKS). The
+    # access_seq in the payload keeps each token unique even for the same
+    # user (refresh mints a new one).
+    access = _mint_jwt(user_id, scope, user["displayName"], str(access_seq), aud)
     token_doc["id"] = access
     token_doc["scope"] = scope
+    token_doc["client_id"] = aud
     # Enforce the advertised ~1h access-token TTL (see expires_in below).
     token_doc["expires_at"] = clock.now_unix() + 3599
 
@@ -144,7 +148,7 @@ def on_token(req):
             if k != "id":
                 u[k] = user[k]
         u["id"] = user.get("user_id", user["id"])
-        return respond(200, _issue_tokens(u, scope))
+        return respond(200, _issue_tokens(u, scope, client_id))
 
     # --- authorization_code grant ---
     if grant_type != "authorization_code":
@@ -178,7 +182,7 @@ def on_token(req):
     u["id"] = user["id"]
     uc.insert(u)
 
-    return respond(200, _issue_tokens(user, scope))
+    return respond(200, _issue_tokens(user, scope, client_id))
 
 # on_jwks serves the JWKS (public signing keys) so a client can verify the RS256
 # tokens minted by _mint_jwt. Matches the Microsoft identity platform's

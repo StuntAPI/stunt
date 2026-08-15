@@ -2,8 +2,13 @@ package engine
 
 import (
 	"context"
+	"crypto"
+	"crypto/rsa"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -118,6 +123,57 @@ func TestGoogleStyleAdapter(t *testing.T) {
 		t.Fatalf("scope = %v, want non-empty", tokenResp["scope"])
 	}
 
+	// ===== openid scope → real RS256 id_token, verifiable via /oauth2/v3/certs =====
+
+	idToken, ok := tokenResp["id_token"].(string)
+	if !ok || idToken == "" {
+		t.Fatalf("id_token = %v, want non-empty string (scope includes openid)", tokenResp["id_token"])
+	}
+	certsBody, certsStatus := googleGetAuth(t, base+"/oauth2/v3/certs", accessToken)
+	if certsStatus != 200 {
+		t.Fatalf("GET /oauth2/v3/certs -> status %d, want 200; body %s", certsStatus, certsBody)
+	}
+	var certs struct {
+		Keys []map[string]any `json:"keys"`
+	}
+	if err := json.Unmarshal([]byte(certsBody), &certs); err != nil {
+		t.Fatalf("unmarshal certs: %v (body %s)", err, certsBody)
+	}
+	if len(certs.Keys) != 1 {
+		t.Fatalf("certs keys = %d, want 1", len(certs.Keys))
+	}
+	googleVerifyIDToken(t, idToken, certs.Keys[0], clientID)
+
+	// ===== non-openid scope → NO id_token =====
+
+	resp = googleGetNoRedirect(t, base+"/o/oauth2/auth?"+
+		"client_id="+clientID+
+		"&redirect_uri="+url.QueryEscape(redirectURI)+
+		"&state="+state+
+		"&response_type=code&scope=email%20profile")
+	if resp.StatusCode != 302 {
+		t.Fatalf("authorize (no openid) -> status %d, want 302", resp.StatusCode)
+	}
+	noOIDCCode := googleExtractParam(resp.Header.Get("Location"), "code")
+	resp.Body.Close()
+	body, status = googlePostForm(t, base+"/o/oauth2/token", url.Values{
+		"grant_type":    {"authorization_code"},
+		"code":          {noOIDCCode},
+		"client_id":     {clientID},
+		"client_secret": {clientSecret},
+		"redirect_uri":  {redirectURI},
+	})
+	if status != 200 {
+		t.Fatalf("token (no openid) -> status %d, want 200; body %s", status, body)
+	}
+	var noOIDCResp map[string]any
+	if err := json.Unmarshal([]byte(body), &noOIDCResp); err != nil {
+		t.Fatalf("unmarshal no-openid response: %v (body %s)", err, body)
+	}
+	if noOIDCResp["id_token"] != nil {
+		t.Fatalf("id_token = %v, want absent (scope lacks openid)", noOIDCResp["id_token"])
+	}
+
 	// ===== Code is single-use =====
 
 	_, status = googlePostForm(t, base+"/o/oauth2/token", url.Values{
@@ -227,6 +283,64 @@ func TestGoogleStyleAdapter(t *testing.T) {
 }
 
 // === Helpers ===
+
+// googleVerifyIDToken verifies an RS256 id_token against a served JWK and
+// checks Google's claim set (iss, aud == clientID, future exp).
+func googleVerifyIDToken(t *testing.T, token string, jwk map[string]any, clientID string) {
+	t.Helper()
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		t.Fatalf("id_token has %d parts, want 3", len(parts))
+	}
+	nBytes, err := base64.RawURLEncoding.DecodeString(jwk["n"].(string))
+	if err != nil {
+		t.Fatalf("decode n: %v", err)
+	}
+	eBytes, err := base64.RawURLEncoding.DecodeString(jwk["e"].(string))
+	if err != nil {
+		t.Fatalf("decode e: %v", err)
+	}
+	pub := &rsa.PublicKey{
+		N: new(big.Int).SetBytes(nBytes),
+		E: int(new(big.Int).SetBytes(eBytes).Int64()),
+	}
+	sig, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil {
+		t.Fatalf("decode signature: %v", err)
+	}
+	digest := sha256.Sum256([]byte(parts[0] + "." + parts[1]))
+	if err := rsa.VerifyPKCS1v15(pub, crypto.SHA256, digest[:], sig); err != nil {
+		t.Fatalf("id_token RS256 signature did not verify against the served certs key: %v", err)
+	}
+	var hdr map[string]any
+	headerJSON, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		t.Fatalf("decode header: %v", err)
+	}
+	if err := json.Unmarshal(headerJSON, &hdr); err != nil {
+		t.Fatalf("unmarshal header: %v", err)
+	}
+	if hdr["alg"] != "RS256" || hdr["kid"] != jwk["kid"] {
+		t.Fatalf("id_token header = %v, want alg=RS256 kid=%v", hdr, jwk["kid"])
+	}
+	var claims map[string]any
+	payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("decode payload: %v", err)
+	}
+	if err := json.Unmarshal(payloadJSON, &claims); err != nil {
+		t.Fatalf("unmarshal claims: %v", err)
+	}
+	if claims["iss"] != "https://accounts.google.com" {
+		t.Fatalf("id_token iss = %v", claims["iss"])
+	}
+	if claims["aud"] != clientID {
+		t.Fatalf("id_token aud = %v, want %v", claims["aud"], clientID)
+	}
+	if exp, ok := claims["exp"].(float64); !ok || exp <= float64(time.Now().Unix()) {
+		t.Fatalf("id_token exp = %v, want future timestamp", claims["exp"])
+	}
+}
 
 func googleGetNoRedirect(t *testing.T, url string) *http.Response {
 	t.Helper()

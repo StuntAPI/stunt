@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -203,7 +204,178 @@ func TestJumioStyleAdapter(t *testing.T) {
 	}
 }
 
+// TestJumioStyleRejectionsAndLifecycle exercises the rejection/outcome
+// surface added on top of the async scan slice:
+//
+//   - create without merchantScanReference → 400
+//   - scan with simulate_reject_reason (no simulate_fail) → FAILED with that
+//     rejectionReason + rejectReasonDescription
+//   - simulate_fail alone → default reason MANIPULATED_DOCUMENT
+//   - /data on a FAILED scan → 409 carrying the rejectionReason
+//   - DELETE scan → 200; GET and DELETE after → 404
+func TestJumioStyleRejectionsAndLifecycle(t *testing.T) {
+	adapterDir := filepath.Join("..", "..", "adapters", "jumio-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateDir := t.TempDir()
+	manifestPath := filepath.Join(stateDir, "stunt.yaml")
+
+	m := &manifest.Manifest{
+		Path:    manifestPath,
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"jumio": {Adapter: absAdapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["jumio"]
+	const token = "test-token-jumio"
+
+	// ===== Create without merchantScanReference → 400 =====
+
+	body, status := jumioPost(t, base+"/netverify/v2/scans", token, map[string]any{
+		"country": "USA",
+	})
+	if status != 400 {
+		t.Fatalf("create without merchantScanReference -> status %d, want 400; body %s", status, body)
+	}
+
+	// ===== Rejected scan with an explicit reason code =====
+
+	body, status = jumioPost(t, base+"/netverify/v2/scans", token, map[string]any{
+		"merchantScanReference":  "merchant-reject-001",
+		"country":                "USA",
+		"type":                   "PASSPORT",
+		"simulate_reject_reason": "DOCUMENT_EXPIRED",
+	})
+	if status != 200 {
+		t.Fatalf("create rejected scan -> status %d, want 200; body %s", status, body)
+	}
+	var createResp map[string]any
+	if err := json.Unmarshal([]byte(body), &createResp); err != nil {
+		t.Fatalf("unmarshal: %v (body %s)", err, body)
+	}
+	rejectRef, ok := createResp["scanReference"].(string)
+	if !ok || rejectRef == "" {
+		t.Fatalf("rejected scanReference = %v, want non-empty", createResp["scanReference"])
+	}
+
+	// ===== Default-reason scan (simulate_fail only) =====
+
+	body, status = jumioPost(t, base+"/netverify/v2/scans", token, map[string]any{
+		"merchantScanReference": "merchant-reject-002",
+		"country":               "USA",
+		"type":                  "ID_CARD",
+		"simulate_fail":         true,
+	})
+	if status != 200 {
+		t.Fatalf("create default-fail scan -> status %d, want 200; body %s", status, body)
+	}
+	var defaultCreate map[string]any
+	if err := json.Unmarshal([]byte(body), &defaultCreate); err != nil {
+		t.Fatalf("unmarshal: %v (body %s)", err, body)
+	}
+	defaultRef, _ := defaultCreate["scanReference"].(string)
+
+	// ===== Sleep past the 3s terminal window =====
+
+	time.Sleep(3500 * time.Millisecond)
+
+	// ===== Rejected scan → FAILED + rejectionReason =====
+
+	body, status = jumioGet(t, base+"/netverify/v2/scans/"+rejectRef, token)
+	if status != 200 {
+		t.Fatalf("get rejected scan -> status %d, want 200; body %s", status, body)
+	}
+	var rejectGet map[string]any
+	if err := json.Unmarshal([]byte(body), &rejectGet); err != nil {
+		t.Fatalf("unmarshal: %v (body %s)", err, body)
+	}
+	if rejectGet["status"] != "FAILED" {
+		t.Fatalf("rejected scan status = %v, want FAILED", rejectGet["status"])
+	}
+	if rejectGet["rejectionReason"] != "DOCUMENT_EXPIRED" {
+		t.Fatalf("rejectionReason = %v, want DOCUMENT_EXPIRED", rejectGet["rejectionReason"])
+	}
+	desc, ok := rejectGet["rejectReasonDescription"].(string)
+	if !ok || desc == "" {
+		t.Fatalf("rejectReasonDescription = %v, want non-empty", rejectGet["rejectReasonDescription"])
+	}
+
+	// Default reason scan.
+	body, status = jumioGet(t, base+"/netverify/v2/scans/"+defaultRef, token)
+	if status != 200 {
+		t.Fatalf("get default-fail scan -> status %d, want 200; body %s", status, body)
+	}
+	var defaultGet map[string]any
+	if err := json.Unmarshal([]byte(body), &defaultGet); err != nil {
+		t.Fatalf("unmarshal: %v (body %s)", err, body)
+	}
+	if defaultGet["status"] != "FAILED" || defaultGet["rejectionReason"] != "MANIPULATED_DOCUMENT" {
+		t.Fatalf("default-fail scan = %v/%v, want FAILED/MANIPULATED_DOCUMENT", defaultGet["status"], defaultGet["rejectionReason"])
+	}
+
+	// ===== /data on a FAILED scan → 409 with the reason =====
+
+	body, status = jumioGet(t, base+"/netverify/v2/scans/"+rejectRef+"/data", token)
+	if status != 409 {
+		t.Fatalf("rejected scan data -> status %d, want 409; body %s", status, body)
+	}
+	if !strings.Contains(body, "DOCUMENT_EXPIRED") {
+		t.Fatalf("rejected scan data 409 body should carry the reason, got: %s", body)
+	}
+
+	// ===== DELETE scan lifecycle endpoint =====
+
+	body, status = jumioDelete(t, base+"/netverify/v2/scans/"+rejectRef, token)
+	if status != 200 {
+		t.Fatalf("delete scan -> status %d, want 200; body %s", status, body)
+	}
+	body, status = jumioGet(t, base+"/netverify/v2/scans/"+rejectRef, token)
+	if status != 404 {
+		t.Fatalf("get deleted scan -> status %d, want 404; body %s", status, body)
+	}
+	body, status = jumioDelete(t, base+"/netverify/v2/scans/"+rejectRef, token)
+	if status != 404 {
+		t.Fatalf("delete deleted scan -> status %d, want 404; body %s", status, body)
+	}
+	body, status = jumioGet(t, base+"/netverify/v2/scans/"+defaultRef+"/data", token)
+	if status != 409 {
+		t.Fatalf("default-fail scan data -> status %d, want 409", status)
+	}
+}
+
 // === Jumio test helpers ===
+
+func jumioDelete(t *testing.T, rawurl, token string) (string, int) {
+	t.Helper()
+	req, _ := http.NewRequest("DELETE", rawurl, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return string(b), resp.StatusCode
+}
 
 func jumioGet(t *testing.T, rawurl, token string) (string, int) {
 	t.Helper()

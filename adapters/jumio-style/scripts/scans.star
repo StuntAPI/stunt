@@ -1,15 +1,19 @@
 # Scan handlers — Jumio Netverify API.
 #
-# POST /netverify/v2/scans
+# POST   /netverify/v2/scans
 #   JSON {merchantScanReference, country, ...}
 #   → {timestamp, scanReference, status:"PENDING"}
-# GET  /netverify/v2/scans/{scan_reference}
+# GET    /netverify/v2/scans/{scan_reference}
 #   → status PENDING (0-3s) → DONE (+3s) | FAILED (+3s if simulate_fail)
-# GET  /netverify/v2/scans/{scan_reference}/data
+#   FAILED scans carry rejectionReason (Netverify's real reject reason codes)
+# GET    /netverify/v2/scans/{scan_reference}/data
 #   → extractedData (only once DONE)
+# DELETE /netverify/v2/scans/{scan_reference}
+#   → delete the scan (200); subsequent GETs return 404
 
 # Shared helpers (_bearer, _require_auth, _err, _gen_scan_ref,
-# _derive_scan_status, _signed_emit) are preloaded.
+# _derive_scan_status, _signed_emit, _reject_reason, _reject_description)
+# are preloaded.
 
 def on_create_scan(req):
     if not _require_auth(req):
@@ -20,10 +24,17 @@ def on_create_scan(req):
         body = {}
 
     merchant_ref = body.get("merchantScanReference", "")
+    if merchant_ref == None or merchant_ref == "":
+        return respond(400, _err(400, "merchantScanReference is required"))
     country = body.get("country", "USA")
     doc_type = body.get("type", "DRIVING_LICENSE")
-    front_image = body.get("frontsideImage", "")
-    back_image = body.get("backsideImage", "")
+
+    # Failure injection: simulate_fail, or an explicit reject reason (which
+    # implies failure — see README).
+    reject_reason = body.get("simulate_reject_reason", "")
+    if reject_reason == None:
+        reject_reason = ""
+    fail = body.get("simulate_fail", False) == True or reject_reason != ""
 
     seq = store_kv_incr("jumio", "scan_seq")
     scan_ref = _gen_scan_ref(seq)
@@ -44,7 +55,8 @@ def on_create_scan(req):
         "extractedData": None,
         "_running_at": now + 1,
         "_done_at": now + 3,
-        "_fail": body.get("simulate_fail", False) == True,
+        "_fail": fail,
+        "_reject": reject_reason,
     })
 
     return respond(200, {
@@ -56,7 +68,8 @@ def on_create_scan(req):
 
 # _advance_scan derives the scan's current status from the clock, persists the
 # transition, and fires once-only side effects (signed webhook + extracted
-# data seeding) at the terminal transitions Jumio notifies.
+# data seeding) at the terminal transitions Jumio notifies. FAILED
+# transitions also stamp the rejection reason (real Netverify reject codes).
 def _advance_scan(scan_ref):
     sc = store_collection("scans")
     doc = sc.get(scan_ref)
@@ -68,6 +81,8 @@ def _advance_scan(scan_ref):
         doc["status"] = new_status
         if new_status == "DONE":
             doc["extractedData"] = _build_extracted(doc)
+        elif new_status == "FAILED":
+            doc["rejectionReason"] = _reject_reason(doc)
         sc.update(scan_ref, doc)
         if new_status == "DONE":
             _signed_emit("scan.completed", {
@@ -78,6 +93,7 @@ def _advance_scan(scan_ref):
             _signed_emit("scan.failed", {
                 "scanReference": scan_ref,
                 "status": "FAILED",
+                "rejectionReason": doc["rejectionReason"],
             })
     return doc
 
@@ -93,11 +109,34 @@ def on_get_scan(req):
     doc["get_count"] = doc.get("get_count", 0) + 1
     store_collection("scans").update(scan_ref, doc)
 
-    return respond(200, {
+    resp = {
         "timestamp": doc.get("timestamp", ""),
         "scanReference": doc["scanReference"],
         "merchantScanReference": doc.get("merchantScanReference", ""),
         "status": doc["status"],
+    }
+    if doc["status"] == "FAILED":
+        resp["rejectionReason"] = doc.get("rejectionReason", _reject_reason(doc))
+        resp["rejectReasonDescription"] = _reject_description(resp["rejectionReason"])
+    return respond(200, resp)
+
+# on_delete_scan deletes a scan (the real Netverify scan-deletion endpoint).
+# Terminal states are advanced first so the lifecycle side effects (signed
+# webhook, extracted-data seeding) fire before the scan disappears.
+def on_delete_scan(req):
+    if not _require_auth(req):
+        return respond(401, _err(401, "Unauthorized"))
+
+    scan_ref = req["params"]["scan_reference"]
+    doc = _advance_scan(scan_ref)
+    if doc == None:
+        return respond(404, _err(404, "Scan not found"))
+
+    store_collection("scans").delete(scan_ref)
+    return respond(200, {
+        "timestamp": "2024-01-15T10:00:00.000Z",
+        "scanReference": scan_ref,
+        "deleted": True,
     })
 
 def on_get_scan_data(req):
@@ -110,7 +149,9 @@ def on_get_scan_data(req):
         return respond(404, _err(404, "Scan not found"))
 
     if doc["status"] == "FAILED":
-        return respond(409, _err(409, "Scan failed; no extracted data available"))
+        err = _err(409, "Scan failed; no extracted data available")
+        err["rejectionReason"] = doc.get("rejectionReason", _reject_reason(doc))
+        return respond(409, err)
 
     return respond(200, {
         "scanReference": doc["scanReference"],

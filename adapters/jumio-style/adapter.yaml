@@ -6,7 +6,7 @@
 # See DISCLAIMER.
 id: jumio-style
 name: "Jumio Netverify API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Jumio API"
@@ -25,6 +25,10 @@ endpoints:
   - route: /netverify/v2/scans/{scan_reference}
     method: GET
     handler: scripts/scans.star#on_get_scan
+    concurrency_key: scan_reference
+  - route: /netverify/v2/scans/{scan_reference}
+    method: DELETE
+    handler: scripts/scans.star#on_delete_scan
     concurrency_key: scan_reference
   - route: /netverify/v2/scans/{scan_reference}/data
     method: GET

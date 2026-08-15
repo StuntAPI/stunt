@@ -39,27 +39,71 @@ endpoints:
     method: POST
     handler: scripts/auth.star#on_relyingparty
 
+  # --- securetoken grant (refresh_token exchange) ---
+  - route: /v1/token
+    method: POST
+    handler: scripts/auth.star#on_securetoken
+
   # --- Firestore ---
+  # documents:runQuery (literal) BEFORE the parameterized document routes.
+  - route: /v1/projects/{project}/databases/(default)/documents:runQuery
+    method: POST
+    handler: scripts/firestore.star#on_run_query
   - route: /v1/projects/{project}/databases/(default)/documents/{collection}
     method: GET
     handler: scripts/firestore.star#on_list_documents
+  # concurrency_key serializes the read-modify-write documentId
+  # conflict-check+insert per collection.
   - route: /v1/projects/{project}/databases/(default)/documents/{collection}
     method: POST
     handler: scripts/firestore.star#on_create_document
+    concurrency_key: collection
   - route: /v1/projects/{project}/databases/(default)/documents/{collection}/{id}
     method: GET
     handler: scripts/firestore.star#on_get_document
   - route: /v1/projects/{project}/databases/(default)/documents/{collection}/{id}
     method: PATCH
     handler: scripts/firestore.star#on_upsert_document
+    concurrency_key: id
   - route: /v1/projects/{project}/databases/(default)/documents/{collection}/{id}
     method: DELETE
     handler: scripts/firestore.star#on_delete_document
+    concurrency_key: id
+  # Nested collection paths (subcollections under a document).
+  - route: /v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}
+    method: GET
+    handler: scripts/firestore.star#on_list_subdocuments
+  - route: /v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}
+    method: POST
+    handler: scripts/firestore.star#on_create_subdocument
+    concurrency_key: sub
+  - route: /v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}/{id}
+    method: GET
+    handler: scripts/firestore.star#on_get_subdocument
+  - route: /v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}/{id}
+    method: PATCH
+    handler: scripts/firestore.star#on_upsert_subdocument
+    concurrency_key: id
+  - route: /v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}/{id}
+    method: DELETE
+    handler: scripts/firestore.star#on_delete_subdocument
+    concurrency_key: id
 
   # --- FCM (Cloud Messaging) ---
   - route: /v1/projects/{project}/messages:send
     method: POST
     handler: scripts/fcm.star#on_send_message
+  # Simulator extension: list stored messages (assert topic/condition fanout).
+  - route: /v1/projects/{project}/messages
+    method: GET
+    handler: scripts/fcm.star#on_list_messages
+  # Topic subscriptions (simulator extension standing in for the IID API).
+  - route: /v1/projects/{project}/topics/{topic}:subscribe
+    method: POST
+    handler: scripts/fcm.star#on_subscribe
+  - route: /v1/projects/{project}/topics/{topic}:unsubscribe
+    method: POST
+    handler: scripts/fcm.star#on_unsubscribe
 
 # Backing stores — collections for stateful data.
 resources:
@@ -68,6 +112,8 @@ resources:
   - name: documents
     kind: collection
   - name: messages
+    kind: collection
+  - name: subscriptions
     kind: collection
 
 # Auth scheme metadata (mock: bearer token or key accepted; presence checked).

@@ -30,8 +30,8 @@ A stunt adapter simulating the **Microsoft Entra ID (Azure AD)** API via Microso
 
 ## Key shapes
 
-- Access tokens are real, verifiable JWTs (`header.payload.signature`): signed with RS256 using a fixed mock RSA keypair (`kid: mock-entra-kid-1`), with claims `sub`, `name`, `scp`, `nonce`, and `iss: https://login.microsoftonline.com/mock-tenant/v2.0`. Verify them against `GET /common/discovery/v2.0/keys`.
-- Bearer tokens are validated against the `tokens` store collection and carry an `expires_at` (unix) of `now + 3599`, matching the advertised `expires_in`. A missing, unknown, or expired token returns `401` with `{error:{code: "InvalidAuthenticationToken", message}}`.
+- Access tokens are real, verifiable JWTs (`header.payload.signature`): signed with RS256 using a fixed mock RSA keypair (`kid: mock-entra-kid-1`), with claims `sub`, `name`, `scp`, `nonce`, `iss: https://login.microsoftonline.com/mock-tenant/v2.0`, `aud` (the client_id the token was issued to) and `iat`/`exp` (`now`/`now + 3599`). Verify them against `GET /common/discovery/v2.0/keys`.
+- Inbound Bearer tokens are verified **cryptographically**, not just by store lookup: the RS256 signature over `header.payload` is checked with `crypto.rsa_verify` against the JWKS public key, the JOSE header must carry the matching `kid`, and the `exp` (vs `clock.now_unix()`), `iss` and `aud` claims are enforced (`aud` is cross-checked against the client_id recorded at mint time). Bearer tokens also carry an `expires_at` (unix) of `now + 3599` on their store doc, matching the advertised `expires_in`. A missing, unknown, forged, or expired token returns `401` with `{error:{code: "InvalidAuthenticationToken", message}}`.
 - User objects use `userPrincipalName` (UPN), not `email`.
 - Listings use `"value": [...]` arrays with `@odata.context`.
 - Admin consent is modeled via `prompt=admin_consent` on the authorize endpoint.

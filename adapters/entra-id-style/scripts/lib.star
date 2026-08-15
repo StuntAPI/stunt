@@ -16,10 +16,17 @@ def _bearer(req):
 # _user_for_token looks up the user/principal document bound to a Bearer
 # token. Returns None if the token is absent, not found in the store, or
 # expired (expires_at, a unix timestamp set at mint time — the access-token
-# TTL reported by the real identity platform is ~3600s).
+# TTL reported by the real identity platform is ~3600s). The JWT itself is
+# also VERIFIED cryptographically (RS256 signature over header.payload with
+# the JWKS public key, plus exp/iss/aud claim checks) — not just a store
+# lookup — so forged or claim-tampered tokens are rejected even if a store
+# row existed.
 def _user_for_token(req):
     token = _bearer(req)
     if token == "":
+        return None
+    claims = _verify_access_jwt(token)
+    if claims == None:
         return None
     c = store_collection("tokens")
     doc = c.get(token)
@@ -27,6 +34,12 @@ def _user_for_token(req):
         return None
     exp = doc.get("expires_at", 0)
     if exp != None and exp != 0 and clock.now_unix() > exp:
+        return None
+    # Cross-check the token's aud against the client_id recorded at mint
+    # time (defends against a minted token being replayed against another
+    # API audience).
+    want_aud = doc.get("client_id", "")
+    if want_aud != "" and claims.get("aud", "") != want_aud:
         return None
     return doc
 
@@ -131,18 +144,101 @@ def _b64url(s):
             out += "_"
     return out
 
-# _mint_jwt builds a synthetic JWT-shaped access token (header.payload.sig).
-# The payload encodes the user id and scopes so downstream handlers can
-# validate it. The nonce (typically the access_seq) ensures each token is
-# unique even when refreshing for the same user.
-def _mint_jwt(sub, scopes, name, nonce="0"):
+# _mint_jwt builds a real RS256-signed access token (header.payload.sig).
+# The payload encodes the user id, scopes, issuer, audience (client_id) and
+# iat/exp (1h TTL) so downstream verifiers can validate it with the JWKS at
+# /common/discovery/v2.0/keys. The nonce (typically the access_seq) ensures
+# each token is unique even when refreshing for the same user.
+def _mint_jwt(sub, scopes, name, nonce, aud):
+    now = clock.now_unix()
     header = crypto.base64url_encode('{"alg":"RS256","typ":"JWT","kid":"' + _JWT_KID + '"}')
-    payload_parts = '{"sub":"' + sub + '","name":"' + name + '","scp":"' + scopes + '","nonce":"' + nonce + '","iss":"https://login.microsoftonline.com/mock-tenant/v2.0"}'
+    payload_parts = '{"sub":"' + sub + '","name":"' + name + '","scp":"' + scopes + '","nonce":"' + nonce + '","iss":"' + _JWT_ISS + '","aud":"' + aud + '","iat":' + str(now) + ',"exp":' + str(now + 3599) + '}'
     payload = crypto.base64url_encode(payload_parts)
     signing_input = header + "." + payload
     sig = crypto.rsa_sign(_JWT_PRIVATE_KEY, signing_input, encoding="base64url")
     return signing_input + "." + sig
+
+# --- inbound JWT verification ---
+
+# _B64URL is the base64url alphabet (- and _ replace + and /).
+_B64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" + "0123" + "45678" + "9-_"
+
+# _b64url_ok reports whether seg is a syntactically valid unpadded
+# base64url segment (alphabet chars only, length not == 1 mod 4). Guards
+# the crypto.base64url_decode / crypto.rsa_verify builtins, which error
+# (surfacing as a 500) on malformed input.
+def _b64url_ok(seg):
+    if seg == "":
+        return False
+    if len(seg) % 4 == 1:
+        return False
+    for i in range(len(seg)):
+        if _B64URL.find(seg[i]) < 0:
+            return False
+    return True
+
+# _jwt_json decodes a JWT segment (0=header, 1=payload) into a Starlark
+# dict via crypto.base64url_decode + json.decode, or None when malformed.
+# Shape guards keep json.decode from erroring on garbage.
+def _jwt_json(token, seg):
+    parts = token.split(".")
+    if len(parts) != 3:
+        return None
+    if not _b64url_ok(parts[0]) or not _b64url_ok(parts[1]) or not _b64url_ok(parts[2]):
+        return None
+    txt = crypto.base64url_decode(parts[seg])
+    if txt == "" or txt[:1] != "{":
+        return None
+    out = json_safe_decode(txt)
+    if type(out) != "dict":
+        return None
+    return out
+
+# _claim_int coerces a claim value to int (JSON numbers decode as int).
+# Returns None when absent/None.
+def _claim_int(v):
+    if v == None:
+        return None
+    if type(v) == "int":
+        return v
+    return None
+
+# _verify_access_jwt fully verifies an inbound access token:
+#   - 3 dot-separated, base64url-valid segments
+#   - JOSE header alg=="RS256" and kid == the served JWKS kid
+#   - RSA-SHA256 signature over header.payload verified with the JWKS
+#     public key (crypto.rsa_verify)
+#   - exp in the future (clock.now_unix()), iss == the mock tenant issuer,
+#     aud present and non-empty
+# Returns the claims dict, or None when the token fails any check.
+def _verify_access_jwt(token):
+    if token == "" or token == None:
+        return None
+    header = _jwt_json(token, 0)
+    if header == None:
+        return None
+    if header.get("alg", "") != "RS256":
+        return None
+    if header.get("kid", "") != _JWT_KID:
+        return None
+    parts = token.split(".")
+    if not crypto.rsa_verify(_JWT_PUBLIC_KEY, parts[0] + "." + parts[1], parts[2], encoding="base64url"):
+        return None
+    claims = _jwt_json(token, 1)
+    if claims == None:
+        return None
+    exp = _claim_int(claims.get("exp", None))
+    if exp == None:
+        return None
+    if clock.now_unix() >= exp:
+        return None
+    if claims.get("iss", "") != _JWT_ISS:
+        return None
+    if claims.get("aud", "") == "":
+        return None
+    return claims
 _JWT_KID = "mock-entra-kid-1"
+_JWT_ISS = "https://login.microsoftonline.com/mock-tenant/v2.0"
 _JWT_PRIVATE_KEY = """-----BEGIN PRIVATE KEY-----
 MIIEowIBAAKCAQEAvr9/xXKqJmLa53C2IDf3DUu83XmYEwqLbxD62LJg7x+aLJ1d
 1uFHDiCphI5ab6d1fEx6BKa0CVJ9VG74+Fg5vM07SgztJgWvHpFGDM4lB5v/BCe4

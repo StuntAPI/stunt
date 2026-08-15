@@ -29,16 +29,52 @@ endpoints:
     method: GET
     handler: scripts/models.star#on_list_modules
 
-  # --- Imports: run + task status (literal path segments) ---
-  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/imports/{importId}/tasks
+  # --- Files: upload (full body or Content-Range chunk), download, chunks ---
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/files
+    method: GET
+    handler: scripts/files.star#on_list_files
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}
+    method: GET
+    handler: scripts/files.star#on_download_file
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}
     method: POST
-    handler: scripts/tasks.star#on_run_import
+    handler: scripts/files.star#on_upload_file
+    concurrency_key: fileId # chunk appends read-modify-write the chunk table
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}
+    method: PUT
+    handler: scripts/files.star#on_upload_file
+    concurrency_key: fileId
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}/chunks
+    method: GET
+    handler: scripts/files.star#on_list_chunks
 
-  # --- Exports ---
+  # --- Action catalog lists (imports/exports/actions/processes) ---
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/imports
+    method: GET
+    handler: scripts/catalog.star#on_list_imports
   - route: /2/0/workspaces/{workspaceId}/models/{modelId}/exports
     method: GET
     handler: scripts/tasks.star#on_list_exports
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/actions
+    method: GET
+    handler: scripts/catalog.star#on_list_actions
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/processes
+    method: GET
+    handler: scripts/catalog.star#on_list_processes
+
+  # --- Imports: run (tasks = Anaplan's name; jobs = alias) ---
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/imports/{importId}/tasks
+    method: POST
+    handler: scripts/tasks.star#on_run_import
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/imports/{importId}/jobs
+    method: POST
+    handler: scripts/tasks.star#on_run_import
+
+  # --- Exports: run (tasks + jobs alias) ---
   - route: /2/0/workspaces/{workspaceId}/models/{modelId}/exports/{exportId}/tasks
+    method: POST
+    handler: scripts/tasks.star#on_run_export
+  - route: /2/0/workspaces/{workspaceId}/models/{modelId}/exports/{exportId}/jobs
     method: POST
     handler: scripts/tasks.star#on_run_export
 
@@ -46,6 +82,7 @@ endpoints:
   - route: /2/0/workspaces/{workspaceId}/models/{modelId}/tasks/{taskId}
     method: GET
     handler: scripts/tasks.star#on_get_task
+    concurrency_key: taskId # derive-on-read transition persists a state change
 
   # --- Get single model ---
   - route: /2/0/workspaces/{workspaceId}/models/{modelId}
@@ -57,6 +94,18 @@ resources:
   - name: workspaces
     kind: collection
   - name: tasks
+    kind: collection
+  - name: files
+    kind: collection
+  - name: imports
+    kind: collection
+  - name: exports
+    kind: collection
+  - name: actions
+    kind: collection
+  - name: processes
+    kind: collection
+  - name: modelData
     kind: collection
 
 # Auth scheme metadata.

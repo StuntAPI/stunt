@@ -19,8 +19,17 @@ is synthetic — no real API data is included.
 - `GET /oauth2/userInfo` (Bearer) → `{sub, username, email, ...}`.
 - `GET /login` → 302 to `/oauth2/authorize`.
 - `GET /logout` → 302 to `redirect_uri`.
+- `GET /{userPoolId}/.well-known/jwks.json` → JWKS for the pool's signing key.
 
-JWT-shaped `id_token` and `access_token` are minted (synthetic, not cryptographically valid).
+`id_token` and `access_token` are **real, decodable RS256 JWTs** signed with a
+fixed synthetic RSA-2048 keypair (kid `mock-cognito-key-1`). Access tokens
+carry `{sub, iss, client_id, token_use:"access", username, jti, iat, exp}`;
+id tokens carry `{sub, iss, aud, token_use:"id", cognito:username, email,
+email_verified, auth_time, iat, exp}`. The JWKS endpoint serves the public
+half (via `crypto.rsa_public_jwk`), so any standards-compliant JWT library
+can verify them, and the adapter itself verifies inbound access/id tokens
+(signature + `exp` + `iss` + `token_use`) on `/oauth2/userInfo` and
+`GetUser` — not just a store lookup.
 
 ### Service API (user pool — `X-Amz-Target`)
 
@@ -54,6 +63,7 @@ Users and tokens are **stateful**.
 | GET | `/login` | `oauth.star#on_login` | Hosted UI login |
 | GET | `/logout` | `oauth.star#on_logout` | Hosted UI logout |
 | POST | `/` | `service.star#on_service_api` | Service API (X-Amz-Target dispatch) |
+| GET | `/{userPoolId}/.well-known/jwks.json` | `oauth.star#on_jwks` | Pool JWKS (real RSA key) |
 
 ## Backing stores
 
@@ -70,6 +80,14 @@ Users and tokens are **stateful**.
 - **`/oauth2/userInfo`** requires `Authorization: Bearer <token>`.
 - **Service API** uses `X-Amz-Target` header dispatch. SigV4 structural validation is
   applied when an `Authorization` header is present, but is not cryptographically enforced.
+- **Inbound JWTs** (userInfo Bearer, `GetUser` AccessToken) are verified
+  cryptographically: RS256 signature against the JWKS key, plus `exp`, `iss`
+  and `token_use` claim checks. Tampered or expired tokens → `401 invalid_token`
+  (hosted UI) / `NotAuthorizedException` (service API).
+
+The fixed synthetic RSA keypair lives in `scripts/lib.star`
+(`_JWT_PRIVATE_KEY` / `_JWT_PUBLIC_KEY`); it is throwaway mock material that
+exists nowhere but this repository.
 
 ## Usage
 

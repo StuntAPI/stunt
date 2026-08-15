@@ -74,7 +74,7 @@ def on_trigger(req):
         lead_id = lead_entry.get("leadId", "")
         seq = store_kv_incr("marketo", "activity_seq")
         ac.insert({
-            "id": str(55000 + seq),
+            "id": str((55*1000) + seq),
             "leadId": str(lead_id),
             "activityDate": _now(),
             "activityTypeId": "51",

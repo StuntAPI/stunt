@@ -21,20 +21,44 @@ Three Firebase surfaces with their distinctive shapes:
   `POST .../signupNewUser`, `POST .../getAccountInfo`, `POST .../refreshToken`.
 - Returns `{localId, idToken, refreshToken, expiresIn, email}`.
 - Users are **stateful** — a user created via signUp persists and can sign in.
+- **idTokens are bound to their user:** every issued `idToken` maps to the uid
+  it was minted for (1h expiry). `getAccountInfo` / `lookup` resolve the
+  presented token to ITS user — never "the first user" — and an unknown or
+  expired token returns **401** `INVALID_ID_TOKEN`.
 - **Refresh tokens are stateful too:** every issued `refreshToken` is bound to
   its user, and `POST .../relyingparty/refreshToken` (body `refresh_token` or
   `refreshToken`) exchanges it for fresh tokens:
   `{user_id, id_token, refresh_token, expires_in, token_type:"Bearer"}`.
   Unknown refresh tokens return `400 INVALID_REFRESH_TOKEN`.
+- **Secure Token Service:** `POST /v1/token` (form-encoded
+  `grant_type=refresh_token&refresh_token=...`) exchanges a VERIFIED inbound
+  refresh token for freshly minted tokens (1h expiry), returning the real
+  securetoken shape `{access_token, id_token, refresh_token, expires_in:"3600",
+  token_type:"Bearer", user_id, project_id}`. Wrong grant types and unknown
+  refresh tokens return `400`.
 
 ### Firestore
 
 - `GET /v1/projects/{project}/databases/(default)/documents/{collection}` → list.
-- `POST .../documents/{collection}` → create.
+- `POST .../documents/{collection}` → create. Honors an explicit
+  `?documentId=` (or body `documentId`); reusing an existing ID returns
+  **409 `ALREADY_EXISTS`** like the real API.
 - `GET .../documents/{collection}/{id}` → get.
 - `PATCH .../documents/{collection}/{id}` → upsert (existing fields are merged).
 - `DELETE .../documents/{collection}/{id}` → delete (200 with empty body;
   404 if the document does not exist).
+- **Nested collection paths:** subcollections under a document are supported
+  one level deep — `GET/POST .../documents/{collection}/{document}/{sub}` and
+  `GET/PATCH/DELETE .../documents/{collection}/{document}/{sub}/{id}`. The
+  document `name` carries the full resource path
+  (`.../documents/users/alice/addresses/doc-1`).
+- **`POST .../documents:runQuery`** — structuredQuery subset evaluated with
+  query_select: `from:[{collectionId}]`, `where:{fieldFilter:{field:{fieldPath},
+  op, value}}` (ops `EQUAL`, `NOT_EQUAL`, `GREATER_THAN`, `GREATER_THAN_OR_EQUAL`,
+  `LESS_THAN`, `LESS_THAN_OR_EQUAL`, `IN`, `ARRAY_CONTAINS`),
+  `orderBy:[{field, direction}]`, `limit`. The response is the real
+  RunQueryResponse array `[{document, readTime}]`. Malformed queries (missing
+  `structuredQuery`/`from`, unsupported ops) return `400 INVALID_ARGUMENT`.
 - **Typed values:** every field is `{stringValue:"x"}`, `{integerValue:"5"}`,
   `{booleanValue:true}`, `{arrayValue:{values:[...]}}`, `{mapValue:{fields:{...}}}`.
 - **Cursor pagination on list:** `GET .../documents/{collection}` accepts
@@ -45,7 +69,17 @@ Three Firebase surfaces with their distinctive shapes:
 ### FCM (Cloud Messaging)
 
 - `POST /v1/projects/{project}/messages:send` → `{name:"projects/.../messages/N"}`.
-- Sent messages are stored (stateful).
+- **Targets:** exactly one of `message.token`, `message.topic`, or
+  `message.condition` (zero or multiple targets → `400`). Conditions use the
+  real syntax — `'news' in topics || 'sports' in topics` (union) and
+  `'a' in topics && 'b' in topics` (intersection) — and are routed to the
+  subscribed-token collections.
+- **Topic subscriptions (simulator extension standing in for the Instance ID
+  API):** `POST /v1/projects/{project}/topics/{topic}:subscribe` /
+  `:unsubscribe` with body `{token}` or `{tokens:[...]}`.
+- Sent messages are stored (stateful) with their resolved recipient tokens;
+  `GET /v1/projects/{project}/messages` lists them (simulator extension, for
+  asserting fanout).
 
 ## Endpoints
 
@@ -57,12 +91,19 @@ Three Firebase surfaces with their distinctive shapes:
 | POST | `/v1/accounts:getAccountInfo` | `auth.star#on_get_account_info` | Get user info |
 | POST | `/v1/accounts:lookup` | `auth.star#on_get_account_info` | Lookup user |
 | POST | `/identitytoolkit/v3/relyingparty/{action}` | `auth.star#on_relyingparty` | v3 dispatcher (verifyPassword, signupNewUser, getAccountInfo, refreshToken) |
+| POST | `/v1/token` | `auth.star#on_securetoken` | securetoken refresh_token exchange |
+| POST | `.../documents:runQuery` | `firestore.star#on_run_query` | structuredQuery (from/where/orderBy/limit) |
 | GET | `.../documents/{collection}` | `firestore.star#on_list_documents` | List docs |
-| POST | `.../documents/{collection}` | `firestore.star#on_create_document` | Create doc |
+| POST | `.../documents/{collection}` | `firestore.star#on_create_document` | Create doc (honors documentId) |
 | GET | `.../documents/{collection}/{id}` | `firestore.star#on_get_document` | Get doc |
 | PATCH | `.../documents/{collection}/{id}` | `firestore.star#on_upsert_document` | Upsert doc (merge) |
 | DELETE | `.../documents/{collection}/{id}` | `firestore.star#on_delete_document` | Delete doc |
-| POST | `/v1/projects/{project}/messages:send` | `fcm.star#on_send_message` | Send FCM |
+| GET/POST | `.../documents/{collection}/{document}/{sub}` | `firestore.star#on_list/on_create_subdocuments` | Subcollection list/create |
+| GET/PATCH/DELETE | `.../documents/{collection}/{document}/{sub}/{id}` | `firestore.star#on_get/on_upsert/on_delete_subdocument` | Subcollection doc ops |
+| POST | `/v1/projects/{project}/messages:send` | `fcm.star#on_send_message` | Send FCM (token/topic/condition) |
+| GET | `/v1/projects/{project}/messages` | `fcm.star#on_list_messages` | List sent messages (extension) |
+| POST | `/v1/projects/{project}/topics/{topic}:subscribe` | `fcm.star#on_subscribe` | Subscribe tokens to topic (extension) |
+| POST | `/v1/projects/{project}/topics/{topic}:unsubscribe` | `fcm.star#on_unsubscribe` | Unsubscribe tokens (extension) |
 
 ## Backing stores
 
@@ -71,6 +112,7 @@ Three Firebase surfaces with their distinctive shapes:
 | `users` | Auth users (with email, password, localId) |
 | `documents` | Firestore documents (with typed fields) |
 | `messages` | Sent FCM messages |
+| `subscriptions` | FCM topic subscriptions (token ↔ topic) |
 
 ## Auth
 

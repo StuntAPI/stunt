@@ -3,12 +3,17 @@
 # This simulates the service-account JWT exchange:
 # POST /oauth2/v4/token (grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer)
 #
-# The client sends a signed JWT assertion. The mock accepts any non-empty
-# assertion and mints an access token. The assertion is a base64url-encoded
-# JWT with the service account email as the issuer (iss claim).
+# The client sends a signed RS256 JWT assertion. The assertion is VERIFIED
+# cryptographically (signature against the mock Google public key served at
+# GET /oauth2/v3/certs, plus iss/exp/aud claim checks) — not just parsed.
+# On success an access token is minted; when the scope includes openid a
+# real RS256 id_token is returned too (Google returns one on SA flows).
+#
+# GET /oauth2/v3/certs serves the JWKS for both directions.
 
-# Shared helpers (_bearer, _require_bearer, _contains, _pad3) are preloaded
-# from scripts/lib.star.
+# Shared helpers (_bearer, _require_bearer, _contains, _pad3,
+# _verify_assertion, _mint_id_token, _JWT_PUBLIC_KEY) are preloaded from
+# scripts/lib.star.
 
 # on_jwt_exchange handles the JWT-bearer grant.
 def on_jwt_exchange(req):
@@ -30,12 +35,20 @@ def on_jwt_exchange(req):
             "error_description": "Missing assertion.",
         })
 
-    # The assertion is a JWT (header.payload.signature). We extract the
-    # payload (middle segment) to determine the service account email.
-    # Since it's base64url, we just check it has 3 dot-separated parts.
-    # In a real scenario, the assertion would be signed. We accept any
-    # syntactically valid JWT shape.
-    sa_email = _extract_sa_from_assertion(assertion)
+    # Verify the assertion cryptographically: RS256 signature over
+    # header.payload against the mock Google key, iss non-empty, exp in
+    # the future, aud == this token endpoint.
+    claims = _verify_assertion(assertion)
+    if claims == None:
+        return respond(400, {
+            "error": "invalid_grant",
+            "error_description": "Invalid JWT: signature or claims verification failed.",
+        })
+
+    # The service-account identity is the assertion's iss claim.
+    sa_email = claims.get("iss", "")
+
+    scope = body.get("scope", claims.get("scope", "https://www.googleapis.com/auth/cloud-platform"))
 
     # Mint an access token.
     token_seq = store_kv_incr("iam", "token_seq")
@@ -45,32 +58,26 @@ def on_jwt_exchange(req):
     tc.insert({
         "id": access,
         "service_account": sa_email,
-        "scope": body.get("scope", "https://www.googleapis.com/auth/cloud-platform"),
+        "scope": scope,
+        "expires_at": clock.now_unix() + 3600,
     })
 
-    return respond(200, {
+    resp = {
         "access_token": access,
         "expires_in": 3600,
         "token_type": "Bearer",
-    })
+    }
+    if _contains(scope, "openid"):
+        resp["id_token"] = _mint_id_token(sa_email, scope)
+    return respond(200, resp)
 
-# _extract_sa_from_assertion attempts to find the service account email from
-# the JWT assertion payload. The assertion is base64url-encoded, so we look
-# for the gserviceaccount.com pattern in the raw string.
-def _extract_sa_from_assertion(assertion):
-    # Try to find a gserviceaccount.com pattern.
-    idx = assertion.find("gserviceaccount.com")
-    if idx < 0:
-        # Can't decode base64 in Starlark; return a default.
-        return "mock-sa@mock-project.iam.gserviceaccount.com"
-    # Walk backwards to find the start of the email.
-    start = idx
-    while start > 0 and assertion[start-1] != "." and assertion[start-1] != "@":
-        # Look for alphanumeric, @, - characters.
-        ch = assertion[start-1]
-        if (ch >= "a" and ch <= "z") or (ch >= "A" and ch <= "Z") or (ch >= "0" and ch <= "9") or ch == "-" or ch == "@":
-            start -= 1
-        else:
-            break
-    end = idx + len("gserviceaccount.com")
-    return assertion[start:end]
+# on_certs serves the JWKS at Google's real discovery path
+# (/oauth2/v3/certs). The key is REAL: the fixed synthetic RSA keypair whose
+# private half signs id_tokens and whose public half verifies jwt-bearer
+# assertions.
+def on_certs(req):
+    key = crypto.rsa_public_jwk(_JWT_PUBLIC_KEY)
+    key["kid"] = _JWT_KID
+    key["alg"] = "RS256"
+    key["use"] = "sig"
+    return respond(200, {"keys": [key]})

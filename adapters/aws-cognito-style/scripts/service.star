@@ -134,7 +134,7 @@ def _do_initiate_auth(req):
         return _cognito_err("UserNotConfirmedException",
             "User is not confirmed.")
 
-    return respond(200, _auth_result(user))
+    return respond(200, _auth_result(user, body.get("ClientId", "mock-client-id")))
 
 # RespondToAuthChallenge: handle an auth challenge.
 # {ChallengeName, ChallengeResponses, ClientId, Session}
@@ -153,7 +153,7 @@ def _do_respond_to_challenge(req):
     if user == None:
         user = _mint_user_by_name(username)
 
-    return respond(200, _auth_result(user))
+    return respond(200, _auth_result(user, body.get("ClientId", "mock-client-id")))
 
 # ConfirmSignUp: confirm a user's registration.
 # {ClientId, Username, ConfirmationCode}
@@ -176,7 +176,8 @@ def _do_confirm_signup(req):
     return respond(200, {})
 
 # GetUser: get user attributes from an access token.
-# {AccessToken}
+# {AccessToken}. The token is a real RS256 JWT — signature + exp + iss +
+# token_use are verified cryptographically (not just a store lookup).
 def _do_get_user(req):
     body = req["body"]
     if body == None:
@@ -186,6 +187,10 @@ def _do_get_user(req):
     if access_token == "":
         return _cognito_err("NotAuthorizedException",
             "Access token is required")
+
+    if _verify_jwt(access_token, "access") == None:
+        return _cognito_err("NotAuthorizedException",
+            "Invalid Access Token")
 
     # Look up the user via the token → user binding.
     tc = store_collection("tokens")
@@ -326,12 +331,13 @@ def _do_get_credentials(req):
 # --- helpers ---
 
 # _auth_result returns an AuthenticationResult for a successfully authed user.
-def _auth_result(user):
+# The access/id tokens are real RS256 JWTs signed with the pool key.
+def _auth_result(user, client_id):
     access_seq = store_kv_incr("cognito", "access_seq")
     refresh_seq = store_kv_incr("cognito", "refresh_seq")
 
-    access = _mint_jwt(user["sub"], user["username"], user.get("email", ""), "acc" + str(access_seq))
-    id_token = _mint_jwt(user["sub"], user["username"], user.get("email", ""), "id" + str(access_seq))
+    access = _mint_jwt(user["sub"], user["username"], user.get("email", ""), "acc" + str(access_seq), client_id, "access")
+    id_token = _mint_jwt(user["sub"], user["username"], user.get("email", ""), "id" + str(access_seq), client_id, "id")
     refresh = "mock-refresh-token-" + str(refresh_seq)
 
     # Store the access token → user binding for GetUser.
