@@ -191,9 +191,11 @@ func TestThreadsStyleAdapter(t *testing.T) {
 		t.Fatalf("missing text -> status %d, want 400", status)
 	}
 
-	// ===== Container processing lifecycle (derive-on-read) =====
+	// ===== Container processing lifecycle =====
 
-	// A fresh container is in_progress and threads_publish is gated on finished.
+	// TEXT containers finish processing immediately (real Threads only makes
+	// you poll video/image uploads), so the status poll reports finished and
+	// a back-to-back create -> publish succeeds without any poll.
 	body, status = getAuth(t, base+"/v1.0/"+containerID+"?fields=id,status", accessToken)
 	if status != 200 {
 		t.Fatalf("container status -> status %d, want 200; body %s", status, body)
@@ -202,13 +204,13 @@ func TestThreadsStyleAdapter(t *testing.T) {
 	if err := json.Unmarshal([]byte(body), &statusResp); err != nil {
 		t.Fatalf("unmarshal container status: %v (body %s)", err, body)
 	}
-	if statusResp["status"] != "in_progress" {
-		t.Fatalf("fresh container status = %v, want in_progress", statusResp["status"])
+	if statusResp["status"] != "finished" {
+		t.Fatalf("fresh TEXT container status = %v, want finished", statusResp["status"])
 	}
 
 	_, status = threadsPostNoBodyAuth(t, base+"/v1.0/"+userID+"/threads_publish?creation_id="+containerID, accessToken)
-	if status != 400 {
-		t.Fatalf("publish while in_progress -> status %d, want 400", status)
+	if status != 201 {
+		t.Fatalf("back-to-back publish -> status %d, want 201", status)
 	}
 
 	// Simulator-only failure injection: simulate_fail=true ends in error.
@@ -345,12 +347,16 @@ func TestThreadsStyleAdapter(t *testing.T) {
 	if !ok {
 		t.Fatalf("engagement data = %v, want list", engagementResp["data"])
 	}
-	if len(engData) != 1 {
-		t.Fatalf("engagement data length = %d, want 1 (the published media)", len(engData))
+	// Two published media exist (the lifecycle publish + the back-to-back one).
+	var post map[string]any
+	for _, e := range engData {
+		if m, ok := e.(map[string]any); ok && m["id"] == mediaID {
+			post = m
+			break
+		}
 	}
-	post := engData[0].(map[string]any)
-	if post["id"] != mediaID {
-		t.Fatalf("engagement post id = %v, want %v", post["id"], mediaID)
+	if post == nil {
+		t.Fatalf("engagement data = %v, want the published media %v present", engagementResp["data"], mediaID)
 	}
 	if post["text"] != "Hello from the stunt test suite!" {
 		t.Fatalf("engagement post text = %v, want original text", post["text"])

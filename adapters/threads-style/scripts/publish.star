@@ -43,12 +43,16 @@ def on_create(req):
 
     now = clock.now_unix()
     cc = store_collection("containers")
+    # TEXT containers finish processing immediately (real Threads only makes
+    # you poll video/image uploads) — a text create -> publish back-to-back
+    # must succeed without a status poll. The poll endpoint + derive-on-read
+    # machinery stay for the simulate_fail branch.
     cc.insert({
         "id": container_id,
         "text": text,
         "user_id": user_id,
         "status": "in_progress",
-        "_done_at": now + 3,
+        "_done_at": now,
         "_fail": _flag(body.get("simulate_fail", False)),
     })
 
