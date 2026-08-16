@@ -118,7 +118,7 @@ Builtins:
   # issue a verifiable JWT: hdr=crypto.base64url_encode(alg_rs256_kid); pl=crypto.base64url_encode(claims);
   #                          jwt=hdr+"."+pl+"."+crypto.rsa_sign(priv, hdr+"."+pl, encoding="base64url")
   v = json_safe_decode(s)                    # total JSON decode: value or None (never raises — for untrusted JWT claims/multipart parts)
-  json.loads(s) / json.dumps(obj)           # json module predeclared
+  json.decode(s) / json.encode(obj)         # json module predeclared
 lib.star in scripts/ is PRELOADED — its defs are shared across handlers. NO load(). NO fs/net/import.
 Gotchas: literal routes before param routes; routes support embedded params like /accounts({id}) (OData);
   req.raw_body is the verbatim request bytes (use store_blob for byte-exact binary uploads);

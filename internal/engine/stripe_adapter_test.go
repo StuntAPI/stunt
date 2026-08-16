@@ -559,10 +559,10 @@ func TestStripeStyleAuthAndWebhooks(t *testing.T) {
 	var foundCreated bool
 	for _, env := range receivedEvents {
 		if env["type"] == "charge.created" {
-			payload, ok := env["payload"].(map[string]any)
+			payload, ok := env["data"].(map[string]any)["object"].(map[string]any)
 			if !ok {
 				mu.Unlock()
-				t.Fatalf("charge.created payload = %v, want a dict", env["payload"])
+				t.Fatalf("charge.created data.object = %v, want a dict", env["data"])
 			}
 			if payload["id"] == chargeID {
 				foundCreated = true
