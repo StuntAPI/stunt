@@ -2,18 +2,26 @@
 #
 # GET /services/data/v60.0/query?q=SELECT+Id,+Name+FROM+Account
 # GET /services/data/v60.0/queryAll?q=...
-# -> { totalSize, records:[{attributes:{type,url}, Id, Name, ...}], done:true }
+# -> { totalSize, records:[{attributes:{type,url}, Id, Name, ...}], done }
 #
 # query and queryAll differ exactly as in the real API: query EXCLUDES
 # soft-deleted records (IsDeleted, set by DELETE /sobjects/{type}/{id}),
 # while queryAll INCLUDES them so clients can read recycle-bin rows
 # (typically with WHERE IsDeleted = true).
 #
+# Results are batched like the real API: at most batchsize records per
+# response (default 200, Sforce-Query-Options header, range 200-2000). When
+# more remain the response carries done:false and nextRecordsUrl, and
+# fetching that URL (GET /query/{queryLocator}) returns the next batch — the
+# queryMore round-trip. The locator is an opaque, single-use token whose
+# continuation state (original SOQL, absolute offset, queryAll visibility,
+# batch size) lives in the KV store.
+#
 # SOQL parsing: we pattern-match the FROM <Entity> token and the SELECT
-# field list. We do NOT implement a full SOQL parser. For "WHERE Id = '...'",
-# we filter to that single record.
+# field list. We do NOT implement a full SOQL parser. See lib.star for the
+# shared execution pipeline.
 
-# Shared helpers (_require_token, _parse_soql, _project, _collection,
+# Shared helpers (_require_token, _query_docs, _query_page, _batch_size,
 # _sf_error, etc.) from lib.star.
 
 def on_query(req):
@@ -28,66 +36,38 @@ def on_query(req):
     if soql == "":
         return _sf_error(400, "Missing query parameter 'q'", "INVALID_QUERY")
 
-    entity, fields, where, order_field, order_dir, limit, offset = _parse_soql(soql)
-    if entity == "":
-        return _sf_error(400, "Malformed query: could not determine FROM entity", "INVALID_QUERY")
-
-    col = _collection(entity)
-    if col == None:
-        return _sf_error(400, "Entity type '" + entity + "' is not accessible", "INVALID_TYPE")
-
     # queryAll (path-routed) sees recycle-bin rows; plain query does not.
     include_deleted = _contains(req["path"], "queryAll")
 
-    docs = col.list()
+    docs, entity, fields, es, em, ec = _query_docs(soql, include_deleted)
+    if es != 0:
+        return _sf_error(es, em, ec)
 
-    # Records created before IsDeleted was tracked (seeds) are live rows.
-    for d in docs:
-        if d.get("IsDeleted", None) == None:
-            d["IsDeleted"] = False
+    return _query_page(docs, entity, fields, 0, _batch_size(req), include_deleted, soql)
 
-    if not include_deleted:
-        docs = [d for d in docs if not d["IsDeleted"]]
+# on_query_more continues a paged query: GET /query/{queryLocator} where the
+# locator came from a prior response's nextRecordsUrl. Replaying the original
+# SOQL reproduces the same total result set; the stored absolute offset picks
+# up where the previous batch stopped.
+def on_query_more(req):
+    _, err = _require_token(req)
+    if err != None:
+        return err
 
-    # WHERE (comparators, IN, LIKE, AND/OR).
-    if where != "":
-        docs = [d for d in docs if _soql_eval(where, d)]
+    locator = req["params"].get("queryLocator", "")
+    raw = None
+    if locator != "":
+        raw = store_kv_get("salesforce", "qloc_" + locator)
+    if raw == None:
+        return _sf_error(400, "invalid query locator", "INVALID_QUERY_LOCATOR")
 
-    # ORDER BY (decorate-sort-undecorate so a missing value sorts first; the
-    # index tiebreaker avoids comparing dicts).
-    if order_field != "":
-        pairs = []
-        idx = 0
-        for d in docs:
-            kv = _soql_field(d, order_field)
-            if kv == None:
-                kv = ""
-            pairs.append((kv, idx, d))
-            idx = idx + 1
-        pairs = sorted(pairs)
-        docs = []
-        n = len(pairs)
-        if order_dir == "desc":
-            i = n - 1
-            while i >= 0:
-                docs.append(pairs[i][2])
-                i = i - 1
-        else:
-            for p in pairs:
-                docs.append(p[2])
+    # Locators are consumed on use (the next batch mints a fresh one).
+    store_kv_delete("salesforce", "qloc_" + locator)
+    state = json.decode(raw)
+    include_deleted = state.get("all_rows", False) == True
 
-    # OFFSET then LIMIT.
-    if offset > 0 and offset < len(docs):
-        docs = docs[offset:]
-    elif offset >= len(docs):
-        docs = []
-    if limit > 0:
-        docs = docs[:limit]
+    docs, entity, fields, es, em, ec = _query_docs(state.get("soql", ""), include_deleted)
+    if es != 0:
+        return _sf_error(es, em, ec)
 
-    records = [_project(d, fields, entity) for d in docs]
-
-    return respond(200, {
-        "totalSize": len(records),
-        "records": records,
-        "done": True,
-    })
+    return _query_page(docs, entity, fields, _to_int(str(state.get("next", 0))), _to_int(str(state.get("batch", _QUERY_BATCH_DEFAULT))), include_deleted, state.get("soql", ""))

@@ -53,12 +53,26 @@ endpoints:
   - route: /v1.0/me/mailFolders
     method: GET
     handler: scripts/mail.star#on_list_folders
+  - route: /v1.0/me/mailFolders/{id}/messages
+    method: GET
+    handler: scripts/mail.star#on_list_folder_messages
   - route: /v1.0/me/messages
     method: GET
     handler: scripts/mail.star#on_list_messages
+  - route: /v1.0/me/messages
+    method: POST
+    handler: scripts/mail.star#on_create_draft_message
+  - route: /v1.0/me/messages/{id}/send
+    method: POST
+    handler: scripts/mail.star#on_send_draft_message
+    concurrency_key: id # read-modify-write on the draft, serialized per message
   - route: /v1.0/me/messages/{id}
     method: GET
     handler: scripts/mail.star#on_get_message
+  - route: /v1.0/me/messages/{id}
+    method: PATCH
+    handler: scripts/mail.star#on_update_message
+    concurrency_key: id # read-modify-write on the message, serialized per message
   - route: /v1.0/me/messages/{id}
     method: DELETE
     handler: scripts/mail.star#on_delete_message
@@ -67,18 +81,42 @@ endpoints:
     handler: scripts/mail.star#on_send_mail
 
   # --- Calendar ---
+  # Literal calendarView route declared before the parameterized event routes.
+  - route: /v1.0/me/calendarView
+    method: GET
+    handler: scripts/calendar.star#on_calendar_view
+  - route: /v1.0/me/calendar/calendarView
+    method: GET
+    handler: scripts/calendar.star#on_calendar_view
   - route: /v1.0/me/events
     method: GET
     handler: scripts/calendar.star#on_list_events
   - route: /v1.0/me/events
     method: POST
     handler: scripts/calendar.star#on_create_event
+  # Literal action routes declared before the bare {id} routes.
+  - route: /v1.0/me/events/{id}/accept
+    method: POST
+    handler: scripts/calendar.star#on_accept_event
+    concurrency_key: id # read-modify-write on the event, serialized per event
+  - route: /v1.0/me/events/{id}/decline
+    method: POST
+    handler: scripts/calendar.star#on_decline_event
+    concurrency_key: id # read-modify-write on the event, serialized per event
+  - route: /v1.0/me/events/{id}/tentativelyAccept
+    method: POST
+    handler: scripts/calendar.star#on_tentatively_accept_event
+    concurrency_key: id # read-modify-write on the event, serialized per event
+  - route: /v1.0/me/events/{id}
+    method: GET
+    handler: scripts/calendar.star#on_get_event
   - route: /v1.0/me/events/{id}
     method: DELETE
     handler: scripts/calendar.star#on_delete_event
   - route: /v1.0/me/events/{id}
     method: PATCH
     handler: scripts/calendar.star#on_update_event
+    concurrency_key: id # read-modify-write on the event, serialized per event
 
   # --- OneDrive ---
   # NOTE on colon addressing: the router does not recognize "{param}:" as a
@@ -171,9 +209,29 @@ endpoints:
   - route: /v1.0/me/drive/items/{id}/workbook/worksheets
     method: GET
     handler: scripts/excel.star#on_list_worksheets
+  # Literal rows/add declared before the parameterized {index} routes.
   - route: /v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/add
     method: POST
     handler: scripts/excel.star#on_add_table_row
+    concurrency_key: id # read-modify-write on the table doc, serialized per item
+  - route: /v1.0/me/drive/items/{id}/workbook/tables/{name}/rows
+    method: GET
+    handler: scripts/excel.star#on_list_rows
+  - route: /v1.0/me/drive/items/{id}/workbook/tables/{name}/rows
+    method: POST
+    handler: scripts/excel.star#on_create_rows
+    concurrency_key: id # read-modify-write on the table doc, serialized per item
+  - route: /v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/{index}
+    method: PATCH
+    handler: scripts/excel.star#on_update_row
+    concurrency_key: id # read-modify-write on the table doc, serialized per item
+  - route: /v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/{index}
+    method: DELETE
+    handler: scripts/excel.star#on_delete_row
+    concurrency_key: id # read-modify-write on the table doc, serialized per item
+  - route: /v1.0/me/drive/items/{id}/workbook/tables/{name}/range
+    method: GET
+    handler: scripts/excel.star#on_get_range
 
 # Backing stores — collections for stateful data.
 resources:
@@ -186,6 +244,8 @@ resources:
   - name: chat_messages
     kind: collection
   - name: files
+    kind: collection
+  - name: tables
     kind: collection
   - name: recyclebin
     kind: collection

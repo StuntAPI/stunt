@@ -55,6 +55,7 @@ endpoints:
   - route: /api.xro/2.0/Invoices/{id}/Payments
     method: POST
     handler: scripts/invoices.star#on_post_payment
+    concurrency_key: id # payment read-modify-write of invoice balances, serialized per invoice
 
   # --- Accounts ---
   - route: /api.xro/2.0/Accounts
@@ -86,6 +87,8 @@ resources:
   - name: contacts
     kind: collection
   - name: invoices
+    kind: collection
+  - name: payments
     kind: collection
   - name: accounts
     kind: collection

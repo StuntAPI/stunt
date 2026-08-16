@@ -15,33 +15,62 @@ CRM integrations during local development:
 
 - **OAuth2:** `POST /services/oauth2/token` (password, authorization_code, or
   refresh_token grants) → `{access_token:"00D...", instance_url, token_type:"Bearer",
-  id, issued_at, signature, refresh_token}`. Refresh tokens are single-use: each
-  token response issues a new `refresh_token`, and redeeming it via the
-  `refresh_token` grant rotates it (the old one is invalidated and a fresh
-  access + refresh token pair is issued for the same user).
+  id, issued_at, signature, refresh_token}`. Refresh tokens are long-lived and
+  **reusable**, exactly as in real Salesforce: redeeming one never invalidates
+  it, and the refresh grant response omits `refresh_token` (the caller keeps
+  the one it has). Access tokens rotate on every grant and expire with the
+  2-hour session TTL — an expired token 401s with `INVALID_SESSION_ID` until
+  the client refreshes again with the same refresh token.
 - **sObjects describe global:** `GET /services/data/v60.0/sobjects` → list of
   available objects (Account, Contact, Opportunity, Lead, User).
 - **sObjects describe object:** `GET /services/data/v60.0/sobjects/Account` →
   object metadata with fields.
 - **SOQL query:** `GET /services/data/v60.0/query?q=SELECT+Id,+Name+FROM+Account` →
-  `{totalSize, records:[{attributes:{type,url}, Id, Name, ...}], done:true}`.
+  `{totalSize, records:[{attributes:{type,url}, Id, Name, ...}], done}`.
   Supports `WHERE` with comparators (`=`, `!=`, `<`, `<=`, `>`, `>=`), `IN`,
   `LIKE` (with leading/trailing `%` wildcards), and `AND`/`OR` combinations
   (no parenthesized grouping), plus `ORDER BY` (`ASC`/`DESC`), `LIMIT`, and
   `OFFSET`. `SELECT *` projects all fields. Works against all five objects
   (Account, Contact, Opportunity, Lead, User).
+- **queryMore:** results are batched — at most 200 records per response
+  (default; the `Sforce-Query-Options: batchsize=N` header selects 200–2000).
+  When more remain, the response carries `done:false` plus `nextRecordsUrl`
+  (`/services/data/v60.0/query/<queryLocator>`); fetching that URL returns
+  the next batch, exactly like the real queryMore round-trip. Locators are
+  single-use opaque tokens; replaying or guessing one returns
+  `400 INVALID_QUERY_LOCATOR`.
 - **queryAll:** `GET /services/data/v60.0/queryAll?q=...` — same SOQL subset
   as query, but INCLUDES soft-deleted (recycle-bin) records, which carry
   `IsDeleted: true` (and `DeletedDate`). The usual pattern is
-  `SELECT Id, Name, IsDeleted FROM Account WHERE IsDeleted = true`.
+  `SELECT Id, Name, IsDeleted FROM Account WHERE IsDeleted = true`. Paged
+  queryAll continuations keep the recycle-bin visibility of the original
+  query.
 - **Account/Contact/Opportunity CRUD:** `POST` (create, 201), `GET /{id}`
   (retrieve), `PATCH /{id}` (update, 204), `DELETE /{id}` (204, soft delete —
   see below).
+- **External-ID upsert:** `PATCH /services/data/v60.0/sobjects/{type}/{extIdField}/{extIdValue}`
+  — inserts when no record carries that external ID (stamping the field from
+  the URL), updates the single match otherwise; both return
+  201 `{id, success, errors, created}` with `created` telling insert from
+  update. Ambiguous external IDs (multiple matches) return
+  300 Multiple Choices with the matching records, like the real API.
 - **Composite batch:** `POST /services/data/v60.0/composite` → processes
   sub-requests sequentially, returns per-request results. Sub-request URLs are
   pattern-matched as `/services/data/v60.0/sobjects/<Type>[/<id>]` and support
   `GET` (single record by Id, or the full list when no Id is given), `POST`,
-  `PATCH`, and `DELETE`.
+  `PATCH`, and `DELETE`. Sub-requests may reference earlier results by
+  referenceId: `@{ref}` (real syntax) or `{ref}` inside a URL string or a body
+  value resolves to that sub-response's record Id, and dot paths
+  (`@{ref.records.0.Id}`) walk into response fields. Unresolvable references
+  substitute an empty string.
+- **SObject Collections:** bulk DML over `/composite/sobjects` —
+  `POST` (insert `records[]`, each with `attributes.type`),
+  `PATCH` (update `records[]` carrying `Id`), and
+  `DELETE ?ids=a,b,c` (object type inferred from each Id's key prefix).
+  `allOrNone=true` fails the whole request with a 400 error envelope and
+  rolls back earlier writes in the batch; `allOrNone=false` (default) returns
+  200 with per-record results and in-record `errors` entries. Max 200 records
+  per request.
 
 Salesforce ID format: 3-char key prefix + 15-char alphanumeric (Account=001,
 Contact=003, Opportunity=006, Lead=00Q, User=005).
@@ -53,8 +82,11 @@ endpoint supports the password grant for local testing convenience (real Salesfo
 requires the web-server or JWT flow). The session token is `00D`-prefixed (the org
 key prefix). The `refresh_token` grant is also supported: pass the
 `refresh_token` returned by a previous token response to mint a new access token
-for the same user. Refresh tokens are single-use — each redemption consumes the
-presented token and returns a newly issued one (rotation).
+for the same user. Refresh tokens are long-lived and reusable (redemption does
+not rotate or invalidate them, and the refresh response omits `refresh_token`);
+access tokens rotate on every grant and expire after the 2-hour session TTL,
+after which protected routes 401 with `INVALID_SESSION_ID` until the client
+refreshes again.
 
 ## Endpoints
 
@@ -67,9 +99,14 @@ presented token and returns a newly issued one (rotation).
 | GET | `/services/data/v60.0/sobjects/Account/{id}` | `sobjects.star#on_retrieve` | Retrieve record |
 | PATCH | `/services/data/v60.0/sobjects/Account/{id}` | `sobjects.star#on_update` | Update record |
 | DELETE | `/services/data/v60.0/sobjects/Account/{id}` | `sobjects.star#on_delete` | Delete record |
-| GET | `/services/data/v60.0/query` | `query.star#on_query` | SOQL query |
+| PATCH | `/services/data/v60.0/sobjects/Account/{extIdField}/{extIdValue}` | `sobjects.star#on_upsert` | Upsert by external ID |
+| GET | `/services/data/v60.0/query` | `query.star#on_query` | SOQL query (batched) |
 | GET | `/services/data/v60.0/queryAll` | `query.star#on_query` | SOQL query (incl. deleted) |
+| GET | `/services/data/v60.0/query/{queryLocator}` | `query.star#on_query_more` | queryMore (next batch) |
 | POST | `/services/data/v60.0/composite` | `composite.star#on_composite` | Composite batch |
+| POST | `/services/data/v60.0/composite/sobjects` | `composite.star#on_collections_insert` | Collections bulk insert |
+| PATCH | `/services/data/v60.0/composite/sobjects` | `composite.star#on_collections_update` | Collections bulk update |
+| DELETE | `/services/data/v60.0/composite/sobjects` | `composite.star#on_collections_delete` | Collections bulk delete |
 
 (Contact and Opportunity have the same CRUD pattern as Account. Lead and User
 are describe-only — no CRUD routes are registered for them — but both remain
@@ -109,6 +146,54 @@ The query handler evaluates a practical SOQL subset. It:
    missing the field sort first), then applies `OFFSET` followed by `LIMIT`.
 5. Returns seeded + created records with the `attributes: {type, url}` block.
 
+## Paging (queryMore)
+
+`/query` and `/queryAll` return at most one batch of records per response.
+The batch size defaults to 200 (the real API default) and can be selected per
+request with the `Sforce-Query-Options: batchsize=N` header, clamped to the
+real 200–2000 range. When more records remain:
+
+- the response carries `done: false` and a `nextRecordsUrl` of
+  `/services/data/v60.0/query/<queryLocator>`, and `totalSize` reports the
+  records in the current batch (as the real API does);
+- fetching `nextRecordsUrl` returns the next batch, mints a fresh locator
+  when still more remain, and ends with `done: true` and no `nextRecordsUrl`;
+- a `queryAll` continuation keeps recycle-bin visibility from the original
+  query (the visibility is carried in the locator state);
+- locators are single-use opaque tokens — replaying a consumed one, or
+  presenting a made-up one, returns `400 INVALID_QUERY_LOCATOR`.
+
+## Composite references
+
+Sub-requests in `POST /composite` run in order and can build on earlier
+results. Inside a sub-request's URL string or body values, `@{refId}` (the
+real syntax; a bare `{refId}` is also accepted) is replaced before dispatch:
+
+- a bare reference resolves to that sub-response's record `Id` (the common
+  "create, then reference the created Id" pattern);
+- a dot path (`@{ref.records.0.Id}`) walks into the response body's fields,
+  dict keys (case-insensitive) and list indexes;
+- an unresolvable reference (unknown refId, missing field, bad index) rejects
+  the whole composite request with `400 INVALID_INPUT`, as the real API does.
+
+## SObject Collections (bulk DML)
+
+`/composite/sobjects` applies one request to up to 200 records:
+
+- `POST` — insert; each record carries `attributes: {type}` plus fields.
+- `PATCH` — update; each record carries `attributes` and its `Id`.
+- `DELETE ?ids=001...,003...` — delete; the object type of each Id is
+  inferred from its key prefix (001 Account, 003 Contact, 006 Opportunity),
+  and deletion is the same soft delete as the single-record endpoint.
+
+With `allOrNone: false` (default) the response is always 200: an array
+mirroring the input order, each entry `{id, success, errors}` (inserts also
+carry `created: true`); failures carry `id: ""`, `success: false` and an
+`errors` array of `{statusCode, message, fields}`. With `allOrNone: true` the
+first failure fails the entire request — 400 with the single error in the
+standard array envelope — and every record already written in that batch is
+rolled back, so nothing half-applies.
+
 ## Soft delete (recycle bin)
 
 `DELETE /services/data/v60.0/sobjects/{type}/{id}` sends the record to the
@@ -132,12 +217,15 @@ behavior:
 
 | Collection | Purpose |
 |------------|---------|
-| `access_tokens` | OAuth2 session tokens |
+| `access_tokens` | OAuth2 session tokens (with `expires_at`) |
 | `accounts` | Account records (seeded) |
 | `contacts` | Contact records (seeded) |
 | `opportunities` | Opportunity records (seeded) |
 | `leads` | Lead records (seeded) |
 | `users` | User records (seeded) |
+
+The KV store (`salesforce` namespace) holds the refresh-token registry
+(reusable, long-lived) and the single-use queryLocator continuation state.
 
 ## Usage
 

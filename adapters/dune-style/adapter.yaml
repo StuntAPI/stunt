@@ -32,12 +32,22 @@ endpoints:
     handler: scripts/auth.star#on_validate
 
   # --- Parameterized routes ---
+  # The execution routes derive-on-read (get + update the state transition),
+  # so they carry concurrency_key: execution_id to serialize RMW per poll.
+  # The CSV variant is declared before the JSON results route (most specific
+  # path first).
   - route: /api/v1/execution/{execution_id}/status
     method: GET
     handler: scripts/execute.star#on_get_status
+    concurrency_key: execution_id
+  - route: /api/v1/execution/{execution_id}/results/csv
+    method: GET
+    handler: scripts/execute.star#on_get_results_csv
+    concurrency_key: execution_id
   - route: /api/v1/execution/{execution_id}/results
     method: GET
     handler: scripts/execute.star#on_get_results
+    concurrency_key: execution_id
 
 # Backing stores — collections for stateful data.
 resources:

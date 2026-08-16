@@ -4,9 +4,16 @@
 #   (form: grant_type=password|authorization_code|refresh_token,
 #          client_id, client_secret, username, password)
 #   -> { access_token:"00D...", instance_url, token_type:"Bearer",
-#        id, issued_at, signature }
+#        id, issued_at, signature, refresh_token }
+#
+# Refresh semantics follow real Salesforce: refresh tokens are long-lived
+# and REUSABLE — redeeming one never invalidates it — while access tokens
+# rotate on every grant and expire after the session TTL (2h), after which
+# the client refreshes again with the same refresh token. The refresh_token
+# grant response omits refresh_token entirely (the caller keeps the one it
+# has); password/code grants mint and return a new one.
 
-# Shared helpers from lib.star.
+# Shared helpers from lib.star (_SESSION_TTL lives there).
 
 def on_token(req):
     body = req["body"]
@@ -34,13 +41,16 @@ def on_token(req):
         username = store_kv_get("salesforce", "refresh_" + refresh_token)
         if refresh_token == "" or username == None:
             return _oauth_error("invalid_grant", "invalid refresh_token")
-        store_kv_delete("salesforce", "refresh_" + refresh_token)
-        return _issue_token(username, client_id)
+        # Reuse-safe: the refresh token stays valid for the next redemption;
+        # only the access token rotates.
+        return _issue_token(username, client_id, refresh_token)
 
     return _oauth_error("unsupported_grant_type", "grant_type not supported")
 
-# _issue_token issues a Salesforce-style session token.
-def _issue_token(username, client_id):
+# _issue_token issues a Salesforce-style session token. `refresh` is the
+# existing refresh token on a refresh grant (reused, not echoed) or None to
+# mint a fresh one (password/code grants).
+def _issue_token(username, client_id, refresh=None):
     seq = store_kv_incr("salesforce", "token_seq")
     # Session IDs are 00D-prefixed (org key prefix).
     access = "00D" + _pad_b62(seq, 15)
@@ -52,22 +62,27 @@ def _issue_token(username, client_id):
         "user_id": user_id,
         "username": username,
         "client_id": client_id,
+        # Access tokens expire with the session; refresh tokens do not.
+        "expires_at": clock.now_unix() + _SESSION_TTL,
     })
 
     issued_at = _epoch_ms()
 
-    refresh = "refresh_" + _pad_b62(seq, 25)
-    store_kv_set("salesforce", "refresh_" + refresh, username)
-
-    return respond(200, {
+    result = {
         "access_token": access,
         "instance_url": "https://mock-instance.my.salesforce.com",
-        "id": "https://mock-instance.my.salesforce.com/id/00D000000000000EAA/" + user_id,
+        "id": "https://mock-instance.my.salesforce.com/id/00D" + ("0" * 12) + "EAA/" + user_id,
         "token_type": "Bearer",
         "issued_at": issued_at,
         "signature": "mock-signature-base64",
-        "refresh_token": refresh,
-    })
+    }
+
+    if refresh == None or refresh == "":
+        refresh = "refresh_" + _pad_b62(seq, 25)
+        store_kv_set("salesforce", "refresh_" + refresh, username)
+        result["refresh_token"] = refresh
+
+    return respond(200, result)
 
 # _oauth_error returns an OAuth2 error response.
 def _oauth_error(error, description):
