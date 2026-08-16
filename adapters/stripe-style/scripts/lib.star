@@ -47,13 +47,15 @@ def _tc_clear(clock_id):
         store_kv_delete("stripe", "tc_active")
 
 # _signed_emit MACs the exact on-wire body and delivers with Stripe-Signature.
-# The same (event_type, payload) feeds events_body (signing input) and
-# events_emit (delivery), so the signature verifies against the bytes the sink
-# receives. Stripe signs "{timestamp}.{body}" and carries t=,v1= in the header.
+# The DELIVERED body is the full Stripe event object (id/object/type/data),
+# exactly like a real Stripe webhook POST — so receiver-side SDK event parsers
+# (stripe-node webhooks.constructEvent etc.) and signature verification both
+# run against the real shape. The same serialized bytes feed the MAC and the
+# delivery, so the signature verifies against what the sink receives. Stripe
+# signs "{timestamp}.{body}" and carries t=,v1= in the header.
 #
-# Every emitted event is ALSO recorded in the "events" collection with
-# Stripe's event-object shape, so GET /v1/events (scripts/events.star) lists
-# exactly the event types the webhook sink receives.
+# The event is ALSO recorded in the "events" collection (the same object), so
+# GET /v1/events (scripts/events.star) lists exactly what the sink receives.
 def _signed_emit(event_type, payload):
     t = _now()
     ev = {
@@ -75,9 +77,9 @@ def _signed_emit(event_type, payload):
     # above is still recorded either way, like real Stripe's GET /v1/events.
     if not _events_enabled(event_type):
         return
-    body = events_body(event_type, payload)
+    body = json.encode(ev)
     sig = crypto.hmac_sha256(_WEBHOOK_SECRET, str(t) + "." + body)
-    events_emit(event_type, payload, {"Stripe-Signature": "t=" + str(t) + ",v1=" + sig})
+    events_emit_raw(event_type, body, {"Stripe-Signature": "t=" + str(t) + ",v1=" + sig})
 
 # _events_enabled reports whether event_type should be delivered to the
 # configured webhook sink. True when no webhook endpoints are registered

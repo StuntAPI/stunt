@@ -556,6 +556,32 @@ func buildEventsBuiltins(emitter *events.Emitter, serviceName string) sk.StringD
 			}
 			return sk.String(string(body)), nil
 		}),
+		"events_emit_raw": sk.NewBuiltin("events_emit_raw", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			var eventType string
+			var body string
+			var headersVal sk.Value = sk.None
+			if err := sk.UnpackArgs("events_emit_raw", args, kwargs, "event_type", &eventType, "body", &body, "headers?", &headersVal); err != nil {
+				return nil, err
+			}
+			if emitter == nil {
+				return nil, fmt.Errorf("events_emit_raw: no events emitter configured")
+			}
+			var headers map[string]string
+			if headersVal != sk.None {
+				hd, ok := headersVal.(*sk.Dict)
+				if !ok {
+					return nil, fmt.Errorf("events_emit_raw: headers must be a dict, got %s", headersVal.Type())
+				}
+				headers = starlark.ToStringMap(hd)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), eventsEmitTimeout)
+			defer cancel()
+			// Fire-and-forget, like events_emit. The body string is delivered
+			// verbatim (no {type, payload} envelope) for providers whose
+			// receivers parse the provider's own event-object shape.
+			_ = emitter.EmitRaw(ctx, serviceName, eventType, []byte(body), headers)
+			return sk.None, nil
+		}),
 	}
 }
 

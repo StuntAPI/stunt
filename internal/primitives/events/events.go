@@ -128,16 +128,26 @@ func (e *Emitter) Close() {
 // maxRetries times with exponential-ish backoff. Returns the last error
 // if all attempts fail.
 func (e *Emitter) Emit(ctx context.Context, ns, eventType string, payload map[string]any, headers map[string]string) error {
+	body, err := MarshalEnvelope(eventType, payload)
+	if err != nil {
+		return fmt.Errorf("events: marshal envelope: %w", err)
+	}
+	return e.EmitRaw(ctx, ns, eventType, body, headers)
+}
+
+// EmitRaw delivers an exact pre-marshaled body to the service's registered
+// target. Providers whose webhook receivers parse the delivery as the
+// provider's own event object (Stripe, GitHub, …) need the real shape on the
+// wire — not the {type, payload} envelope — so signature schemes that MAC the
+// raw bytes and SDK event parsers both verify against what the sink receives.
+// eventType names the event for registration bookkeeping only; it does not
+// appear in the body. Retry/header/validation semantics match Emit.
+func (e *Emitter) EmitRaw(ctx context.Context, ns, eventType string, body []byte, headers map[string]string) error {
 	e.mu.RLock()
 	url, ok := e.targets[ns]
 	e.mu.RUnlock()
 	if !ok {
 		return fmt.Errorf("events: emit %s/%s: %w", ns, eventType, ErrNotRegistered)
-	}
-
-	body, err := MarshalEnvelope(eventType, payload)
-	if err != nil {
-		return fmt.Errorf("events: marshal envelope: %w", err)
 	}
 
 	// Fail fast on bad caller headers: these are permanent errors (a malformed

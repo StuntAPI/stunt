@@ -2,10 +2,12 @@ package runtime_test
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"stuntapi.com/stunt/internal/adapter/runtime"
 	"stuntapi.com/stunt/internal/primitives/events"
@@ -348,6 +350,107 @@ def on_post(req):
 	}
 	if got.Get("Content-Type") != "application/json" {
 		t.Errorf("Content-Type = %q, want application/json", got.Get("Content-Type"))
+	}
+}
+
+// --- events_emit_raw delivers the exact bytes ---
+
+// TestEventsEmitRawVerbatimBody proves events_emit_raw delivers the caller's
+// body string VERBATIM — no {type, payload} envelope — so providers whose
+// webhook receivers parse the provider's own event-object shape (Stripe,
+// GitHub, …) get the real structure on the wire, and signature schemes that
+// MAC the raw bytes verify against what the sink actually received.
+func TestEventsEmitRawVerbatimBody(t *testing.T) {
+	var mu sync.Mutex
+	type delivery struct {
+		body   string
+		header http.Header
+	}
+	var deliveries []delivery
+
+	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
+		deliveries = append(deliveries, delivery{body: string(b), header: r.Header.Clone()})
+		mu.Unlock()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer sink.Close()
+
+	emitter := events.NewEmitter()
+	defer emitter.Close()
+	builtins := runtime.BuildAllBuiltins(runtime.BuiltinOptions{
+		Emitter:     emitter,
+		ServiceName: "test-svc",
+	})
+
+	src := `
+def on_post(req):
+    events_register(req["body"]["url"])
+    body = json.encode({"id": "evt_1", "object": "event", "type": "charge.created", "data": {"object": {"id": "ch_1"}}})
+    events_emit_raw("charge.created", body, {"Stripe-Signature": "t=1,v1=abc"})
+    events_emit("plain", {"n": 1})
+    return respond(200, {"ok": True})
+`
+	vm, err := starlark.Load(src, builtins)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+
+	resp, err := vm.Call("on_post", starlark.Request{
+		Method: "POST",
+		Body:   map[string]any{"url": sink.URL},
+	})
+	if err != nil {
+		t.Fatalf("Call: %v", err)
+	}
+	if resp.Body["ok"] != true {
+		t.Fatalf("ok = %v, want true", resp.Body["ok"])
+	}
+
+	time.Sleep(200 * time.Millisecond)
+	mu.Lock()
+	defer mu.Unlock()
+	if len(deliveries) != 2 {
+		t.Fatalf("sink received %d bodies, want 2", len(deliveries))
+	}
+	var rawDeliveries, envelopeDeliveries int
+	var rawHeader http.Header
+	for _, d := range deliveries {
+		b := d.body
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(b), &parsed); err != nil {
+			t.Fatalf("delivery not JSON: %v (%s)", err, b)
+		}
+		if obj, ok := parsed["object"].(string); ok && obj == "event" {
+			rawDeliveries++
+			if parsed["id"] != "evt_1" || parsed["type"] != "charge.created" {
+				t.Errorf("raw body altered: %s", b)
+			}
+			data, ok := parsed["data"].(map[string]any)
+			if !ok {
+				t.Fatalf("raw body data = %v, want dict", parsed["data"])
+			}
+			inner, ok := data["object"].(map[string]any)
+			if !ok || inner["id"] != "ch_1" {
+				t.Errorf("data.object.id = %v, want ch_1", data["object"])
+			}
+			if _, wrapped := parsed["payload"]; wrapped {
+				t.Errorf("raw delivery still wrapped in an envelope: %s", b)
+			}
+			rawHeader = d.header
+		} else if _, ok := parsed["type"]; ok && parsed["type"] == "plain" {
+			envelopeDeliveries++
+			if _, ok := parsed["payload"]; !ok {
+				t.Errorf("events_emit delivery lost its envelope payload: %s", b)
+			}
+		}
+	}
+	if rawDeliveries != 1 || envelopeDeliveries != 1 {
+		t.Fatalf("deliveries: %d raw, %d envelope; want 1 each", rawDeliveries, envelopeDeliveries)
+	}
+	if rawHeader.Get("Stripe-Signature") != "t=1,v1=abc" {
+		t.Errorf("Stripe-Signature = %q, want the caller header on the raw delivery", rawHeader.Get("Stripe-Signature"))
 	}
 }
 

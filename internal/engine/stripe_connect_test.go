@@ -719,7 +719,7 @@ func TestStripeStylePayoutAccountScoping(t *testing.T) {
 	if err := json.Unmarshal([]byte(bodies[0]), &env); err != nil {
 		t.Fatalf("webhook body is not JSON: %v (%s)", err, bodies[0])
 	}
-	payload, ok := env["payload"].(map[string]any)
+	payload, ok := env["data"].(map[string]any)["object"].(map[string]any)
 	if !ok {
 		t.Fatalf("webhook body has no payload object: %s", bodies[0])
 	}
