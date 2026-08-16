@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -379,12 +380,128 @@ func parseFormBody(raw string) map[string]any {
 	}
 	out := make(map[string]any, len(vals))
 	for k, vs := range vals {
-		if len(vs) > 0 {
-			out[k] = vs[0]
+		if len(vs) == 0 {
+			continue
 		}
+		// Bracket-notation keys (a[b]=v, a[]=v, a[0][b]=v) expand into nested
+		// dicts/lists — provider SDKs (stripe-node, Octokit, …) POST
+		// urlencoded bodies in exactly this Rails/PHP shape, and handlers
+		// expect req["body"]["line_items"] to be a real list. Every value of
+		// a repeated bracket key appends (a[]=1&a[]=2). Malformed bracketing
+		// falls back to the flat first-value behavior.
+		if segs, ok := splitFormKey(k); ok && len(segs) > 1 {
+			for _, v := range vs {
+				assignFormValue(out, segs, v)
+			}
+			continue
+		}
+		out[k] = vs[0]
 	}
 	if len(out) == 0 {
 		return nil
 	}
 	return out
+}
+
+// splitFormKey breaks "a[b][c]" into ["a","b","c"] and "a[]" into ["a",""].
+// ok is false when the brackets are malformed (unbalanced, trailing junk,
+// missing bare key) — the caller then treats the whole key as flat.
+func splitFormKey(k string) ([]string, bool) {
+	i := strings.IndexByte(k, '[')
+	if i < 0 {
+		return []string{k}, true
+	}
+	if i == 0 {
+		return nil, false // no bare key before the first bracket
+	}
+	segs := []string{k[:i]}
+	rest := k[i:]
+	for rest != "" {
+		if rest[0] != '[' {
+			return nil, false
+		}
+		j := strings.IndexByte(rest, ']')
+		if j < 1 {
+			return nil, false
+		}
+		segs = append(segs, rest[1:j])
+		rest = rest[j+1:]
+	}
+	return segs, true
+}
+
+// assignFormValue walks segs, materializing nested dicts and lists, and sets
+// the final segment to val. "" means "append to a list"; a numeric segment
+// indexes one (gaps become nil). Conflicting shapes at a path are skipped
+// (first writer wins) rather than crashing the handler.
+func assignFormValue(cur map[string]any, segs []string, val string) {
+	head := segs[0]
+	if len(segs) == 1 {
+		// A terminal scalar never clobbers an existing structure at the same
+		// path (ParseQuery's map iteration order makes "first writer"
+		// unenforceable; skip-instead-of-clobber is order-independent).
+		switch cur[head].(type) {
+		case map[string]any, []any:
+			return
+		}
+		cur[head] = val
+		return
+	}
+	tail := segs[1:]
+	switch {
+	case tail[0] == "":
+		l, _ := cur[head].([]any)
+		l = append(l, buildFormValue(tail[1:], val))
+		cur[head] = l
+	case isNumericSegment(tail[0]):
+		idx, _ := strconv.Atoi(tail[0])
+		l, _ := cur[head].([]any)
+		for len(l) <= idx {
+			l = append(l, nil)
+		}
+		if em, ok := l[idx].(map[string]any); ok {
+			assignFormValue(em, tail[1:], val)
+		} else if l[idx] == nil {
+			sub := map[string]any{}
+			assignFormValue(sub, tail[1:], val)
+			l[idx] = sub
+		}
+		cur[head] = l
+	default:
+		sub, ok := cur[head].(map[string]any)
+		if !ok {
+			if cur[head] != nil {
+				return // shape conflict; skip
+			}
+			sub = map[string]any{}
+			cur[head] = sub
+		}
+		assignFormValue(sub, tail, val)
+	}
+}
+
+// buildFormValue materializes the value under a bare "a[]" append: the
+// remaining segments nest inside the appended element.
+func buildFormValue(segs []string, val string) any {
+	if len(segs) == 0 {
+		return val
+	}
+	if len(segs) == 1 {
+		return map[string]any{segs[0]: val}
+	}
+	sub := map[string]any{}
+	assignFormValue(sub, segs, val)
+	return sub
+}
+
+func isNumericSegment(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
 }
