@@ -108,6 +108,7 @@ def _seed_verifications(inquiry_id, inquiry_ref):
         if v.get("inquiry_id", "") == inquiry_id:
             return
     seq = store_kv_incr("persona", "ver_seq")
+    now = clock.now_rfc3339()
 
     ver_id = _gen_ver_id(seq)
     vc.insert({
@@ -117,7 +118,7 @@ def _seed_verifications(inquiry_id, inquiry_ref):
         "name": "government-id",
         "status": "completed",
         "result": "pass",
-        "created_at": "2024-01-15T10:00:00.000Z",
+        "created_at": now,
     })
 
     seq2 = store_kv_incr("persona", "ver_seq")
@@ -129,5 +130,5 @@ def _seed_verifications(inquiry_id, inquiry_ref):
         "name": "selfie",
         "status": "completed",
         "result": "pass",
-        "created_at": "2024-01-15T10:00:05.000Z",
+        "created_at": clock.unix_to_rfc3339(clock.now_unix() + 5),
     })

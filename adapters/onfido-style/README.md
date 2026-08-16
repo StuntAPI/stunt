@@ -50,6 +50,42 @@ completes at +3s but with result `consider` (Onfido's flagged outcome) instead
 of `clear`, and each report breakdown reports `consider`. This is a stunt-only
 flag — Onfido's real sandbox drives `consider` via special sandbox documents.
 
+## Webhook verification
+
+Both directions use Onfido's scheme:
+
+```
+X-SHA2-Signature: <hex(HMAC-SHA256(webhook_token, raw_body))>
+```
+
+- **Outbound** (signed delivery): when a check first transitions to
+  `complete`, the adapter emits a `check.completed` event signed exactly the
+  way Onfido signs its webhooks.
+- **Inbound** (receiver): `POST /v3.6/webhooks` is the local stand-in for
+  YOUR webhook endpoint. It verifies the MAC for real — recomputing
+  HMAC-SHA256 over the exact bytes on the wire (`req.raw_body`, never a
+  re-serialized copy) — and returns **401** (`authorization_error`) when the
+  header is missing or the signature does not match.
+
+The signing token is the fixed synthetic secret documented here and in
+`scripts/lib.star`:
+
+```
+stunt_onfido_mock_signing_key
+```
+
+Public + low-entropy: local stunt only. Tests and receivers compute the same
+MAC with it:
+
+```go
+mac := hmac.New(sha256.New, []byte("stunt_onfido_mock_signing_key"))
+mac.Write(rawBody) // verbatim request bytes
+expected := hex.EncodeToString(mac.Sum(nil))
+if !hmac.Equal([]byte(expected), []byte(r.Header.Get("X-SHA2-Signature"))) {
+    // 401
+}
+```
+
 ---
 
 *Synthetic. No real Onfido data. See [DISCLAIMER](DISCLAIMER).*

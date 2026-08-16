@@ -9,7 +9,8 @@ Azure Blob Storage REST API simulator for local testing.
 SAS tokens and SharedKey signing are a top local-dev pain for Azure Storage.
 Real code must sign requests with HMAC-SHA256 over a canonical string-to-sign,
 or append SAS tokens with the right query parameters. This mock lets you test
-the full blob CRUD lifecycle locally with any structurally-valid auth.
+the full blob CRUD lifecycle locally with really-verified SharedKey auth
+(documented synthetic key) or structurally-valid SAS/bearer tokens.
 
 ## API version
 
@@ -18,17 +19,72 @@ the full blob CRUD lifecycle locally with any structurally-valid auth.
 
 ## Auth
 
-Accepts three auth schemes (structural validation only):
+Accepts three auth schemes:
 
-1. **SharedKey** — `Authorization: SharedKey <accountName>:<signature>`
-   - The signature is an HMAC-SHA256 over a string-to-sign: `method + canonicalized-headers + canonicalized-resource`
-   - The HMAC is **not recomputed** (documented stretch goal); any header with account + non-empty base64 signature is accepted.
+1. **SharedKey** — `Authorization: SharedKey <accountName>:<signature>` —
+   **verified for real** (see [SharedKey verification](#sharedkey-verification)).
 
 2. **SAS token** — query params: `?sv=2024-08-04&ss=b&srt=co&sp=...&sig=<base64-hmac>&se=...&st=...`
-   - Validates presence of `sv`, `sig`, and `se`.
+   - Validates presence of `sv`, `sig`, and `se` (structural check).
 
 3. **Bearer** — `Authorization: Bearer <token>` (Azure Entra ID / OAuth2)
    - Accepts any non-empty bearer token.
+
+## SharedKey verification
+
+The SharedKey signature is recomputed and compared, using the real Azure
+Storage string-to-sign (2015-02-21+ form):
+
+```
+VERB\n
+Content-Encoding\n
+Content-Language\n
+Content-Length\n            (empty string when the request has no content)
+Content-MD5\n
+Content-Type\n
+Date\n
+If-Modified-Since\n
+If-Match\n
+If-None-Match\n
+If-Unmodified-Since\n
+Range\n
+CanonicalizedHeaders       x-ms-* headers, lowercased, sorted, "name:value\n" each
+CanonicalizedResource      /<account><path> then "\n<name>:<value>" per query
+                           parameter, names sorted lexicographically
+```
+
+`signature = base64( HMAC-SHA256( base64decode(accountKey), stringToSign ) )`
+and it is compared with the value after the colon in the Authorization
+header. Any mismatch (or an unknown account) returns the real Azure error:
+**403** with the XML envelope `<Error><Code>AuthenticationFailed</Code>…`.
+
+### Synthetic credentials (documented)
+
+| Account | Key (raw) | Key (base64 — what SharedKey uses) |
+|---------|-----------|------------------------------------|
+| `stuntstorage` | `stunt-local-storage-signing-key` | `c3R1bnQtbG9jYWwtc3RvcmFnZS1zaWduaW5nLWtleQ==` |
+
+Tests and clients derive the same MACs from these constants (the adapter's
+Go tests sign with `crypto/hmac` + `encoding/base64` in Go). The key table
+lives in `scripts/lib.star` (`_SHARED_KEYS`); add rows there for more
+synthetic accounts.
+
+### Signing example (Go)
+
+```go
+sts := strings.Join([]string{"PUT", "", "", "", "", "application/json", "", "", "", "", "", ""}, "\n") + "\n" +
+    "x-ms-blob-type:BlockBlob\nx-ms-date:<http-date>\n" +
+    "/stuntstorage/mycontainer/report.json"
+mac := hmac.New(sha256.New, []byte("stunt-local-storage-signing-key"))
+mac.Write([]byte(sts))
+auth := "SharedKey stuntstorage:" + base64.StdEncoding.EncodeToString(mac.Sum(nil))
+```
+
+### Timestamps
+
+`Last-Modified`, `x-ms-creation-time`, and `ETag` reflect the actual store:
+timestamps come from the engine clock (`clock.now_rfc3339()` rendered as an
+RFC 1123 HTTP date — no hardcoded dates), and ETags are minted per write.
 
 ## Endpoints
 

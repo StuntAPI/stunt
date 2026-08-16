@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -130,6 +131,25 @@ func TestGDocsStyleAdapter(t *testing.T) {
 	replies, ok := resp["replies"].([]any)
 	if !ok || len(replies) != 1 {
 		t.Fatalf("replies = %v, want array of 1", resp["replies"])
+	}
+
+	// ===== GET revisions → clock-derived modifiedTime =====
+
+	body, status = gdocsGet(t, base+"/v1/documents/"+docID+"/revisions", token)
+	if status != 200 {
+		t.Fatalf("revisions -> status %d, want 200; body %s", status, body)
+	}
+	var revResp map[string]any
+	if err := json.Unmarshal([]byte(body), &revResp); err != nil {
+		t.Fatalf("unmarshal revisions: %v (body %s)", err, body)
+	}
+	revs, ok := revResp["revisions"].([]any)
+	if !ok || len(revs) != 2 {
+		t.Fatalf("revisions = %v, want 2 (create + batchUpdate)", revResp["revisions"])
+	}
+	for i, r := range revs {
+		rm := r.(map[string]any)
+		assertRecentDocsStamp(t, rm["modifiedTime"], fmt.Sprintf("revisions[%d].modifiedTime", i))
 	}
 
 	// ===== GET document → inserted text visible, ranged structure =====
@@ -675,6 +695,24 @@ func TestGDocsStyleAdapter(t *testing.T) {
 }
 
 // === GDocs test helpers ===
+
+// assertRecentDocsStamp checks that v is a Docs-format timestamp (RFC3339
+// with milliseconds) minted within the last 15 minutes — the adapter derives
+// revision modifiedTime values from the engine clock, never a hardcoded date.
+func assertRecentDocsStamp(t *testing.T, v any, what string) {
+	t.Helper()
+	s, ok := v.(string)
+	if !ok || s == "" {
+		t.Fatalf("%s = %v, want non-empty timestamp string", what, v)
+	}
+	ts, err := time.Parse("2006-01-02T15:04:05.000Z", s)
+	if err != nil {
+		t.Fatalf("%s = %q, unparsable as Docs stamp: %v", what, s, err)
+	}
+	if d := time.Since(ts); d < -time.Minute || d > 15*time.Minute {
+		t.Fatalf("%s = %q, want within 15min of now (age %s)", what, s, d)
+	}
+}
 
 func gdocsGet(t *testing.T, rawurl, token string) (string, int) {
 	t.Helper()

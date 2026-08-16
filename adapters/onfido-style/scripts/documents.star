@@ -32,6 +32,7 @@ def on_upload_document(req):
 
     seq = store_kv_incr("onfido", "document_seq")
     doc_id = _gen_id("doc", seq)
+    created_at = clock.now_rfc3339()
 
     dc = store_collection("documents")
     dc.insert({
@@ -40,7 +41,7 @@ def on_upload_document(req):
         "type": doc_type,
         "side": side,
         "file_name": file_name,
-        "created_at": "2024-01-15T10:00:05.000Z",
+        "created_at": created_at,
     })
 
     return respond(201, {
@@ -49,7 +50,7 @@ def on_upload_document(req):
         "type": doc_type,
         "side": side,
         "file_name": file_name,
-        "created_at": "2024-01-15T10:00:05.000Z",
+        "created_at": created_at,
     })
 
 def on_upload_live_photo(req):
@@ -74,18 +75,19 @@ def on_upload_live_photo(req):
 
     seq = store_kv_incr("onfido", "photo_seq")
     photo_id = _gen_id("lph", seq)
+    created_at = clock.now_rfc3339()
 
     pc = store_collection("live_photos")
     pc.insert({
         "id": photo_id,
         "applicant_id": applicant_id,
         "file_name": file_name,
-        "created_at": "2024-01-15T10:00:10.000Z",
+        "created_at": created_at,
     })
 
     return respond(201, {
         "id": photo_id,
         "applicant_id": applicant_id,
         "file_name": file_name,
-        "created_at": "2024-01-15T10:00:10.000Z",
+        "created_at": created_at,
     })

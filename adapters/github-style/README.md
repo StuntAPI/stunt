@@ -114,6 +114,24 @@ if !hmac.Equal([]byte(expected), []byte(r.Header.Get("X-Hub-Signature-256"))) {
 **Important:** GitHub expects 200 for successful processing. Non-2xx responses
 trigger retries with exponential backoff.
 
+### Inbound receiver (`POST /webhooks/receive`)
+
+The hook URL you register points at your own external server; GitHub never
+calls stunt. For local testing of your verification middleware, stunt also
+ships a minimal RECEIVER at `POST /webhooks/receive` (documented stunt-local
+convenience). It verifies the real inbound scheme:
+
+```
+X-Hub-Signature-256: sha256=<hex(HMAC-SHA256(hook_secret, raw_body))>
+```
+
+The MAC is computed over the **verbatim** request bytes, and the secret must
+be one of the registered hooks' `config.secret` values (or the fallback mock
+secret above when a hook was registered without one). A correct signature
+gets `200 {"message":"Webhook received"}`; a missing, malformed, or
+mismatched signature gets GitHub's `401` error envelope — what a real
+receiver should answer so GitHub stops retrying.
+
 ### Emitted events
 
 | Event type | Emitted when | Payload |
@@ -240,6 +258,7 @@ real vocabulary) and the usual `workflow_run` `completed` delivery.
 | GET | `/repos/{owner}/{repo}/actions/runs` | `actions.star#on_list_runs` | List workflow runs (honors `branch`, `event`, `status`) |
 | GET | `/repos/{owner}/{repo}/actions/runs/{run_id}` | `actions.star#on_get_run` | Get a workflow run |
 | POST | `/repos/{owner}/{repo}/hooks` | `hooks.star#on_create_hook` | Register webhook (201) |
+| POST | `/webhooks/receive` | `hooks.star#on_receive_webhook` | Local webhook receiver — verifies `X-Hub-Signature-256` (200 ok / 401 bad signature) |
 | POST | `/graphql` | `graphql.star#on_graphql` | GraphQL (pattern-matched) |
 
 ## Synthetic data

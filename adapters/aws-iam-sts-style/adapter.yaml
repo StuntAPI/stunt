@@ -41,7 +41,9 @@ resources:
   - name: access_keys
     kind: collection
 
-# Auth scheme: SigV4 (AWS4-HMAC-SHA256). Structural validation only for v1.
+# Auth scheme: SigV4 (AWS4-HMAC-SHA256), verified for real (canonical
+# request rebuilt + HMAC chain recomputed with the documented synthetic
+# credentials; see README).
 identity:
   token_scheme: custom
 

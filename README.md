@@ -133,7 +133,7 @@ stunt adapter test ./myapi-style              # conformance vs your local real t
 stunt catalog search stripe                   # browse the adapter registry
 ```
 
-**Reference adapters in this repo** — 91 of them (Stripe, Salesforce, Discord, Twilio,
+**Reference adapters in this repo** — 94 of them (Stripe, Salesforce, Discord, Twilio,
 Square, Adyen, AWS S3, Google/Microsoft/Apple families, blockchain RPCs, …; all unofficial,
 synthetic-data-only, with a DISCLAIMER). Browse them with `stunt catalog search`. Highlights:
 

@@ -97,7 +97,7 @@ def on_publish(req):
         "caption": container.get("caption", ""),
         "media_type": container.get("media_type", "IMAGE"),
         "media_url": container.get("image_url", container.get("video_url", "")),
-        "timestamp": "2024-01-01T00:00:00+0000",
+        "timestamp": _ig_now(),
     })
 
     return respond(200, {"id": media_id})

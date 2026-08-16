@@ -3,6 +3,9 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -187,18 +190,53 @@ func TestJumioStyleAdapter(t *testing.T) {
 		t.Fatalf("unknown scan -> status %d, want 404", status)
 	}
 
-	// ===== Webhook receiver =====
+	// ===== Webhook receiver: real X-Jumio-Webhook-Signature verification =====
 
-	body, status = jumioWebhook(t, base+"/netverify/v2/webhooks", "jumio-hmac-signature", map[string]any{
+	// The synthetic signing secret documented in the adapter README.
+	const jumioWebhookSecret = "stunt_jumio_mock_signing_key"
+
+	whBody, err := json.Marshal(map[string]any{
 		"scanReference": scanRef,
 		"status":        "DONE",
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mac := hmac.New(sha256.New, []byte(jumioWebhookSecret))
+	mac.Write(whBody)
+	goodSig := hex.EncodeToString(mac.Sum(nil))
+
+	// Correct signature over the exact bytes → 200.
+	body, status = jumioWebhook(t, base+"/netverify/v2/webhooks", goodSig, whBody)
 	if status != 200 {
-		t.Fatalf("webhook -> status %d, want 200; body %s", status, body)
+		t.Fatalf("webhook with correct signature -> status %d, want 200; body %s", status, body)
+	}
+
+	// Tampered body (signature was computed over different bytes) → 401.
+	tampered := append([]byte{}, whBody...)
+	tampered = append(tampered, ' ')
+	body, status = jumioWebhook(t, base+"/netverify/v2/webhooks", goodSig, tampered)
+	if status != 401 {
+		t.Fatalf("webhook with tampered body -> status %d, want 401; body %s", status, body)
+	}
+	if !strings.Contains(body, "httpStatus") {
+		t.Fatalf("tampered body 401 should use the Jumio error envelope, got: %s", body)
+	}
+
+	// Tampered signature (right shape, wrong MAC) → 401.
+	badSig := []byte(goodSig)
+	if badSig[0] == '0' {
+		badSig[0] = '1'
+	} else {
+		badSig[0] = '0'
+	}
+	body, status = jumioWebhook(t, base+"/netverify/v2/webhooks", string(badSig), whBody)
+	if status != 401 {
+		t.Fatalf("webhook with tampered signature -> status %d, want 401; body %s", status, body)
 	}
 
 	// Webhook without signature → 401.
-	body, status = jumioWebhook(t, base+"/netverify/v2/webhooks", "", map[string]any{})
+	body, status = jumioWebhook(t, base+"/netverify/v2/webhooks", "", []byte("{}"))
 	if status != 401 {
 		t.Fatalf("webhook without signature -> status %d, want 401; body %s", status, body)
 	}
@@ -416,10 +454,9 @@ func jumioNoAuth(t *testing.T, rawurl string) (string, int) {
 	return string(b), resp.StatusCode
 }
 
-func jumioWebhook(t *testing.T, rawurl, signature string, body any) (string, int) {
+func jumioWebhook(t *testing.T, rawurl, signature string, body []byte) (string, int) {
 	t.Helper()
-	data, _ := json.Marshal(body)
-	req, _ := http.NewRequest("POST", rawurl, bytes.NewReader(data))
+	req, _ := http.NewRequest("POST", rawurl, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	if signature != "" {
 		req.Header.Set("X-Jumio-Webhook-Signature", signature)

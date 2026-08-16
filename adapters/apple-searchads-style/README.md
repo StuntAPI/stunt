@@ -65,3 +65,13 @@ time a campaign's keywords are touched.
 ---
 
 *Synthetic. No real Apple Search Ads data. See [DISCLAIMER](DISCLAIMER).*
+
+## Clock
+
+`creationTime` / `modificationTime` on campaigns are derived from the engine
+clock (`clock.now_rfc3339()` / `clock.unix_to_rfc3339()`) in the Search Ads
+format — ISO8601 with millisecond precision and no zone suffix, e.g.
+`2026-08-15T10:00:00.000`. Created campaigns get now for both stamps; updates
+refresh `modificationTime`; seeded campaigns get `now − 30d/2d` and
+`now − 45d/9d` respectively. No hardcoded calendar dates; assertions should
+parse the value.

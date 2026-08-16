@@ -45,8 +45,8 @@ def on_create_project(req):
         "scriptId": script_id,
         "title": title,
         "parentId": parent_id,
-        "createTime": "2024-01-01T00:00:00.000Z",
-        "updateTime": "2024-01-01T00:00:00.000Z",
+        "createTime": _now_ms(),
+        "updateTime": _now_ms(),
         "content": {"files": []},
     }
 
@@ -100,7 +100,7 @@ def on_create_deployment(req):
         "deploymentId": dep_id,
         "scriptId": script_id,
         "deploymentConfig": body.get("deploymentConfig", {}),
-        "version": {"versionNumber": version_number, "createTime": "2024-01-01T00:00:00.000Z"},
+        "version": {"versionNumber": version_number, "createTime": _now_ms()},
     })
 
 # _project_resource builds the API response shape for a project.

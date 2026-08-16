@@ -57,3 +57,17 @@ process.
   before pagination.
 - A default calendar (`mock-user@gmail.com`) with a seeded event is created on
   first access.
+
+## Clock and ETags
+
+- **Timestamps**: all synthesized datetimes (seed event times, default
+  `start`/`end` when a create omits them) are derived from the engine clock
+  (`clock.now_unix()` / `clock.unix_to_rfc3339()`), never hardcoded calendar
+  dates. A default event starts 30 minutes after the request and ends one hour
+  later. Assertions on these values should parse them, not compare literals.
+- **ETags**: every `etag` (events, instances, calendars, calendar-list entries,
+  list envelopes) is content-derived — the quoted first 22 hex chars of
+  `crypto.sha256(json.encode(resource))` over the resource minus its own
+  `etag` key — so the tag changes whenever the content changes, like the real
+  API. Recurring instances re-derive their etag from the instance's own
+  shifted content. Format stays Google's: a quoted opaque string.

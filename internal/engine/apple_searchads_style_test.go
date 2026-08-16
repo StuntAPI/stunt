@@ -133,6 +133,10 @@ func TestAppleSearchadsStyleAdapter(t *testing.T) {
 	if createdCamp["name"] != "New Test Campaign" {
 		t.Fatalf("name = %v, want New Test Campaign", createdCamp["name"])
 	}
+	assertRecentASATime(t, createdCamp["creationTime"], "created campaign creationTime", 15*time.Minute)
+	assertRecentASATime(t, createdCamp["modificationTime"], "created campaign modificationTime", 15*time.Minute)
+	// Seeded campaigns carry clock-derived stamps 2–45 days in the past.
+	assertRecentASATime(t, firstCamp["creationTime"], "seed campaign creationTime", 46*24*time.Hour)
 
 	// ===== Get campaign by ID =====
 
@@ -442,6 +446,25 @@ func TestAppleSearchadsStyleAdapter(t *testing.T) {
 }
 
 // === Search Ads test helpers ===
+
+// assertRecentASATime checks that v is an Apple Search Ads-format timestamp
+// (ISO8601, millisecond precision, no zone) within `maxAge` of now — the
+// adapter derives creation/modification times from the engine clock, never a
+// hardcoded calendar date.
+func assertRecentASATime(t *testing.T, v any, what string, maxAge time.Duration) {
+	t.Helper()
+	s, ok := v.(string)
+	if !ok || s == "" {
+		t.Fatalf("%s = %v, want non-empty timestamp string", what, v)
+	}
+	ts, err := time.Parse("2006-01-02T15:04:05.000", s)
+	if err != nil {
+		t.Fatalf("%s = %q, unparsable as ASA stamp: %v", what, s, err)
+	}
+	if d := time.Since(ts); d < -time.Minute || d > maxAge {
+		t.Fatalf("%s = %q, want within %s of now (age %s)", what, s, maxAge, d)
+	}
+}
 
 func searchadsGet(t *testing.T, rawurl, token string) (string, int) {
 	t.Helper()

@@ -230,9 +230,11 @@ def _make_product(pid, title, ptype, price, sku):
         ],
     }
 
-# _now returns a synthetic ISO-8601 timestamp.
+# _now returns the current time as an ISO-8601 timestamp (live clock —
+# created_at/updated_at reflect request time; seeded docs are stamped once
+# at seed time and stay stable).
 def _now():
-    return "2024-06-15T10:30:00-04:00"
+    return clock.now_rfc3339()
 
 # _parse_gql_stub inspects a GraphQL query string and returns a tuple
 # (kind, arg_str) where kind is the top-level operation keyword (e.g.

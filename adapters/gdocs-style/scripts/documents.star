@@ -30,6 +30,7 @@ def on_create_document(req):
     doc_id = _gen_doc_id(seq)
 
     doc = _build_doc(doc_id, title, [])
+    _touch_doc(doc)
     dc = store_collection("documents")
     dc.insert(doc)
 
@@ -196,6 +197,7 @@ def on_batch_update(req):
     doc["model"] = model
     doc["inlineObjects"] = inline_objects
     doc["lists"] = lists
+    _touch_doc(doc)
     dc = store_collection("documents")
     dc.update(doc.get("id"), doc)
 
@@ -217,15 +219,19 @@ def on_get_revisions(req):
     if doc == None:
         return _g_err(404, "The document " + doc_id + " does not exist.", "NOT_FOUND")
 
-    return respond(200, {
-        "documentId": doc_id,
-        "revisions": [
+    revisions = doc.get("revisions")
+    if revisions == None or len(revisions) == 0:
+        revisions = [
             {
                 "id": "1",
-                "modifiedTime": "2024-01-01T00:00:00.000Z",
+                "modifiedTime": _now_ms(),
                 "lastModifier": {"displayName": "Test User", "me": True},
             },
-        ],
+        ]
+
+    return respond(200, {
+        "documentId": doc_id,
+        "revisions": revisions,
     })
 
 # --- helpers ---------------------------------------------------------------

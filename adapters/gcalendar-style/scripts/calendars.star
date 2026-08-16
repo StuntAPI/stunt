@@ -18,15 +18,16 @@ def on_get_primary(req):
     cc = store_collection("calendars")
     for doc in cc.list():
         if doc["id"] == cal_id:
-            return respond(200, {
+            cal = {
                 "kind": "calendar#calendar",
                 "id": doc["id"],
                 "summary": doc["summary"],
                 "timeZone": doc["timeZone"],
                 "accessRole": doc["accessRole"],
                 "primary": doc.get("primary", True),
-                "etag": '"mock-cal-etag"',
-            })
+            }
+            cal["etag"] = _etag(cal)
+            return respond(200, cal)
 
     return _not_found("Calendar not found: primary")
 
@@ -41,21 +42,22 @@ def on_list_calendars(req):
     cc = store_collection("calendars")
     items = []
     for doc in cc.list():
-        items.append({
+        entry = {
             "kind": "calendar#calendarListEntry",
             "id": doc["id"],
             "summary": doc["summary"],
             "timeZone": doc["timeZone"],
             "accessRole": doc["accessRole"],
             "primary": doc.get("primary", False),
-            "etag": '"mock-cal-list-etag"',
-        })
+        }
+        entry["etag"] = _etag(entry)
+        items.append(entry)
 
     page, next_cursor = _list_page(req, items)
 
     result = {
         "kind": "calendar#calendarList",
-        "etag": '"mock-cal-list"',
+        "etag": _etag(page),
         "items": page,
     }
     if next_cursor != None:

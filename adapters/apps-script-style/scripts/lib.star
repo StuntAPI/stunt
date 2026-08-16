@@ -40,6 +40,13 @@ def _gen_script_id(seq):
         val = val // 64 + 31
     return base[:48]
 
+# _now_ms returns the current time in the Apps Script timestamp format
+# (RFC3339 with milliseconds, e.g. "...T00:00:00.000Z"). Derived from the
+# engine clock, so createTime/updateTime track real elapsed time.
+def _now_ms():
+    rfc = clock.now_rfc3339()
+    return rfc[:-1] + ".000Z"
+
 # _seed creates a default project with content.
 def _seed():
     if store_kv_get("apps-script", "seeded") == "yes":
@@ -55,8 +62,8 @@ def _seed():
         "scriptId": script_id,
         "title": "Untitled project",
         "parentId": None,
-        "createTime": "2024-01-01T00:00:00.000Z",
-        "updateTime": "2024-01-01T00:00:00.000Z",
+        "createTime": _now_ms(),
+        "updateTime": _now_ms(),
         "content": {
             "files": [
                 {

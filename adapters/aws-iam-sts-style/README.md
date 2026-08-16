@@ -16,14 +16,59 @@ that entire flow locally without real AWS credentials.
 - **API**: AWS STS + IAM API
 - **Version**: `2011-06-15`
 
-## Auth
+## Auth — AWS Signature Version 4 (SigV4), verified for real
 
-**SigV4** (AWS Signature Version 4) — structural validation only.
+The adapter **recomputes the signature**: the canonical request is rebuilt
+from the incoming request (method, RFC 3986-encoded path, sorted/encoded
+query — where the query-API `Action`/`Version`/... parameters live —, signed
+headers, sha256 of the verbatim body), the string-to-sign is formed with the
+`X-Amz-Date` header and the Credential scope, and the signing key
+`HMAC(HMAC(HMAC(HMAC("AWS4"+secret, date), region), service), "aws4_request")`
+is derived from the documented synthetic secret. A real SDK configured with
+the credentials below produces signatures that verify against this adapter.
 
-Accepts `Authorization: AWS4-HMAC-SHA256 Credential=<AK>/YYYYMMDD/<region>/<service>/aws4_request, SignedHeaders=..., Signature=<hex>`.
+### Synthetic credentials (documented constants)
 
-The service scope may be `sts` or `iam`. The HMAC signature is **not**
-recomputed (documented stretch goal); any well-formed SigV4 header is accepted.
+```
+Access key ID:     AKIAIOSFODNN7EXAMPLE
+Secret access key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+```
+
+These are the long-public example credentials from the AWS documentation —
+no real account backs them. The service in the Credential scope may be `sts`
+or `iam`.
+
+### Verification scheme
+
+1. **Structure**: `Credential`
+   (`<AK>/<YYYYMMDD>/<region>/{sts,iam}/aws4_request`), `SignedHeaders`, and
+   a hex `Signature` must be present (missing pieces → `403
+   IncompleteSignature`, the real STS error).
+2. **Access key**: must be the documented AKID, else `403
+   InvalidClientTokenId` ("The security token included in the request is
+   invalid." — the real STS error for an unknown key).
+3. **Clock window**: `x-amz-date` is required and must be within ±15 minutes
+   of the adapter clock (the engine's injectable clock), else `403
+   RequestTimeTooSkewed`.
+4. **Signature**: the recomputed hex signature must match, else `403
+   SignatureDoesNotMatch`. The payload hash is sha256 of the verbatim raw
+   body (empty for GETs; the form-encoded body for POSTs), so a request
+   tampered after signing is rejected.
+
+### Known limitations
+
+- The adapter sees the **decoded** path and query, so the canonical URI and
+  query string are rebuilt by re-encoding the decoded values. Duplicate
+  query keys and non-canonical encodings in the original wire request cannot
+  be distinguished.
+- The RFC 1123 `Date` header fallback is not parsed; `x-amz-date` is required.
+
+### Clock-derived response data
+
+- `<Expiration>` on temporary credentials is `now + DurationSeconds` from the
+  engine clock (real STS semantics; default 3600s).
+- `<CreateDate>` on CreateRole/CreateAccessKey (and on the seeded role/user)
+  derives from the clock as an RFC 3339 timestamp.
 
 ## Endpoints
 
@@ -74,7 +119,7 @@ AWS query API shape. Errors use `<ErrorResponse><Error><Type/><Code/><Message/><
 
 ```
 GET /?Action=AssumeRole&RoleArn=arn:aws:iam::123456789012:role/my-role&RoleSessionName=dev
-Authorization: AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20260120/us-east-1/sts/aws4_request, ...
+Authorization: AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20260120/us-east-1/sts/aws4_request, SignedHeaders=host;x-amz-date, Signature=<computed-with-the-documented-secret>
 
 → 200 text/xml
 <AssumeRoleResponse>

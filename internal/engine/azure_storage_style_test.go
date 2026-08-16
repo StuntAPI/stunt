@@ -3,9 +3,14 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"io"
 	"net/http"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -218,13 +223,73 @@ func TestAzureStorageStyleAdapter(t *testing.T) {
 
 // === Azure Storage test helpers ===
 
+// azSharedKey computes a real SharedKey Authorization header signed with the
+// adapter's documented synthetic key (must match scripts/lib.star).
+func azSharedKey(req *http.Request, account string) string {
+	key, _ := base64.StdEncoding.DecodeString(base64.StdEncoding.EncodeToString([]byte("stunt-local-storage-signing-key")))
+	cl := req.Header.Get("Content-Length")
+	if cl == "0" {
+		cl = ""
+	}
+	lines := []string{
+		req.Method,
+		req.Header.Get("Content-Encoding"),
+		req.Header.Get("Content-Language"),
+		cl,
+		req.Header.Get("Content-MD5"),
+		req.Header.Get("Content-Type"),
+		req.Header.Get("Date"),
+		req.Header.Get("If-Modified-Since"),
+		req.Header.Get("If-Match"),
+		req.Header.Get("If-None-Match"),
+		req.Header.Get("If-Unmodified-Since"),
+		req.Header.Get("Range"),
+	}
+	sts := strings.Join(lines, "\n") + "\n"
+	var xms []string
+	for k, v := range req.Header {
+		lk := strings.ToLower(k)
+		if strings.HasPrefix(lk, "x-ms-") {
+			xms = append(xms, lk+":"+strings.TrimSpace(v[0]))
+		}
+	}
+	sort.Strings(xms)
+	for _, h := range xms {
+		sts += h + "\n"
+	}
+	u := req.URL
+	sts += "/" + account + u.Path
+	var qk []string
+	for k := range u.Query() {
+		qk = append(qk, strings.ToLower(k))
+	}
+	sort.Strings(qk)
+	for _, k := range qk {
+		v := u.Query().Get(k)
+		sts += "\n" + k + ":" + v
+	}
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(sts))
+	return "SharedKey " + account + ":" + base64.StdEncoding.EncodeToString(mac.Sum(nil))
+}
+
+// azMaybeSign swaps the historical placeholder credential for a real
+// SharedKey signature; other values (e.g. malformed tokens in negative
+// tests) pass through verbatim.
+func azMaybeSign(req *http.Request, auth string) string {
+	if auth == "SharedKey stuntstorage:dHVudA==" {
+		return azSharedKey(req, "stuntstorage")
+	}
+	return auth
+}
+
 func azGet(t *testing.T, rawurl, auth string) (string, int) {
 	t.Helper()
 	req, err := http.NewRequest("GET", rawurl, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", auth)
+	req.Header.Set("Authorization", azMaybeSign(req, auth))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -255,11 +320,13 @@ func azPut(t *testing.T, rawurl, auth string, body []byte) (string, int) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", auth)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Length", strconv.Itoa(len(body)))
 	}
 	req.Header.Set("x-ms-blob-type", "BlockBlob")
+	// Sign last: the adapter signs every header the wire carries.
+	req.Header.Set("Authorization", azMaybeSign(req, auth))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -275,7 +342,7 @@ func azHead(t *testing.T, rawurl, auth string) *http.Response {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", auth)
+	req.Header.Set("Authorization", azMaybeSign(req, auth))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -289,7 +356,7 @@ func azDelete(t *testing.T, rawurl, auth string) *http.Response {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", auth)
+	req.Header.Set("Authorization", azMaybeSign(req, auth))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)

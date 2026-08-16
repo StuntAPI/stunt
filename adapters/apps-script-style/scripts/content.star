@@ -45,7 +45,7 @@ def on_update_content(req):
         files = []
 
     project["content"] = {"files": files}
-    project["updateTime"] = "2024-01-02T00:00:00.000Z"
+    project["updateTime"] = _now_ms()
 
     pc = store_collection("projects")
     pc.update(project.get("id"), project)

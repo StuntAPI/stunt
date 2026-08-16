@@ -57,6 +57,37 @@ def _g_err(code, message, status):
 def _bad_request(message):
     return _g_err(400, message, "INVALID_ARGUMENT")
 
+# --- clock -----------------------------------------------------------------
+
+# _now_ms returns the current time in the Docs revision timestamp format
+# (RFC3339 with milliseconds, e.g. "...T00:00:00.000Z"). Derived from the
+# engine clock, so revision modifiedTime values track real elapsed time.
+def _now_ms():
+    rfc = clock.now_rfc3339()
+    return rfc[:-1] + ".000Z"
+
+# _touch_doc records a revision on the document: appends
+# {id, modifiedTime, lastModifier} to doc["revisions"] (seeded with the
+# creation revision on first touch). Every batchUpdate calls this, so the
+# revisions endpoint reflects the document's real edit history.
+def _touch_doc(doc):
+    revs = doc.get("revisions")
+    if revs == None:
+        revs = [{
+            "id": "1",
+            "modifiedTime": _now_ms(),
+            "lastModifier": {"displayName": "Test User", "me": True},
+        }]
+    else:
+        revs = list(revs)
+        revs.append({
+            "id": str(len(revs) + 1),
+            "modifiedTime": _now_ms(),
+            "lastModifier": {"displayName": "Test User", "me": True},
+        })
+    doc["revisions"] = revs
+    return doc
+
 # --- numeric coercion ------------------------------------------------------
 # JSON bodies deliver every number as a float (2, not 2.0, never arrives).
 # _num_to_int coerces a body value to an int, falling back to dflt.
@@ -682,7 +713,9 @@ def _seed():
     store_kv_set("gdocs", "default_doc_id", doc_id)
 
     dc = store_collection("documents")
-    dc.insert(_build_doc(doc_id, "Untitled document", []))
+    seed_doc = _build_doc(doc_id, "Untitled document", [])
+    _touch_doc(seed_doc)
+    dc.insert(seed_doc)
 
 # _build_doc constructs a document record carrying the internal model plus
 # its inline-object and list registries.

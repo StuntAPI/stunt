@@ -27,7 +27,7 @@ def on_send_email(req):
         body = {}
 
     email_id = _next_email_id()
-    created_at = _now_ts()
+    created_at = _now()
 
     # Failure injection: simulator-only body flag selecting the "bounced"
     # terminal (see README).

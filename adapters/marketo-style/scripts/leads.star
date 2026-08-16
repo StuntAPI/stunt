@@ -222,6 +222,10 @@ def _get_lead(req):
         return _quota_err()
 
     lead_id = req["params"].get("id", "")
+    # The {id}.json route captures the ".json" suffix in the param — strip
+    # it so lookups hit the stored id (same convention as shopify-style).
+    if lead_id.endswith(".json"):
+        lead_id = lead_id[:-5]
     col = store_collection("leads")
     doc = col.get(lead_id)
     if doc == None:

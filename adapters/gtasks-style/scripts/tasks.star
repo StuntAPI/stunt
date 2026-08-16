@@ -67,7 +67,7 @@ def on_create_task(req):
         "completed": None,
         "parent": None,
         "position": str(seq * 1000),
-        "updated": "2024-01-01T00:00:00.000Z",
+        "updated": _now_ms(),
         "selfLink": "https://www.googleapis.com/tasks/v1/lists/" + list_id + "/tasks/" + task_id,
     }
 
@@ -114,7 +114,7 @@ def on_update_task(req):
         if val != None:
             task[field] = val
 
-    task["updated"] = "2024-01-02T00:00:00.000Z"
+    task["updated"] = _now_ms()
 
     tc = store_collection("tasks")
     tc.update(task.get("id"), task)
@@ -165,7 +165,7 @@ def on_move_task(req):
         new_pos = store_kv_incr("gtasks", "move_seq") + 1
         task["position"] = str(new_pos * 1000)
 
-    task["updated"] = "2024-01-03T00:00:00.000Z"
+    task["updated"] = _now_ms()
 
     tc = store_collection("tasks")
     tc.update(task.get("id"), task)

@@ -3,9 +3,13 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -25,6 +29,18 @@ import (
 //   - Topic info
 //   - Storage queue send (JSON) → 201 XML response
 //   - Storage queue receive → XML with MessageText
+
+// sbSAS builds a real SharedAccessSignature token signed with the adapter's
+// documented synthetic key (must match scripts/lib.star).
+func sbSAS(resource string) string {
+	secret := "stunt-servicebus-signing-key"
+	se := "1900000000"
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(resource + "\n" + se))
+	sig := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
+	return "SharedAccessSignature sr=" + url.QueryEscape(resource) + "&sig=" + url.QueryEscape(sig) + "&se=" + se + "&skn=RootManageSharedAccessKey"
+}
+
 func TestAzureServiceBusStyleAdapter(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "azure-servicebus-style")
 	absAdapterDir, err := filepath.Abs(adapterDir)
@@ -58,7 +74,7 @@ func TestAzureServiceBusStyleAdapter(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	base := addrs["sb"]
-	sasToken := "SharedAccessSignature sr=https%3A%2F%2Fmybus.servicebus.windows.net%2Fmyqueue&sig=fakesig&se=1900000000&skn=RootManageSharedAccessKey"
+	sasToken := sbSAS("https://mybus.servicebus.windows.net/myqueue")
 
 	// ===== 401 without auth =====
 
@@ -209,7 +225,7 @@ func TestAzureServiceBusStylePeekLockAndTopics(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 
 	base := addrs["sb"]
-	sasToken := "SharedAccessSignature sr=https%3A%2F%2Fmybus.servicebus.windows.net%2Fmyqueue&sig=fakesig&se=1900000000&skn=RootManageSharedAccessKey"
+	sasToken := sbSAS("https://mybus.servicebus.windows.net/myqueue")
 
 	// ===== Peek-lock receive + complete =====
 

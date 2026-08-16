@@ -203,8 +203,8 @@ def _seed_campaigns():
         "dailyBudgetAmount": {"amount": "500", "currency": "USD"},
         "servingStatus": "RUNNING",
         "servingStateReasons": [],
-        "creationTime": "2024-01-15T10:00:00.000",
-        "modificationTime": "2024-01-15T10:00:00.000",
+        "creationTime": _asa_ts_ago(30 * 24 * 3600),
+        "modificationTime": _asa_ts_ago(2 * 24 * 3600),
     })
     cc.insert({
         "id": _gen_campaign_id(),
@@ -214,8 +214,8 @@ def _seed_campaigns():
         "dailyBudgetAmount": {"amount": "250", "currency": "USD"},
         "servingStatus": "PAUSED",
         "servingStateReasons": ["USER_PAUSED"],
-        "creationTime": "2024-01-10T08:00:00.000",
-        "modificationTime": "2024-01-12T14:30:00.000",
+        "creationTime": _asa_ts_ago(45 * 24 * 3600),
+        "modificationTime": _asa_ts_ago(9 * 24 * 3600),
     })
 
 # _asa_find_campaign locates a campaign by numeric campaignId or internal
@@ -247,6 +247,15 @@ def _asa_status_to_serving(status):
 # zone) derived from the engine clock.
 def _asa_now_ts():
     s = clock.now_rfc3339()
+    if len(s) >= 19:
+        return s[:19] + ".000"
+    return s
+
+# _asa_ts_ago returns an ASA-style timestamp for `ago_seconds` before the
+# engine clock's current time (seed campaigns get creation/modification
+# times in the past relative to now, not fixed calendar dates).
+def _asa_ts_ago(ago_seconds):
+    s = clock.unix_to_rfc3339(clock.now_unix() - ago_seconds)
     if len(s) >= 19:
         return s[:19] + ".000"
     return s

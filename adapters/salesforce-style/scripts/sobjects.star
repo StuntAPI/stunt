@@ -149,6 +149,11 @@ def on_create(req):
         doc[k] = v
     doc["Id"] = record_id
     doc["id"] = record_id
+    # Salesforce stamps system fields server-side; they are live clock
+    # values (RFC 3339 UTC), not client-settable.
+    now = _now()
+    doc["CreatedDate"] = now
+    doc["LastModifiedDate"] = now
 
     col.insert(doc)
 
@@ -207,6 +212,7 @@ def on_update(req):
         merged[k] = v
     merged["Id"] = record_id
     merged["id"] = record_id
+    merged["LastModifiedDate"] = _now()
     col.update(record_id, merged)
 
     # Salesforce returns 204 No Content on successful PATCH.
