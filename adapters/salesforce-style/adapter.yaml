@@ -56,6 +56,10 @@ endpoints:
     method: DELETE
     handler: scripts/sobjects.star#on_delete
     concurrency_key: id # read-then-flag read-modify-write, serialized per record
+  - route: /services/data/v60.0/sobjects/Account/{extIdField}/{extIdValue}
+    method: PATCH
+    handler: scripts/sobjects.star#on_upsert
+    concurrency_key: extIdValue # match-then-insert/update, serialized per external ID
 
   # --- Contact CRUD ---
   - route: /services/data/v60.0/sobjects/Contact
@@ -72,6 +76,10 @@ endpoints:
     method: DELETE
     handler: scripts/sobjects.star#on_delete
     concurrency_key: id # read-then-flag read-modify-write, serialized per record
+  - route: /services/data/v60.0/sobjects/Contact/{extIdField}/{extIdValue}
+    method: PATCH
+    handler: scripts/sobjects.star#on_upsert
+    concurrency_key: extIdValue # match-then-insert/update, serialized per external ID
 
   # --- Opportunity CRUD ---
   - route: /services/data/v60.0/sobjects/Opportunity
@@ -87,6 +95,10 @@ endpoints:
     method: DELETE
     handler: scripts/sobjects.star#on_delete
     concurrency_key: id # read-then-flag read-modify-write, serialized per record
+  - route: /services/data/v60.0/sobjects/Opportunity/{extIdField}/{extIdValue}
+    method: PATCH
+    handler: scripts/sobjects.star#on_upsert
+    concurrency_key: extIdValue # match-then-insert/update, serialized per external ID
 
   # --- SOQL query ---
   - route: /services/data/v60.0/query
@@ -95,11 +107,25 @@ endpoints:
   - route: /services/data/v60.0/queryAll
     method: GET
     handler: scripts/query.star#on_query
+  - route: /services/data/v60.0/query/{queryLocator}
+    method: GET
+    handler: scripts/query.star#on_query_more
 
   # --- composite batch ---
   - route: /services/data/v60.0/composite
     method: POST
     handler: scripts/composite.star#on_composite
+
+  # --- SObject Collections (bulk DML) ---
+  - route: /services/data/v60.0/composite/sobjects
+    method: POST
+    handler: scripts/composite.star#on_collections_insert
+  - route: /services/data/v60.0/composite/sobjects
+    method: PATCH
+    handler: scripts/composite.star#on_collections_update
+  - route: /services/data/v60.0/composite/sobjects
+    method: DELETE
+    handler: scripts/composite.star#on_collections_delete
 
 # Backing stores — collections for stateful data.
 resources:

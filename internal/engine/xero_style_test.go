@@ -563,3 +563,437 @@ func xeroDelete(t *testing.T, rawurl, auth, tenantID string) (string, int) {
 	b, _ := io.ReadAll(resp.Body)
 	return string(b), resp.StatusCode
 }
+
+// xeroValidationMessage digs the per-element ValidationErrors message out of
+// Xero's 400 validation envelope: { ErrorNumber:"ValidationError", Type:
+// "BadRequest", Elements: [{ ValidationErrors: [{ Message }] }] }.
+func xeroValidationMessage(t *testing.T, body string) (map[string]any, string) {
+	t.Helper()
+	var errResp map[string]any
+	if err := json.Unmarshal([]byte(body), &errResp); err != nil {
+		t.Fatalf("unmarshal validation error: %v (body %s)", err, body)
+	}
+	elements, ok := errResp["Elements"].([]any)
+	if !ok || len(elements) == 0 {
+		t.Fatalf("validation error has no Elements: %s", body)
+	}
+	verrs, ok := elements[0].(map[string]any)["ValidationErrors"].([]any)
+	if !ok || len(verrs) == 0 {
+		t.Fatalf("validation error has no ValidationErrors: %s", body)
+	}
+	msg, _ := verrs[0].(map[string]any)["Message"].(string)
+	return errResp, msg
+}
+
+// TestXeroStyleInvoiceTotalsAndPayments covers the invoice arithmetic and
+// payment ledger:
+//
+//   - Totals are summed over EVERY line item (not just the first): per line
+//     net = UnitAmount × Quantity less DiscountRate%, tax = TaxAmount; the
+//     invoice exposes SubTotal / TotalTax / Total / TotalDiscount.
+//   - Sequential partial payments accumulate: AmountPaid grows, AmountDue
+//     (the outstanding balance) decrements toward 0.00 and never goes
+//     negative; the invoice flips to PAID exactly at zero.
+//   - Over-payment is rejected with the real Xero validation error
+//     ("PaymentAmount exceeds the amount outstanding on this document"), as
+//     is paying a non-AUTHORISED invoice ("Payments can only be made against
+//     AUTHORISED documents"); an unknown invoice is the 404 envelope.
+func TestXeroStyleInvoiceTotalsAndPayments(t *testing.T) {
+	adapterDir := filepath.Join("..", "..", "adapters", "xero-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"xero": {Adapter: absAdapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["xero"]
+
+	const tenantID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+	const auth = "Bearer xero-token"
+
+	// ===== multi-line invoice: totals sum every line =====
+	//
+	//   line 1: 100.00 × 2 less 10%  → 180.00 (discount 20.00)
+	//   line 2: 49.99  × 3            → 149.97 (no discount)
+	//   line 3: 250.00 × 1 less 20%  → 200.00 (discount 50.00, tax 15.00)
+	//   SubTotal 529.97 + TotalTax 15.00 = Total 544.97, TotalDiscount 70.00
+	body, status := xeroPutJSON(t, base+"/api.xro/2.0/Invoices", auth, tenantID, map[string]any{
+		"Invoices": []map[string]any{{
+			"InvoiceNumber": "MULTI-001",
+			"Status":        "AUTHORISED",
+			"LineItems": []map[string]any{
+				{"Description": "Consulting", "UnitAmount": "100.00", "Quantity": 2, "DiscountRate": "10"},
+				{"Description": "Licence", "UnitAmount": "49.99", "Quantity": 3},
+				{"Description": "Support", "UnitAmount": "250.00", "Quantity": 1, "DiscountRate": "20", "TaxAmount": "15.00"},
+			},
+		}},
+	})
+	if status != 200 {
+		t.Fatalf("create multi-line invoice -> %d, want 200; body %s", status, body)
+	}
+	var created map[string]any
+	json.Unmarshal([]byte(body), &created)
+	inv0 := created["Invoices"].([]any)[0].(map[string]any)
+	invoiceID := inv0["InvoiceID"].(string)
+	for field, want := range map[string]string{
+		"SubTotal":      "529.97",
+		"TotalTax":      "15.00",
+		"Total":         "544.97",
+		"TotalDiscount": "70.00",
+		"AmountDue":     "544.97",
+		"AmountPaid":    "0.00",
+	} {
+		if got := inv0[field]; got != want {
+			t.Fatalf("multi-line invoice %s = %v, want %s", field, got, want)
+		}
+	}
+	lines := inv0["LineItems"].([]any)
+	wantLineAmounts := []string{"180.00", "149.97", "200.00"}
+	for i, want := range wantLineAmounts {
+		if got := lines[i].(map[string]any)["LineAmount"]; got != want {
+			t.Fatalf("line %d LineAmount = %v, want %s", i, got, want)
+		}
+	}
+
+	// ===== sequential partial payments decrement the balance =====
+	body, status = xeroPostJSON(t, base+"/api.xro/2.0/Invoices/"+invoiceID+"/Payments", auth, tenantID,
+		map[string]any{"Amount": "100.00"})
+	if status != 200 {
+		t.Fatalf("1st partial payment -> %d, want 200; body %s", status, body)
+	}
+
+	getInvoice := func() map[string]any {
+		b, s := xeroGet(t, base+"/api.xro/2.0/Invoices/"+invoiceID, auth, tenantID)
+		if s != 200 {
+			t.Fatalf("get invoice -> %d; body %s", s, b)
+		}
+		var resp map[string]any
+		json.Unmarshal([]byte(b), &resp)
+		return resp["Invoices"].([]any)[0].(map[string]any)
+	}
+
+	inv := getInvoice()
+	if inv["AmountDue"] != "444.97" || inv["AmountPaid"] != "100.00" || inv["Status"] != "AUTHORISED" {
+		t.Fatalf("after 1st payment invoice = %v, want due 444.97 / paid 100.00 / AUTHORISED", inv)
+	}
+
+	// 2nd payment (over-pay attempt rejected first): 445.00 > 444.97 due.
+	body, status = xeroPostJSON(t, base+"/api.xro/2.0/Invoices/"+invoiceID+"/Payments", auth, tenantID,
+		map[string]any{"Amount": "445.00"})
+	if status != 400 {
+		t.Fatalf("over-payment -> %d, want 400; body %s", status, body)
+	}
+	errResp, msg := xeroValidationMessage(t, body)
+	if errResp["ErrorNumber"] != "ValidationError" || errResp["Type"] != "BadRequest" {
+		t.Fatalf("over-payment error = %v, want ValidationError/BadRequest", errResp)
+	}
+	if msg != "PaymentAmount exceeds the amount outstanding on this document" {
+		t.Fatalf("over-payment message = %q, want the real Xero validation message", msg)
+	}
+
+	// The rejected payment left the balance untouched.
+	inv = getInvoice()
+	if inv["AmountDue"] != "444.97" || inv["AmountPaid"] != "100.00" {
+		t.Fatalf("after rejected over-payment invoice = %v, want due 444.97 / paid 100.00", inv)
+	}
+
+	// 2nd payment clears the remainder exactly.
+	body, status = xeroPostJSON(t, base+"/api.xro/2.0/Invoices/"+invoiceID+"/Payments", auth, tenantID,
+		map[string]any{"Amount": "444.97"})
+	if status != 200 {
+		t.Fatalf("2nd payment -> %d, want 200; body %s", status, body)
+	}
+	inv = getInvoice()
+	if inv["AmountDue"] != "0.00" || inv["AmountPaid"] != "544.97" || inv["Status"] != "PAID" {
+		t.Fatalf("after 2nd payment invoice = %v, want due 0.00 / paid 544.97 / PAID", inv)
+	}
+
+	// A 3rd payment on the zero balance is rejected (never negative). The
+	// invoice is now PAID — no longer an AUTHORISED document — so Xero's
+	// status validation fires.
+	body, status = xeroPostJSON(t, base+"/api.xro/2.0/Invoices/"+invoiceID+"/Payments", auth, tenantID,
+		map[string]any{"Amount": "0.01"})
+	if status != 400 {
+		t.Fatalf("payment on paid invoice -> %d, want 400; body %s", status, body)
+	}
+	if _, msg = xeroValidationMessage(t, body); msg != "Payments can only be made against AUTHORISED documents" {
+		t.Fatalf("paid-invoice payment message = %q", msg)
+	}
+	inv = getInvoice()
+	if inv["AmountDue"] != "0.00" {
+		t.Fatalf("AmountDue after rejected 3rd payment = %v, want 0.00 (never negative)", inv["AmountDue"])
+	}
+
+	// ===== partial-payment ledger on a round invoice =====
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Invoices", auth, tenantID, map[string]any{
+		"Invoices": []map[string]any{{
+			"InvoiceNumber": "PART-001",
+			"Status":        "AUTHORISED",
+			"LineItems":     []map[string]any{{"Description": "Deposit work", "UnitAmount": "150.00", "Quantity": 2}},
+		}},
+	})
+	if status != 200 {
+		t.Fatalf("create part invoice -> %d; body %s", status, body)
+	}
+	var partCreated map[string]any
+	json.Unmarshal([]byte(body), &partCreated)
+	partID := partCreated["Invoices"].([]any)[0].(map[string]any)["InvoiceID"].(string)
+
+	for i, tc := range []struct {
+		pay, wantDue, wantPaid, wantStatus string
+		wantHTTP                           int
+	}{
+		{"100.00", "200.00", "100.00", "AUTHORISED", 200},
+		{"150.00", "50.00", "250.00", "AUTHORISED", 200},
+		{"51.00", "50.00", "250.00", "AUTHORISED", 400}, // over-pay
+		{"50.00", "0.00", "300.00", "PAID", 200},
+	} {
+		body, status = xeroPostJSON(t, base+"/api.xro/2.0/Invoices/"+partID+"/Payments", auth, tenantID,
+			map[string]any{"Amount": tc.pay})
+		if status != tc.wantHTTP {
+			t.Fatalf("payment %d (%s) -> %d, want %d; body %s", i, tc.pay, status, tc.wantHTTP, body)
+		}
+		if tc.wantHTTP != 200 {
+			continue
+		}
+		var pmt map[string]any
+		json.Unmarshal([]byte(body), &pmt)
+		p := pmt["Payments"].([]any)[0].(map[string]any)
+		if p["Amount"] != tc.pay || p["Status"] != "AUTHORISED" {
+			t.Fatalf("payment %d echo = %v", i, p)
+		}
+		var resp map[string]any
+		b, _ := xeroGet(t, base+"/api.xro/2.0/Invoices/"+partID, auth, tenantID)
+		json.Unmarshal([]byte(b), &resp)
+		inv = resp["Invoices"].([]any)[0].(map[string]any)
+		if inv["AmountDue"] != tc.wantDue || inv["AmountPaid"] != tc.wantPaid || inv["Status"] != tc.wantStatus {
+			t.Fatalf("payment %d invoice = due %v paid %v status %v, want %s/%s/%s",
+				i, inv["AmountDue"], inv["AmountPaid"], inv["Status"], tc.wantDue, tc.wantPaid, tc.wantStatus)
+		}
+	}
+
+	// ===== non-AUTHORISED invoices are not payable =====
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Invoices", auth, tenantID, map[string]any{
+		"Invoices": []map[string]any{{
+			"InvoiceNumber": "DRFT-001",
+			"Status":        "DRAFT",
+			"LineItems":     []map[string]any{{"Description": "Draft work", "UnitAmount": "80.00", "Quantity": 1}},
+		}},
+	})
+	if status != 200 {
+		t.Fatalf("create draft invoice -> %d; body %s", status, body)
+	}
+	var draftCreated map[string]any
+	json.Unmarshal([]byte(body), &draftCreated)
+	draftID := draftCreated["Invoices"].([]any)[0].(map[string]any)["InvoiceID"].(string)
+	body, status = xeroPostJSON(t, base+"/api.xro/2.0/Invoices/"+draftID+"/Payments", auth, tenantID,
+		map[string]any{"Amount": "80.00"})
+	if status != 400 {
+		t.Fatalf("pay DRAFT invoice -> %d, want 400; body %s", status, body)
+	}
+	errResp, msg = xeroValidationMessage(t, body)
+	if errResp["ErrorNumber"] != "ValidationError" {
+		t.Fatalf("draft payment error = %v, want ValidationError", errResp)
+	}
+	if msg != "Payments can only be made against AUTHORISED documents" {
+		t.Fatalf("draft payment message = %q", msg)
+	}
+
+	// ===== payment against an unknown invoice is the 404 envelope =====
+	body, status = xeroPostJSON(t, base+"/api.xro/2.0/Invoices/no-such-invoice/Payments", auth, tenantID,
+		map[string]any{"Amount": "10.00"})
+	if status != 404 {
+		t.Fatalf("pay unknown invoice -> %d, want 404; body %s", status, body)
+	}
+	var notFound map[string]any
+	json.Unmarshal([]byte(body), &notFound)
+	if notFound["Type"] != "NotFound" {
+		t.Fatalf("pay unknown invoice envelope = %v, want Type NotFound", notFound)
+	}
+}
+
+// TestXeroStyleContactUpsert proves PUT /Contacts is a true upsert and that
+// Xero's contact-name uniqueness rule is enforced with the real validation
+// error:
+//
+//   - a ContactID match UPDATES the existing record in place — the
+//     ContactID is stable across updates (no duplicate insert);
+//   - a ContactNumber match updates the same record the same way;
+//   - creating (or renaming to) a Name held by another ACTIVE contact is a
+//     400 ValidationErrors envelope quoting Xero's message; archived
+//     contacts release their name;
+//   - unknown ids stay the 404 envelope.
+func TestXeroStyleContactUpsert(t *testing.T) {
+	adapterDir := filepath.Join("..", "..", "adapters", "xero-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"xero": {Adapter: absAdapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["xero"]
+
+	const tenantID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+	const auth = "Bearer xero-token"
+
+	countContacts := func(name string) int {
+		b, s := xeroGet(t, base+"/api.xro/2.0/Contacts?where="+url.QueryEscape(`ContactStatus=="ACTIVE"`), auth, tenantID)
+		if s != 200 {
+			t.Fatalf("list contacts -> %d; body %s", s, b)
+		}
+		var resp map[string]any
+		json.Unmarshal([]byte(b), &resp)
+		n := 0
+		for _, ct := range resp["Contacts"].([]any) {
+			if ct.(map[string]any)["Name"] == name {
+				n++
+			}
+		}
+		return n
+	}
+
+	// ===== create =====
+	body, status := xeroPutJSON(t, base+"/api.xro/2.0/Contacts", auth, tenantID, map[string]any{
+		"Contacts": []map[string]any{{"Name": "Widgit Co", "EmailAddress": "hello@widgit.example"}},
+	})
+	if status != 200 {
+		t.Fatalf("create contact -> %d, want 200; body %s", status, body)
+	}
+	var ctResp map[string]any
+	json.Unmarshal([]byte(body), &ctResp)
+	widgit := ctResp["Contacts"].([]any)[0].(map[string]any)
+	widgitID := widgit["ContactID"].(string)
+
+	// ===== update via ContactID: same id, merged fields, no duplicate =====
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Contacts", auth, tenantID, map[string]any{
+		"Contacts": []map[string]any{{"ContactID": widgitID, "EmailAddress": "billing@widgit.example"}},
+	})
+	if status != 200 {
+		t.Fatalf("update contact by ContactID -> %d, want 200; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &ctResp)
+	upd := ctResp["Contacts"].([]any)[0].(map[string]any)
+	if upd["ContactID"] != widgitID {
+		t.Fatalf("update changed ContactID: %v -> %v (id must be stable)", widgitID, upd["ContactID"])
+	}
+	if upd["EmailAddress"] != "billing@widgit.example" {
+		t.Fatalf("update EmailAddress = %v", upd["EmailAddress"])
+	}
+	if upd["Name"] != "Widgit Co" {
+		t.Fatalf("update dropped Name (merge must preserve unspecified fields): %v", upd["Name"])
+	}
+	if upd["ContactStatus"] != "ACTIVE" {
+		t.Fatalf("update dropped ContactStatus: %v", upd["ContactStatus"])
+	}
+	if n := countContacts("Widgit Co"); n != 1 {
+		t.Fatalf("after ContactID update there are %d Widgit Co contacts, want 1 (no duplicate insert)", n)
+	}
+
+	// ===== update via ContactNumber: same record =====
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Contacts", auth, tenantID, map[string]any{
+		"Contacts": []map[string]any{{"Name": "Supplier One", "ContactNumber": "SUP-77"}},
+	})
+	if status != 200 {
+		t.Fatalf("create supplier -> %d, want 200; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &ctResp)
+	supplier := ctResp["Contacts"].([]any)[0].(map[string]any)
+	supplierID := supplier["ContactID"].(string)
+
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Contacts", auth, tenantID, map[string]any{
+		"Contacts": []map[string]any{{"ContactNumber": "SUP-77", "Name": "Supplier One Ltd"}},
+	})
+	if status != 200 {
+		t.Fatalf("update contact by ContactNumber -> %d, want 200; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &ctResp)
+	upd = ctResp["Contacts"].([]any)[0].(map[string]any)
+	if upd["ContactID"] != supplierID {
+		t.Fatalf("ContactNumber update addressed %v, want the original record %v", upd["ContactID"], supplierID)
+	}
+	if upd["Name"] != "Supplier One Ltd" {
+		t.Fatalf("ContactNumber update Name = %v", upd["Name"])
+	}
+
+	// ===== duplicate Name on create: Xero's real validation error =====
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Contacts", auth, tenantID, map[string]any{
+		"Contacts": []map[string]any{{"Name": "Widgit Co"}},
+	})
+	if status != 400 {
+		t.Fatalf("duplicate-name create -> %d, want 400; body %s", status, body)
+	}
+	errResp, msg := xeroValidationMessage(t, body)
+	if errResp["ErrorNumber"] != "ValidationError" || errResp["Type"] != "BadRequest" {
+		t.Fatalf("duplicate-name error = %v, want ValidationError/BadRequest", errResp)
+	}
+	wantMsg := "The contact name Widgit Co is already assigned to another contact. The contact name must be unique across all active contacts."
+	if msg != wantMsg {
+		t.Fatalf("duplicate-name message = %q, want the real Xero validation message", msg)
+	}
+	if n := countContacts("Widgit Co"); n != 1 {
+		t.Fatalf("after rejected duplicate create there are %d Widgit Co contacts, want 1", n)
+	}
+
+	// Renaming to a taken name is the same error, via the single-contact PUT.
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Contacts/"+supplierID, auth, tenantID,
+		map[string]any{"Name": "Widgit Co"})
+	if status != 400 {
+		t.Fatalf("rename to taken name -> %d, want 400; body %s", status, body)
+	}
+	if _, msg = xeroValidationMessage(t, body); msg != wantMsg {
+		t.Fatalf("rename-to-taken message = %q", msg)
+	}
+
+	// ===== archiving releases the name (uniqueness is over ACTIVE contacts) =====
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Contacts/"+widgitID, auth, tenantID,
+		map[string]any{"ContactStatus": "ARCHIVED"})
+	if status != 200 {
+		t.Fatalf("archive contact -> %d, want 200; body %s", status, body)
+	}
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Contacts", auth, tenantID, map[string]any{
+		"Contacts": []map[string]any{{"Name": "Widgit Co"}},
+	})
+	if status != 200 {
+		t.Fatalf("create with an archived contact's name -> %d, want 200; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &ctResp)
+	if ctResp["Contacts"].([]any)[0].(map[string]any)["ContactID"] == widgitID {
+		t.Fatalf("name-reuse must create a NEW contact, not reuse the archived ContactID")
+	}
+}

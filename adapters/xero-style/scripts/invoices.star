@@ -1,7 +1,8 @@
 # Invoices handlers — list, create, get, payment, void.
 #
 # Requires Bearer + xero-tenant-id.
-# STATEFUL invoices stored in the "invoices" collection.
+# STATEFUL invoices stored in the "invoices" collection, payments in the
+# "payments" collection.
 #
 # GET    /api.xro/2.0/Invoices           → { Id, Status, Invoices: [...] }
 # PUT    /api.xro/2.0/Invoices           → { Id, Status, Invoices: [...] }
@@ -69,7 +70,34 @@ def _apply_invoice_filters(req, invoices):
         filt = f
     return query_select(invoices, filt, order[0], order[1], None, None, None)
 
-# on_put_invoices creates invoices.
+# _compute_invoice_amounts sums EVERY line item — not just the first — into
+# the real API's invoice totals. Per line: net = UnitAmount × Quantity less
+# DiscountRate% (a LineAmount-only line is taken as-is), tax = TaxAmount.
+# Returns the line items with each computed LineAmount echoed back, plus the
+# SubTotal / TotalTax / TotalDiscount cent subtotals.
+def _compute_invoice_amounts(line_items):
+    out_lines = []
+    sub = 0
+    tax = 0
+    disc = 0
+    for li in line_items:
+        if li == None:
+            li = {}
+        net = _line_net_cents(li)
+        line = {}
+        for k in li:
+            line[k] = li[k]
+        line["LineAmount"] = _fmt_cents(net)
+        out_lines.append(line)
+        sub = sub + net
+        tax = tax + _line_tax_cents(li)
+        disc = disc + _line_discount_cents(li, net)
+    return out_lines, sub, tax, disc
+
+# on_put_invoices creates invoices. Totals are derived from all line items:
+# SubTotal = Σ line nets, TotalTax = Σ per-line TaxAmount, Total = SubTotal +
+# TotalTax, TotalDiscount = Σ per-line discount portions, and the initial
+# AmountDue (outstanding balance) equals Total.
 def on_put_invoices(req):
     err = _require_auth(req)
     if err != None:
@@ -94,11 +122,7 @@ def on_put_invoices(req):
         if line_items == None:
             line_items = []
 
-        # Compute total from line items.
-        total = "0.00"
-        if len(line_items) > 0:
-            li0 = line_items[0]
-            total = li0.get("LineAmount", "100.00")
+        line_items, sub, tax, disc = _compute_invoice_amounts(line_items)
 
         doc = {
             "InvoiceID": invoice_id,
@@ -109,9 +133,13 @@ def on_put_invoices(req):
             "Date": inv_in.get("Date", _now_dt()),
             "DueDate": inv_in.get("DueDate", _plus_days_dt(_DEFAULT_TERMS_DAYS)),
             "LineItems": line_items,
-            "Total": total,
-            "AmountDue": total,
+            "SubTotal": _fmt_cents(sub),
+            "TotalTax": _fmt_cents(tax),
+            "Total": _fmt_cents(sub + tax),
+            "TotalDiscount": _fmt_cents(disc),
+            "AmountDue": _fmt_cents(sub + tax),
             "AmountPaid": "0.00",
+            "UpdatedDateUTC": _now_dt(),
         }
         c.insert(doc)
         result.append(_invoice_public(doc))
@@ -173,7 +201,18 @@ def on_delete_invoice(req):
 
     return _xero_err(404, "NotFound", "NotFound", "The invoice was not found")
 
-# on_post_payment records a payment against an invoice.
+# _PAYABLE_STATUSES are the invoice states the real API accepts payments
+# against (a bill moves DRAFT → SUBMITTED → AUTHORISED before payment).
+_PAYABLE_STATUSES = ["AUTHORISED", "SUBMITTED"]
+
+# on_post_payment records a payment against an invoice. Payments ACCUMULATE:
+# each application grows AmountPaid and shrinks AmountDue (the outstanding
+# balance) on the stored invoice, so 2nd/3rd partial payments decrement the
+# balance correctly and the balance can never go negative — an over-payment
+# is rejected with the real API's validation error. The invoice flips to
+# PAID exactly when the balance reaches zero; payments are only accepted
+# against AUTHORISED/SUBMITTED invoices; each payment is persisted in the
+# "payments" collection before the response is returned.
 def on_post_payment(req):
     err = _require_auth(req)
     if err != None:
@@ -190,26 +229,48 @@ def on_post_payment(req):
     if body == None:
         body = {}
 
-    amount = body.get("Amount", "0.00")
-    payment_id = _payment_id()
+    amount_c = _amt_cents(body.get("Amount", "0.00"))
 
-    # Find the invoice and update amounts.
     c = store_collection("invoices")
-    docs = c.list()
-    for doc in docs:
-        if doc.get("InvoiceID", "") == invoice_id:
-            paid = amount
-            doc["AmountPaid"] = paid
-            doc["AmountDue"] = "0.00"
+    for doc in c.list():
+        if doc.get("InvoiceID", "") != invoice_id:
+            continue
+
+        status = doc.get("Status", "DRAFT")
+        payable = False
+        for s in _PAYABLE_STATUSES:
+            if s == status:
+                payable = True
+        if not payable:
+            return _validation_err("Payments can only be made against AUTHORISED documents")
+
+        due_c = _amt_cents(doc.get("AmountDue", "0.00"))
+        paid_c = _amt_cents(doc.get("AmountPaid", "0.00"))
+        # Over-payment (and a refund larger than what was paid) is rejected;
+        # the balance arithmetic below therefore never goes negative.
+        if amount_c > due_c or (amount_c < 0 and -amount_c > paid_c):
+            return _validation_err("PaymentAmount exceeds the amount outstanding on this document")
+
+        new_due = due_c - amount_c
+        doc["AmountPaid"] = _fmt_cents(paid_c + amount_c)
+        doc["AmountDue"] = _fmt_cents(new_due)
+        if new_due == 0:
             doc["Status"] = "PAID"
-            c.update(doc.get("id", doc.get("InvoiceID", "")), doc)
-            break
+        doc["UpdatedDateUTC"] = _now_dt()
+        c.update(doc.get("id", invoice_id), doc)
 
-    payment = {
-        "PaymentID": payment_id,
-        "Invoice": {"InvoiceID": invoice_id},
-        "Amount": amount,
-        "Date": body.get("Date", _now_dt()),
-    }
+        payment = {
+            "PaymentID": _payment_id(),
+            "Invoice": {
+                "InvoiceID": invoice_id,
+                "InvoiceNumber": doc.get("InvoiceNumber", ""),
+            },
+            "Account": body.get("Account", {}),
+            "Amount": _fmt_cents(amount_c),
+            "Date": body.get("Date", _now_dt()),
+            "Status": "AUTHORISED",
+        }
+        store_collection("payments").insert(payment)
+        return _envelope("Payments", [_payment_public(payment)])
 
-    return _envelope("Payments", [payment])
+    return _xero_err(404, "NotFound", "NotFound", "The invoice was not found")

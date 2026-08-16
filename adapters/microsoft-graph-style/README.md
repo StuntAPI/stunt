@@ -20,13 +20,23 @@ real API data is included.
   `DELETE /v1.0/subscriptions/{id}` (204) — with change notifications on
   supported resources (see [Webhooks](#webhooks)).
 - **Users:** `GET /v1.0/users` (OData list), `GET /v1.0/users/{id}`.
-- **Outlook mail:** `GET /v1.0/me/messages`, `GET /v1.0/me/messages/{id}`,
-  `DELETE /v1.0/me/messages/{id}` (204), `POST /v1.0/me/sendMail`
-  (202, STATEFUL), `GET /v1.0/me/mailFolders`.
+- **Outlook mail:** `GET /v1.0/me/messages`, `POST /v1.0/me/messages`
+  (create a draft, 201, STATEFUL), `GET /v1.0/me/messages/{id}`,
+  `PATCH /v1.0/me/messages/{id}` (partial update of isRead/flag/subject/
+  body/categories/importance, STATEFUL), `DELETE /v1.0/me/messages/{id}`
+  (204), `POST /v1.0/me/messages/{id}/send` (send a draft, 202, STATEFUL),
+  `POST /v1.0/me/sendMail` (202, STATEFUL), `GET /v1.0/me/mailFolders`,
+  `GET /v1.0/me/mailFolders/{id}/messages` (folder-scoped list; well-known
+  folder ids `inbox`/`sentitems`/`drafts`/`junkemail`, unknown id → 404).
 - **Calendar:** `GET /v1.0/me/events`, `POST /v1.0/me/events` (STATEFUL),
-  `PATCH /v1.0/me/events/{id}` (partial update of subject/start/end/
-  attendees/location/body/isOnlineMeeting), `DELETE /v1.0/me/events/{id}`
-  (204).
+  `GET /v1.0/me/events/{id}`, `PATCH /v1.0/me/events/{id}` (partial update
+  of subject/start/end/attendees/location/body/isOnlineMeeting),
+  `DELETE /v1.0/me/events/{id}` (204), `POST /v1.0/me/events/{id}/accept`,
+  `/decline`, `/tentativelyAccept` (202, records the response on the
+  event's `responseStatus`), and `GET /v1.0/me/calendarView` (alias
+  `/v1.0/me/calendar/calendarView`) with the required
+  `startDateTime`/`endDateTime` window — events overlapping the window are
+  returned and the window is preserved on `@odata.nextLink`.
 - **OneDrive (read):** `GET /v1.0/me/drive` (incl. quota),
   `GET /v1.0/me/drive/root/children`, `GET /v1.0/me/drive/items/{id}/children`
   (listing is per-parent), `GET /v1.0/me/drive/items/{id}` (single item),
@@ -65,15 +75,27 @@ real API data is included.
   `POST /v1.0/chats/{id}/messages` (STATEFUL),
   `DELETE /v1.0/chats/{id}/messages/{messageId}` (204).
 - **Excel:** `GET /v1.0/me/drive/items/{id}/workbook/worksheets`,
-  `POST /v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/add`.
+  `GET /v1.0/me/drive/items/{id}/workbook/tables/{name}/rows` (OData),
+  `POST .../tables/{name}/rows` (add rows, 201) and the legacy
+  `POST .../tables/{name}/rows/add` (200),
+  `PATCH .../tables/{name}/rows/{index}` / `DELETE .../rows/{index}` (204,
+  rows below shift up), and `GET .../tables/{name}/range` (the stored range:
+  address, dimensions, header + data values). Rows are **persisted** per
+  workbook item + table — adds, updates and deletes are all reflected in the
+  row list and in the range (no workbook sessions are modeled, so every
+  session-less write persists immediately). Each workbook-bearing drive item
+  starts with one table `Table1` (columns Region/Units/Revenue, two data
+  rows); an unknown table or drive item is the usual 404.
 
-Messages, events, chats, and chat messages are **stateful** — data you POST appears in
-subsequent GET responses.
+Messages, events, chats, chat messages, and Excel table rows are **stateful** — data
+you POST appears in subsequent GET responses.
 
 OData query parameters (`$select`, `$filter`, `$top`, `$skip`) are supported on list
-endpoints, with `@odata.nextLink` pagination. Pagination is cursor-based: `$top` sets
-the page size and `$skip` carries the opaque cursor token emitted in `@odata.nextLink`
-(not a numeric offset). `$filter` supports the equality pattern
+endpoints, with `@odata.nextLink` pagination. Paging is **numeric**, like real
+Graph: `$skip` is a plain 0-based offset (so `?$skip=10` returns the tail from
+offset 10 even without `$top`) and `$top` is the page size; `@odata.nextLink`
+carries the next offset forward (`?$top=N&$skip=M`). A non-numeric `$top`/`$skip`
+is a 400 (`invalidRequest`). `$filter` supports the equality pattern
 `field eq 'value'`; `$select` takes a comma-separated field list.
 
 ## Endpoints
@@ -88,12 +110,22 @@ the page size and `$skip` carries the opaque cursor token emitted in `@odata.nex
 | GET | `/v1.0/users` | `users.star#on_list_users` | List users (OData) |
 | GET | `/v1.0/users/{id}` | `users.star#on_get_user` | Get user |
 | GET | `/v1.0/me/mailFolders` | `mail.star#on_list_folders` | Mail folders |
+| GET | `/v1.0/me/mailFolders/{id}/messages` | `mail.star#on_list_folder_messages` | Folder-scoped messages (OData) |
 | GET | `/v1.0/me/messages` | `mail.star#on_list_messages` | List messages (OData) |
+| POST | `/v1.0/me/messages` | `mail.star#on_create_draft_message` | Create draft → 201 |
+| POST | `/v1.0/me/messages/{id}/send` | `mail.star#on_send_draft_message` | Send draft → 202 |
 | GET | `/v1.0/me/messages/{id}` | `mail.star#on_get_message` | Get message |
+| PATCH | `/v1.0/me/messages/{id}` | `mail.star#on_update_message` | Update (isRead/flag/...) |
 | DELETE | `/v1.0/me/messages/{id}` | `mail.star#on_delete_message` | Delete message → 204 |
 | POST | `/v1.0/me/sendMail` | `mail.star#on_send_mail` | Send mail → 202 |
+| GET | `/v1.0/me/calendarView` | `calendar.star#on_calendar_view` | Date-window event listing |
+| GET | `/v1.0/me/calendar/calendarView` | `calendar.star#on_calendar_view` | Date-window listing (calendar nav) |
 | GET | `/v1.0/me/events` | `calendar.star#on_list_events` | List events (OData) |
 | POST | `/v1.0/me/events` | `calendar.star#on_create_event` | Create event |
+| GET | `/v1.0/me/events/{id}` | `calendar.star#on_get_event` | Get event |
+| POST | `/v1.0/me/events/{id}/accept` | `calendar.star#on_accept_event` | Accept → 202 (records response) |
+| POST | `/v1.0/me/events/{id}/decline` | `calendar.star#on_decline_event` | Decline → 202 (records response) |
+| POST | `/v1.0/me/events/{id}/tentativelyAccept` | `calendar.star#on_tentatively_accept_event` | Tentatively accept → 202 |
 | PATCH | `/v1.0/me/events/{id}` | `calendar.star#on_update_event` | Update event (partial) |
 | DELETE | `/v1.0/me/events/{id}` | `calendar.star#on_delete_event` | Delete event → 204 |
 | GET | `/v1.0/me/drive` | `drive.star#on_get_drive` | Drive info (incl. quota) |
@@ -119,17 +151,23 @@ the page size and `$skip` carries the opaque cursor token emitted in `@odata.nex
 | POST | `/v1.0/chats/{id}/messages` | `teams.star#on_send_chat_message` | Send chat msg |
 | DELETE | `/v1.0/chats/{id}/messages/{messageId}` | `teams.star#on_delete_chat_message` | Delete chat msg → 204 |
 | GET | `.../workbook/worksheets` | `excel.star#on_list_worksheets` | Excel worksheets |
-| POST | `.../tables/{name}/rows/add` | `excel.star#on_add_table_row` | Add Excel row |
+| GET | `.../tables/{name}/rows` | `excel.star#on_list_rows` | Table rows (OData) |
+| POST | `.../tables/{name}/rows` | `excel.star#on_create_rows` | Add rows → 201 |
+| POST | `.../tables/{name}/rows/add` | `excel.star#on_add_table_row` | Add rows (legacy) → 200 |
+| PATCH | `.../tables/{name}/rows/{index}` | `excel.star#on_update_row` | Update one row |
+| DELETE | `.../tables/{name}/rows/{index}` | `excel.star#on_delete_row` | Delete one row → 204 |
+| GET | `.../tables/{name}/range` | `excel.star#on_get_range` | Table range (stored values) |
 
 ## Backing stores
 
 | Collection | Purpose |
 |------------|---------|
-| `messages` | Outlook mail messages (inbox seed + sent) |
-| `events` | Calendar events |
+| `messages` | Outlook mail messages (inbox seed, drafts, sent) |
+| `events` | Calendar events (with recorded `responseStatus`) |
 | `chats` | Teams chats |
 | `chat_messages` | Teams chat messages (per chat) |
 | `files` | OneDrive files/folders (with `parentId` for per-parent listing) |
+| `tables` | Excel workbook tables (per drive item + table: columns and persisted rows) |
 | `recyclebin` | Recycle-bin rows for deleted driveItems (internal keys `_deleted_at`/`_root_id`; not exposed via the API) |
 | `sessions` | OneDrive resumable upload sessions (next offset, total, conflict behavior; 48h TTL) |
 | `subscriptions` | Webhook subscriptions (notificationUrl, resource, changeType, clientState) |
@@ -155,8 +193,10 @@ Authorization: Bearer <token>
 ```
 
 **Supported notification resources:** `me/events` (calendar events:
-`created`/`updated`/`deleted` on POST/PATCH/DELETE), `me/messages` (mail:
-`created` on `POST /me/sendMail`), and `chats/{chatId}/messages` (Teams chat
+`created`/`updated`/`deleted` on POST/PATCH/DELETE, plus `updated` when an
+invitation is accepted/declined/tentatively accepted), `me/messages` (mail:
+`created` on `POST /me/sendMail` and draft creation, `updated` on PATCH and
+on the draft send action), and `chats/{chatId}/messages` (Teams chat
 messages: `created` on `POST /chats/{id}/messages`). A leading `/` on the
 resource is normalized away when matching.
 
@@ -192,6 +232,17 @@ delivered to the notification URL so receivers can exercise their echo path.
 notifications; the documented verification is the `clientState` you set at
 subscription creation, echoed verbatim in every notification. Drop any
 notification whose `clientState` does not match your expected secret.
+
+## Errors
+
+Errors use Graph's envelope (`{"error": {"code", "message"}}`) with the
+codes the real planes return: the drive/workbook plane uses the camelCase
+codes (`itemNotFound`, `invalidRequest`, `nameAlreadyExists`), the Outlook
+plane the Exchange-style ones (`ErrorItemNotFound` for a missing
+message/event, `ErrorFolderNotFound` for an unknown mail folder,
+`ErrorInvalidOperation` for sending a message that is not a draft,
+`ErrorInvalidParameter` for a calendarView without its required window),
+plus `invalidRequest` for malformed `$top`/`$skip`.
 
 ## Auth
 

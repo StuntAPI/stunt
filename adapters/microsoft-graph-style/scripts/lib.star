@@ -75,10 +75,15 @@ def _ok(context, value):
     })
 
 # _odata_link builds an @odata.nextLink URL for OData pagination. It carries
-# both $top (so the next page keeps the same page size) and $skip (the opaque
-# cursor token returned by the engine paginate() builtin).
-def _odata_link(base_url, top, skip_token):
-    return base_url + "?$top=" + str(top) + "&$skip=" + skip_token
+# both $top (so the next page keeps the same page size) and $skip (the plain
+# numeric offset of the next page — Graph's documented OData semantics).
+# extra, when non-empty, is appended as additional query parameters (e.g.
+# calendarView's startDateTime/endDateTime window).
+def _odata_link(base_url, top, skip_token, extra = ""):
+    link = base_url + "?$top=" + str(top) + "&$skip=" + skip_token
+    if extra != "":
+        link = link + "&" + extra
+    return link
 
 # _to_int parses a decimal string to int. Returns 0 for None, empty string,
 # or any non-numeric input (never crashes on None).
@@ -196,22 +201,44 @@ def _find_substr(s, needle):
             return i
     return -1
 
-# _list_page applies engine pagination to a (pre-filtered) list of entities
-# using the OData $top (page size) and $skip (cursor) query parameters. It
-# delegates the slicing to the pure paginate() builtin. Returns (page,
-# next_cursor) where next_cursor is the opaque token to emit in
-# @odata.nextLink, or "" when there are no more pages.
+# _page_params parses the OData $top/$skip query values. In Graph both are
+# plain non-negative decimal integers ($skip is a 0-based offset, NOT an
+# opaque cursor); anything else is a 400 back to the client. Returns
+# (top, skip, ok); an absent parameter defaults to 0.
+def _page_params(query):
+    top_s = query.get("$top", "")
+    skip_s = query.get("$skip", "")
+    if top_s != None and top_s != "" and not _is_digits(top_s):
+        return 0, 0, False
+    if skip_s != None and skip_s != "" and not _is_digits(skip_s):
+        return 0, 0, False
+    return _to_int(top_s), _to_int(skip_s), True
+
+# _list_page applies OData numeric paging to a (pre-filtered) list of
+# entities: $skip is a plain 0-based offset and $top the page size, so
+# ?$skip=10 returns the tail from offset 10 even without $top. Returns
+# (page, next_skip, ok): next_skip is the numeric offset of the next page
+# ("" when none remains) and ok is False when $top/$skip are malformed.
 def _list_page(entities, query):
-    top = _to_int(query.get("$top", ""))
-    skip = query.get("$skip", "")
-    page, next_cursor = paginate(entities, top, skip)
-    return page, next_cursor
+    top, skip, ok = _page_params(query)
+    if not ok:
+        return [], "", False
+    total = len(entities)
+    if skip > total:
+        skip = total
+    if top > 0:
+        page, next_cursor = paginate(entities, top, str(skip))
+        if next_cursor == None:
+            next_cursor = ""
+        return page, next_cursor, True
+    return entities[skip:], "", True
 
 # _apply_odata applies $select, $filter, $top, and $skip query parameters
 # to a list of entities and returns an OData response envelope dict.
-# base_url is used for the @odata.nextLink. $filter runs BEFORE paging;
-# paging is handled by the engine paginate() builtin via _list_page.
-def _apply_odata(entities, query, base_url):
+# base_url is used for the @odata.nextLink; extra carries any additional
+# query parameters the nextLink must preserve (e.g. a calendarView window).
+# $filter runs BEFORE paging; paging is numeric (see _list_page).
+def _apply_odata(entities, query, base_url, extra = ""):
     # $filter (apply before paging).
     filter_expr = query.get("$filter", "")
     entities = _filter_list(entities, filter_expr)
@@ -219,9 +246,11 @@ def _apply_odata(entities, query, base_url):
     # $select projection fields.
     select_fields = _split_commas(query.get("$select", ""))
 
-    # Pagination: $top = page size, $skip = opaque cursor token.
+    # Pagination: $top = page size, $skip = plain numeric offset.
     top = _to_int(query.get("$top", ""))
-    page, next_cursor = _list_page(entities, query)
+    page, next_cursor, ok = _list_page(entities, query)
+    if not ok:
+        return _err("invalidRequest", 400, "$top and $skip must be non-negative integers.")
 
     # Project selected fields.
     value = []
@@ -233,7 +262,7 @@ def _apply_odata(entities, query, base_url):
         "value": value,
     }
     if next_cursor != None and next_cursor != "":
-        envelope["@odata.nextLink"] = _odata_link(base_url, top, next_cursor)
+        envelope["@odata.nextLink"] = _odata_link(base_url, top, next_cursor, extra)
     return respond(200, envelope)
 
 # --- Change notifications (webhook subscriptions) -------------------------
@@ -301,6 +330,50 @@ def _notify_subscriptions(change_type, resource, odata_type, resource_id):
 # --- OneDrive driveItem helpers (shared by drive.star and drive_upload.star) ---
 
 _DRIVE_ID = "b!mock-drive-id-0001"
+
+# _seed_files inserts the default OneDrive root children once (three items:
+# a Word doc, an Excel workbook, and a Reports folder). Excel workbook
+# handlers call it too, so a workbook table can be resolved against a real
+# drive item.
+def _seed_files():
+    fc = store_collection("files")
+    docs = fc.list()
+    if len(docs) > 0:
+        return
+    seed_files = [
+        {
+            "id": "file-000001-doc",
+            "name": "Project Plan.docx",
+            "file": {"mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+            "folder": None,
+            "size": 24576,
+            "parentId": "root",
+            "createdDateTime": "2024-03-01T10:00:00Z",
+            "lastModifiedDateTime": "2024-06-10T15:30:00Z",
+        },
+        {
+            "id": "file-000002-xls",
+            "name": "Budget.xlsx",
+            "file": {"mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+            "folder": None,
+            "size": 53248,
+            "parentId": "root",
+            "createdDateTime": "2024-02-15T09:00:00Z",
+            "lastModifiedDateTime": "2024-06-12T11:00:00Z",
+        },
+        {
+            "id": "folder-000001-reports",
+            "name": "Reports",
+            "file": None,
+            "folder": {"childCount": 5},
+            "size": 0,
+            "parentId": "root",
+            "createdDateTime": "2024-01-20T08:00:00Z",
+            "lastModifiedDateTime": "2024-06-14T16:00:00Z",
+        },
+    ]
+    for f in seed_files:
+        fc.insert(f)
 
 # _is_digits reports whether s is a non-empty run of ASCII digits.
 def _is_digits(s):

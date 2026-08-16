@@ -1,13 +1,19 @@
 # Microsoft Graph v1.0 — Outlook mail handlers.
 #
-# GET  /v1.0/me/mailFolders       → mail folders
-# GET  /v1.0/me/messages          → list messages (OData)
-# GET  /v1.0/me/messages/{id}     → get a single message
-# POST /v1.0/me/sendMail          → send a message (202, STATEFUL)
+# GET   /v1.0/me/mailFolders               → mail folders
+# GET   /v1.0/me/mailFolders/{id}/messages → folder-scoped message list (OData)
+# GET   /v1.0/me/messages                  → list messages (OData)
+# POST  /v1.0/me/messages                  → create a draft (201, STATEFUL)
+# GET   /v1.0/me/messages/{id}             → get a single message
+# PATCH /v1.0/me/messages/{id}             → update (isRead, flag, ...) (STATEFUL)
+# DELETE /v1.0/me/messages/{id}            → delete a message (204)
+# POST  /v1.0/me/messages/{id}/send        → send a draft (202, STATEFUL)
+# POST  /v1.0/me/sendMail                  → send a message (202, STATEFUL)
 #
-# Messages are STATEFUL: a message sent via POST /sendMail appears in the
-# GET /me/messages list (in the Sent Items folder), enabling send/list
-# round-trip testing.
+# Messages are STATEFUL: drafts created via POST /me/messages appear in the
+# Drafts folder, sending one (sendMail or the draft send action) moves it to
+# Sent Items, and PATCHes (isRead / flag) persist — enabling full
+# create → flag/mark-read → send → list round-trip testing.
 
 # on_list_folders returns the default mail folders.
 # GET /v1.0/me/mailFolders (Bearer)
@@ -34,10 +40,12 @@ def on_list_folders(req):
         if count > 0:
             f["totalItemCount"] = count
 
-    # Pagination: $top = page size, $skip = opaque cursor token.
+    # Pagination: $top = page size, $skip = plain numeric offset.
     base_url = "https://graph.microsoft.com/v1.0/me/mailFolders"
     top = _to_int(req["query"].get("$top", ""))
-    page, next_cursor = _list_page(folders, req["query"])
+    page, next_cursor, ok = _list_page(folders, req["query"])
+    if not ok:
+        return _err("invalidRequest", 400, "$top and $skip must be non-negative integers.")
 
     envelope = {
         "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('me')/mailFolders",
@@ -64,6 +72,29 @@ def on_list_messages(req):
     base_url = "https://graph.microsoft.com/v1.0/me/messages"
     return _apply_odata(entities, req["query"], base_url)
 
+# on_list_folder_messages returns the messages of one mail folder.
+# GET /v1.0/me/mailFolders/{id}/messages (Bearer)
+# Well-known folder ids (inbox, sentitems, drafts, junkemail) address the
+# default folders; an unknown folder id is Graph's 404 ErrorFolderNotFound.
+def on_list_folder_messages(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    folder_id = req["params"].get("id", "")
+    if folder_id not in ["inbox", "sentitems", "drafts", "junkemail"]:
+        return _err("ErrorFolderNotFound", 404, "The folder '" + folder_id + "' was not found.")
+
+    _seed_inbox()
+    mc = store_collection("messages")
+    entities = []
+    for m in mc.list():
+        if m.get("folder", "") == folder_id:
+            entities.append(_message_entity(m))
+
+    base_url = "https://graph.microsoft.com/v1.0/me/mailFolders/" + folder_id + "/messages"
+    return _apply_odata(entities, req["query"], base_url)
+
 # on_get_message returns a single message by id.
 # GET /v1.0/me/messages/{id} (Bearer)
 def on_get_message(req):
@@ -75,7 +106,37 @@ def on_get_message(req):
     mc = store_collection("messages")
     doc = mc.get(msg_id)
     if doc == None:
-        return _err("MessageNotFound", 404, "Message '" + msg_id + "' not found.")
+        return _err("ErrorItemNotFound", 404, "The specified object was not found in the store.")
+
+    entity = _message_entity(doc)
+    entity["@odata.context"] = "https://graph.microsoft.com/v1.0/$metadata#users('me')/messages/$entity"
+    return respond(200, entity)
+
+# on_update_message partially updates a message — the client-visible use is
+# isRead toggling and followup flags, but subject/body/categories/importance
+# patch too, like real Graph PATCH /me/messages/{id}.
+# PATCH /v1.0/me/messages/{id} (Bearer) → 200 with the updated message
+def on_update_message(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    msg_id = req["params"].get("id", "")
+    mc = store_collection("messages")
+    doc = mc.get(msg_id)
+    if doc == None:
+        return _err("ErrorItemNotFound", 404, "The specified object was not found in the store.")
+
+    body = req["body"]
+    if body == None:
+        body = {}
+    for k in ["isRead", "flag", "subject", "body", "categories", "importance"]:
+        if body.get(k) != None:
+            doc[k] = body[k]
+    mc.update(msg_id, doc)
+
+    # Notify subscriptions on me/messages (fire-and-forget).
+    _notify_subscriptions("updated", "me/messages", "#Microsoft.Graph.Message", msg_id)
 
     entity = _message_entity(doc)
     entity["@odata.context"] = "https://graph.microsoft.com/v1.0/$metadata#users('me')/messages/$entity"
@@ -92,10 +153,59 @@ def on_delete_message(req):
     mc = store_collection("messages")
     doc = mc.get(msg_id)
     if doc == None:
-        return _err("MessageNotFound", 404, "Message '" + msg_id + "' not found.")
+        return _err("ErrorItemNotFound", 404, "The specified object was not found in the store.")
 
     mc.delete(msg_id)
     return respond(204)
+
+# on_create_draft_message creates a draft message in the Drafts folder
+# (isDraft: true, folder: "drafts"). Real Graph returns the draft with
+# receivedDateTime null and sentDateTime null.
+# POST /v1.0/me/messages (Bearer) → 201 with the draft message
+def on_create_draft_message(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    doc = _draft_from_body(req["body"])
+    mc = store_collection("messages")
+    mc.insert(doc)
+
+    # Notify subscriptions on me/messages (fire-and-forget).
+    _notify_subscriptions("created", "me/messages", "#Microsoft.Graph.Message", doc["id"])
+
+    entity = _message_entity(doc)
+    entity["@odata.context"] = "https://graph.microsoft.com/v1.0/$metadata#users('me')/messages/$entity"
+    return respond(201, entity)
+
+# on_send_draft_message sends an existing draft (POST /me/messages/{id}/send):
+# the message leaves Drafts, lands in Sent Items with isDraft false and a
+# sentDateTime stamp. Sending a non-draft is Graph's 400; an unknown id 404s.
+# POST /v1.0/me/messages/{id}/send (Bearer) → 202 Accepted, no body
+def on_send_draft_message(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    msg_id = req["params"].get("id", "")
+    mc = store_collection("messages")
+    doc = mc.get(msg_id)
+    if doc == None:
+        return _err("ErrorItemNotFound", 404, "The specified object was not found in the store.")
+
+    if doc.get("isDraft", False) != True:
+        return _err("ErrorInvalidOperation", 400, "Only draft messages can be sent.")
+
+    doc["isDraft"] = False
+    doc["folder"] = "sentitems"
+    doc["sentDateTime"] = clock.now_rfc3339()
+    mc.update(msg_id, doc)
+
+    # Notify subscriptions on me/messages (fire-and-forget).
+    _notify_subscriptions("updated", "me/messages", "#Microsoft.Graph.Message", msg_id)
+
+    # Graph's send action returns 202 Accepted with no body.
+    return respond(202)
 
 # on_send_mail sends a message (creates it in Sent Items).
 # POST /v1.0/me/sendMail (Bearer)
@@ -151,6 +261,32 @@ def on_send_mail(req):
 
 # --- helpers ---
 
+# _draft_from_body builds a Drafts-folder message doc from a POST /me/messages
+# body ({subject, body, toRecipients, ...}). Drafts carry null received/sent
+# timestamps, exactly like real Graph.
+def _draft_from_body(body):
+    if body == None:
+        body = {}
+    body_obj = body.get("body", {})
+    content = body_obj.get("content", "")
+    if content == None:
+        content = ""
+    seq = store_kv_incr("graph", "message_seq")
+    return {
+        "id": "AAMkAG" + _pad6(seq) + "-draft",
+        "subject": body.get("subject", ""),
+        "body": {"contentType": body_obj.get("contentType", "Text"), "content": content},
+        "from": {"emailAddress": {"address": "alex@mock-tenant.onmicrosoft.com"}},
+        "toRecipients": body.get("toRecipients", []),
+        "receivedDateTime": None,
+        "sentDateTime": None,
+        "isRead": True,
+        "isDraft": True,
+        "flag": {"flagStatus": "notFlagged"},
+        "categories": [],
+        "folder": "drafts",
+    }
+
 def _message_entity(doc):
     to_addrs = []
     for r in doc.get("toRecipients", []):
@@ -167,13 +303,17 @@ def _message_entity(doc):
         "sentDateTime": doc.get("sentDateTime", ""),
         "isRead": doc.get("isRead", True),
         "isDraft": doc.get("isDraft", False),
+        "flag": doc.get("flag", {"flagStatus": "notFlagged"}),
     }
 
 def _seed_inbox():
-    mc = store_collection("messages")
-    docs = mc.list()
-    if len(docs) > 0:
+    # Guard on a KV flag, not on "collection is empty": a client that sends
+    # mail (or creates a draft) before its first list must not suppress the
+    # seeded inbox.
+    if store_kv_get("graph", "inbox_seeded") == "yes":
         return
+    store_kv_set("graph", "inbox_seeded", "yes")
+    mc = store_collection("messages")
     seed_msgs = [
         {
             "id": "AAMkAG000001-inbox",

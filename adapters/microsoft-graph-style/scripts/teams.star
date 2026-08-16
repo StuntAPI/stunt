@@ -165,10 +165,12 @@ def _chat_message_entity(doc):
     }
 
 def _seed_chats():
-    cc = store_collection("chats")
-    docs = cc.list()
-    if len(docs) > 0:
+    # Guard on a KV flag, not on "collection is empty": creating a chat
+    # before the first list must not suppress the seeded chats.
+    if store_kv_get("graph", "chats_seeded") == "yes":
         return
+    store_kv_set("graph", "chats_seeded", "yes")
+    cc = store_collection("chats")
     seed_chats = [
         {
             "id": "19:mock-chat-000001@thread.v2",

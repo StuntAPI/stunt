@@ -101,6 +101,15 @@ def _xero_err_elements(status, type_, error_number, message, elements):
         "Elements": elements,
     })
 
+# _validation_err returns Xero's 400 validation envelope with the real
+# per-element ValidationErrors message carried in Elements:
+# { ErrorNumber:"ValidationError", Type:"BadRequest", Message:"A validation
+#   exception has occurred.", Elements:[{ValidationErrors:[{Message}]}] }
+def _validation_err(message):
+    return _xero_err_elements(400, "BadRequest", "ValidationError", "A validation exception has occurred.", [
+        {"ValidationErrors": [{"Message": message}]},
+    ])
+
 # _contact_id generates a Xero ContactID (GUID-style).
 def _contact_id():
     n = store_kv_incr("xero", "contact_seq")
@@ -234,6 +243,7 @@ def _ensure_accounts():
 def _contact_public(doc):
     return {
         "ContactID": doc.get("ContactID", ""),
+        "ContactNumber": doc.get("ContactNumber", ""),
         "ContactStatus": doc.get("ContactStatus", "ACTIVE"),
         "Name": doc.get("Name", ""),
         "EmailAddress": doc.get("EmailAddress", ""),
@@ -241,7 +251,11 @@ def _contact_public(doc):
         "IsCustomer": doc.get("IsCustomer", True),
     }
 
-# _invoice_public returns the Xero-shaped invoice object.
+# _invoice_public returns the Xero-shaped invoice object. Amounts are the
+# 2-decimal strings the real API returns: SubTotal (net of every line item),
+# TotalTax (sum of per-line tax), Total (SubTotal + TotalTax), TotalDiscount
+# (sum of per-line discount portions), and the payment-derived AmountDue
+# (the outstanding balance) / AmountPaid pair.
 def _invoice_public(doc):
     return {
         "InvoiceID": doc.get("InvoiceID", ""),
@@ -252,7 +266,10 @@ def _invoice_public(doc):
         "Date": doc.get("Date", _now_dt()),
         "DueDate": doc.get("DueDate", _plus_days_dt(_DEFAULT_TERMS_DAYS)),
         "LineItems": doc.get("LineItems", []),
+        "SubTotal": doc.get("SubTotal", "0.00"),
+        "TotalTax": doc.get("TotalTax", "0.00"),
         "Total": doc.get("Total", "0.00"),
+        "TotalDiscount": doc.get("TotalDiscount", "0.00"),
         "AmountDue": doc.get("AmountDue", "0.00"),
         "AmountPaid": doc.get("AmountPaid", "0.00"),
     }
@@ -262,9 +279,100 @@ def _payment_public(doc):
     return {
         "PaymentID": doc.get("PaymentID", ""),
         "Invoice": doc.get("Invoice", {}),
+        "Account": doc.get("Account", {}),
         "Amount": doc.get("Amount", "0.00"),
         "Date": doc.get("Date", _now_dt()),
+        "Status": doc.get("Status", "AUTHORISED"),
     }
+
+# ====================================================================
+# Money math — Xero returns amounts as 2-decimal strings; arithmetic runs
+# on integer cents so partial payments and multi-line totals balance.
+# ====================================================================
+
+# _amt_float parses a Xero numeric (int, float, or decimal string like "10",
+# "10.5", "10.00") into a float. Returns default for None or malformed input.
+def _amt_float(v, default):
+    if v == None:
+        return default
+    if type(v) == type(0):
+        return float(v)
+    if type(v) == type(1.0):
+        return v
+    s = str(v)
+    if len(s) == 0:
+        return default
+    dots = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch == ".":
+            dots = dots + 1
+            if dots > 1:
+                return default
+        elif ch == "+" or ch == "-":
+            if i != 0 or len(s) == 1:
+                return default
+        elif ch < "0" or ch > "9":
+            return default
+    return float(s)
+
+# _round_cents rounds a float amount (already in cents) to an integer,
+# half away from zero (Starlark has no round()).
+def _round_cents(val):
+    if val >= 0:
+        return int(val + 0.5)
+    return -int(-val + 0.5)
+
+# _amt_cents parses a Xero amount into integer cents ("10.00" → 1000).
+# Missing or malformed input becomes 0.
+def _amt_cents(v):
+    f = _amt_float(v, 0.0)
+    return _round_cents(f * 100.0)
+
+# _fmt_cents renders integer cents as a Xero amount string ("544" → "5.44").
+def _fmt_cents(c):
+    neg = c < 0
+    if neg:
+        c = -c
+    whole = c // 100
+    frac = c % 100
+    fs = str(frac)
+    if frac < 10:
+        fs = "0" + fs
+    out = str(whole) + "." + fs
+    if neg:
+        out = "-" + out
+    return out
+
+# _PCT_BP is 100% expressed in basis points (hundredths of a percent).
+_PCT_BP = 100 * 100
+
+# _line_net_cents returns one line item's net amount in cents. Like the real
+# API, Xero computes LineAmount = UnitAmount × Quantity less DiscountRate% —
+# so when UnitAmount is present the components win; a line carrying only
+# LineAmount is taken as-is (its discount is already applied).
+def _line_net_cents(li):
+    if "UnitAmount" not in li:
+        return _amt_cents(li.get("LineAmount", "0.00"))
+    unit = _amt_cents(li.get("UnitAmount", "0.00"))
+    qty = _amt_float(li.get("Quantity", 1), 1.0)
+    rate = _amt_float(li.get("DiscountRate", 0), 0.0)
+    return _round_cents(unit * qty * (_PCT_BP - rate * 100.0) / _PCT_BP)
+
+# _line_discount_cents returns the discount portion of one line item in
+# cents (the difference between the undiscounted and net amounts).
+def _line_discount_cents(li, net_cents):
+    if "UnitAmount" not in li:
+        return 0
+    unit = _amt_cents(li.get("UnitAmount", "0.00"))
+    qty = _amt_float(li.get("Quantity", 1), 1.0)
+    gross = _round_cents(unit * qty)
+    return gross - net_cents
+
+# _line_tax_cents returns one line item's tax in cents: the explicit
+# TaxAmount when supplied (no tax-rate registry is simulated).
+def _line_tax_cents(li):
+    return _amt_cents(li.get("TaxAmount", "0.00"))
 
 # ====================================================================
 # List query params (Xero `where` / `order`)

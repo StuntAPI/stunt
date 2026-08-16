@@ -232,42 +232,5 @@ def _children_entities(parent_id):
             entities.append(_drive_item(d))
     return entities
 
-def _seed_files():
-    fc = store_collection("files")
-    docs = fc.list()
-    if len(docs) > 0:
-        return
-    seed_files = [
-        {
-            "id": "file-000001-doc",
-            "name": "Project Plan.docx",
-            "file": {"mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
-            "folder": None,
-            "size": 24576,
-            "parentId": "root",
-            "createdDateTime": "2024-03-01T10:00:00Z",
-            "lastModifiedDateTime": "2024-06-10T15:30:00Z",
-        },
-        {
-            "id": "file-000002-xls",
-            "name": "Budget.xlsx",
-            "file": {"mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
-            "folder": None,
-            "size": 53248,
-            "parentId": "root",
-            "createdDateTime": "2024-02-15T09:00:00Z",
-            "lastModifiedDateTime": "2024-06-12T11:00:00Z",
-        },
-        {
-            "id": "folder-000001-reports",
-            "name": "Reports",
-            "file": None,
-            "folder": {"childCount": 5},
-            "size": 0,
-            "parentId": "root",
-            "createdDateTime": "2024-01-20T08:00:00Z",
-            "lastModifiedDateTime": "2024-06-14T16:00:00Z",
-        },
-    ]
-    for f in seed_files:
-        fc.insert(f)
+# _seed_files (the default OneDrive root children) moved to lib.star: the
+# Excel workbook handlers resolve tables against drive items too.

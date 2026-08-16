@@ -256,3 +256,83 @@ def on_delete(req):
     doc["DeletedDate"] = _now()
     col.update(record_id, doc)
     return respond(204)
+
+# on_upsert implements external-ID upsert:
+#   PATCH /sobjects/{type}/{extIdField}/{extIdValue}
+# No match -> insert (the external ID field is stamped from the URL); exactly
+# one match -> update; multiple matches -> 300 Multiple Choices carrying the
+# matching records, exactly as the real API resolves the ambiguity. Both the
+# insert and update paths return 201 with {id, success, errors, created}.
+def on_upsert(req):
+    _, err = _require_token(req)
+    if err != None:
+        return err
+
+    obj_type = _obj_type_from_path(req)
+    col = _collection(obj_type)
+    if col == None:
+        return _sf_error(404, "The requested resource does not exist", "NOT_FOUND")
+
+    params = req["params"]
+    ext_field = params.get("extIdField", "")
+    ext_value = params.get("extIdValue", "")
+    if ext_field == "" or ext_value == "":
+        return _sf_error(400, "Missing external ID field or value", "INVALID_FIELD")
+
+    body = _get_body(req)
+
+    # Recycle-bin rows are invisible to upsert matching, like /query.
+    matches = []
+    for d in col.list():
+        if d.get("IsDeleted", False) == True:
+            continue
+        if _to_cmp_str(_soql_field(d, ext_field)) == ext_value:
+            matches.append(d)
+
+    if len(matches) > 1:
+        recs = [_project(d, [], obj_type) for d in matches]
+        return respond(300, recs)
+
+    if len(matches) == 1:
+        doc = matches[0]
+        merged = {}
+        for k, v in doc.items():
+            merged[k] = v
+        for k, v in body.items():
+            if k != "attributes":
+                merged[k] = v
+        merged["Id"] = doc["Id"]
+        merged["id"] = doc["Id"]
+        merged["LastModifiedDate"] = _now()
+        col.update(doc["Id"], merged)
+        return respond(201, {
+            "id": doc["Id"],
+            "success": True,
+            "errors": [],
+            "created": False,
+        })
+
+    # No match -> insert. Same required-field rule as plain create.
+    if body.get("Name", "") == "":
+        return _sf_error(400, "Required field missing: [Name]", "REQUIRED_FIELD_MISSING")
+
+    record_id = _next_id(obj_type)
+    doc = {}
+    for k, v in body.items():
+        if k != "attributes":
+            doc[k] = v
+    doc[ext_field] = ext_value
+    doc["Id"] = record_id
+    doc["id"] = record_id
+    now = _now()
+    doc["CreatedDate"] = now
+    doc["LastModifiedDate"] = now
+    doc["IsDeleted"] = False
+    col.insert(doc)
+
+    return respond(201, {
+        "id": record_id,
+        "success": True,
+        "errors": [],
+        "created": True,
+    })

@@ -91,14 +91,14 @@ Behavior:
 |--------|-------|-------------|
 | GET | `/connections` | List tenants |
 | GET | `/api.xro/2.0/Contacts` | List contacts (archived contacts included, `ContactStatus:"ARCHIVED"`) |
-| PUT | `/api.xro/2.0/Contacts` | Create contacts |
+| PUT | `/api.xro/2.0/Contacts` | Upsert contacts (ContactID/ContactNumber match updates, otherwise create) |
 | GET | `/api.xro/2.0/Contacts/{id}` | Get contact (404 envelope if not found) |
 | PUT | `/api.xro/2.0/Contacts/{id}` | Update / archive / reactivate contact (`ContactStatus:"ARCHIVED"` or `"ACTIVE"`) |
 | GET | `/api.xro/2.0/Invoices` | List invoices |
-| PUT | `/api.xro/2.0/Invoices` | Create invoices |
+| PUT | `/api.xro/2.0/Invoices` | Create invoices (totals computed from every line item) |
 | GET | `/api.xro/2.0/Invoices/{id}` | Get invoice (404 envelope if not found) |
 | DELETE | `/api.xro/2.0/Invoices/{id}` | VOID invoice → `204 No Content` (kept with `Status:"VOIDED"`, `AmountDue` 0.00) |
-| POST | `/api.xro/2.0/Invoices/{id}/Payments` | Record payment (marks the invoice `PAID`, `AmountDue` 0.00) |
+| POST | `/api.xro/2.0/Invoices/{id}/Payments` | Record payment (partial payments accumulate; over-payment → 400) |
 | GET | `/api.xro/2.0/Accounts` | Chart of accounts |
 | GET | `/api.xro/2.0/BankTransactions` | Bank transactions |
 | GET | `/api.xro/2.0/Items` | Inventory items |
@@ -126,6 +126,76 @@ soft-delete states:
   contacts; filter with `where=ContactStatus=="ARCHIVED"`), and is
   reactivatable with `"ACTIVE"`. An invalid `ContactStatus` → `400`
   `ValidationError`; unknown id → `404` envelope.
+
+## Invoice totals
+
+`PUT /Invoices` computes the invoice's money the way the real API does —
+summing **every** line item, not just the first. Per line:
+
+- net `LineAmount` = `UnitAmount` × `Quantity` less `DiscountRate`% (a line
+  carrying only a `LineAmount` is taken as-is; `Quantity` defaults to 1);
+- tax = the line's `TaxAmount` (no tax-rate registry is simulated).
+
+The computed `LineAmount` is echoed back on each line, and the invoice
+exposes:
+
+| Field | Meaning |
+|-------|---------|
+| `SubTotal` | Σ line nets (excludes tax) |
+| `TotalTax` | Σ per-line `TaxAmount` |
+| `Total` | `SubTotal` + `TotalTax` |
+| `TotalDiscount` | Σ per-line discount portions |
+| `AmountDue` | outstanding balance — starts at `Total` |
+| `AmountPaid` | Σ payments applied so far |
+
+Example — `100.00 × 2 @ 10% off` (180.00) + `49.99 × 3` (149.97) +
+`250.00 × 1 @ 20% off, 15.00 tax` (200.00) → `SubTotal` 529.97,
+`TotalTax` 15.00, `Total` 544.97, `TotalDiscount` 70.00.
+
+## Payments
+
+`POST /Invoices/{id}/Payments` maintains a real running ledger on the
+stored invoice:
+
+- Payments **accumulate**: each application grows `AmountPaid` and shrinks
+  `AmountDue` (the outstanding balance), so 2nd/3rd partial payments
+  decrement the balance correctly; the balance never goes negative.
+- The invoice flips to `PAID` exactly when the balance reaches `0.00`
+  (a partial payment leaves it `AUTHORISED`).
+- Over-payment (amount > `AmountDue`) → `400` with the real Xero
+  validation error, carried in `Elements`:
+
+  ```json
+  {
+    "ErrorNumber": "ValidationError",
+    "Type": "BadRequest",
+    "Message": "A validation exception has occurred.",
+    "Elements": [{ "ValidationErrors": [{
+      "Message": "PaymentAmount exceeds the amount outstanding on this document"
+    }]}]
+  }
+  ```
+
+- Payments are only accepted against `AUTHORISED` (or `SUBMITTED`) invoices;
+  paying a `DRAFT`/`PAID`/`VOIDED` one → `400` with
+  `"Payments can only be made against AUTHORISED documents"`.
+- Every payment is persisted (payments collection) and echoed with
+  `PaymentID`, `Amount`, `Date` and `Status:"AUTHORISED"`; an unknown
+  invoice id → the `404` envelope.
+
+## Contacts upsert
+
+`PUT /Contacts` is a true upsert, like the real API:
+
+- A contact whose `ContactID` or `ContactNumber` matches an existing one
+  **updates** that record in place — the `ContactID` is stable across
+  updates (no duplicate insert) and unspecified fields keep their stored
+  values.
+- A contact that identifies nothing existing is **created**.
+- Creating — or renaming to — a `Name` held by another **active** contact →
+  `400` with Xero's real validation message:
+  `"The contact name <Name> is already assigned to another contact. The contact name must be unique across all active contacts."`
+  (archiving a contact releases its name for reuse).
 
 ## Filtering and sorting
 
@@ -174,10 +244,29 @@ current instant.
   "Status": "OK",
   "Contacts": [{
     "ContactID": "...",
+    "ContactNumber": "",
+    "ContactStatus": "ACTIVE",
     "Name": "Acme Corp",
     "EmailAddress": "acme@example.com",
     "IsSupplier": false,
     "IsCustomer": true
+  }]
+}
+
+// Invoices carry the computed totals as 2-decimal strings
+{
+  "Invoices": [{
+    "InvoiceID": "...",
+    "InvoiceNumber": "INV-000001",
+    "Type": "ACCREC",
+    "Status": "AUTHORISED",
+    "LineItems": [{ "UnitAmount": "100.00", "Quantity": 2, "DiscountRate": "10", "LineAmount": "180.00" }],
+    "SubTotal": "180.00",
+    "TotalTax": "0.00",
+    "Total": "180.00",
+    "TotalDiscount": "20.00",
+    "AmountDue": "180.00",
+    "AmountPaid": "0.00"
   }]
 }
 
