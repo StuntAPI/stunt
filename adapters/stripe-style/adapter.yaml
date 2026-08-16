@@ -6,13 +6,16 @@
 # synthetic. See DISCLAIMER.
 id: stripe-style
 name: "Stripe-style API simulator (unofficial)"
-version: "0.1.0"
+version: "0.3.0"
 
 api:
   name: "Stripe API"
   version: "2025-01-27.acacia"
 
 # Endpoints — each maps a route + method to a Starlark handler.
+# Route matching is first-match-wins in file order, so literal routes
+# (e.g. /v1/invoices/upcoming) are always listed BEFORE parameterized
+# ones (e.g. /v1/invoices/{id}) that would otherwise shadow them.
 endpoints:
   # --- Tokens ---
   # With a card body: creates a Stripe-style card token (tok_*) whose stored
@@ -30,6 +33,44 @@ endpoints:
   - route: /v1/events/{id}
     method: GET
     handler: scripts/events.star#on_retrieve_event
+
+  # --- Test Clocks (deterministic time; ONE global clock — see
+  #     scripts/test_clocks.star). Short routes + Stripe's real
+  #     /v1/test_helpers/test_clocks routes hit the same handlers. ---
+  - route: /v1/test_clocks
+    method: POST
+    handler: scripts/test_clocks.star#on_create_test_clock
+  - route: /v1/test_clocks
+    method: GET
+    handler: scripts/test_clocks.star#on_list_test_clocks
+  - route: /v1/test_clocks/{id}/advance
+    method: POST
+    handler: scripts/test_clocks.star#on_advance_test_clock
+    concurrency_key: id
+  - route: /v1/test_clocks/{id}
+    method: GET
+    handler: scripts/test_clocks.star#on_retrieve_test_clock
+  - route: /v1/test_clocks/{id}
+    method: DELETE
+    handler: scripts/test_clocks.star#on_delete_test_clock
+    concurrency_key: id
+  - route: /v1/test_helpers/test_clocks
+    method: POST
+    handler: scripts/test_clocks.star#on_create_test_clock
+  - route: /v1/test_helpers/test_clocks
+    method: GET
+    handler: scripts/test_clocks.star#on_list_test_clocks
+  - route: /v1/test_helpers/test_clocks/{id}/advance
+    method: POST
+    handler: scripts/test_clocks.star#on_advance_test_clock
+    concurrency_key: id
+  - route: /v1/test_helpers/test_clocks/{id}
+    method: GET
+    handler: scripts/test_clocks.star#on_retrieve_test_clock
+  - route: /v1/test_helpers/test_clocks/{id}
+    method: DELETE
+    handler: scripts/test_clocks.star#on_delete_test_clock
+    concurrency_key: id
 
   # --- Charges ---
   - route: /v1/charges
@@ -96,6 +137,10 @@ endpoints:
   - route: /v1/refunds
     method: GET
     handler: scripts/refunds.star#on_list_refunds
+  - route: /v1/refunds/{id}/cancel
+    method: POST
+    handler: scripts/refunds.star#on_cancel_refund
+    concurrency_key: id
 
   # --- Customers ---
   - route: /v1/customers
@@ -115,10 +160,356 @@ endpoints:
     handler: scripts/customers.star#on_delete_customer
     concurrency_key: id # read-then-flag read-modify-write, serialized per customer
 
+  # --- Products ---
+  - route: /v1/products
+    method: POST
+    handler: scripts/products.star#on_create_product
+  - route: /v1/products
+    method: GET
+    handler: scripts/products.star#on_list_products
+  - route: /v1/products/{id}
+    method: GET
+    handler: scripts/products.star#on_retrieve_product
+  - route: /v1/products/{id}
+    method: POST
+    handler: scripts/products.star#on_update_product
+    concurrency_key: id
+  - route: /v1/products/{id}
+    method: DELETE
+    handler: scripts/products.star#on_delete_product
+    concurrency_key: id
+
+  # --- Prices (no delete: archive with active=false) ---
+  - route: /v1/prices
+    method: POST
+    handler: scripts/prices.star#on_create_price
+  - route: /v1/prices
+    method: GET
+    handler: scripts/prices.star#on_list_prices
+  - route: /v1/prices/{id}
+    method: GET
+    handler: scripts/prices.star#on_retrieve_price
+  - route: /v1/prices/{id}
+    method: POST
+    handler: scripts/prices.star#on_update_price
+    concurrency_key: id
+
+  # --- Subscriptions ---
+  - route: /v1/subscriptions
+    method: POST
+    handler: scripts/subscriptions.star#on_create_subscription
+  - route: /v1/subscriptions
+    method: GET
+    handler: scripts/subscriptions.star#on_list_subscriptions
+  - route: /v1/subscriptions/{id}
+    method: GET
+    handler: scripts/subscriptions.star#on_retrieve_subscription
+  - route: /v1/subscriptions/{id}
+    method: POST
+    handler: scripts/subscriptions.star#on_update_subscription
+    concurrency_key: id
+  - route: /v1/subscriptions/{id}/cancel
+    method: POST
+    handler: scripts/subscriptions.star#on_cancel_subscription
+    concurrency_key: id
+
+  # --- Subscription items (+ metered usage records) ---
+  - route: /v1/subscription_items
+    method: GET
+    handler: scripts/subscription_items.star#on_list_subscription_items
+  - route: /v1/subscription_items
+    method: POST
+    handler: scripts/subscription_items.star#on_create_subscription_item
+  - route: /v1/subscription_items/{id}
+    method: POST
+    handler: scripts/subscription_items.star#on_update_subscription_item
+    concurrency_key: id
+  - route: /v1/subscription_items/{id}
+    method: DELETE
+    handler: scripts/subscription_items.star#on_delete_subscription_item
+    concurrency_key: id
+  - route: /v1/subscription_items/{id}/usage_records
+    method: POST
+    handler: scripts/subscription_items.star#on_create_usage_record
+    concurrency_key: id
+  - route: /v1/subscription_items/{id}/usage_records
+    method: GET
+    handler: scripts/subscription_items.star#on_list_usage_records
+
+  # --- Invoices (draft -> open -> paid/void/uncollectible + preview) ---
+  # /v1/invoices/upcoming is literal and listed before /v1/invoices/{id}.
+  - route: /v1/invoices
+    method: POST
+    handler: scripts/invoices.star#on_create_invoice
+  - route: /v1/invoices
+    method: GET
+    handler: scripts/invoices.star#on_list_invoices
+  - route: /v1/invoices/upcoming
+    method: GET
+    handler: scripts/invoices.star#on_upcoming_invoice
+  - route: /v1/invoices/{id}
+    method: GET
+    handler: scripts/invoices.star#on_retrieve_invoice
+  - route: /v1/invoices/{id}
+    method: POST
+    handler: scripts/invoices.star#on_update_invoice
+    concurrency_key: id
+  - route: /v1/invoices/{id}
+    method: DELETE
+    handler: scripts/invoices.star#on_delete_invoice
+    concurrency_key: id
+  - route: /v1/invoices/{id}/finalize
+    method: POST
+    handler: scripts/invoices.star#on_finalize_invoice
+    concurrency_key: id
+  - route: /v1/invoices/{id}/pay
+    method: POST
+    handler: scripts/invoices.star#on_pay_invoice
+    concurrency_key: id
+  - route: /v1/invoices/{id}/send
+    method: POST
+    handler: scripts/invoices.star#on_send_invoice
+    concurrency_key: id
+  - route: /v1/invoices/{id}/void
+    method: POST
+    handler: scripts/invoices.star#on_void_invoice
+    concurrency_key: id
+  - route: /v1/invoices/{id}/mark_uncollectible
+    method: POST
+    handler: scripts/invoices.star#on_mark_uncollectible_invoice
+    concurrency_key: id
+  - route: /v1/invoices/{id}/lines
+    method: GET
+    handler: scripts/invoices.star#on_list_invoice_lines
+
+  # --- Invoice items (pending until the next invoice consumes them) ---
+  - route: /v1/invoice_items
+    method: POST
+    handler: scripts/invoice_items.star#on_create_invoice_item
+  - route: /v1/invoice_items
+    method: GET
+    handler: scripts/invoice_items.star#on_list_invoice_items
+  - route: /v1/invoice_items/{id}
+    method: GET
+    handler: scripts/invoice_items.star#on_retrieve_invoice_item
+  - route: /v1/invoice_items/{id}
+    method: POST
+    handler: scripts/invoice_items.star#on_update_invoice_item
+    concurrency_key: id
+  - route: /v1/invoice_items/{id}
+    method: DELETE
+    handler: scripts/invoice_items.star#on_delete_invoice_item
+    concurrency_key: id
+
+  # --- Credit notes (preview is a literal route, listed first) ---
+  - route: /v1/credit_notes
+    method: POST
+    handler: scripts/credit_notes.star#on_create_credit_note
+  - route: /v1/credit_notes
+    method: GET
+    handler: scripts/credit_notes.star#on_list_credit_notes
+  - route: /v1/credit_notes/preview
+    method: GET
+    handler: scripts/credit_notes.star#on_preview_credit_note
+  - route: /v1/credit_notes/{id}
+    method: GET
+    handler: scripts/credit_notes.star#on_retrieve_credit_note
+  - route: /v1/credit_notes/{id}
+    method: POST
+    handler: scripts/credit_notes.star#on_update_credit_note
+    concurrency_key: id
+  - route: /v1/credit_notes/{id}/void
+    method: POST
+    handler: scripts/credit_notes.star#on_void_credit_note
+    concurrency_key: id
+
+  # --- Coupons ---
+  - route: /v1/coupons
+    method: POST
+    handler: scripts/coupons.star#on_create_coupon
+  - route: /v1/coupons
+    method: GET
+    handler: scripts/coupons.star#on_list_coupons
+  - route: /v1/coupons/{id}
+    method: GET
+    handler: scripts/coupons.star#on_retrieve_coupon
+  - route: /v1/coupons/{id}
+    method: POST
+    handler: scripts/coupons.star#on_update_coupon
+    concurrency_key: id
+  - route: /v1/coupons/{id}
+    method: DELETE
+    handler: scripts/coupons.star#on_delete_coupon
+    concurrency_key: id
+
+  # --- Promotion codes ---
+  - route: /v1/promotion_codes
+    method: POST
+    handler: scripts/promotion_codes.star#on_create_promotion_code
+  - route: /v1/promotion_codes
+    method: GET
+    handler: scripts/promotion_codes.star#on_list_promotion_codes
+  - route: /v1/promotion_codes/{id}
+    method: GET
+    handler: scripts/promotion_codes.star#on_retrieve_promotion_code
+  - route: /v1/promotion_codes/{id}
+    method: POST
+    handler: scripts/promotion_codes.star#on_update_promotion_code
+    concurrency_key: id
+
+  # --- Tax rates ---
+  - route: /v1/tax_rates
+    method: POST
+    handler: scripts/tax_rates.star#on_create_tax_rate
+  - route: /v1/tax_rates
+    method: GET
+    handler: scripts/tax_rates.star#on_list_tax_rates
+  - route: /v1/tax_rates/{id}
+    method: GET
+    handler: scripts/tax_rates.star#on_retrieve_tax_rate
+  - route: /v1/tax_rates/{id}
+    method: POST
+    handler: scripts/tax_rates.star#on_update_tax_rate
+    concurrency_key: id
+  - route: /v1/tax_rates/{id}
+    method: DELETE
+    handler: scripts/tax_rates.star#on_delete_tax_rate
+    concurrency_key: id
+
   # --- Balance ---
   - route: /v1/balance
     method: GET
     handler: scripts/balance.star#on_get_balance
+  - route: /v1/balance_transactions
+    method: GET
+    handler: scripts/balance.star#on_list_balance_transactions
+  - route: /v1/balance_transactions/{id}
+    method: GET
+    handler: scripts/balance.star#on_retrieve_balance_transaction
+
+  # --- Disputes (lib-owned derive-on-read state machine) ---
+  - route: /v1/disputes
+    method: GET
+    handler: scripts/disputes.star#on_list_disputes
+  - route: /v1/disputes/{id}
+    method: GET
+    handler: scripts/disputes.star#on_retrieve_dispute
+  - route: /v1/disputes/{id}
+    method: POST
+    handler: scripts/disputes.star#on_update_dispute
+    concurrency_key: id
+  - route: /v1/disputes/{id}/close
+    method: POST
+    handler: scripts/disputes.star#on_close_dispute
+    concurrency_key: id
+
+  # --- Application fees (served from the lib application_fee hook) ---
+  - route: /v1/application_fees
+    method: GET
+    handler: scripts/application_fees.star#on_list_application_fees
+  - route: /v1/application_fees/{id}
+    method: GET
+    handler: scripts/application_fees.star#on_retrieve_application_fee
+  - route: /v1/application_fees/{id}/refunds
+    method: GET
+    handler: scripts/application_fees.star#on_list_fee_refunds
+  - route: /v1/application_fees/{id}/refunds
+    method: POST
+    handler: scripts/application_fees.star#on_create_fee_refund
+    concurrency_key: id
+  - route: /v1/application_fees/{id}/refund
+    method: POST
+    handler: scripts/application_fees.star#on_refund_application_fee
+    concurrency_key: id
+
+  # --- Checkout Sessions ---
+  - route: /v1/checkout/sessions
+    method: POST
+    handler: scripts/checkout.star#on_create_checkout_session
+  - route: /v1/checkout/sessions
+    method: GET
+    handler: scripts/checkout.star#on_list_checkout_sessions
+  - route: /v1/checkout/sessions/{id}/line_items
+    method: GET
+    handler: scripts/checkout.star#on_list_checkout_session_line_items
+  - route: /v1/checkout/sessions/{id}/expire
+    method: POST
+    handler: scripts/checkout.star#on_expire_checkout_session
+    concurrency_key: id
+  - route: /v1/checkout/sessions/{id}
+    method: GET
+    handler: scripts/checkout.star#on_retrieve_checkout_session
+  # --- Hosted Checkout page stand-in (NO auth: hosted-page semantics) ---
+  - route: /c/pay/{id}
+    method: GET
+    handler: scripts/checkout.star#on_pay_checkout_session
+    concurrency_key: id
+
+  # --- SetupIntents ---
+  - route: /v1/setup_intents
+    method: POST
+    handler: scripts/setup_intents.star#on_create_setup_intent
+  - route: /v1/setup_intents
+    method: GET
+    handler: scripts/setup_intents.star#on_list_setup_intents
+  - route: /v1/setup_intents/{id}/confirm
+    method: POST
+    handler: scripts/setup_intents.star#on_confirm_setup_intent
+    concurrency_key: id
+  - route: /v1/setup_intents/{id}/cancel
+    method: POST
+    handler: scripts/setup_intents.star#on_cancel_setup_intent
+    concurrency_key: id
+  - route: /v1/setup_intents/{id}
+    method: GET
+    handler: scripts/setup_intents.star#on_retrieve_setup_intent
+  - route: /v1/setup_intents/{id}
+    method: POST
+    handler: scripts/setup_intents.star#on_update_setup_intent
+    concurrency_key: id
+
+  # --- Webhook Endpoints (registration gates webhook delivery, lib.star) ---
+  - route: /v1/webhook_endpoints
+    method: POST
+    handler: scripts/webhook_endpoints.star#on_create_webhook_endpoint
+  - route: /v1/webhook_endpoints
+    method: GET
+    handler: scripts/webhook_endpoints.star#on_list_webhook_endpoints
+  - route: /v1/webhook_endpoints/{id}
+    method: GET
+    handler: scripts/webhook_endpoints.star#on_retrieve_webhook_endpoint
+  - route: /v1/webhook_endpoints/{id}
+    method: POST
+    handler: scripts/webhook_endpoints.star#on_update_webhook_endpoint
+    concurrency_key: id
+  - route: /v1/webhook_endpoints/{id}
+    method: DELETE
+    handler: scripts/webhook_endpoints.star#on_delete_webhook_endpoint
+    concurrency_key: id
+
+  # --- Files + File Links ---
+  - route: /v1/files
+    method: POST
+    handler: scripts/files.star#on_create_file
+  - route: /v1/files
+    method: GET
+    handler: scripts/files.star#on_list_files
+  - route: /v1/files/{id}
+    method: GET
+    handler: scripts/files.star#on_retrieve_file
+  - route: /v1/file_links
+    method: POST
+    handler: scripts/files.star#on_create_file_link
+  - route: /v1/file_links
+    method: GET
+    handler: scripts/files.star#on_list_file_links
+  - route: /v1/file_links/{id}
+    method: GET
+    handler: scripts/files.star#on_retrieve_file_link
+  - route: /v1/file_links/{id}
+    method: POST
+    handler: scripts/files.star#on_update_file_link
+    concurrency_key: id
 
   # --- Connect: Accounts ---
   - route: /v1/accounts
@@ -133,6 +524,54 @@ endpoints:
   - route: /v1/accounts
     method: GET
     handler: scripts/accounts.star#on_list_accounts
+
+  # --- Connect: persons ---
+  - route: /v1/accounts/{id}/persons
+    method: POST
+    handler: scripts/persons.star#on_create_person
+    concurrency_key: id
+  - route: /v1/accounts/{id}/persons
+    method: GET
+    handler: scripts/persons.star#on_list_persons
+  - route: /v1/accounts/{id}/persons/{person_id}
+    method: GET
+    handler: scripts/persons.star#on_retrieve_person
+  - route: /v1/accounts/{id}/persons/{person_id}
+    method: POST
+    handler: scripts/persons.star#on_update_person
+    concurrency_key: person_id
+  - route: /v1/accounts/{id}/persons/{person_id}
+    method: DELETE
+    handler: scripts/persons.star#on_delete_person
+    concurrency_key: person_id
+  - route: /v1/persons/{id}
+    method: GET
+    handler: scripts/persons.star#on_retrieve_person_standalone
+  - route: /v1/persons/{id}
+    method: POST
+    handler: scripts/persons.star#on_update_person_standalone
+    concurrency_key: id
+
+  # --- Connect: external accounts ---
+  - route: /v1/accounts/{id}/external_accounts
+    method: POST
+    handler: scripts/accounts.star#on_create_external_account
+    concurrency_key: id
+  - route: /v1/accounts/{id}/external_accounts
+    method: GET
+    handler: scripts/accounts.star#on_list_external_accounts
+  - route: /v1/accounts/{id}/external_accounts/{ea_id}
+    method: GET
+    handler: scripts/accounts.star#on_retrieve_external_account
+  - route: /v1/accounts/{id}/external_accounts/{ea_id}
+    method: DELETE
+    handler: scripts/accounts.star#on_delete_external_account
+    concurrency_key: id
+
+  # --- Connect: login links (Express dashboard) ---
+  - route: /v1/accounts/{id}/login_links
+    method: POST
+    handler: scripts/accounts.star#on_create_login_link
 
   # --- Connect: Account Links (onboarding) ---
   - route: /v1/account_links
@@ -152,6 +591,12 @@ endpoints:
   - route: /v1/transfers/{id}/reversals
     method: POST
     handler: scripts/transfers.star#on_reverse_transfer
+  - route: /v1/transfers/{id}/reversals
+    method: GET
+    handler: scripts/transfers.star#on_list_transfer_reversals
+  - route: /v1/transfers/{id}/reversals/{tr_id}
+    method: GET
+    handler: scripts/transfers.star#on_retrieve_transfer_reversal
 
   # --- Connect: Payouts ---
   - route: /v1/payouts
@@ -160,6 +605,17 @@ endpoints:
   - route: /v1/payouts
     method: GET
     handler: scripts/payouts.star#on_list_payouts
+  - route: /v1/payouts/{id}
+    method: GET
+    handler: scripts/payouts.star#on_retrieve_payout
+  - route: /v1/payouts/{id}
+    method: POST
+    handler: scripts/payouts.star#on_update_payout
+    concurrency_key: id
+  - route: /v1/payouts/{id}/cancel
+    method: POST
+    handler: scripts/payouts.star#on_cancel_payout
+    concurrency_key: id
 
 # Backing stores available to Starlark handlers via store_collection.
 resources:
@@ -185,6 +641,50 @@ resources:
   - name: tokens
     kind: collection
   - name: events
+    kind: collection
+  - name: test_clocks
+    kind: collection
+  - name: balance_transactions
+    kind: collection
+  - name: disputes
+    kind: collection
+  - name: application_fees
+    kind: collection
+  - name: invoices
+    kind: collection
+  - name: products
+    kind: collection
+  - name: prices
+    kind: collection
+  - name: subscriptions
+    kind: collection
+  - name: usage_records
+    kind: collection
+  - name: invoice_items
+    kind: collection
+  - name: credit_notes
+    kind: collection
+  - name: coupons
+    kind: collection
+  - name: promotion_codes
+    kind: collection
+  - name: tax_rates
+    kind: collection
+  - name: checkout_sessions
+    kind: collection
+  - name: setup_intents
+    kind: collection
+  - name: webhook_endpoints
+    kind: collection
+  - name: files
+    kind: collection
+  - name: file_links
+    kind: collection
+  - name: persons
+    kind: collection
+  - name: external_accounts
+    kind: collection
+  - name: transfer_reversals
     kind: collection
 
 # Auth scheme: bearer token validated via identity_validate.

@@ -25,6 +25,7 @@ def _pi_public(doc):
         "capture_method": doc.get("capture_method", "automatic"),
         "confirmation_method": "manual",
         "payment_method": doc.get("payment_method", None),
+        "latest_charge": doc.get("latest_charge", None),
         "customer": doc.get("customer", None),
         "description": doc.get("description", None),
         "last_payment_error": doc.get("last_payment_error", None),
@@ -32,6 +33,37 @@ def _pi_public(doc):
         "metadata": doc.get("metadata", {}),
         "created": doc.get("created", 1700000000),
     }
+
+# _pi_settle_charge mints the captured Charge behind a successful
+# PaymentIntent (real Stripe always creates one), records its balance
+# transaction via the shared settlement hooks (lib.star _charge_settle_hooks:
+# 2.9% + 30c fee, application_fee_amount, dispute test cards), and links the
+# PI through latest_charge. Idempotent: a PI that already has a charge keeps
+# it. The PI and charge docs are persisted before any emission.
+def _pi_settle_charge(doc, body):
+    if doc.get("latest_charge", None) != None:
+        return
+    number = _card_number_for(doc.get("payment_method", None))
+    ch = {
+        "id": _next_id("ch"),
+        "object": "charge",
+        "amount": _num(doc.get("amount", 0)),
+        "currency": doc.get("currency", "usd"),
+        "customer": doc.get("customer", None),
+        "description": doc.get("description", None),
+        "status": "succeeded",
+        "captured": True,
+        "refunded": False,
+        "balance_transaction": None,
+        "dispute": None,
+        "payment_intent": doc["id"],
+        "created": _now(),
+    }
+    store_collection("charges").insert(ch)
+    doc["latest_charge"] = ch["id"]
+    store_collection("payment_intents").update(doc["id"], doc)
+    _signed_emit("charge.created", ch)
+    _charge_settle_hooks(ch, body, number)
 
 # _pi_succeed applies the success transitions for capture_method: automatic ->
 # succeeded (amount_received set), manual -> requires_capture. 3DS is complete,
@@ -147,7 +179,7 @@ def on_create_payment_intent(req):
         "last_payment_error": None,
         "next_action": None,
         "metadata": body.get("metadata", {}),
-        "created": 1700000000,
+        "created": _now(),
     }
 
     # Confirm-at-create runs the same test-card resolution as POST /confirm.
@@ -161,6 +193,10 @@ def on_create_payment_intent(req):
 
     _signed_emit("payment_intent.created", _pi_public(doc))
     if pm != None and confirm:
+        if resp == None:
+            # Succeeded at create: mint the charge + ledger rows first so the
+            # charge/dispute webhooks land before payment_intent.succeeded.
+            _pi_settle_charge(doc, body)
         _pi_emit_status(doc)
     if resp != None and doc.get("status") != "requires_action":
         # Declined at create: the PI exists (requires_payment_method +
@@ -257,6 +293,8 @@ def on_confirm_payment_intent(req):
     if resp == None:
         _pi_succeed(doc)
         c.update(id, doc)
+        if doc.get("status") == "succeeded":
+            _pi_settle_charge(doc, body)
         _pi_emit_status(doc)
         _idempotent_remember(req, "payment_intents", 200, id)
         return respond(200, _pi_public(doc))
@@ -287,10 +325,18 @@ def on_capture_payment_intent(req):
     if doc.get("status") != "requires_capture":
         return respond(400, {"error": {"type": "invalid_request_error", "message": "You can only capture PaymentIntents with status: requires_capture."}})
 
+    body = req["body"]
+    if body == None:
+        body = {}
+
     doc["status"] = "succeeded"
     doc["amount_received"] = doc.get("amount", 0)
     doc["amount_capturable"] = 0
     c.update(id, doc)
+
+    # Funds move at capture: mint the charge + ledger rows (the capture call
+    # may carry application_fee_amount, like real Stripe).
+    _pi_settle_charge(doc, body)
 
     _signed_emit("payment_intent.succeeded", _pi_public(doc))
     _idempotent_remember(req, "payment_intents", 200, id)
