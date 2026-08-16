@@ -6,6 +6,55 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.38.0] — 2026-08-16
+
+### Adapters
+
+- **stripe-style: full API coverage** — 48 → **158 endpoints**, 15 → 32
+  collections. Every core Stripe resource family is now simulated:
+  - **Test Clocks** (`/v1/test_clocks` + the real-path
+    `/v1/test_helpers/test_clocks` aliases): a KV time offset drives every
+    adapter timestamp, so subscription renewals, dispute settlement, payout
+    lifecycles, capability activation and session expiry are deterministic
+    and assertable without sleeps.
+  - **Disputes**: test-card triggered (fraudulent / product_not_received)
+    with the `needs_response → under_review → won/lost` derive-on-read
+    lifecycle, all 27 evidence fields, submit/close, evidence due-by, funds
+    withdrawn and reinstated through the ledger, the full
+    `charge.dispute.*` event set.
+  - **Balance transactions**: a real ledger over every money movement
+    (charge incl. the 2.9%+30¢ processing fee, refund, refund_failure,
+    payout, transfer, transfer_reversal, application_fee(+refund), dispute,
+    dispute_reversal), account-scoped rows, full filter set.
+  - **Billing**: products, prices, subscriptions (clock-driven renewal +
+    auto-charge, `past_due` on decline/no-PM, coupon + tax support),
+    subscription items, usage records (metered), invoices (draft → open →
+    paid/void/uncollectible; finalize/pay/void/send/lines/upcoming),
+    invoice items, credit notes (issuing real refunds), coupons, promotion
+    codes, tax rates (exclusive + inclusive).
+  - **Checkout Sessions**: payment/subscription/setup modes, hosted
+    `/c/pay/{id}` completion page with `{CHECKOUT_SESSION_ID}` redirect
+    substitution, decline injection via `payment_method`, expire, line
+    items. **SetupIntents** with SCA challenge + decline behavior.
+  - **Webhook endpoints**: CRUD + registration-gated delivery per
+    `enabled_events` (events always recorded in `/v1/events`).
+  - **Files + file links**: multipart upload with real purpose enum.
+  - **Connect depth**: persons, capabilities (requested → pending → active),
+    external bank accounts (last4 only, default resolution), application
+    fees (+ partial refunds, both refund routes), login links, transfer
+    partial reversals (`trr_*`, list/retrieve), payout full lifecycle
+    (pending → in_transit → paid) + cancel with funds return.
+  - **Refunds completion**: cancel (pending → canceled with
+    `failure_reason` + `refund_failure` ledger row), charge/payment_intent
+    list filters, `balance_transaction` linkage, uncaptured-charge refunds
+    release the authorization.
+
+### Engine
+
+- Adapter lint: the provider-ID heuristic now requires a digit in the
+  suffix, so real API names (`file_links`) are no longer flagged while
+  actual ids (`ch_1Mio2eLkdIwHu7ix`) still are; regression tests added.
+
 ## [0.37.0] — 2026-08-16
 
 ### Adapters
