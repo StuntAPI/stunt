@@ -6,6 +6,41 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.36.0] — 2026-08-16
+
+### Adapters
+
+- **Real GraphQL execution for 5 adapters** (thegraph, producthunt, shopify,
+  github, braintree — previously substring pattern-matchers): provider-real
+  SDL schemas + resolvers over the same collections the REST surface uses,
+  via the manifest `graphql:` transport. Arguments, variables, aliases,
+  fragments, `@skip/@include`, `__typename`, and introspection all work;
+  unknown fields/operations return real errors. Highlights: graph-node
+  semantics (where-suffix filters, orderBy, BigInt/BigDecimal, joins);
+  Relay connections with per-field payload errors (producthunt); Admin
+  2024-10 with `gid://` translation, query/sortKey, mutations with
+  userErrors and REST-identical signed webhook payloads (shopify); v4
+  conventions with base64 global ids, Actor interface, and issue/comment
+  mutations (github); search criteria + charge/void/refund mutations
+  (braintree).
+- **Final P2 slices.** braze (persisted track events/purchases, export/ids,
+  alias merging, validated campaign triggers), hubspot (`/search`
+  filterGroups with the full operator set, batch breadth, archive + restore),
+  apple-music (library CRUD, ratings, catalog/charts), gsearchconsole
+  (dimension cross-product analytics with aggregation, real URL inspection,
+  sites lifecycle), netsuite (`!transform` chain, +2 record types), chainlink
+  (Functions lifecycle, upkeeps, feed rounds), cognito (refresh grant,
+  ForgotPassword, GlobalSignOut, NEW_PASSWORD_REQUIRED challenge).
+- **Resumable uploads** (S3 multipart uploadId/parts with InvalidPart, Azure
+  Put Block/Put Block List, drive + youtube sessions with keyed
+  `concurrency_key` chunk serialization and 308/Range semantics).
+- **Soft-delete semantics** across stripe (`deleted:true`), qbo
+  (`Active=false`), xero (VOIDED), salesforce (`isDeleted` + `queryAll`),
+  dropbox/graph (trash cascade + restore).
+- Review fixed: producthunt Int-variable coercion + numeric NEWEST ordering,
+  shopify webhook payload parity, keyed upload sessions (chunk-retry
+  corruption), ms-graph frozen timestamps.
+
 ## [Unreleased]
 
 ### Added
