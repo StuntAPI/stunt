@@ -178,9 +178,19 @@ def _coupon_public(doc):
 # _bad_body reports a malformed JSON body authoritatively: undecodable bodies
 # arrive as EMPTY DICTS via req.body, so the raw bytes are the only reliable
 # signal (json_safe_decode returns None on malformed). Empty body = not bad.
+# Form-encoded bodies (real SDK clients POST urlencoded, not JSON) are parsed
+# by the engine into req.body — they are never "bad JSON".
 def _bad_body(req):
     raw = req.get("raw_body", "")
     if raw == None or raw == "":
+        return False
+    h = req.get("headers")
+    ct = ""
+    if h != None:
+        ct = h.get("Content-Type", "")
+        if ct == None:
+            ct = ""
+    if ct.find("x-www-form-urlencoded") >= 0:
         return False
     return json_safe_decode(raw) == None
 
