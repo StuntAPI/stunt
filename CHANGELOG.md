@@ -6,6 +6,27 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.37.0] — 2026-08-16
+
+### Adapters
+
+- **Final P3 slices — the 603-gap sweep is complete.**
+  - microsoft-graph: Excel table rows persist (add/list/patch/delete);
+    mail folder-scoped lists, drafts create/send, isRead/flag updates;
+    calendar single-event GET, accept/decline/tentativelyAccept with
+    recorded responses, calendarView windows; numeric `$skip`.
+  - xero: invoice totals across ALL line items (integer-cent discount
+    factoring, SubTotal/TotalTax/Total/TotalDiscount); partial-payment
+    ledger (PAID exactly at zero, over-payment and non-AUTHORISED
+    rejected with the real validation messages); contacts PUT true upsert
+    with active-name uniqueness.
+  - salesforce: reusable refresh tokens (real model, 2h access expiry
+    enforced), external-ID upsert ({id, success, created}), composite
+    `{ref}` substitution, queryLocator queryMore, SObject Collections
+    bulk DML with allOrNone.
+  - dune: parameterized execution ({{param}} substitution, 400 on
+    missing required), results-by-id JSON + CSV, next_uri pagination.
+
 ## [0.36.0] — 2026-08-16
 
 ### Adapters
