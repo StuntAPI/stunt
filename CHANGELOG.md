@@ -6,6 +6,26 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.41.0] — 2026-08-16
+
+### Engine
+
+- **Bracket-notation form bodies parse into nested dicts/lists** — provider
+  SDKs POST urlencoded bodies in the Rails/PHP bracket shape (stripe-node:
+  `line_items[0][price_data][currency]=usd&…`), which previously arrived as
+  literal flat keys so `body.get("line_items")` was None and every SDK-driven
+  create 400'd. `a[b]=v` → nested dicts, `a[]=v` → list appends,
+  `a[0][b]=v` → indexed lists with same-index merge; malformed bracketing
+  keeps the flat fallback and scalar/structure collisions skip
+  order-independently. Found by dogfooding a real stripe-node client.
+
+### Adapters
+
+- **stripe-style**: form-encoded request bodies are valid input, not bad
+  JSON — the `_bad_body` guard now accepts `application/x-www-form-urlencoded`
+  (the engine parses it into `req.body`); JSON bodies keep the strict
+  malformed-JSON 400.
+
 ## [0.40.0] — 2026-08-16
 
 ### Engine
