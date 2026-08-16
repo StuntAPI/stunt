@@ -674,10 +674,13 @@ var reEmail = regexp.MustCompile(`[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2
 var reUUID = regexp.MustCompile(`(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`)
 
 // reProviderID matches provider-specific prefixed IDs like cus_, ch_, pi_,
-// sub_, txn_, acct_, tok_, etc. followed by 4+ alphanumeric characters.
-// These are characteristic of recorded data from payment/SaaS APIs.
+// sub_, txn_, acct_, tok_, etc. followed by 4+ alphanumeric characters that
+// include at least one digit. These are characteristic of recorded data from
+// payment/SaaS APIs, whose real object IDs always embed a digit (Stripe IDs
+// carry a timestamp component). The digit requirement keeps all-alpha suffixes
+// — legitimate API route/collection names like file_links — from matching.
 var reProviderID = regexp.MustCompile(
-	`\b(?:cus|ch|pi|sub|txn|acct|card|tok|evt|fee|file|ref|req|conn|src|dp|payout|setupi|plan|prod|price|coupon|promo)_[A-Za-z0-9]{4,}`)
+	`\b(?:cus|ch|pi|sub|txn|acct|card|tok|evt|fee|file|ref|req|conn|src|dp|payout|setupi|plan|prod|price|coupon|promo)_(?:[0-9][A-Za-z0-9]{3,}|[A-Za-z][0-9][A-Za-z0-9]{2,}|[A-Za-z]{2}[0-9][A-Za-z0-9]+|[A-Za-z]{3,}[0-9][A-Za-z0-9]*)`)
 
 // reCreditCard matches 13–19 digit sequences with optional separators
 // (spaces or hyphens), characteristic of card numbers.

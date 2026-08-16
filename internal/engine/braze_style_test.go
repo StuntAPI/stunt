@@ -895,8 +895,12 @@ func TestBrazeStyleScheduledLifecycle(t *testing.T) {
 		t.Fatalf("schedule unknown campaign message = %v, want Invalid Campaign ID", resp["message"])
 	}
 
-	// Schedule a real send 1s out.
-	scheduleTime := time.Now().Add(1 * time.Second).UTC().Format(time.RFC3339)
+	// Schedule a real send 2-3s out. RFC3339 truncates sub-seconds, so a bare
+	// now+1s is really 0-1s out — when creation lands late in a second, the
+	// "before send" read below already sees it sent. Rounding up to the next
+	// second boundary keeps the upcoming window comfortably wider than the
+	// two intervening roundtrips.
+	scheduleTime := time.Now().UTC().Add(2 * time.Second).Truncate(time.Second).Add(1 * time.Second).Format(time.RFC3339)
 	body, status = brazePost(t, base+"/messages/schedule/create", token, map[string]any{
 		"campaign_id":       "cmp001",
 		"external_user_ids": []string{"user001"},
@@ -957,13 +961,26 @@ func TestBrazeStyleScheduledLifecycle(t *testing.T) {
 	}
 
 	// After the send time, reads derive scheduled -> sent: the broadcast
-	// leaves the upcoming list and the webhook fires exactly once.
-	time.Sleep(2200 * time.Millisecond)
-	for i := 0; i < 3; i++ {
+	// leaves the upcoming list and the webhook fires exactly once. Poll to
+	// the transition instead of sleeping past a guessed deadline — under CI
+	// load the fixed sleep raced the (2-3s-out) send time.
+	empty := false
+	for i := 0; i < 80; i++ {
 		body, status = brazeGet(t, base+"/messages/scheduled?"+endTime.Encode(), token)
 		if status != 200 {
 			t.Fatalf("scheduled (post-send read %d) -> status %d; body %s", i, status, body)
 		}
+		if err := json.Unmarshal([]byte(body), &resp); err != nil {
+			t.Fatalf("unmarshal scheduled post-send: %v (body %s)", err, body)
+		}
+		if bcs, ok := resp["scheduled_broadcasts"].([]any); ok && len(bcs) == 0 {
+			empty = true
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !empty {
+		t.Fatalf("schedule never derived to sent: %v", resp["scheduled_broadcasts"])
 	}
 	if err := json.Unmarshal([]byte(body), &resp); err != nil {
 		t.Fatalf("unmarshal scheduled post-send: %v (body %s)", err, body)

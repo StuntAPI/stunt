@@ -58,7 +58,7 @@ def _create_card_token(card):
         "object": "token",
         "type": "card",
         "card": card_pub,
-        "created": clock.now_unix(),
+        "created": _now(),
         "livemode": False,
         "used": False,
         "client_ip": None,

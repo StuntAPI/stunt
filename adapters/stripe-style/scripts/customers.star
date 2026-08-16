@@ -40,7 +40,7 @@ def on_retrieve_customer(req):
     c = store_collection("customers")
     doc = c.get(id)
     if doc == None:
-        return respond(404, {"error": {"message": "No such customer: " + id, "type": "invalid_request_error"}})
+        return _not_found("customer", id)
     return respond(200, doc)
 
 # GET /v1/customers — list all customers.
@@ -92,7 +92,7 @@ def on_update_customer(req):
     c = store_collection("customers")
     doc = c.get(id)
     if doc == None or doc.get("deleted", False) == True:
-        return respond(404, {"error": {"message": "No such customer: " + id, "type": "invalid_request_error"}})
+        return _not_found("customer", id)
 
     body = req["body"]
     if body != None:
@@ -116,7 +116,7 @@ def on_delete_customer(req):
     c = store_collection("customers")
     doc = c.get(id)
     if doc == None:
-        return respond(404, {"error": {"message": "No such customer: " + id, "type": "invalid_request_error"}})
+        return _not_found("customer", id)
 
     doc["deleted"] = True
     c.update(id, doc)

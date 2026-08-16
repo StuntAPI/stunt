@@ -97,6 +97,54 @@ func TestProviderIDInFixture(t *testing.T) {
 	}
 }
 
+// --- provider-style ids with a digit anywhere in the suffix are caught ---
+// Real recorded IDs embed a digit at any position; all of these must flag.
+
+func TestProviderIDDigitAnywhere(t *testing.T) {
+	for _, id := range []string{"ch_1Mio2eLkdIwHu7ix", "txn_a1bc", "evt_ab1c", "file_abc1", "tok_abcd1ef"} {
+		dir := scaffold(t)
+		writeFile(t, dir, "fixtures/real.jsonl",
+			`{"id":"`+id+`","amount":5000}`+"\n")
+
+		findings, err := Lint(dir)
+		if err != nil {
+			t.Fatalf("Lint(%s): %v", id, err)
+		}
+		if !hasFinding(findings, "provider") {
+			t.Errorf("expected a provider-id finding for %s, got: %+v", id, findings)
+		}
+	}
+}
+
+// --- all-alpha route/collection names are NOT provider ids ---
+// API surface names like file_links match the prefix but carry no digit;
+// they are legitimate route/collection names, not recorded data.
+
+func TestProviderIDIgnoresAllAlphaNames(t *testing.T) {
+	dir := scaffold(t)
+	writeFile(t, dir, "adapter.yaml",
+		"id: test-api\n"+
+			"name: \"Test API\"\n"+
+			"api:\n"+
+			"  name: \"Test API\"\n"+
+			"  version: \"2025-01-01\"\n"+
+			"endpoints:\n"+
+			"  - route: /v1/file_links\n"+
+			"    method: GET\n"+
+			"    handler: scripts/files.star#on_list_file_links\n"+
+			"resources:\n"+
+			"  - name: file_links\n"+
+			"    kind: collection\n")
+
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatalf("Lint: %v", err)
+	}
+	for _, f := range findings {
+		t.Errorf("unexpected finding: %s:%d [%s] %s", f.File, f.Line, f.Severity, f.Message)
+	}
+}
+
 // --- api_key with real-looking value produces error ---
 
 func TestPIIFieldInFixture(t *testing.T) {

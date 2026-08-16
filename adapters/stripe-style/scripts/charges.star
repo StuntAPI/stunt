@@ -66,7 +66,7 @@ def on_create_charge(req):
                 "status": "failed",
                 "captured": False,
                 "refunded": False,
-                "created": clock.now_unix(),
+                "created": _now(),
             }
             store_collection("charges").insert(doc)
             _signed_emit("charge.failed", doc)
@@ -86,7 +86,9 @@ def on_create_charge(req):
         "status": status,
         "captured": captured,
         "refunded": False,
-        "created": 1700000000,
+        "balance_transaction": None,
+        "dispute": None,
+        "created": _now(),
     }
 
     c = store_collection("charges")
@@ -94,6 +96,14 @@ def on_create_charge(req):
 
     # Emit webhook event (fire-and-forget: errors do not break charge creation).
     _signed_emit("charge.created", doc)
+
+    # Settlement hooks (lib.star): the charge balance transaction (recorded
+    # once funds move — immediately for a captured card charge, at capture
+    # time otherwise), the application-fee record for Connect charges with
+    # application_fee_amount, and the immediate dispute raised by the
+    # documented dispute test cards.
+    if captured:
+        _charge_settle_hooks(doc, body, number)
 
     _idempotent_remember(req, "charges", 201, charge_id)
     return respond(201, doc)
@@ -108,7 +118,7 @@ def on_retrieve_charge(req):
     c = store_collection("charges")
     doc = c.get(id)
     if doc == None:
-        return respond(404, {"error": {"message": "No such charge: " + id, "type": "invalid_request_error"}})
+        return _not_found("charge", id)
     return respond(200, doc)
 
 # GET /v1/charges — list all charges.
@@ -153,7 +163,11 @@ def on_capture_charge(req):
     c = store_collection("charges")
     doc = c.get(id)
     if doc == None:
-        return respond(404, {"error": {"message": "No such charge: " + id, "type": "invalid_request_error"}})
+        return _not_found("charge", id)
+
+    body = req["body"]
+    if body == None:
+        body = {}
 
     doc["status"] = "succeeded"
     doc["captured"] = True
@@ -161,6 +175,11 @@ def on_capture_charge(req):
 
     # Emit webhook event (fire-and-forget).
     _signed_emit("charge.updated", doc)
+
+    # Funds move at capture: record the charge balance transaction now (plus
+    # any application_fee_amount supplied on the capture call, like real
+    # Stripe). The hooks are idempotent for already-settled charges.
+    _charge_settle_hooks(doc, body, "")
 
     return respond(200, doc)
 
@@ -179,7 +198,7 @@ def on_refund_charge(req):
     c = store_collection("charges")
     doc = c.get(id)
     if doc == None:
-        return respond(404, {"error": {"message": "No such charge: " + id, "type": "invalid_request_error"}})
+        return _not_found("charge", id)
 
     body = req["body"]
     if body == None:
