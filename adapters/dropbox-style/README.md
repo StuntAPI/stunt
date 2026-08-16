@@ -31,10 +31,10 @@ create in one request is visible in subsequent requests within the same
 |--------|-------|---------|-------------|
 | POST | `/2/files/upload` | `files.star#on_upload` | Upload a file (JSON `{path, content}`) |
 | POST | `/2/files/download` | `files.star#on_download` | Download file content (`{path}` or `{id}`) |
-| POST | `/2/files/list_folder` | `files.star#on_list_folder` | List entries under a path prefix |
+| POST | `/2/files/list_folder` | `files.star#on_list_folder` | List entries under a path prefix (missing path → `409 path/not_found`; file path → `409 path/not_folder`) |
 | POST | `/2/files/get_metadata` | `files.star#on_get_metadata` | Get entry metadata (`{path}`) |
 | POST | `/2/files/create_folder` | `files.star#on_create_folder` | Create a folder (`{path}`) |
-| POST | `/2/files/delete` | `files.star#on_delete` | Delete entry + content (`{path}`) |
+| POST | `/2/files/delete` | `files.star#on_delete` | Delete entry + content (`{path}`); folders cascade to all descendants |
 | POST | `/2/files/get_temporary_link` | `files.star#on_get_temporary_link` | Synthetic temporary download link |
 | POST | `/2/users/get_current_account` | `users.star#on_get_current_account` | Synthetic account info |
 
@@ -46,6 +46,22 @@ Any unmatched route returns `404 {"error":"resource_not_found"}`.
 `Content-Type: application/octet-stream`. This mirrors the real provider's
 behaviour of streaming binary content in the response body (without a JSON
 envelope). The file metadata is available via `get_metadata`.
+
+### Delete semantics (permanent, cascading)
+
+Real files_v2 delete is **permanent** — there is no restore — and a folder
+delete takes everything beneath it. stunt reproduces both:
+
+- `POST /2/files/delete {path}` removes the entry (metadata + content) from
+  the tree; later `get_metadata` / `download` / `list_folder` no longer see
+  it (`409 path/not_found`).
+- Deleting a **folder cascades**: every nested entry (files and subfolders,
+  at any depth) is removed in the same operation, so no child is ever left
+  dangling under a deleted parent.
+- Removed metadata rows are moved to the internal `trash` collection as
+  tombstones (`_deleted_at`, `_batch_root` = the deleted root's id) — an
+  audit trail proving the cascade deleted exactly the subtree, with no
+  orphaned rows and no restore endpoint (matching the real API).
 
 ### Error format
 
@@ -63,6 +79,7 @@ Errors use a simplified Dropbox-style envelope with HTTP status `409`:
 | Store | Kind | Purpose |
 |-------|------|---------|
 | `entries` | collection | File/folder metadata records |
+| `trash` | collection | Tombstones for deleted entries (internal, not exposed via the API) |
 | `dropbox` | blob | File content (raw bytes) |
 | `dropbox` | kv | Sequence counter for entry IDs |
 

@@ -10,57 +10,78 @@ All data is synthetic — no real API data is included.
 
 ## What it simulates
 
-A faithful behavioral mock of the Product Hunt GraphQL surface, covering the
-launch-publish pipeline that the reference client adapter uses:
+A faithful behavioral mock of the Product Hunt GraphQL surface, served by
+stunt's **real GraphQL executor**: documents are parsed, validated, and executed
+against the schema — arguments, variables, aliases, fragments, `__typename`,
+full introspection, and spec-shaped `errors[]` all work. Unknown fields and
+operations are now rejected by validation instead of silently returning
+`{"data": {}}`.
 
-- **postCreate mutation:** `POST /v2/api/graphql.json` (Bearer) — creates a
-  product launch from `{name, tagline, description, url}` variables; returns
-  `{data: {postCreate: {post: {id}, errors: []}}}`.
-- **post query:** queries a post by id (supports the metrics adapter's
-  `post(id){votesCount}` shape).
-- **Bearer auth:** requests without `Authorization: Bearer <token>` — or with
-  an unknown/expired token — get `401`.
+The launch-publish pipeline the reference client adapter uses:
 
-This is **not a full GraphQL engine** — the single `/v2/api/graphql.json`
-endpoint pattern-matches the operation name in the query string and returns
-the JSON shape that the reference client adapter parses. This is the simplest faithful
-approach to satisfy the specific mutations/queries the adapter sends.
+- **postCreate mutation:** creates a product launch from
+  `{name, tagline, description, url}` input; returns
+  `{data: {postCreate: {post: {id}, errors: []}}}`. Server-side validation
+  failures return per-field errors **in the payload** (Product Hunt's
+  verb+Noun mutation convention), not as top-level GraphQL errors:
+  `data.postCreate.errors: [{attribute, message, path}]`.
+- **post query:** `post(id)` — supports the metrics adapter's
+  `post(id){votesCount}` shape.
+- **posts query:** Relay-style connection (`edges`/`nodes`/`pageInfo`,
+  `first`/`after` offset cursors, `totalCount`, `order: NEWEST | FEATURED_AT`).
 
 State persists in SQLite-backed collections, so posts created via `postCreate`
 are visible to subsequent queries within the same `stunt up` session.
 
-## Endpoints
+## Endpoint
 
-| Method | Route | Handler | Description |
-|--------|-------|---------|-------------|
-| POST | `/v2/api/graphql.json` | `graphql.star#on_graphql` | GraphQL endpoint (Bearer; pattern-matches operation) |
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST/GET | `/v2/api/graphql.json` | Real GraphQL execution (the real provider serves `/v2/api/graphql`; this adapter keeps its historical `.json` route — the path its reference client sends) |
 
 Any unmatched route returns `404`.
+
+### Example
+
+```graphql
+mutation Create($name: String!, $tagline: String!, $description: String!, $url: String!) {
+  postCreate(input: { name: $name, tagline: $tagline, description: $description, url: $url }) {
+    post { id name votesCount user { username } }
+    errors { message attribute }
+  }
+}
+```
+
+```graphql
+query($id: ID!) {
+  post(id: $id) { id name tagline votesCount url createdAt }
+  latest: posts(first: 10) { edges { node { name } cursor } pageInfo { hasNextPage } totalCount }
+}
+```
+
+Unknown fields produce real GraphQL errors:
+
+```
+POST /v2/api/graphql.json  {"query": "{ post(id: \"1\") { votes } }"}
+→ 400 {"errors": [{"message": "… votes does not exist on type \"Post\" …"}]}
+```
 
 ## Backing stores
 
 | Collection | Purpose |
 |------------|---------|
-| `posts` | Created product launches (id, name, tagline, description, url, votes_count) |
+| `posts` | Created product launches (id, name, tagline, description, url, votes_count, created_at) |
 
 KV is used for the monotonic `post_seq` counter.
 
 ## Auth
 
-All requests must include `Authorization: Bearer <token>`, and the token must
-be known to the adapter's credential store (KV namespace `producthunt`, keys
-`tok:<token>` holding the expiry as unix seconds). Requests without a bearer
-token, with an unknown token, or with an expired token receive `401` with a
-GraphQL errors array:
-
-```json
-{"errors": [{"message": "You need to sign in or sign up before continuing."}]}
-```
-
-One well-known static test token is seeded on first request with a far-future
-expiry so existing clients keep working: `mock-token-1`. Any other token is
-rejected. This mirrors how the reference client adapter stores `accessToken`
-in sealed credentials and sends it as a bearer token.
+Product Hunt's API requires an OAuth developer token; the provider's bearer
+scheme is documented in `scripts/lib.star` (credential store: KV namespace
+`producthunt`, keys `tok:<token>` holding the expiry as unix seconds; seeded
+test token `mock-token-1`). The `graphql:` transport dispatches before adapter
+endpoints and hands resolvers only `{parent, args}` — it has no auth hook — so
+the query endpoint is served open; the helpers back any handler-backed route.
 
 ## Usage
 

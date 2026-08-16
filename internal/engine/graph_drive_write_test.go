@@ -796,3 +796,172 @@ func TestGraphDriveUploadSessionInWindowSurvives(t *testing.T) {
 		t.Fatalf("chunk to in-window session -> %d, want 202", status)
 	}
 }
+
+// TestGraphDriveRecycleBinRestore proves the OneDrive soft-delete model:
+// DELETE moves the item (a folder delete cascades to the whole subtree, so
+// no child is orphaned) into the recycle bin — every read path 404s, but the
+// content blob is retained — and POST /restore brings the entire subtree
+// back with its original ids, parent links, and bytes.
+func TestGraphDriveRecycleBinRestore(t *testing.T) {
+	base := bootGraphService(t, 0)
+	jsonHdr := map[string]string{"Content-Type": "application/json"}
+
+	// Tree: /Docs (folder) containing doc.bin + nested /Docs/Inner with
+	// inner.bin; plus a root-level sibling that must survive.
+	folderBody, _ := json.Marshal(map[string]any{"name": "Docs", "folder": map[string]any{}})
+	status, body := graphDo(t, "POST", base+"/v1.0/me/drive/root/children", graphToken, folderBody, jsonHdr)
+	if status != 201 {
+		t.Fatalf("createFolder Docs -> %d; body %s", status, body)
+	}
+	docs := graphJSON(t, body)
+	docsID, _ := docs["id"].(string)
+
+	status, body = graphDo(t, "PUT", base+"/v1.0/me/drive/items/"+docsID+":/doc.bin:/content", graphToken,
+		[]byte("doc-bytes"), map[string]string{"Content-Type": "application/octet-stream"})
+	if status != 201 {
+		t.Fatalf("upload doc.bin -> %d; body %s", status, body)
+	}
+	docItem := graphJSON(t, body)
+	docID, _ := docItem["id"].(string)
+
+	innerBody, _ := json.Marshal(map[string]any{"name": "Inner", "folder": map[string]any{}})
+	status, body = graphDo(t, "POST", base+"/v1.0/me/drive/items/"+docsID+"/children", graphToken, innerBody, jsonHdr)
+	if status != 201 {
+		t.Fatalf("createFolder Inner -> %d; body %s", status, body)
+	}
+	inner := graphJSON(t, body)
+	innerID, _ := inner["id"].(string)
+
+	status, body = graphDo(t, "PUT", base+"/v1.0/me/drive/items/"+innerID+":/inner.bin:/content", graphToken,
+		[]byte("inner-bytes"), map[string]string{"Content-Type": "application/octet-stream"})
+	if status != 201 {
+		t.Fatalf("upload inner.bin -> %d; body %s", status, body)
+	}
+	innerFile := graphJSON(t, body)
+	innerFileID, _ := innerFile["id"].(string)
+
+	status, _ = graphDo(t, "PUT", base+"/v1.0/me/drive/root:/sibling.bin:/content", graphToken,
+		[]byte("sibling-bytes"), nil)
+	if status != 201 {
+		t.Fatalf("upload sibling -> %d", status)
+	}
+
+	// ===== DELETE the folder: cascades to doc.bin, Inner, inner.bin =====
+	status, body = graphDo(t, "DELETE", base+"/v1.0/me/drive/items/"+docsID, graphToken, nil, nil)
+	if status != 204 {
+		t.Fatalf("DELETE folder -> %d, want 204; body %s", status, body)
+	}
+
+	// Every subtree item 404s on the metadata and content read paths.
+	for _, id := range []string{docsID, docID, innerID, innerFileID} {
+		if status, _ = graphDo(t, "GET", base+"/v1.0/me/drive/items/"+id, graphToken, nil, nil); status != 404 {
+			t.Fatalf("GET items/%s after cascade delete -> %d, want 404", id, status)
+		}
+	}
+	if status, _ = graphDo(t, "GET", base+"/v1.0/me/drive/items/"+docID+"/content", graphToken, nil, nil); status != 404 {
+		t.Fatalf("GET content of cascaded file -> %d, want 404", status)
+	}
+
+	// Root children no longer include the folder; the sibling survives.
+	status, body = graphDo(t, "GET", base+"/v1.0/me/drive/root/children", graphToken, nil, nil)
+	if status != 200 {
+		t.Fatalf("list root children -> %d", status)
+	}
+	var children graphODataList
+	json.Unmarshal(body, &children)
+	for _, c := range children.Value {
+		if c["id"] == docsID || c["id"] == docID || c["id"] == innerID || c["id"] == innerFileID {
+			t.Fatalf("deleted subtree leaked into root children: %v", c["id"])
+		}
+	}
+	sawSibling := false
+	for _, c := range children.Value {
+		if c["name"] == "sibling.bin" {
+			sawSibling = true
+		}
+	}
+	if !sawSibling {
+		t.Fatalf("sibling.bin missing from root children after folder delete: %s", body)
+	}
+
+	// ===== restore: the whole subtree returns with original ids =====
+	status, body = graphDo(t, "POST", base+"/v1.0/me/drive/items/"+docsID+"/restore", graphToken, []byte("{}"), jsonHdr)
+	if status != 201 {
+		t.Fatalf("restore folder -> %d, want 201; body %s", status, body)
+	}
+	restored := graphJSON(t, body)
+	if restored["id"] != docsID {
+		t.Fatalf("restored id = %v, want original %v", restored["id"], docsID)
+	}
+	if _, ok := restored["folder"].(map[string]any); !ok {
+		t.Fatalf("restored item lacks folder facet: %s", body)
+	}
+	parentRef, _ := restored["parentReference"].(map[string]any)
+	if parentRef == nil || parentRef["id"] != "root" {
+		t.Fatalf("restored parentReference = %v, want root", restored["parentReference"])
+	}
+
+	// Children and content are back, ids unchanged, bytes intact.
+	for _, id := range []string{docsID, docID, innerID, innerFileID} {
+		if status, _ = graphDo(t, "GET", base+"/v1.0/me/drive/items/"+id, graphToken, nil, nil); status != 200 {
+			t.Fatalf("GET items/%s after restore -> %d, want 200", id, status)
+		}
+	}
+	status, body = graphDo(t, "GET", base+"/v1.0/me/drive/items/"+docID+"/content", graphToken, nil, nil)
+	if status != 200 || string(body) != "doc-bytes" {
+		t.Fatalf("restored doc.bin content -> %d %q, want 200 doc-bytes", status, body)
+	}
+	status, body = graphDo(t, "GET", base+"/v1.0/me/drive/items/"+innerFileID+"/content", graphToken, nil, nil)
+	if status != 200 || string(body) != "inner-bytes" {
+		t.Fatalf("restored inner.bin content -> %d %q, want 200 inner-bytes", status, body)
+	}
+
+	// The restored nested structure still hangs off the same parents.
+	status, body = graphDo(t, "GET", base+"/v1.0/me/drive/items/"+innerID+"/children", graphToken, nil, nil)
+	if status != 200 {
+		t.Fatalf("list restored Inner children -> %d", status)
+	}
+	var innerChildren graphODataList
+	json.Unmarshal(body, &innerChildren)
+	foundInnerFile := false
+	for _, c := range innerChildren.Value {
+		if c["id"] == innerFileID {
+			foundInnerFile = true
+		}
+	}
+	if !foundInnerFile {
+		t.Fatalf("inner.bin not back under restored Inner folder: %s", body)
+	}
+
+	// ===== failure paths =====
+	// Restoring an item that is not in the bin -> 404.
+	status, body = graphDo(t, "POST", base+"/v1.0/me/drive/items/"+docsID+"/restore", graphToken, []byte("{}"), jsonHdr)
+	if status != 404 {
+		t.Fatalf("restore already-restored -> %d, want 404; body %s", status, body)
+	}
+	if e := graphJSON(t, body)["error"].(map[string]any); e["code"] != "itemNotFound" {
+		t.Fatalf("restore already-restored error code = %v, want itemNotFound", e["code"])
+	}
+
+	// A cascaded descendant cannot be restored on its own: delete the folder
+	// again, then try restoring the inner FILE (not the batch root) -> 409.
+	if status, _ = graphDo(t, "DELETE", base+"/v1.0/me/drive/items/"+docsID, graphToken, nil, nil); status != 204 {
+		t.Fatalf("re-delete folder -> %d", status)
+	}
+	status, body = graphDo(t, "POST", base+"/v1.0/me/drive/items/"+innerFileID+"/restore", graphToken, []byte("{}"), jsonHdr)
+	if status != 409 {
+		t.Fatalf("restore cascaded descendant -> %d, want 409; body %s", status, body)
+	}
+	if e := graphJSON(t, body)["error"].(map[string]any); e["code"] != "invalidRequest" {
+		t.Fatalf("restore descendant error code = %v, want invalidRequest", e["code"])
+	}
+
+	// DELETE of an unknown item stays 404 itemNotFound.
+	status, body = graphDo(t, "DELETE", base+"/v1.0/me/drive/items/item-does-not-exist", graphToken, nil, nil)
+	if status != 404 {
+		t.Fatalf("delete unknown -> %d, want 404", status)
+	}
+	if e := graphJSON(t, body)["error"].(map[string]any); e["code"] != "itemNotFound" {
+		t.Fatalf("delete unknown error code = %v, want itemNotFound", e["code"])
+	}
+}

@@ -71,6 +71,8 @@ resources:
     kind: collection
   - name: blobs
     kind: collection
+  - name: blocks
+    kind: collection
 
 # Auth scheme: SharedKey / SAS / bearer. Structural validation only for v1.
 identity:
@@ -89,4 +91,7 @@ rules:
 # Resources notes:
 # - containers: {name, publicAccess, lastModified, etag}
 # - blobs: {container, name, content, contentType, blobType, contentLength,
-#            etag, lastModified, metadata}
+#            etag, lastModified, metadata, committedBlocks}
+# - blocks: staged (uncommitted) Put Block payloads
+#   {id: sha256(container,blob,blockId), container, blob, blockId, bid,
+#    size, sha256b64, lastModifiedUnix}

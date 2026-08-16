@@ -29,11 +29,18 @@ real API data is included.
   (204).
 - **OneDrive (read):** `GET /v1.0/me/drive` (incl. quota),
   `GET /v1.0/me/drive/root/children`, `GET /v1.0/me/drive/items/{id}/children`
-  (listing is per-parent), `GET /v1.0/me/drive/items/{id}/content` (stored
+  (listing is per-parent), `GET /v1.0/me/drive/items/{id}` (single item),
+  `GET /v1.0/me/drive/items/{id}/content` (stored
   bytes served verbatim), `GET /v1.0/me/drive/root:/{path}:/` path resolution
   (supports `?select=id`).
-- **OneDrive (delete):** `DELETE /v1.0/me/drive/items/{id}` → 204; also drops
-  the stored content blob for file items.
+- **OneDrive (delete → recycle bin):** `DELETE /v1.0/me/drive/items/{id}` →
+  204; the item moves to an internal `recyclebin` collection (content blob
+  kept) and 404s on every read path. A folder delete **cascades** to the
+  whole subtree (no child is left dangling under a missing parent).
+  `POST /v1.0/me/drive/items/{id}/restore` brings the item — and everything
+  cascaded with it, original ids and parent links intact — back to the tree
+  (201 with the restored driveItem). Restoring a cascaded descendant rather
+  than its deleted parent → 409; restoring anything not in the bin → 404.
 - **OneDrive (write):** real Graph colon addressing, implemented strictly.
   Simple upload `PUT /v1.0/me/drive/root:/{name}:/content` (and the
   `items/{parentId}:/{name}:/content` variant) → 201 driveItem; a repeat PUT
@@ -95,7 +102,9 @@ the page size and `$skip` carries the opaque cursor token emitted in `@odata.nex
 | GET | `/v1.0/me/drive/items/{id}/children` | `drive.star#on_list_item_children` | Folder children |
 | POST | `/v1.0/me/drive/items/{id}/children` | `drive.star#on_create_child_item` | createFolder (nested) |
 | GET | `/v1.0/me/drive/items/{id}/content` | `drive_upload.star#on_get_content` | Download stored bytes |
-| DELETE | `/v1.0/me/drive/items/{id}` | `drive.star#on_delete_item` | Delete item (drops content blob) → 204 |
+| GET | `/v1.0/me/drive/items/{id}` | `drive.star#on_get_item` | Get driveItem by id |
+| DELETE | `/v1.0/me/drive/items/{id}` | `drive.star#on_delete_item` | Recycle item (folder: cascades) → 204 |
+| POST | `/v1.0/me/drive/items/{id}/restore` | `drive.star#on_restore_item` | Restore item + subtree from recycle bin → 201 |
 | PUT | `/v1.0/me/drive/root:/{name}:/content` | `drive_upload.star#on_simple_upload_root` | Simple upload (root) |
 | PUT | `/v1.0/me/drive/items/{parentId}:/{name}:/content` | `drive_upload.star#on_simple_upload_item` | Simple upload (folder) |
 | POST | `/v1.0/me/drive/root:/{name}:/createUploadSession` | `drive_upload.star#on_create_session_root` | Resumable session (root) |
@@ -121,6 +130,7 @@ the page size and `$skip` carries the opaque cursor token emitted in `@odata.nex
 | `chats` | Teams chats |
 | `chat_messages` | Teams chat messages (per chat) |
 | `files` | OneDrive files/folders (with `parentId` for per-parent listing) |
+| `recyclebin` | Recycle-bin rows for deleted driveItems (internal keys `_deleted_at`/`_root_id`; not exposed via the API) |
 | `sessions` | OneDrive resumable upload sessions (next offset, total, conflict behavior; 48h TTL) |
 | `subscriptions` | Webhook subscriptions (notificationUrl, resource, changeType, clientState) |
 

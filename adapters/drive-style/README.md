@@ -30,6 +30,9 @@ create in one request is visible in subsequent requests within the same
 | GET | `/o/oauth2/auth` | `oauth.star#on_authorize` | OAuth2 authorize → 302 redirect with `code`+`state` |
 | POST | `/o/oauth2/token` | `oauth.star#on_token` | OAuth2 token (authorization_code / refresh_token grants) |
 | POST | `/upload/drive/v3/files` | `files.star#on_upload` | Upload a file (JSON `{name, content, parents}` or folder via `mimeType`) |
+| POST | `/upload/drive/v3/files?uploadType=resumable` | `files.star#on_upload` | Start a resumable upload session → `Location` |
+| PUT | `/upload/drive/v3/files?uploadType=resumable&upload_id=…` | `files.star#on_resumable_chunk` | Resumable chunk / status probe (308 + `Range` until the final chunk) |
+| DELETE | `/upload/drive/v3/files?uploadType=resumable&upload_id=…` | `files.star#on_resumable_cancel` | Cancel a resumable session (499) |
 | GET | `/drive/v3/files` | `files.star#on_list` | List files (honors `q`, `orderBy`, `fields` + paging) |
 | POST | `/drive/v3/files` | `files.star#on_create_metadata` | Create file/folder metadata (no content) |
 | GET | `/drive/v3/files/{id}` | `files.star#on_get` | Retrieve file metadata |
@@ -103,6 +106,51 @@ Examples:
 Filterable fields map onto `query_select` filter triples (dotted property
 paths resolve through it); `parents in` is evaluated directly since it
 tests list membership.
+
+## Resumable upload sessions
+
+`POST /upload/drive/v3/files?uploadType=resumable` starts the real
+two-phase Drive upload protocol. The metadata (JSON body: `name`,
+`mimeType`, `parents`) is captured up front; the response is `200` with an
+empty body and a `Location` header pointing at the session URL
+(`/upload/drive/v3/files?uploadType=resumable&upload_id=…`).
+
+Chunks are then `PUT` to that URL with `Content-Range:
+bytes {start}-{end}/{total}`. The protocol is enforced **strictly** (a
+lenient mock would let client bugs hide behind it):
+
+- Chunks are **sequential and contiguous**: `start` must equal the session's
+  next expected offset — anything else (a skipped range, the final chunk
+  sent early) is a `400` with a Google error envelope, never a silent
+  accept.
+- The declared `total` must be consistent across chunks, `end` must stay
+  below `total`, and the body length must equal `end-start+1` — violations
+  are `400`s.
+- Every non-final chunk answers `308 Resume Incomplete` with
+  `Range: bytes=0-{end}` — the total bytes accepted so far.
+- The chunk whose `end == total-1` completes the upload: the file is
+  created from the assembled bytes (byte-exact — verify with
+  `GET /drive/v3/files/{id}?alt=media`), a changes-feed entry is recorded,
+  and the `200` response carries the file resource. The session is gone
+  afterwards (later PUTs are `404`).
+- **Status probe**: an empty `PUT` to the session URL (or with
+  `Content-Range: bytes */{total}`) answers `308` with the current
+  `Range: bytes=0-{next-1}` (no `Range` header before the first byte).
+- **Cancel**: `DELETE` the session URL → `499` (the Google upload backend's
+  cancel status). The partial bytes and the session are discarded and no
+  file is ever created.
+
+Session URLs are **pre-authenticated** (no bearer check on chunk/cancel
+PUTs/DELETEs, like real Google upload URLs); sessions expire after a week,
+after which the session reads as `404`.
+
+```
+POST /upload/drive/v3/files?uploadType=resumable   → 200, Location: <session URL>
+PUT  <session URL>  Content-Range: bytes 0-8191/15360      → 308, Range: bytes=0-8191
+PUT  <session URL>  Content-Range: bytes 8192-15359/15360  → 200 {file resource}
+GET  /drive/v3/files/{id}?alt=media                        → byte-exact content
+DELETE <session URL>                                       → 499 (cancel)
+```
 
 ## Changes feed
 

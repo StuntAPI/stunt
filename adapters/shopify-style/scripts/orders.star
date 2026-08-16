@@ -355,57 +355,10 @@ def on_create_transaction(req):
 # _order_view returns the public-facing order object. Internal keys (the
 # per-line _fulfilled counters) are projected away by _line_item_view.
 # Numeric ids are converted from stored strings back to ints.
-def _order_view(o):
-    lines = o.get("line_items", [])
-    line_views = []
-    for li in lines:
-        line_views.append(_line_item_view(li))
-    return {
-        "id": _num_id(o["id"]),
-        "email": o.get("email", ""),
-        "financial_status": o.get("financial_status", "pending"),
-        "fulfillment_status": o.get("fulfillment_status", None),
-        "total_price": o.get("total_price", "0.00"),
-        "currency": o.get("currency", "USD"),
-        "line_items": line_views,
-        "customer": o.get("customer", {}),
-        "order_number": o.get("order_number", 0),
-        "name": o.get("name", ""),
-        "closed_at": o.get("closed_at", None),
-        "cancelled_at": o.get("cancelled_at", None),
-        "cancel_reason": o.get("cancel_reason", None),
-        "created_at": o.get("created_at", _now()),
-        "updated_at": o.get("updated_at", _now()),
-    }
 
 # _line_item_view returns the public-facing line item, dropping the internal
 # "_fulfilled" counter and deriving the per-line fulfillment_status and
 # fulfillable_quantity the way Shopify derives them.
-def _line_item_view(li):
-    qty = li.get("quantity", 0)
-    ful = li.get("_fulfilled", 0)
-    if ful > qty:
-        ful = qty
-    remaining = qty - ful
-    line_status = None
-    if ful > 0:
-        if remaining == 0:
-            line_status = "fulfilled"
-        else:
-            line_status = "partial"
-    vid = li.get("variant_id", None)
-    if vid != None:
-        vid = _num_id(str(vid))
-    return {
-        "id": _num_id(li["id"]),
-        "title": li.get("title", ""),
-        "quantity": qty,
-        "price": li.get("price", "0.00"),
-        "sku": li.get("sku", ""),
-        "variant_id": vid,
-        "fulfillable_quantity": remaining,
-        "fulfillment_status": line_status,
-    }
 
 # _norm_line_item normalizes an input line item into the stored shape:
 # integer quantity >= 1, money-formatted price, zeroed internal fulfilled

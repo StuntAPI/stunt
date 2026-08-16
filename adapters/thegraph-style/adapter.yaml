@@ -6,19 +6,28 @@
 # index any real blockchain data. All data is synthetic. See DISCLAIMER.
 id: thegraph-style
 name: "The Graph subgraph GraphQL simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "The Graph (GraphQL over subgraphs)"
   version: "1.0"
 
-# Endpoints — each subgraph is served at /subgraphs/id/<id>.
+# GraphQL service — served from the SDL schema + convention-named Starlark
+# resolvers by the engine's REAL GraphQL executor (validation, variables,
+# fragments, introspection, errors[]). The Graph serves one schema per
+# deployment; this adapter models one canonical seeded deployment (the
+# Uniswap V3-style one) whose entity set also carries the ENS-style
+# domains, so a single schema covers both seeded themes. The engine's
+# graphql transport matches one literal path, so the endpoint is the
+# seeded deployment id below.
+graphql:
+  schema: schemas/schema.graphql
+  resolvers: scripts/resolvers.star
+  path: /subgraphs/id/5zvR82QoaXYxfyKOCH8Qfl6p
+
+# Endpoints — the remaining REST surface.
 endpoints:
-  # GraphQL query endpoint.
-  - route: /subgraphs/id/{subgraphId}
-    method: POST
-    handler: scripts/graphql.star#on_query
-  # GraphQL schema/introspection (SDL).
+  # GraphQL SDL schema/introspection (informational, per-subgraph).
   - route: /subgraphs/id/{subgraphId}/graphql
     method: GET
     handler: scripts/graphql.star#on_schema
@@ -32,7 +41,7 @@ resources:
   - name: domains
     kind: collection
 
-# Catch-all: any unmatched route returns 404.
+# Catch-all: any unmatched route returns a 404.
 rules:
   - name: catchall-404
     match: { path: "/**" }

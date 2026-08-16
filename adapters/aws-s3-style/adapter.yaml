@@ -36,15 +36,16 @@ endpoints:
     concurrency_key: bucket
 
   # --- Object operations ---
-  # Upload object: PUT /{bucket}/{key}
+  # Upload object: PUT /{bucket}/{key} — or UploadPart when the request
+  # carries ?partNumber=N&uploadId=... (multipart upload).
   # concurrency_key serialises the read-modify-write (find existing doc +
   # blob id, then insert/update) against concurrent writers of the same
-  # bucket.
+  # bucket (both simple PUTs and part uploads).
   - route: /{bucket}/{key}
     method: PUT
     handler: scripts/objects.star#on_put_object
     concurrency_key: bucket
-  # Download object: GET /{bucket}/{key}
+  # Download object: GET /{bucket}/{key} — or ListParts with ?uploadId=...
   - route: /{bucket}/{key}
     method: GET
     handler: scripts/objects.star#on_get_object
@@ -52,11 +53,17 @@ endpoints:
   - route: /{bucket}/{key}
     method: HEAD
     handler: scripts/objects.star#on_head_object
-  # Delete object: DELETE /{bucket}/{key}
-  # concurrency_key serialises doc+blob deletion against overwriters.
+  # Delete object: DELETE /{bucket}/{key} — or AbortMultipartUpload with
+  # ?uploadId=... (both mutate object/part state for the bucket).
   - route: /{bucket}/{key}
     method: DELETE
     handler: scripts/objects.star#on_delete_object
+    concurrency_key: bucket
+  # Multipart upload POST verb: ?uploads creates (CreateMultipartUpload),
+  # ?uploadId=... completes (assembles the object — read-modify-write).
+  - route: /{bucket}/{key}
+    method: POST
+    handler: scripts/multipart.star#on_post_multipart
     concurrency_key: bucket
 
 # Backing stores — collections for stateful data.
@@ -64,6 +71,10 @@ resources:
   - name: buckets
     kind: collection
   - name: objects
+    kind: collection
+  - name: mpu_uploads
+    kind: collection
+  - name: mpu_parts
     kind: collection
 
 # Auth scheme: SigV4 (AWS4-HMAC-SHA256), verified for real (canonical
@@ -86,3 +97,8 @@ rules:
 # - buckets collection: {name, created, region}
 # - objects collection: {bucket, key, content, contentType, etag,
 #                        lastModified, size}
+# - mpu_uploads collection: in-progress multipart uploads
+#   {id: uploadId, bucket, key, contentType, initiatedUnix}
+# - mpu_parts collection: uploaded parts
+#   {id: uploadId-partNumber, uploadId, partNumber, etag, size, bid,
+#    lastModifiedUnix}

@@ -24,9 +24,25 @@ endpoints:
     handler: scripts/oauth.star#on_token
 
   # --- Files (upload, metadata, download, list, patch, delete) ---
+  # POST: direct create (JSON/raw body) or, with ?uploadType=resumable,
+  # resumable-session initiation (200 + Location).
   - route: /upload/drive/v3/files
     method: POST
     handler: scripts/files.star#on_upload
+  # PUT to the session URL: resumable chunks (strict Content-Range; 308
+  # Resume Incomplete + Range until the final chunk). The session id rides
+  # the PATH so concurrency_key can serialize chunk retries per session —
+  # blob append is not linearizable across concurrent writers.
+  # No bearer check — real upload session URLs are pre-authenticated.
+  - route: /upload/drive/v3/files/{upload_id}
+    method: PUT
+    handler: scripts/files.star#on_resumable_chunk
+    concurrency_key: upload_id
+  # DELETE to the session URL: cancel the upload (499, the Google upload
+  # backend's cancel status) and discard the partial bytes.
+  - route: /upload/drive/v3/files/{upload_id}
+    method: DELETE
+    handler: scripts/files.star#on_resumable_cancel
   - route: /drive/v3/files
     method: GET
     handler: scripts/files.star#on_list
@@ -63,6 +79,8 @@ resources:
     kind: collection
     seed: fixtures/files.jsonl
   - name: changes
+    kind: collection
+  - name: upload_sessions
     kind: collection
   - name: tokens
     kind: collection

@@ -19,6 +19,12 @@ def _bearer(req):
 # with the expiry as unix seconds. Product Hunt's server-to-server tokens
 # have no fixed short TTL, so the seeded test token gets a far-future
 # expiry computed at runtime (never a hardcoded epoch).
+#
+# The GraphQL query endpoint now runs on the engine's graphql: transport
+# (see adapter.yaml), which dispatches before adapter endpoints and hands
+# resolvers only {parent, args} — it has no auth hook. These helpers
+# document the provider's OAuth bearer scheme and back any handler-backed
+# route (e.g. a future authenticated mirror).
 
 # Well-known static test token, seeded once on first request (see
 # _seed_tokens) so existing clients/tests that use it keep working while

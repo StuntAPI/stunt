@@ -8,7 +8,7 @@
 # pool + identity pool operations via X-Amz-Target).
 id: aws-cognito-style
 name: "Amazon Cognito Identity Provider API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Amazon Cognito Identity Provider API"
@@ -53,6 +53,8 @@ resources:
   - name: tokens
     kind: collection
   - name: oauth_codes
+    kind: collection
+  - name: auth_sessions
     kind: collection
 
 # Auth scheme metadata (mock: SigV4 structural check for service API, or

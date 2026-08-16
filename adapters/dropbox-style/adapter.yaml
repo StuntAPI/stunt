@@ -49,6 +49,8 @@ resources:
   - name: entries
     kind: collection
     seed: fixtures/entries.jsonl
+  - name: trash
+    kind: collection
 
 # Auth scheme metadata (mock: any bearer token is accepted; not enforced).
 identity:

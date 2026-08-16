@@ -90,12 +90,14 @@ Behavior:
 | Method | Route | Description |
 |--------|-------|-------------|
 | GET | `/connections` | List tenants |
-| GET | `/api.xro/2.0/Contacts` | List contacts |
+| GET | `/api.xro/2.0/Contacts` | List contacts (archived contacts included, `ContactStatus:"ARCHIVED"`) |
 | PUT | `/api.xro/2.0/Contacts` | Create contacts |
+| GET | `/api.xro/2.0/Contacts/{id}` | Get contact (404 envelope if not found) |
+| PUT | `/api.xro/2.0/Contacts/{id}` | Update / archive / reactivate contact (`ContactStatus:"ARCHIVED"` or `"ACTIVE"`) |
 | GET | `/api.xro/2.0/Invoices` | List invoices |
 | PUT | `/api.xro/2.0/Invoices` | Create invoices |
 | GET | `/api.xro/2.0/Invoices/{id}` | Get invoice (404 envelope if not found) |
-| DELETE | `/api.xro/2.0/Invoices/{id}` | Delete invoice → `204 No Content` (404 envelope if not found) |
+| DELETE | `/api.xro/2.0/Invoices/{id}` | VOID invoice → `204 No Content` (kept with `Status:"VOIDED"`, `AmountDue` 0.00) |
 | POST | `/api.xro/2.0/Invoices/{id}/Payments` | Record payment (marks the invoice `PAID`, `AmountDue` 0.00) |
 | GET | `/api.xro/2.0/Accounts` | Chart of accounts |
 | GET | `/api.xro/2.0/BankTransactions` | Bank transactions |
@@ -105,6 +107,25 @@ Behavior:
 
 Any unmatched route returns Xero's `404` envelope
 (`{ ErrorNumber: 404, Type: "NotFound", Message: ... }`).
+
+## Soft delete (void + archive)
+
+Xero never destroys invoices or contacts; stunt reproduces the terminal
+soft-delete states:
+
+- **`DELETE /api.xro/2.0/Invoices/{id}`** voids the invoice (real Xero
+  invoices are not deletable — the terminal state is `VOIDED`): the record is
+  kept with `Status:"VOIDED"` and `AmountDue:"0.00"`, and remains retrievable
+  via `GET /Invoices/{id}` and filterable via `Statuses=VOIDED` /
+  `where=Status=="VOIDED"`. Voiding a `PAID` or already-`VOIDED` invoice →
+  `400 { ErrorNumber:"ValidationError", Type:"BadRequest" }`; unknown id → the
+  usual `404` envelope.
+- **`PUT /api.xro/2.0/Contacts/{id}`** with `{ "ContactStatus": "ARCHIVED" }`
+  archives the contact (Xero's archive IS an update). The contact stays
+  readable by id and in list results (real Xero lists include archived
+  contacts; filter with `where=ContactStatus=="ARCHIVED"`), and is
+  reactivatable with `"ACTIVE"`. An invalid `ContactStatus` → `400`
+  `ValidationError`; unknown id → `404` envelope.
 
 ## Filtering and sorting
 

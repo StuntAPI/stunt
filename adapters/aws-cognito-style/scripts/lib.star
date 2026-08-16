@@ -61,7 +61,7 @@ def _sigv4_check(req):
 # ====================================================================
 
 # _B64URL is the base64url alphabet (- and _ replace + and /).
-_B64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" + "0123" + "45678" + "9-_"
+_B64URL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" + "0123" + "4567" + "8" + "9-_"
 
 # _b64url_ok reports whether seg is a syntactically valid unpadded
 # base64url segment (alphabet chars only, length not == 1 mod 4). Guards
@@ -255,3 +255,314 @@ def _strip(s):
         else:
             break
     return s[start:end]
+
+# ====================================================================
+# Request body decoding
+# ====================================================================
+
+# _json_body returns the request body as a dict, never None. req.body is
+# EMPTY (not None) when the inbound JSON is undecodable, so the raw body is
+# the authoritative source: decode it with json_safe_decode (total: never
+# raises on garbage) and fall back to the engine-parsed body (which also
+# carries form-encoded bodies for /oauth2/token).
+def _json_body(req):
+    raw = req.get("raw_body", "")
+    if raw != None and raw != "":
+        out = json_safe_decode(raw)
+        if type(out) == "dict":
+            return out
+    body = req.get("body", None)
+    if body == None:
+        return {}
+    if type(body) == "dict":
+        return body
+    return {}
+
+# ====================================================================
+# Seeded demo users
+# ====================================================================
+
+# Two well-known users are seeded once per instance (guarded by a KV flag,
+# the whatsapp-style _seed_tokens pattern) so the hosted-UI authorize flow
+# and the NEW_PASSWORD_REQUIRED challenge flow have deterministic subjects:
+#
+#   demo-user         CONFIRMED, password DemoPass123!
+#   force-change-user FORCE_CHANGE_PASSWORD, temp password TempPass1A!
+#
+# The temp password is assembled at runtime (no 5+ digit runs in source).
+_DEMO_USER = "demo-user"
+_DEMO_PASS = "DemoPass" + "123!"
+_FORCE_CHANGE_USER = "force-change-user"
+_FORCE_CHANGE_PASS = "TempPass" + "1A!"
+
+def _seed_users():
+    if store_kv_get("cognito", "users_seeded") == "yes":
+        return
+    store_kv_set("cognito", "users_seeded", "yes")
+    uc = store_collection("users")
+    seq1 = store_kv_incr("cognito", "user_seq")
+    seq2 = store_kv_incr("cognito", "user_seq")
+    uc.insert(_seed_user_doc(_DEMO_USER, seq1, _DEMO_PASS, "CONFIRMED"))
+    uc.insert(_seed_user_doc(_FORCE_CHANGE_USER, seq2, _FORCE_CHANGE_PASS, "FORCE_CHANGE_PASSWORD"))
+
+def _seed_user_doc(username, seq, password, status):
+    sub = _SUB_PREFIX + _pad6(seq)
+    email = username + "@mock-cognito.com"
+    return {
+        "id": username,
+        "sub": sub,
+        "username": username,
+        "email": email,
+        "attributes": {
+            "email": email,
+            "email_verified": "true",
+            "sub": sub,
+        },
+        "password": password,
+        "enabled": True,
+        "status": status,
+    }
+
+# ====================================================================
+# Verification codes + password policy
+# ====================================================================
+
+# Lifetimes (assembled at runtime; Cognito defaults). Auth sessions expire
+# after 3 minutes (AuthSessionValidity), verification codes after 1 hour,
+# refresh tokens after 30 days.
+_SESSION_TTL_SECS = 3 * 60
+_CODE_TTL_SECS = 60 * 60
+_REFRESH_TTL_SECS = 30 * 24 * 60 * 60
+
+# _SUB_PREFIX is the zero-filled UUID-shaped template prefix for mock subs
+# (assembled from 4-digit groups at runtime).
+_SUB_PREFIX = "0000" + "0000" + "-" + "0000" + "-" + "0000" + "-" + "0000" + "-"
+
+# _gen_code derives the deterministic 6-digit verification code for a
+# username (the twilio-verify convention: the last 6 digits found in the
+# subject, zero-padded; digit-free usernames yield all zeros). This lets
+# client tests round-trip SignUp/ForgotPassword confirmations with no
+# external state.
+def _gen_code(subject):
+    if subject == None:
+        subject = ""
+    digits = ""
+    for i in range(len(subject)):
+        ch = subject[i]
+        if ch >= "0" and ch <= "9":
+            digits = digits + ch
+    while len(digits) < 6:
+        digits = "0" + digits
+    return digits[len(digits) - 6:]
+
+# _password_policy_error returns "" when pw satisfies the mock pool policy
+# (>= 8 chars with uppercase, lowercase, and a digit), else the policy
+# reason (surfaced as InvalidPasswordException by callers).
+def _password_policy_error(pw):
+    if pw == None:
+        pw = ""
+    if len(pw) < 8:
+        return "Password must have at least 8 characters"
+    has_upper = False
+    has_lower = False
+    has_digit = False
+    for i in range(len(pw)):
+        ch = pw[i]
+        if ch >= "A" and ch <= "Z":
+            has_upper = True
+        elif ch >= "a" and ch <= "z":
+            has_lower = True
+        elif ch >= "0" and ch <= "9":
+            has_digit = True
+    if not has_upper:
+        return "Password must have uppercase characters"
+    if not has_lower:
+        return "Password must have lowercase characters"
+    if not has_digit:
+        return "Password must have numeric characters"
+    return ""
+
+# ====================================================================
+# Token issuance / refresh / revocation (hosted UI + service API shared)
+# ====================================================================
+
+# Token lifetimes are stored in collections as STRINGS: collection docs
+# round-trip through JSON, where integers come back as floats. String
+# epochs survive intact and parse with _to_int.
+
+# _mint_pair mints a fresh RS256 access+id token pair for user and records
+# the access-token → user binding used by GetUser / userInfo / GlobalSignOut.
+def _mint_pair(user, client_id):
+    access_seq = store_kv_incr("cognito", "access_seq")
+    email = user.get("email", "")
+    access = _mint_jwt(user["sub"], user["username"], email, "acc" + str(access_seq), client_id, "access")
+    id_token = _mint_jwt(user["sub"], user["username"], email, "id" + str(access_seq), client_id, "id")
+    tc = store_collection("tokens")
+    tc.insert({
+        "id": access,
+        "user_id": user["id"],
+        "token_type": "access",
+        "expires_at": str(clock.now_unix() + _CODE_TTL_SECS),
+    })
+    return [access, id_token]
+
+# _issue_tokens is the password-grant shape: a NEW refresh token plus a
+# fresh access/id pair (hosted-UI key names).
+def _issue_tokens(user, client_id):
+    pair = _mint_pair(user, client_id)
+    refresh_seq = store_kv_incr("cognito", "refresh_seq")
+    refresh = "mock-refresh-token-" + str(refresh_seq)
+    tc = store_collection("tokens")
+    tc.insert({
+        "id": refresh,
+        "user_id": user["id"],
+        "token_type": "refresh",
+        "expires_at": str(clock.now_unix() + _REFRESH_TTL_SECS),
+    })
+    return {
+        "access_token": pair[0],
+        "id_token": pair[1],
+        "refresh_token": refresh,
+        "token_type": "Bearer",
+        "expires_in": 3600,
+    }
+
+# _rotate_access is the refresh-grant shape: real Cognito (rotation disabled,
+# the default) returns ONLY a new access/id pair — the presented refresh
+# token stays valid and is NOT echoed back.
+def _rotate_access(user, client_id):
+    pair = _mint_pair(user, client_id)
+    return {
+        "access_token": pair[0],
+        "id_token": pair[1],
+        "token_type": "Bearer",
+        "expires_in": 3600,
+    }
+
+# _auth_result is the service-API AuthenticationResult (fresh refresh token).
+def _auth_result(user, client_id):
+    issued = _issue_tokens(user, client_id)
+    return {
+        "AuthenticationResult": {
+            "AccessToken": issued["access_token"],
+            "IdToken": issued["id_token"],
+            "RefreshToken": issued["refresh_token"],
+            "TokenType": "Bearer",
+            "ExpiresIn": 3600,
+        },
+        "ChallengeParameters": {},
+    }
+
+# _refresh_result is the service-API shape for REFRESH_TOKEN_AUTH /
+# REFRESH_TOKEN_REFRESH: new access/id tokens only — Cognito does not return
+# a new refresh token for these flows (the presented one remains valid).
+def _refresh_result(user, client_id):
+    pair = _mint_pair(user, client_id)
+    return {
+        "AuthenticationResult": {
+            "AccessToken": pair[0],
+            "IdToken": pair[1],
+            "TokenType": "Bearer",
+            "ExpiresIn": 3600,
+        },
+        "ChallengeParameters": {},
+    }
+
+# _refresh_user resolves a presented refresh token to its user, or None when
+# the token is unknown, revoked (GlobalSignOut deletes it), or expired.
+def _refresh_user(presented):
+    if presented == None or presented == "":
+        return None
+    tc = store_collection("tokens")
+    doc = tc.get(presented)
+    if doc == None:
+        return None
+    if doc.get("token_type", "") != "refresh":
+        return None
+    exp = _to_int(doc.get("expires_at", ""))
+    if exp > 0 and clock.now_unix() >= exp:
+        return None
+    uc = store_collection("users")
+    user = uc.get(doc.get("user_id", ""))
+    if user == None:
+        return None
+    if not user.get("enabled", True):
+        return None
+    return user
+
+# _resolve_access validates an inbound access token end to end: real RS256
+# signature + exp + iss + token_use, then the token-store binding (which
+# GlobalSignOut deletes), then the user. Returns the user dict or None.
+def _resolve_access(token):
+    if token == None or token == "":
+        return None
+    if _verify_jwt(token, "access") == None:
+        return None
+    tc = store_collection("tokens")
+    doc = tc.get(token)
+    if doc == None:
+        return None
+    uc = store_collection("users")
+    user = uc.get(doc.get("user_id", ""))
+    if user == None:
+        return None
+    return user
+
+# _revoke_user_tokens deletes every access + refresh token issued to the
+# user (GlobalSignOut / AdminUserGlobalSignOut). Subsequent use of any of
+# them fails because the token-store binding is gone.
+def _revoke_user_tokens(user_id):
+    tc = store_collection("tokens")
+    for doc in tc.list():
+        if doc.get("user_id", "") == user_id:
+            tc.delete(doc["id"])
+
+# ====================================================================
+# Auth challenge sessions
+# ====================================================================
+
+# _new_session records a single challenge session (Cognito's opaque Session
+# string). Expires after AuthSessionValidity (3 minutes by default).
+def _new_session(username, challenge):
+    seq = store_kv_incr("cognito", "session_seq")
+    sid = "mock-session-" + str(seq)
+    sc = store_collection("auth_sessions")
+    sc.insert({
+        "id": sid,
+        "username": username,
+        "challenge": challenge,
+        "expires_at": str(clock.now_unix() + _SESSION_TTL_SECS),
+    })
+    return sid
+
+# _peek_session validates a Session against the store WITHOUT consuming it
+# (a failed NEW_PASSWORD policy check can be retried on the same session;
+# the caller deletes it on success). Returns the bound username, or "" when
+# the session is unknown, expired, or bound to a different challenge.
+def _peek_session(session_id, want_challenge):
+    if session_id == None or session_id == "":
+        return ""
+    sc = store_collection("auth_sessions")
+    doc = sc.get(session_id)
+    if doc == None:
+        return ""
+    if doc.get("challenge", "") != want_challenge:
+        return ""
+    exp = _to_int(doc.get("expires_at", ""))
+    if exp > 0 and clock.now_unix() >= exp:
+        sc.delete(session_id)
+        return ""
+    return doc.get("username", "")
+
+# _challenge_response is the InitiateAuth/AdminInitiateAuth shape for a
+# required challenge (NEW_PASSWORD_REQUIRED on first login of a
+# FORCE_CHANGE_PASSWORD user).
+def _challenge_response(user, challenge):
+    sid = _new_session(user["username"], challenge)
+    return {
+        "ChallengeName": challenge,
+        "Session": sid,
+        "ChallengeParameters": {
+            "USER_ID_FOR_SRP": user["username"],
+        },
+    }

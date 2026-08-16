@@ -6,7 +6,7 @@
 # the real GitHub API. All data is synthetic. See DISCLAIMER.
 id: github-style
 name: "GitHub App-style API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "GitHub REST + GraphQL API"
@@ -117,10 +117,19 @@ endpoints:
     method: POST
     handler: scripts/hooks.star#on_receive_webhook
 
-  # --- GraphQL ---
-  - route: /graphql
-    method: POST
-    handler: scripts/graphql.star#on_graphql
+# GraphQL service — served from the SDL schema + convention-named Starlark
+# resolvers by the engine's REAL GraphQL executor (validation, variables,
+# fragments, introspection, errors[]). Objects map onto the same collections
+# as the REST surface, with GitHub base64 global IDs; mutations share the
+# REST state machine (issue numbers, state validation, signed webhooks).
+#
+# NOTE: the graphql: transport dispatches before adapter endpoints and hands
+# resolvers only {parent, args} — it has no auth hook — so this endpoint is
+# served without the Bearer/PAT check the REST surface enforces.
+graphql:
+  schema: schemas/schema.graphql
+  resolvers: scripts/resolvers.star
+  path: /graphql
 
 # Backing stores — collections for stateful data.
 resources:

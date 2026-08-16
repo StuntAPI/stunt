@@ -1,0 +1,2 @@
+{"id":"1","entity":{"refName":"Acme Corporation"},"title":"ERP migration","status":"Open","projectedTotal":5250.00,"closeDate":"2024-06-30","currency":{"refName":"USD"},"salesRep":{"refName":"GB"},"probability":25}
+{"id":"2","entity":{"refName":"Globex Industries"},"title":"Support renewal","status":"Qualification","projectedTotal":1200.00,"closeDate":"2024-09-15","currency":{"refName":"USD"},"salesRep":{"refName":"JT"},"probability":10}

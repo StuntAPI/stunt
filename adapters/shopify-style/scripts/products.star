@@ -182,7 +182,9 @@ def on_delete_product(req):
     if prod == None:
         return _not_found("Product", pid)
 
+    view = _product_view(prod)
     pc.delete(pid)
+    _emit_if_subscribed("products/delete", view)
     return respond(200, {})
 
 # --- helpers ---
@@ -190,19 +192,6 @@ def on_delete_product(req):
 # _product_view returns the public-facing product object.
 # Numeric ids are converted from stored strings back to ints for the JSON
 # response (Shopify returns numeric ids).
-def _product_view(p):
-    return {
-        "id": _num_id(p["id"]),
-        "title": p.get("title", ""),
-        "product_type": p.get("product_type", ""),
-        "body_html": p.get("body_html", ""),
-        "vendor": p.get("vendor", ""),
-        "status": p.get("status", "active"),
-        "tags": p.get("tags", ""),
-        "created_at": p.get("created_at", _now()),
-        "updated_at": p.get("updated_at", _now()),
-        "variants": p.get("variants", []),
-    }
 
 # _variant_view normalizes a variant from input (create path). The variant
 # gets its own numeric id offset from the product id, matching how Shopify

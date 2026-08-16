@@ -7,7 +7,7 @@
 # data is synthetic. See DISCLAIMER.
 id: chainlink-style
 name: "Chainlink Data Feeds + Functions + Automation + CCIP simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Chainlink Data Feeds + Functions + Automation"
@@ -18,6 +18,10 @@ identity:
   token_scheme: bearer
 
 # Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+# concurrency_key serialises read-modify-write handlers against the same
+# path-param value (derive-on-read state transitions, fund/withdraw).
 endpoints:
   # --- Data Feeds (public, no auth required) ---
   - route: /feeds
@@ -26,6 +30,15 @@ endpoints:
   - route: /feeds/{feedID}
     method: GET
     handler: scripts/feeds.star#on_get_feed
+  - route: /feeds/{feedID}/latestRoundData
+    method: GET
+    handler: scripts/feeds.star#on_latest_round_data
+  - route: /feeds/{feedID}/rounds
+    method: GET
+    handler: scripts/feeds.star#on_list_rounds
+  - route: /feeds/{feedID}/rounds/{roundId}
+    method: GET
+    handler: scripts/feeds.star#on_get_round
 
   # --- Functions (auth required) ---
   - route: /v2/functions/createSecrets
@@ -40,8 +53,12 @@ endpoints:
   - route: /v2/functions/request/{requestID}
     method: GET
     handler: scripts/functions.star#on_get_request
+    concurrency_key: requestID # derive-on-read transition persists a state change
+  - route: /v2/functions/secrets/{secretID}
+    method: GET
+    handler: scripts/functions.star#on_get_secrets
 
-  # --- Automation (auth required) ---
+  # --- Automation (auth required; keepers-registry lifecycle) ---
   - route: /v2/automation/registerUpkeep
     method: POST
     handler: scripts/automation.star#on_register_upkeep
@@ -51,6 +68,31 @@ endpoints:
   - route: /v2/automation/{id}
     method: GET
     handler: scripts/automation.star#on_get_upkeep
+    concurrency_key: id # derive-on-read performs persist state changes
+  - route: /v2/automation/{id}/fund
+    method: POST
+    handler: scripts/automation.star#on_fund_upkeep
+    concurrency_key: id
+  - route: /v2/automation/{id}/cancel
+    method: POST
+    handler: scripts/automation.star#on_cancel_upkeep
+    concurrency_key: id
+  - route: /v2/automation/{id}/withdraw
+    method: POST
+    handler: scripts/automation.star#on_withdraw_upkeep
+    concurrency_key: id
+  - route: /v2/automation/{id}/check
+    method: GET
+    handler: scripts/automation.star#on_check_upkeep
+    concurrency_key: id
+  - route: /v2/automation/{id}/perform
+    method: POST
+    handler: scripts/automation.star#on_perform_upkeep
+    concurrency_key: id
+  - route: /v2/automation/{id}/performs
+    method: GET
+    handler: scripts/automation.star#on_list_performs
+    concurrency_key: id
 
   # --- CCIP (auth required) ---
   - route: /v2/ccip/messages

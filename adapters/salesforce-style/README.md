@@ -30,9 +30,13 @@ CRM integrations during local development:
   (no parenthesized grouping), plus `ORDER BY` (`ASC`/`DESC`), `LIMIT`, and
   `OFFSET`. `SELECT *` projects all fields. Works against all five objects
   (Account, Contact, Opportunity, Lead, User).
-- **queryAll:** Same as query (includes deleted records conceptually).
+- **queryAll:** `GET /services/data/v60.0/queryAll?q=...` — same SOQL subset
+  as query, but INCLUDES soft-deleted (recycle-bin) records, which carry
+  `IsDeleted: true` (and `DeletedDate`). The usual pattern is
+  `SELECT Id, Name, IsDeleted FROM Account WHERE IsDeleted = true`.
 - **Account/Contact/Opportunity CRUD:** `POST` (create, 201), `GET /{id}`
-  (retrieve), `PATCH /{id}` (update, 204), `DELETE /{id}` (204).
+  (retrieve), `PATCH /{id}` (update, 204), `DELETE /{id}` (204, soft delete —
+  see below).
 - **Composite batch:** `POST /services/data/v60.0/composite` → processes
   sub-requests sequentially, returns per-request results. Sub-request URLs are
   pattern-matched as `/services/data/v60.0/sobjects/<Type>[/<id>]` and support
@@ -104,6 +108,25 @@ The query handler evaluates a practical SOQL subset. It:
 4. Sorts with `ORDER BY <field> [ASC|DESC]` (ascending by default; records
    missing the field sort first), then applies `OFFSET` followed by `LIMIT`.
 5. Returns seeded + created records with the `attributes: {type, url}` block.
+
+## Soft delete (recycle bin)
+
+`DELETE /services/data/v60.0/sobjects/{type}/{id}` sends the record to the
+recycle bin instead of destroying it, reproducing the real observable
+behavior:
+
+- The stored row is kept and flagged `IsDeleted: true` with a `DeletedDate`
+  stamp; the DELETE returns `204` as usual.
+- `GET /sobjects/{type}/{id}` → `404 NOT_FOUND` (deleted records are not
+  retrievable).
+- `PATCH /sobjects/{type}/{id}` → `404` with `errorCode: "ENTITY_IS_DELETED"`;
+  a second `DELETE` returns the same error.
+- `GET /query?q=SELECT ... ` excludes deleted rows (SOQL cannot see the bin).
+- `GET /queryAll?q=SELECT Id, IsDeleted FROM ... WHERE IsDeleted = true`
+  surfaces them; `IsDeleted` is queryable and selectable on every object
+  (`false` for live rows, including seeded records).
+- `SELECT *` projections strip internal storage keys, so a record's public
+  shape is identical whether read via query or retrieve.
 
 ## Backing stores
 

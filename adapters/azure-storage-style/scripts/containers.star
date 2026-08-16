@@ -132,13 +132,18 @@ def on_delete_container(req):
             break
     if c_id != None and c_id != "":
         cc.delete(c_id)
-        # Also delete blobs in this container
+        # Also delete blobs in this container (docs only; blob bytes and
+        # staged blocks are cleaned below so nothing is orphaned).
         bc = store_collection("blobs")
         for b in bc.list():
             if b.get("container", "") == container:
                 b_id = b.get("id", "")
                 if b_id != None and b_id != "":
                     bc.delete(b_id)
+                bid = b.get("bid", "")
+                if bid != None and bid != "":
+                    store_blob("az-blobs").delete(bid)
+                _discard_staged_blocks(container, b.get("name", ""))
 
     return respond(202, "", {"x-ms-request-id": _req_id()})
 

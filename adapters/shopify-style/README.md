@@ -62,9 +62,29 @@ commerce integrations during local development:
   `page_info` (opaque cursor) query params, with the continuation cursor
   round-tripped in a `Link: <url>; rel="next"` response header. When `limit`
   is missing or `<= 0`, paging is disabled and the whole list is returned.
-- **GraphQL:** `POST /graphql.json` with pattern-matched operations
-  (`products(first:)`, `orders(first:)`, `customer`, `shop`) returning
-  relay-style `edges`/`pageInfo` payloads with `gid://shopify/...` IDs.
+- **GraphQL (real execution):** `POST /admin/api/2024-10/graphql.json` is
+  served by stunt's real GraphQL executor from
+  [`schemas/schema.graphql`](schemas/schema.graphql) — documents are parsed,
+  validated, and executed: arguments, variables, aliases, fragments,
+  introspection, and spec-shaped `errors[]`. Unknown fields are rejected at
+  validation time (the old pattern matcher returned a canned response).
+  Modeled surface: `shop`, `product`/`products(first, after, query, sortKey,
+  reverse)`, `order`/`orders(first, after, query)`,
+  `customer`/`customers(first, after, query, sortKey, reverse)` connections
+  with `edges`/`nodes`/`pageInfo`, `Money` objects, `gid://shopify/...`
+  global IDs translated to/from the REST numeric ids, and the mutations
+  `productCreate`/`productUpdate`/`productDelete`,
+  `customerCreate`/`customerUpdate`/`customerDelete` (archiving, like REST
+  DELETE), `orderCancel(orderId, reason, restock)`, and `orderClose(orderId)`
+  — each returning Shopify's `userErrors` convention. The `query` argument
+  supports a bare substring term plus `field:value` equality tokens.
+  GraphQL mutations emit the same signed webhooks as their REST twins, with
+  GraphQL-shaped payloads.
+
+  > The `graphql:` transport dispatches before adapter endpoints and hands
+  > resolvers only `{parent, args}` — it has no auth hook — so this endpoint
+  > is served without the `X-Shopify-Access-Token` check the REST surface
+  > enforces.
 
 Products, orders, and customers are **stateful** — created data persists across
 requests for the duration of the server session.
@@ -137,7 +157,7 @@ compute it on its own authorize redirect.
 | GET | `/admin/api/2024-10/webhooks.json` | `webhooks.star#on_list_webhooks` | List webhooks |
 | POST | `/admin/api/2024-10/webhooks.json` | `webhooks.star#on_create_webhook` | Register webhook (201) |
 | DELETE | `/admin/api/2024-10/webhooks/{id}.json` | `webhooks.star#on_delete_webhook` | Delete webhook (200 {}) |
-| POST | `/admin/api/2024-10/graphql.json` | `graphql.star#on_graphql` | GraphQL (pattern-matched) |
+| POST/GET | `/admin/api/2024-10/graphql.json` | `graphql:` transport → `resolvers.star` | Real GraphQL execution (see above) |
 
 ## Usage
 

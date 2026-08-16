@@ -113,7 +113,7 @@ def _list_blobs(req):
     return respond(200, xml, {"Content-Type": "application/xml", "x-ms-request-id": _req_id()})
 
 # on_put_blob handles blob upload or blob sub-operations (?comp=block,
-# ?comp=properties, ?comp=metadata).
+# ?comp=blocklist, ?comp=properties, ?comp=metadata).
 def on_put_blob(req):
     err = _require_auth(req)
     if err != None:
@@ -131,7 +131,9 @@ def on_put_blob(req):
             return _set_blob_metadata(req, container, blob)
         if comp == "block":
             return _put_block(req, container, blob)
-        # Other comp values (blocklist, etc.) — accept generically
+        if comp == "blocklist":
+            return _put_block_list(req, container, blob)
+        # Other comp values — accept generically
         return respond(201, "", {"x-ms-request-id": _req_id()})
 
     # Regular blob upload
@@ -198,6 +200,9 @@ def _upload_blob(req, container, blob):
         "lastModified": _rfc1123(),
         "creationTime": _creation_time(),
         "metadata": metadata,
+        # A single-shot Put Blob has no addressable committed blocks; only
+        # Put Block List commits named blocks (see _put_block_list).
+        "committedBlocks": [],
     }
     if existing_id != None and existing_id != "":
         bc.update(existing_id, doc)
@@ -285,7 +290,8 @@ def on_head_blob(req):
         "x-ms-request-id": _req_id(),
     })
 
-# on_delete_blob deletes a blob. Returns 202.
+# on_delete_blob deletes a blob (and any staged uncommitted blocks, like the
+# real service). Returns 202.
 def on_delete_blob(req):
     err = _require_auth(req)
     if err != None:
@@ -306,6 +312,7 @@ def on_delete_blob(req):
         bc.delete(b_id)
     if bid != None and bid != "":
         store_blob("az-blobs").delete(bid)
+    _discard_staged_blocks(container, blob)
 
     return respond(202, "", {"x-ms-request-id": _req_id()})
 
@@ -394,18 +401,245 @@ def _get_blob_properties(req, container, blob):
         "x-ms-request-id": _req_id(),
     })
 
-# _put_block: PUT /{container}/{blob}?comp=block&blockid=...
+# ====================================================================
+# Block staging (Put Block / Put Block List / Get Block List)
+# ====================================================================
+# The real Azure block-blob model: Put Block stages bytes under a
+# base64 block id (out of order, re-uploadable), Put Block List commits
+# the blob by concatenating the listed blocks in order, and Get Block
+# List enumerates committed vs uncommitted blocks. Committed content is
+# byte-exact: GET /{container}/{blob} returns the assembled bytes.
+#
+# Documented deviation: the crypto module has no MD5, so Content-MD5
+# response headers carry the base64 SHA-256 of the bytes instead (the S3
+# adapter makes the same trade for its ETags).
+
+# _put_block: PUT /{container}/{blob}?comp=block&blockid=<base64>
+# Stages the request body as an uncommitted block. Blocks may be staged in
+# any order; re-staging an id replaces its bytes.
 def _put_block(req, container, blob):
-    # Accept the block upload; return a Content-MD5
+    if not _container_exists(container):
+        return _container_not_found(container)
+
+    block_id = _query_val(req, "blockid")
+    if block_id == "":
+        return _az_blob_error(400, "MissingRequiredQueryParameter",
+            "A query parameter that's mandatory for this request is not specified.\nRequestId:" + _req_id() + "\nTime:" + _rfc1123())
+    err = _validate_block_id(block_id)
+    if err != None:
+        return err
+
+    raw = req.get("raw_body", "")
+    if raw == None:
+        raw = ""
+    digest = crypto.sha256(raw, "base64")
+
+    bstore = store_blob("az-blocks")
+    bc = store_collection("blocks")
+    row_id = _block_row_id(container, blob, block_id)
+    existing = bc.get(row_id)
+    bid = ""
+    if existing != None:
+        bid = existing.get("bid", "")
+    if bid == None or bid == "":
+        bid = "azblk_" + str(store_kv_incr("azure", "block_seq"))
+    bstore.put(bid, raw, "application/octet-stream")
+
+    doc = {
+        "id": row_id,
+        "container": container,
+        "blob": blob,
+        "blockId": block_id,
+        "bid": bid,
+        "size": len(raw),
+        "sha256b64": digest,
+        "lastModifiedUnix": clock.now_unix(),
+    }
+    if existing == None:
+        bc.insert(doc)
+    else:
+        bc.update(row_id, doc)
+
     return respond(201, "", {
-        "Content-MD5": "",
+        "Content-MD5": digest,
         "x-ms-request-id": _req_id(),
+        "x-ms-version": "2024-08-04",
     })
 
-# _get_block_list: GET /{container}/{blob}?comp=blocklist
+# _invalid_block_list returns the real Azure 400 InvalidBlockList error.
+def _invalid_block_list():
+    return _az_blob_error(400, "InvalidBlockList",
+        "The specified block list is invalid.\nRequestId:" + _req_id() + "\nTime:" + _rfc1123())
+
+# _put_block_list: PUT /{container}/{blob}?comp=blocklist
+# Commits the blob: the listed blocks (in list order) are concatenated into
+# the blob content, unlisted staged blocks are discarded, and the listed
+# blocks become the blob's committed block list.
+def _put_block_list(req, container, blob):
+    if not _container_exists(container):
+        return _container_not_found(container)
+
+    raw = req.get("raw_body", "")
+    if raw == None:
+        raw = ""
+    entries = _parse_block_list_xml(raw)
+    if entries == None:
+        return _az_blob_error(400, "InvalidXMLDocument",
+            "XML specified is not syntactically valid.\nRequestId:" + _req_id() + "\nTime:" + _rfc1123())
+
+    bdoc = _find_blob(container, blob)
+    committed = []
+    if bdoc != None:
+        cb = bdoc.get("committedBlocks", None)
+        if cb != None:
+            committed = cb
+
+    # Resolve each listed id to staged bytes (Latest/Uncommitted) or an
+    # already-committed block (Committed); anything missing is a 400.
+    bstore = store_blob("az-blocks")
+    staged = {}
+    for r in _staged_blocks(container, blob):
+        staged[r.get("blockId", "")] = r
+    committed_map = {}
+    for c in committed:
+        committed_map[c.get("Name", "")] = c
+
+    full = ""
+    committed_list = []
+    for entry in entries:
+        kind = entry[0]
+        block_id = entry[1]
+        if block_id == "" or not _is_base64(block_id) or len(block_id) > _MAX_BLOCK_ID_CHARS:
+            return _invalid_block_list()
+        row = staged.get(block_id, None)
+        if row != None:
+            content = bstore.get(row.get("bid", ""))
+            if content == None:
+                content = ""
+            full = full + content
+            committed_list.append({"Name": block_id, "Size": _to_num(row.get("size", 0))})
+            continue
+        if kind == "Committed":
+            cb = committed_map.get(block_id, None)
+            if cb != None:
+                # Reuse the committed bytes from the assembled blob content:
+                # slice the previously committed range out of the doc.
+                piece = _committed_bytes(bdoc, cb)
+                if piece != None:
+                    full = full + piece
+                    committed_list.append({"Name": block_id, "Size": _to_num(cb.get("Size", 0))})
+                    continue
+        return _invalid_block_list()
+
+    # Assemble: reuse the existing blob's backing id when overwriting.
+    bc = store_collection("blobs")
+    bid = ""
+    existing_id = ""
+    if bdoc != None:
+        bid = bdoc.get("bid", "")
+        existing_id = bdoc.get("id", "")
+    if bid == None or bid == "":
+        bid = "azb_" + str(store_kv_incr("azure", "blob_seq"))
+    content_type = "application/octet-stream"
+    if bdoc != None:
+        ct = bdoc.get("contentType", "")
+        if ct != None and ct != "":
+            content_type = ct
+    store_blob("az-blobs").put(bid, full, content_type)
+
+    metadata = {}
+    if bdoc != None:
+        md = bdoc.get("metadata", None)
+        if md != None:
+            metadata = md
+    doc = {
+        "container": container,
+        "name": blob,
+        "bid": bid,
+        "contentType": content_type,
+        "blobType": "BlockBlob",
+        "contentLength": len(full),
+        "etag": _gen_etag(),
+        "lastModified": _rfc1123(),
+        "creationTime": _creation_time(),
+        "metadata": metadata,
+        "committedBlocks": committed_list,
+    }
+    if existing_id != None and existing_id != "":
+        bc.update(existing_id, doc)
+    else:
+        bc.insert(doc)
+
+    # Staged blocks are consumed by the commit; unlisted ones are discarded.
+    _discard_staged_blocks(container, blob)
+
+    return respond(201, "", {
+        "ETag": '"' + doc["etag"] + '"',
+        "Last-Modified": doc["lastModified"],
+        "Content-MD5": crypto.sha256(full, "base64"),
+        "x-ms-request-id": _req_id(),
+        "x-ms-version": "2024-08-04",
+    })
+
+# _committed_bytes returns the byte range of a committed block by replaying
+# the committed list offsets against the blob content (Put Block List with
+# <Committed> entries reuses previously committed bytes). Returns None when
+# the block is not part of the current committed content.
+def _committed_bytes(bdoc, committed_block):
+    if bdoc == None:
+        return None
+    content = store_blob("az-blobs").get(bdoc.get("bid", ""))
+    if content == None:
+        return None
+    offset = 0
+    want = committed_block.get("Name", "")
+    for c in bdoc.get("committedBlocks", []):
+        size = _to_num(c.get("Size", 0))
+        if c.get("Name", "") == want:
+            return content[offset:offset + size]
+        offset = offset + size
+    return None
+
+# _get_block_list: GET /{container}/{blob}?comp=blocklist&blocklisttype=...
+# Returns the Committed/Uncommitted block lists. blocklisttype is required
+# (committed | uncommitted | all), like the real service.
 def _get_block_list(req, container, blob):
+    if not _container_exists(container):
+        return _container_not_found(container)
+
+    blt = _query_val(req, "blocklisttype")
+    if blt == "":
+        return _az_blob_error(400, "MissingRequiredQueryParameter",
+            "A query parameter that's mandatory for this request is not specified.\nRequestId:" + _req_id() + "\nTime:" + _rfc1123())
+    if blt != "committed" and blt != "uncommitted" and blt != "all":
+        return _az_blob_error(400, "InvalidQueryParameterValue",
+            "Value for one of the query parameters specified in the request URI is invalid.\nRequestId:" + _req_id() + "\nTime:" + _rfc1123())
+
+    bdoc = _find_blob(container, blob)
+    staged = _staged_blocks(container, blob)
+    if bdoc == None and len(staged) == 0:
+        return _blob_not_found(container, blob)
+
     xml = '<?xml version="1.0" encoding="utf-8"?>\n'
-    xml = xml + '<BlockList><CommittedBlocks /><UncommittedBlocks /></BlockList>'
+    xml = xml + "<BlockList>"
+    if blt == "committed" or blt == "all":
+        xml = xml + "<CommittedBlocks>"
+        if bdoc != None:
+            for c in bdoc.get("committedBlocks", []):
+                xml = xml + "<Block>"
+                xml = xml + "<Name>" + _xml_escape(c.get("Name", "")) + "</Name>"
+                xml = xml + "<Size>" + _to_int_str(c.get("Size", 0)) + "</Size>"
+                xml = xml + "</Block>"
+        xml = xml + "</CommittedBlocks>"
+    if blt == "uncommitted" or blt == "all":
+        xml = xml + "<UncommittedBlocks>"
+        for r in staged:
+            xml = xml + "<Block>"
+            xml = xml + "<Name>" + _xml_escape(r.get("blockId", "")) + "</Name>"
+            xml = xml + "<Size>" + _to_int_str(r.get("size", 0)) + "</Size>"
+            xml = xml + "</Block>"
+        xml = xml + "</UncommittedBlocks>"
+    xml = xml + "</BlockList>"
     return respond(200, xml, {"Content-Type": "application/xml", "x-ms-request-id": _req_id()})
 
 # ====================================================================

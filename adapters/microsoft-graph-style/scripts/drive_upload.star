@@ -83,7 +83,7 @@ def _simple_upload(req, parent_id, name):
             b.put(existing["id"], content, content_type)
             existing["size"] = len(content)
             existing["file"] = {"mimeType": content_type}
-            existing["lastModifiedDateTime"] = "2024-06-15T12:00:00Z"
+            existing["lastModifiedDateTime"] = clock.now_rfc3339()
             fc.update(existing["id"], existing)
             return respond(200, _drive_item(existing))
 
@@ -96,8 +96,8 @@ def _simple_upload(req, parent_id, name):
         "folder": None,
         "size": len(content),
         "parentId": parent_id,
-        "createdDateTime": "2024-06-15T12:00:00Z",
-        "lastModifiedDateTime": "2024-06-15T12:00:00Z",
+        "createdDateTime": clock.now_rfc3339(),
+        "lastModifiedDateTime": clock.now_rfc3339(),
     }
     fc.insert(doc)
     return respond(201, _drive_item(doc))
@@ -276,8 +276,8 @@ def on_upload_chunk(req):
             "folder": None,
             "size": len(full),
             "parentId": parent_id,
-            "createdDateTime": "2024-06-15T12:00:00Z",
-            "lastModifiedDateTime": "2024-06-15T12:00:00Z",
+            "createdDateTime": clock.now_rfc3339(),
+            "lastModifiedDateTime": clock.now_rfc3339(),
         }
         fc.insert(doc)
         b.delete("up-" + session_id)

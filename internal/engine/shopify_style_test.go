@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -15,6 +16,46 @@ import (
 
 	"stuntapi.com/stunt/internal/manifest"
 )
+
+// setupShopifyStyle serves the committed shopify-style adapter and returns
+// its HTTP base URL + cleanup.
+func setupShopifyStyle(t *testing.T) (string, func()) {
+	t.Helper()
+
+	absDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "shopify-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"shopify": {Adapter: absDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		e.Close()
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	url := addrs["shopify"]
+	cleanup := func() {
+		cancel()
+		e.Close()
+	}
+	return url, cleanup
+}
 
 // TestShopifyStyleAdapter exercises the Shopify Admin-style adapter end-to-end:
 //
@@ -419,14 +460,266 @@ func TestShopifyStyleAdapter(t *testing.T) {
 		}
 	}
 
-	// ===== 401 on GraphQL without token (POST, no auth header) =====
+	// ===== GraphQL transport auth posture =====
+	//
+	// The graphql: transport dispatches before adapter endpoints and has no
+	// auth hook, so the query endpoint is served without the REST token
+	// check (documented in the adapter README); REST endpoints still 401.
 
-	_, status = shopifyPostJSONNoToken(t, base+"/admin/api/2024-10/graphql.json", "", map[string]any{
+	body, status = shopifyPostJSONNoToken(t, base+"/admin/api/2024-10/graphql.json", "", map[string]any{
 		"query": "{ shop { name } }",
 	})
-	if status != 401 {
-		t.Fatalf("graphql POST without token -> status %d, want 401", status)
+	if status != 200 {
+		t.Fatalf("graphql POST without token -> status %d, want 200 (transport has no auth hook)", status)
 	}
+	var shopResp map[string]any
+	if err := json.Unmarshal([]byte(body), &shopResp); err != nil {
+		t.Fatalf("unmarshal shop response: %v (body %s)", err, body)
+	}
+	if got := shopResp["data"].(map[string]any)["shop"].(map[string]any)["name"]; got != "Stunt Dev Store" {
+		t.Fatalf("shop.name = %v, want Stunt Dev Store", got)
+	}
+}
+
+// TestShopifyStyleGraphqlExecution exercises the real GraphQL executor end
+// to end: variables + aliases + nested joins on reads, gid:// ID round-trips
+// against the REST ids, mutation userErrors, order lifecycle mutations, and
+// validation failures for unknown fields/args.
+func TestShopifyStyleGraphqlExecution(t *testing.T) {
+	base, cleanup := setupShopifyStyle(t)
+	defer cleanup()
+	const token = "shpat_test_token"
+
+	// Grab the seeded product + order ids from REST for gid round-trips.
+	body, status := shopifyGet(t, base+"/admin/api/2024-10/products.json", token)
+	if status != 200 {
+		t.Fatalf("REST products -> %d", status)
+	}
+	var prodList map[string]any
+	json.Unmarshal([]byte(body), &prodList)
+	seedProd := prodList["products"].([]any)[0].(map[string]any)
+	seedProdID := seedProd["id"].(float64)
+	seedProdGID := fmt.Sprintf("gid://shopify/Product/%d", int64(seedProdID))
+
+	// ===== Read: variables, aliases, nested joins =====
+
+	query := `query($n: Int!, $id: ID!) {
+		byGid: product(id: $id) { id title status variants(first: 3) { nodes { id title price { amount currencyCode } inventoryQuantity product { title } } } }
+		found: products(first: $n, query: "boots") { edges { node { title } } pageInfo { hasNextPage } }
+		none: products(first: $n, query: "no-such-thing") { edges { node { title } } }
+		orders(first: 1) { nodes { id name email totalPrice { amount currencyCode } customer { id email displayName } lineItems(first: 5) { nodes { title quantity fulfillableQuantity discountedTotalPrice { amount } } } } }
+	}`
+	vars := map[string]any{"n": 5, "id": seedProdGID}
+	gql := shopifyGraphql(t, base, token, query, vars)
+
+	byGid := gql["byGid"].(map[string]any)
+	if byGid["id"] != seedProdGID {
+		t.Fatalf("product.id = %v, want %s (gid round-trip)", byGid["id"], seedProdGID)
+	}
+	if byGid["status"] != "ACTIVE" {
+		t.Fatalf("product.status = %v, want ACTIVE (enum casing)", byGid["status"])
+	}
+	vars_ := byGid["variants"].(map[string]any)["nodes"].([]any)
+	if len(vars_) != 1 {
+		t.Fatalf("variant nodes = %v, want the seeded default variant", vars_)
+	}
+	v0 := vars_[0].(map[string]any)
+	if _, ok := v0["id"].(string); !ok || !strings.HasPrefix(v0["id"].(string), "gid://shopify/ProductVariant/") {
+		t.Fatalf("variant.id = %v, want a ProductVariant gid", v0["id"])
+	}
+	price := v0["price"].(map[string]any)
+	if price["amount"] != "89.99" || price["currencyCode"] != "USD" {
+		t.Fatalf("variant.price = %v, want amount 89.99 USD (decimal string)", price)
+	}
+	// Nested join: variant → product.
+	if v0["product"].(map[string]any)["title"] != seedProd["title"] {
+		t.Fatalf("variant.product.title = %v, want %v", v0["product"], seedProd["title"])
+	}
+
+	found := gql["found"].(map[string]any)
+	edges := found["edges"].([]any)
+	if len(edges) != 1 || !strings.Contains(edges[0].(map[string]any)["node"].(map[string]any)["title"].(string), "Boots") {
+		t.Fatalf("query \"boots\" edges = %v, want the boots product (case-insensitive)", edges)
+	}
+	if none := gql["none"].(map[string]any)["edges"].([]any); len(none) != 0 {
+		t.Fatalf("no-match query edges = %v, want empty", none)
+	}
+
+	order := gql["orders"].(map[string]any)["nodes"].([]any)[0].(map[string]any)
+	if !strings.HasPrefix(order["id"].(string), "gid://shopify/Order/") {
+		t.Fatalf("order.id = %v, want an Order gid", order["id"])
+	}
+	if order["name"] != "#1001" {
+		t.Fatalf("order.name = %v, want #1001", order["name"])
+	}
+	total := order["totalPrice"].(map[string]any)
+	if total["amount"] != "89.99" {
+		t.Fatalf("order.totalPrice.amount = %v, want 89.99", total["amount"])
+	}
+	lines := order["lineItems"].(map[string]any)["nodes"].([]any)
+	if len(lines) != 1 || lines[0].(map[string]any)["fulfillableQuantity"] != float64(1) {
+		t.Fatalf("lineItems = %v, want 1 fulfillable line", lines)
+	}
+	cust := order["customer"].(map[string]any)
+	if _, ok := cust["email"].(string); !ok || !strings.HasPrefix(cust["id"].(string), "gid://shopify/Customer/") {
+		t.Fatalf("order.customer = %v, want a Customer gid + email", cust)
+	}
+
+	// ===== Mutations: productCreate → productUpdate → REST parity =====
+
+	mut := `mutation($in: ProductInput!) {
+		productCreate(input: $in) { product { id title status tags } userErrors { field message } }
+	}`
+	createVars := map[string]any{"in": map[string]any{
+		"title":           "GraphQL Kettle",
+		"descriptionHtml": "<p>Brews via queries.</p>",
+		"tags":            []string{"kitchen", "graphql"},
+		"variants":        []any{map[string]any{"price": "19.50", "sku": "KETTLE-1", "inventoryQuantity": 7}},
+	}}
+	gql = shopifyGraphql(t, base, token, mut, createVars)
+	created := gql["productCreate"].(map[string]any)
+	if errs := created["userErrors"].([]any); len(errs) != 0 {
+		t.Fatalf("productCreate userErrors = %v", errs)
+	}
+	prod := created["product"].(map[string]any)
+	gid := prod["id"].(string)
+	if !strings.HasPrefix(gid, "gid://shopify/Product/") {
+		t.Fatalf("created product id = %v, want a Product gid", gid)
+	}
+	if prod["status"] != "ACTIVE" {
+		t.Fatalf("created status = %v, want ACTIVE", prod["status"])
+	}
+	if got := prod["tags"].([]any); len(got) != 2 || got[0] != "kitchen" {
+		t.Fatalf("created tags = %v, want [kitchen graphql]", got)
+	}
+	// REST parity: the same product is visible through REST by numeric id.
+	restID := gid[strings.LastIndex(gid, "/")+1:]
+	body, status = shopifyGet(t, base+"/admin/api/2024-10/products/"+restID+".json", token)
+	if status != 200 {
+		t.Fatalf("REST get of GraphQL-created product -> %d (body %s)", status, body)
+	}
+	var restProd map[string]any
+	json.Unmarshal([]byte(body), &restProd)
+	if restProd["product"].(map[string]any)["title"] != "GraphQL Kettle" {
+		t.Fatalf("REST title = %v, want GraphQL Kettle", restProd["product"])
+	}
+
+	// Blank title is a userError, not a transport failure.
+	gql = shopifyGraphql(t, base, token, mut, map[string]any{"in": map[string]any{"title": "  "}})
+	created = gql["productCreate"].(map[string]any)
+	if created["product"] != nil {
+		t.Fatalf("blank-title product = %v, want null", created["product"])
+	}
+	ue := created["userErrors"].([]any)[0].(map[string]any)
+	if ue["message"] != "Title can't be blank" {
+		t.Fatalf("blank-title userError = %v", ue)
+	}
+
+	// productUpdate round-trips the gid and merges fields.
+	upd := `mutation($in: ProductInput!) {
+		productUpdate(input: $in) { product { id title } userErrors { field message } }
+	}`
+	gql = shopifyGraphql(t, base, token, upd, map[string]any{"in": map[string]any{
+		"id":    gid,
+		"title": "GraphQL Kettle v2",
+	}})
+	updated := gql["productUpdate"].(map[string]any)
+	if updated["product"].(map[string]any)["title"] != "GraphQL Kettle v2" {
+		t.Fatalf("productUpdate title = %v", updated["product"])
+	}
+
+	// Unknown gid → userErrors.
+	gql = shopifyGraphql(t, base, token, upd, map[string]any{"in": map[string]any{"id": "gid://shopify/Product/1", "title": "x"}})
+	if errs := gql["productUpdate"].(map[string]any)["userErrors"].([]any); len(errs) != 1 {
+		t.Fatalf("unknown-gid userErrors = %v, want one", errs)
+	}
+
+	// ===== Order lifecycle via GraphQL (mirrors the REST semantics) =====
+
+	orderGID := order["id"].(string)
+	cancelMut := `mutation($id: ID!) { orderCancel(orderId: $id, reason: CUSTOMER) { order { cancelledAt cancelReason } orderCancelUserErrors { message } } }`
+	gql = shopifyGraphql(t, base, token, cancelMut, map[string]any{"id": orderGID})
+	cancelled := gql["orderCancel"].(map[string]any)
+	if errs := cancelled["orderCancelUserErrors"].([]any); len(errs) != 0 {
+		t.Fatalf("orderCancel userErrors = %v", errs)
+	}
+	cOrder := cancelled["order"].(map[string]any)
+	if cOrder["cancelledAt"] == nil {
+		t.Fatalf("cancelledAt = nil, want a timestamp")
+	}
+	if cOrder["cancelReason"] != "customer" {
+		t.Fatalf("cancelReason = %v, want customer (stored lowercase like REST)", cOrder["cancelReason"])
+	}
+
+	// Double cancel → userError; close after cancel → userError.
+	gql = shopifyGraphql(t, base, token, cancelMut, map[string]any{"id": orderGID})
+	if errs := gql["orderCancel"].(map[string]any)["orderCancelUserErrors"].([]any); len(errs) != 1 {
+		t.Fatalf("double cancel userErrors = %v, want one", errs)
+	}
+	closeMut := `mutation($id: ID!) { orderClose(orderId: $id) { orderCloseUserErrors { message } } }`
+	gql = shopifyGraphql(t, base, token, closeMut, map[string]any{"id": orderGID})
+	if errs := gql["orderClose"].(map[string]any)["orderCloseUserErrors"].([]any); len(errs) != 1 {
+		t.Fatalf("close-after-cancel userErrors = %v, want one", errs)
+	}
+
+	// ===== customerCreate duplicate email → userError =====
+
+	custMut := `mutation($in: CustomerInput!) { customerCreate(input: $in) { customer { id email } userErrors { field message } } }`
+	gql = shopifyGraphql(t, base, token, custMut, map[string]any{"in": map[string]any{
+		"email": "jane2@example.test", "firstName": "Jane", "lastName": "Two",
+	}})
+	if errs := gql["customerCreate"].(map[string]any)["userErrors"].([]any); len(errs) != 0 {
+		t.Fatalf("customerCreate userErrors = %v", errs)
+	}
+	gql = shopifyGraphql(t, base, token, custMut, map[string]any{"in": map[string]any{
+		"email": "jane2@example.test",
+	}})
+	if errs := gql["customerCreate"].(map[string]any)["userErrors"].([]any); len(errs) != 1 {
+		t.Fatalf("duplicate email userErrors = %v, want one", errs)
+	}
+
+	// ===== Validation failures: unknown field / unknown argument =====
+
+	resp, status := shopifyGraphqlRaw(t, base, token, `{ products(first: 5) { edges { node { nope } } } }`, nil)
+	if status != 400 {
+		t.Fatalf("unknown field -> %d, want 400 (body %s)", status, resp)
+	}
+	if !strings.Contains(resp, "nope") {
+		t.Fatalf("unknown field error should name the field: %s", resp)
+	}
+	resp, status = shopifyGraphqlRaw(t, base, token, `{ products(first: 5, bogus: true) { edges { node { id } } } }`, nil)
+	if status != 400 {
+		t.Fatalf("unknown argument -> %d, want 400 (body %s)", status, resp)
+	}
+}
+
+// shopifyGraphqlRaw sends a GraphQL POST and returns the raw body + status.
+func shopifyGraphqlRaw(t *testing.T, base, token, query string, variables map[string]any) (string, int) {
+	t.Helper()
+	body, status := shopifyPostJSON(t, base+"/admin/api/2024-10/graphql.json", token, map[string]any{
+		"query":     query,
+		"variables": variables,
+	})
+	return body, status
+}
+
+// shopifyGraphql sends a GraphQL POST and returns data (fails the test when
+// the response carries top-level errors).
+func shopifyGraphql(t *testing.T, base, token, query string, variables map[string]any) map[string]any {
+	t.Helper()
+	body, _ := shopifyGraphqlRaw(t, base, token, query, variables)
+	var resp map[string]any
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		t.Fatalf("unmarshal graphql response: %v (body %s)", err, body)
+	}
+	if errs, ok := resp["errors"]; ok && errs != nil {
+		t.Fatalf("graphql errors: %v (query %s)", errs, query)
+	}
+	data, ok := resp["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("graphql data = %v (body %s)", resp["data"], body)
+	}
+	return data
 }
 
 // === Shopify test helpers ===

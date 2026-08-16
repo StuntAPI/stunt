@@ -6,7 +6,7 @@
 # See DISCLAIMER.
 id: braze-style
 name: "Braze REST API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Braze REST API"
@@ -18,6 +18,9 @@ endpoints:
   - route: /messages/send
     method: POST
     handler: scripts/messages.star#on_send
+  - route: /messages/schedule/create
+    method: POST
+    handler: scripts/messages.star#on_schedule_create
 
   # --- Users ---
   - route: /users/track
@@ -29,6 +32,14 @@ endpoints:
   - route: /users/identify
     method: POST
     handler: scripts/users.star#on_identify
+  - route: /users/delete
+    method: POST
+    handler: scripts/users.star#on_delete
+
+  # --- Export ---
+  - route: /users/export/ids
+    method: POST
+    handler: scripts/users.star#on_export_ids
 
   # --- Campaigns ---
   - route: /campaigns/trigger/send
@@ -58,7 +69,15 @@ endpoints:
 resources:
   - name: users
     kind: collection
-  - name: campaigns
+  - name: events # raw custom-event records (name, time, properties)
+    kind: collection
+  - name: purchases # raw purchase records (product_id, currency, price, quantity)
+    kind: collection
+  - name: campaigns # seeded API-triggered campaigns (id validation)
+    kind: collection
+  - name: dispatches # one record per send (real 32-hex dispatch ids)
+    kind: collection
+  - name: schedules # scheduled sends (derive-on-read scheduled -> sent)
     kind: collection
   - name: webhooks
     kind: collection

@@ -104,9 +104,19 @@ endpoints:
   - route: /v1.0/me/drive/items/{id}/content
     method: GET
     handler: scripts/drive_upload.star#on_get_content
+  # Recycle-bin restore (literal segment; declared before the bare {id}
+  # routes below so it is matched first).
+  - route: /v1.0/me/drive/items/{id}/restore
+    method: POST
+    handler: scripts/drive.star#on_restore_item
+    concurrency_key: id # moves a subtree between collections, serialized per item
+  - route: /v1.0/me/drive/items/{id}
+    method: GET
+    handler: scripts/drive.star#on_get_item
   - route: /v1.0/me/drive/items/{id}
     method: DELETE
     handler: scripts/drive.star#on_delete_item
+    concurrency_key: id # cascade read-modify-write, serialized per item
   # Simple upload (< 4 MB path): PUT root:/{name}:/content and the
   # items/{parentId}:/{name}:/content variant.
   - route: /v1.0/me/drive/root:/{item}/content
@@ -176,6 +186,8 @@ resources:
   - name: chat_messages
     kind: collection
   - name: files
+    kind: collection
+  - name: recyclebin
     kind: collection
   - name: sessions
     kind: collection

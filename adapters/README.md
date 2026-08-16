@@ -734,6 +734,12 @@ def resolve_Post_author(args):
 
 - GraphQL resolvers use the same Starlark sandbox as REST, gRPC, and WS handlers — no host I/O,
   no network.
+- **Auth:** the `graphql:` transport dispatches before adapter endpoints and hands resolvers only
+  `{parent, args}` — it has no access to request headers, so an adapter's token check cannot gate
+  the GraphQL endpoint itself (REST endpoints keep enforcing it). Adapters that model providers
+  requiring auth on GraphQL (e.g. `github-style`, `shopify-style`, `braintree-style`,
+  `producthunt-style`) document this in their READMEs; `thegraph-style`'s public hosted-service
+  endpoint matches the real provider by being open.
 - `stunt adapter lint` validates the `graphql:` section (schema + resolvers must be present with a
   valid handler spec) and scans resolver scripts for real-looking data, just like fixtures and
   templates.

@@ -161,22 +161,6 @@ def on_delete_customer(req):
 # _customer_view returns the public-facing customer object. The internal
 # "_archived" flag is never surfaced. Numeric ids are converted from stored
 # strings back to ints.
-def _customer_view(c):
-    return {
-        "id": _num_id(c["id"]),
-        "email": c.get("email", ""),
-        "first_name": c.get("first_name", ""),
-        "last_name": c.get("last_name", ""),
-        "orders_count": c.get("orders_count", 0),
-        "total_spent": c.get("total_spent", "0.00"),
-        "phone": c.get("phone", ""),
-        "note": c.get("note", ""),
-        "tags": c.get("tags", ""),
-        "state": c.get("state", "enabled"),
-        "verified_email": c.get("verified_email", True),
-        "created_at": c.get("created_at", _now()),
-        "updated_at": c.get("updated_at", _now()),
-    }
 
 # _or_blank normalizes a None field value to "".
 def _or_blank(v):

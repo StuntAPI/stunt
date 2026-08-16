@@ -6,7 +6,7 @@
 # synthetic. See DISCLAIMER.
 id: netsuite-style
 name: "NetSuite SuiteTalk REST API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "NetSuite SuiteTalk REST API"
@@ -24,112 +24,42 @@ endpoints:
     method: POST
     handler: scripts/query.star#on_suiteql
 
-  # --- metadata catalog ---
+  # --- metadata catalog (literal route BEFORE the parameterized record
+  #     routes below) ---
   - route: /services/rest/record/v1/metadata-catalog
     method: GET
     handler: scripts/catalog.star#on_catalog
 
-  # --- customer CRUD (literal list/create BEFORE parameterized) ---
-  - route: /services/rest/record/v1/customer
+  # --- record CRUD (customer, salesOrder, invoice, item, employee, vendor,
+  #     opportunity, customerPayment): the handlers resolve the record type
+  #     from the URL path, so one parameterized route per method serves all
+  #     types at the provider-real paths. Unknown record types return the
+  #     NetSuite 404 RCRD_TYPE_DSNT_EXIST envelope. concurrency_key on the
+  #     read-modify-write methods serializes updates per record id. ---
+  - route: /services/rest/record/v1/{recordType}
     method: GET
     handler: scripts/record.star#on_list
-  - route: /services/rest/record/v1/customer
+  - route: /services/rest/record/v1/{recordType}
     method: POST
     handler: scripts/record.star#on_create
-  - route: /services/rest/record/v1/customer/{id}
+  - route: /services/rest/record/v1/{recordType}/{id}
     method: GET
     handler: scripts/record.star#on_get
-  - route: /services/rest/record/v1/customer/{id}
+  - route: /services/rest/record/v1/{recordType}/{id}
     method: PATCH
     handler: scripts/record.star#on_update
-  - route: /services/rest/record/v1/customer/{id}
+    concurrency_key: id
+  - route: /services/rest/record/v1/{recordType}/{id}
     method: DELETE
     handler: scripts/record.star#on_delete
 
-  # --- salesOrder CRUD ---
-  - route: /services/rest/record/v1/salesOrder
-    method: GET
-    handler: scripts/record.star#on_list
-  - route: /services/rest/record/v1/salesOrder
+  # --- !transform operations (salesOrder->invoice, invoice->customerPayment,
+  #     opportunity->salesOrder); concurrency_key serializes read-modify-write
+  #     of the source record (e.g. applying the generated payment) ---
+  - route: /services/rest/record/v1/{recordType}/{id}/!transform/{target}
     method: POST
-    handler: scripts/record.star#on_create
-  - route: /services/rest/record/v1/salesOrder/{id}
-    method: GET
-    handler: scripts/record.star#on_get
-  - route: /services/rest/record/v1/salesOrder/{id}
-    method: PATCH
-    handler: scripts/record.star#on_update
-  - route: /services/rest/record/v1/salesOrder/{id}
-    method: DELETE
-    handler: scripts/record.star#on_delete
-
-  # --- invoice CRUD ---
-  - route: /services/rest/record/v1/invoice
-    method: GET
-    handler: scripts/record.star#on_list
-  - route: /services/rest/record/v1/invoice
-    method: POST
-    handler: scripts/record.star#on_create
-  - route: /services/rest/record/v1/invoice/{id}
-    method: GET
-    handler: scripts/record.star#on_get
-  - route: /services/rest/record/v1/invoice/{id}
-    method: PATCH
-    handler: scripts/record.star#on_update
-  - route: /services/rest/record/v1/invoice/{id}
-    method: DELETE
-    handler: scripts/record.star#on_delete
-
-  # --- item CRUD ---
-  - route: /services/rest/record/v1/item
-    method: GET
-    handler: scripts/record.star#on_list
-  - route: /services/rest/record/v1/item
-    method: POST
-    handler: scripts/record.star#on_create
-  - route: /services/rest/record/v1/item/{id}
-    method: GET
-    handler: scripts/record.star#on_get
-  - route: /services/rest/record/v1/item/{id}
-    method: PATCH
-    handler: scripts/record.star#on_update
-  - route: /services/rest/record/v1/item/{id}
-    method: DELETE
-    handler: scripts/record.star#on_delete
-
-  # --- employee CRUD ---
-  - route: /services/rest/record/v1/employee
-    method: GET
-    handler: scripts/record.star#on_list
-  - route: /services/rest/record/v1/employee
-    method: POST
-    handler: scripts/record.star#on_create
-  - route: /services/rest/record/v1/employee/{id}
-    method: GET
-    handler: scripts/record.star#on_get
-  - route: /services/rest/record/v1/employee/{id}
-    method: PATCH
-    handler: scripts/record.star#on_update
-  - route: /services/rest/record/v1/employee/{id}
-    method: DELETE
-    handler: scripts/record.star#on_delete
-
-  # --- vendor CRUD ---
-  - route: /services/rest/record/v1/vendor
-    method: GET
-    handler: scripts/record.star#on_list
-  - route: /services/rest/record/v1/vendor
-    method: POST
-    handler: scripts/record.star#on_create
-  - route: /services/rest/record/v1/vendor/{id}
-    method: GET
-    handler: scripts/record.star#on_get
-  - route: /services/rest/record/v1/vendor/{id}
-    method: PATCH
-    handler: scripts/record.star#on_update
-  - route: /services/rest/record/v1/vendor/{id}
-    method: DELETE
-    handler: scripts/record.star#on_delete
+    handler: scripts/transform.star#on_transform
+    concurrency_key: id
 
 # Backing stores — collections for stateful data.
 resources:
@@ -151,6 +81,12 @@ resources:
   - name: vendors
     kind: collection
     seed: fixtures/vendors.jsonl
+  - name: opportunities
+    kind: collection
+    seed: fixtures/opportunities.jsonl
+  - name: customerPayments
+    kind: collection
+    seed: fixtures/customerPayments.jsonl
 
 # Auth scheme metadata: Token-Based Authentication (TBA) or NLAuth.
 identity:

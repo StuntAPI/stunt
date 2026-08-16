@@ -459,7 +459,871 @@ func TestAWSCognitoStyleAdapter(t *testing.T) {
 	}
 }
 
-// === AWS Cognito test helpers ===
+// TestAWSCognitoAuthorizeCoherence pins the hosted-UI authorize binding:
+// codes bind EXISTING users (the seeded demo-user by default, or the
+// login_hint user when given) — never a fresh random user. Unknown
+// login_hint users and unsupported response_types get OAuth error
+// redirects, the way real Cognito rejects the flow.
+func TestAWSCognitoAuthorizeCoherence(t *testing.T) {
+	base := cognitoServe(t)
+	const redirectURI = "http://localhost:3000/callback"
+	const clientID = "coherence-client"
+
+	authorizeURL := func(extra string) string {
+		return base + "/oauth2/authorize?client_id=" + clientID +
+			"&redirect_uri=" + url.QueryEscape(redirectURI) + extra
+	}
+
+	// Default (no login_hint): binds the seeded demo-user.
+	resp := cognitoGetNoRedirect(t, authorizeURL("&response_type=code&state=s1"))
+	if resp.StatusCode != 302 {
+		t.Fatalf("authorize default -> status %d, want 302", resp.StatusCode)
+	}
+	code1 := cognitoExtractParam(resp.Header.Get("Location"), "code")
+	if code1 == "" {
+		t.Fatalf("authorize default: no code in %q", resp.Header.Get("Location"))
+	}
+
+	// login_hint binds an existing user: sign one up + confirm it first.
+	const hintUser = "coherence-user"
+	body, status := cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.SignUp",
+		map[string]any{
+			"ClientId": clientID,
+			"Username": hintUser,
+			"Password": "Coherence123!",
+			"UserAttributes": []any{
+				map[string]any{"Name": "email", "Value": "coherence@mock-cognito.com"},
+			},
+		})
+	if status != 200 {
+		t.Fatalf("SignUp -> status %d, want 200; body %s", status, body)
+	}
+	var signUpResp map[string]any
+	if err := json.Unmarshal([]byte(body), &signUpResp); err != nil {
+		t.Fatalf("unmarshal SignUp: %v (body %s)", err, body)
+	}
+	wantSub, _ := signUpResp["UserSub"].(string)
+	if wantSub == "" {
+		t.Fatalf("UserSub = %v, want non-empty", signUpResp["UserSub"])
+	}
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.ConfirmSignUp",
+		map[string]any{"ClientId": clientID, "Username": hintUser, "ConfirmationCode": "000000"})
+	if status != 200 {
+		t.Fatalf("ConfirmSignUp -> status %d, want 200; body %s", status, body)
+	}
+
+	resp = cognitoGetNoRedirect(t, authorizeURL(
+		"&response_type=code&state=s2&login_hint="+hintUser))
+	if resp.StatusCode != 302 {
+		t.Fatalf("authorize login_hint -> status %d, want 302", resp.StatusCode)
+	}
+	code2 := cognitoExtractParam(resp.Header.Get("Location"), "code")
+	if code2 == "" || code2 == code1 {
+		t.Fatalf("authorize login_hint: code = %q, want fresh code", code2)
+	}
+	if cognitoExtractParam(resp.Header.Get("Location"), "state") != "s2" {
+		t.Fatalf("authorize login_hint: state mismatch in %q", resp.Header.Get("Location"))
+	}
+
+	// userInfo from both codes: default → demo-user, login_hint → hintUser's sub.
+	exchange := func(code string) map[string]any {
+		t.Helper()
+		body, status := cognitoPostForm(t, base+"/oauth2/token", url.Values{
+			"grant_type":   {"authorization_code"},
+			"code":         {code},
+			"client_id":    {clientID},
+			"redirect_uri": {redirectURI},
+		})
+		if status != 200 {
+			t.Fatalf("token exchange -> status %d, want 200; body %s", status, body)
+		}
+		var tok map[string]any
+		if err := json.Unmarshal([]byte(body), &tok); err != nil {
+			t.Fatalf("unmarshal token: %v (body %s)", err, body)
+		}
+		uiBody, uiStatus := cognitoGetBearer(t, base+"/oauth2/userInfo", tok["access_token"].(string))
+		if uiStatus != 200 {
+			t.Fatalf("userInfo -> status %d, want 200; body %s", uiStatus, uiBody)
+		}
+		var ui map[string]any
+		if err := json.Unmarshal([]byte(uiBody), &ui); err != nil {
+			t.Fatalf("unmarshal userInfo: %v (body %s)", err, uiBody)
+		}
+		return ui
+	}
+
+	uiDefault := exchange(code1)
+	if uiDefault["username"] != "demo-user" {
+		t.Fatalf("default authorize bound username = %v, want demo-user", uiDefault["username"])
+	}
+	uiHint := exchange(code2)
+	if uiHint["sub"] != wantSub {
+		t.Fatalf("login_hint authorize sub = %v, want %v (the existing user's sub)", uiHint["sub"], wantSub)
+	}
+	if uiHint["email"] != "coherence@mock-cognito.com" {
+		t.Fatalf("login_hint authorize email = %v, want the existing user's email", uiHint["email"])
+	}
+
+	// Unknown login_hint → OAuth error redirect (never a minted user).
+	resp = cognitoGetNoRedirect(t, authorizeURL("&response_type=code&login_hint=ghost-user"))
+	if resp.StatusCode != 302 {
+		t.Fatalf("authorize ghost login_hint -> status %d, want 302", resp.StatusCode)
+	}
+	if got := cognitoExtractParam(resp.Header.Get("Location"), "error"); got != "invalid_request" {
+		t.Fatalf("ghost login_hint error = %q, want invalid_request (Location %q)", got, resp.Header.Get("Location"))
+	}
+
+	// Unsupported response_type → unsupported_response_type redirect.
+	resp = cognitoGetNoRedirect(t, authorizeURL("&response_type=token"))
+	if resp.StatusCode != 302 {
+		t.Fatalf("authorize response_type=token -> status %d, want 302", resp.StatusCode)
+	}
+	if got := cognitoExtractParam(resp.Header.Get("Location"), "error"); got != "unsupported_response_type" {
+		t.Fatalf("response_type=token error = %q, want unsupported_response_type (Location %q)", got, resp.Header.Get("Location"))
+	}
+}
+
+// TestAWSCognitoRefreshGrants exercises REFRESH_TOKEN_AUTH /
+// REFRESH_TOKEN_REFRESH and the hosted-UI refresh_token grant with real
+// Cognito default semantics: refresh tokens are REUSABLE, access/id tokens
+// rotate, and no new refresh token is returned. GlobalSignOut then revokes
+// everything.
+func TestAWSCognitoRefreshGrants(t *testing.T) {
+	base := cognitoServe(t)
+	const clientID = "refresh-client"
+
+	// Password login as the seeded demo-user.
+	body, status := cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.InitiateAuth",
+		map[string]any{
+			"AuthFlow": "USER_PASSWORD_AUTH",
+			"AuthParameters": map[string]any{
+				"USERNAME": "demo-user",
+				"PASSWORD": "DemoPass123!",
+			},
+			"ClientId": clientID,
+		})
+	if status != 200 {
+		t.Fatalf("InitiateAuth demo-user -> status %d, want 200; body %s", status, body)
+	}
+	var authResp map[string]any
+	if err := json.Unmarshal([]byte(body), &authResp); err != nil {
+		t.Fatalf("unmarshal InitiateAuth: %v (body %s)", err, body)
+	}
+	result := authResp["AuthenticationResult"].(map[string]any)
+	refreshToken := result["RefreshToken"].(string)
+	firstAccess := result["AccessToken"].(string)
+
+	// REFRESH_TOKEN_AUTH: fresh access+id pair, NO RefreshToken in the
+	// response (the presented one stays valid — real Cognito default).
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.InitiateAuth",
+		map[string]any{
+			"AuthFlow": "REFRESH_TOKEN_AUTH",
+			"AuthParameters": map[string]any{
+				"REFRESH_TOKEN": refreshToken,
+			},
+			"ClientId": clientID,
+		})
+	if status != 200 {
+		t.Fatalf("InitiateAuth REFRESH_TOKEN_AUTH -> status %d, want 200; body %s", status, body)
+	}
+	var refreshAuth map[string]any
+	if err := json.Unmarshal([]byte(body), &refreshAuth); err != nil {
+		t.Fatalf("unmarshal REFRESH_TOKEN_AUTH: %v (body %s)", err, body)
+	}
+	rr := refreshAuth["AuthenticationResult"].(map[string]any)
+	secondAccess := rr["AccessToken"].(string)
+	if secondAccess == "" || secondAccess == firstAccess {
+		t.Fatalf("REFRESH_TOKEN_AUTH AccessToken = %q, want a fresh token", secondAccess)
+	}
+	if _, ok := rr["RefreshToken"]; ok {
+		t.Fatalf("REFRESH_TOKEN_AUTH returned a RefreshToken (%v), want none — refresh tokens are reusable, not rotated", rr["RefreshToken"])
+	}
+	if _, ok := rr["IdToken"].(string); !ok {
+		t.Fatalf("REFRESH_TOKEN_AUTH IdToken = %v, want string", rr["IdToken"])
+	}
+
+	// The SAME refresh token works again via REFRESH_TOKEN_REFRESH...
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.InitiateAuth",
+		map[string]any{
+			"AuthFlow": "REFRESH_TOKEN_REFRESH",
+			"AuthParameters": map[string]any{
+				"REFRESH_TOKEN": refreshToken,
+			},
+			"ClientId": clientID,
+		})
+	if status != 200 {
+		t.Fatalf("InitiateAuth REFRESH_TOKEN_REFRESH -> status %d, want 200; body %s", status, body)
+	}
+
+	// ...and again via the hosted-UI refresh_token grant (no refresh_token
+	// field in the OAuth response either).
+	body, status = cognitoPostForm(t, base+"/oauth2/token", url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+		"client_id":     {clientID},
+	})
+	if status != 200 {
+		t.Fatalf("hosted-UI refresh grant -> status %d, want 200; body %s", status, body)
+	}
+	var oauthRefresh map[string]any
+	if err := json.Unmarshal([]byte(body), &oauthRefresh); err != nil {
+		t.Fatalf("unmarshal refresh grant: %v (body %s)", err, body)
+	}
+	thirdAccess := oauthRefresh["access_token"].(string)
+	if thirdAccess == "" || thirdAccess == firstAccess || thirdAccess == secondAccess {
+		t.Fatalf("refresh grant access_token = %q, want a fresh token", thirdAccess)
+	}
+	if _, ok := oauthRefresh["refresh_token"]; ok {
+		t.Fatalf("refresh grant returned a refresh_token (%v), want none — refresh tokens are reusable, not rotated", oauthRefresh["refresh_token"])
+	}
+	if _, ok := oauthRefresh["id_token"].(string); !ok {
+		t.Fatalf("refresh grant id_token = %v, want string", oauthRefresh["id_token"])
+	}
+
+	// The refreshed access token is a real RS256 JWT that GetUser accepts.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.GetUser",
+		map[string]any{"AccessToken": thirdAccess})
+	if status != 200 {
+		t.Fatalf("GetUser with refreshed token -> status %d, want 200; body %s", status, body)
+	}
+
+	// GlobalSignOut revokes everything: access token, then refresh token.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.GlobalSignOut",
+		map[string]any{"AccessToken": thirdAccess})
+	if status != 200 {
+		t.Fatalf("GlobalSignOut -> status %d, want 200; body %s", status, body)
+	}
+
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.GetUser",
+		map[string]any{"AccessToken": thirdAccess})
+	if status != 400 {
+		t.Fatalf("GetUser after GlobalSignOut -> status %d, want 400", status)
+	}
+	cognitoAssertErrType(t, body, "NotAuthorizedException")
+
+	uiBody, uiStatus := cognitoGetBearer(t, base+"/oauth2/userInfo", thirdAccess)
+	if uiStatus != 401 {
+		t.Fatalf("userInfo after GlobalSignOut -> status %d, want 401; body %s", uiStatus, uiBody)
+	}
+
+	body, status = cognitoPostForm(t, base+"/oauth2/token", url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+		"client_id":     {clientID},
+	})
+	if status != 400 {
+		t.Fatalf("refresh grant after GlobalSignOut -> status %d, want 400; body %s", status, body)
+	}
+	var grantErr map[string]any
+	if err := json.Unmarshal([]byte(body), &grantErr); err != nil {
+		t.Fatalf("unmarshal revoked refresh error: %v (body %s)", err, body)
+	}
+	if grantErr["error"] != "invalid_grant" {
+		t.Fatalf("revoked refresh error = %v, want invalid_grant", grantErr["error"])
+	}
+
+	// Unknown refresh tokens are invalid_grant from the start.
+	body, status = cognitoPostForm(t, base+"/oauth2/token", url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {"mock-refresh-token-nope"},
+		"client_id":     {clientID},
+	})
+	if status != 400 {
+		t.Fatalf("unknown refresh token -> status %d, want 400; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &grantErr); err != nil {
+		t.Fatalf("unmarshal unknown refresh error: %v (body %s)", err, body)
+	}
+	if grantErr["error"] != "invalid_grant" {
+		t.Fatalf("unknown refresh error = %v, want invalid_grant", grantErr["error"])
+	}
+}
+
+// TestAWSCognitoNewPasswordChallenge walks the NEW_PASSWORD_REQUIRED
+// challenge: AdminCreateUser lands the user in FORCE_CHANGE_PASSWORD, the
+// first password login returns the challenge + session (no tokens), the
+// response sets a policy-compliant password and mints tokens, and the
+// session is single-use.
+func TestAWSCognitoNewPasswordChallenge(t *testing.T) {
+	base := cognitoServe(t)
+	const clientID = "challenge-client"
+	const challengeUser = "challenge-user"
+	const tempPass = "TempPass7B!"
+	const newPass = "Rotated1Pass!"
+
+	body, status := cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.AdminCreateUser",
+		map[string]any{
+			"UserPoolId":        "us-east-1_mock",
+			"Username":          challengeUser,
+			"TemporaryPassword": tempPass,
+			"UserAttributes": []any{
+				map[string]any{"Name": "email", "Value": "challenge@mock-cognito.com"},
+			},
+		})
+	if status != 200 {
+		t.Fatalf("AdminCreateUser -> status %d, want 200; body %s", status, body)
+	}
+	var createResp map[string]any
+	if err := json.Unmarshal([]byte(body), &createResp); err != nil {
+		t.Fatalf("unmarshal AdminCreateUser: %v (body %s)", err, body)
+	}
+	created := createResp["User"].(map[string]any)
+	if created["UserStatus"] != "FORCE_CHANGE_PASSWORD" {
+		t.Fatalf("AdminCreateUser UserStatus = %v, want FORCE_CHANGE_PASSWORD", created["UserStatus"])
+	}
+
+	// First login with the temporary password: challenge, not tokens.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.InitiateAuth",
+		map[string]any{
+			"AuthFlow": "USER_PASSWORD_AUTH",
+			"AuthParameters": map[string]any{
+				"USERNAME": challengeUser,
+				"PASSWORD": tempPass,
+			},
+			"ClientId": clientID,
+		})
+	if status != 200 {
+		t.Fatalf("InitiateAuth temp password -> status %d, want 200; body %s", status, body)
+	}
+	var challengeResp map[string]any
+	if err := json.Unmarshal([]byte(body), &challengeResp); err != nil {
+		t.Fatalf("unmarshal challenge response: %v (body %s)", err, body)
+	}
+	if challengeResp["ChallengeName"] != "NEW_PASSWORD_REQUIRED" {
+		t.Fatalf("ChallengeName = %v, want NEW_PASSWORD_REQUIRED (body %s)", challengeResp["ChallengeName"], body)
+	}
+	if _, ok := challengeResp["AuthenticationResult"]; ok {
+		t.Fatalf("challenge response carried AuthenticationResult = %v, want none until the challenge is answered", challengeResp["AuthenticationResult"])
+	}
+	session, ok := challengeResp["Session"].(string)
+	if !ok || session == "" {
+		t.Fatalf("Session = %v, want non-empty string", challengeResp["Session"])
+	}
+	params := challengeResp["ChallengeParameters"].(map[string]any)
+	if params["USER_ID_FOR_SRP"] != challengeUser {
+		t.Fatalf("USER_ID_FOR_SRP = %v, want %q", params["USER_ID_FOR_SRP"], challengeUser)
+	}
+
+	// Wrong temp password → generic NotAuthorizedException.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.InitiateAuth",
+		map[string]any{
+			"AuthFlow": "USER_PASSWORD_AUTH",
+			"AuthParameters": map[string]any{
+				"USERNAME": challengeUser,
+				"PASSWORD": "wrong-temp-password",
+			},
+			"ClientId": clientID,
+		})
+	if status != 400 {
+		t.Fatalf("InitiateAuth wrong temp password -> status %d, want 400", status)
+	}
+	cognitoAssertErrType(t, body, "NotAuthorizedException")
+
+	// Weak new password → InvalidPasswordException (session stays usable).
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.RespondToAuthChallenge",
+		map[string]any{
+			"ChallengeName": "NEW_PASSWORD_REQUIRED",
+			"Session":       session,
+			"ClientId":      clientID,
+			"ChallengeResponses": map[string]any{
+				"USERNAME":     challengeUser,
+				"NEW_PASSWORD": "short",
+			},
+		})
+	if status != 400 {
+		t.Fatalf("RespondToAuthChallenge weak password -> status %d, want 400", status)
+	}
+	cognitoAssertErrType(t, body, "InvalidPasswordException")
+
+	// Policy-compliant password → tokens, user confirmed.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.RespondToAuthChallenge",
+		map[string]any{
+			"ChallengeName": "NEW_PASSWORD_REQUIRED",
+			"Session":       session,
+			"ClientId":      clientID,
+			"ChallengeResponses": map[string]any{
+				"USERNAME":     challengeUser,
+				"NEW_PASSWORD": newPass,
+			},
+		})
+	if status != 200 {
+		t.Fatalf("RespondToAuthChallenge -> status %d, want 200; body %s", status, body)
+	}
+	var answered map[string]any
+	if err := json.Unmarshal([]byte(body), &answered); err != nil {
+		t.Fatalf("unmarshal challenge answer: %v (body %s)", err, body)
+	}
+	finalResult := answered["AuthenticationResult"].(map[string]any)
+	newAccess := finalResult["AccessToken"].(string)
+	if newAccess == "" {
+		t.Fatalf("AccessToken after challenge = %v, want non-empty", finalResult["AccessToken"])
+	}
+
+	// The session is single-use: replaying it fails.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.RespondToAuthChallenge",
+		map[string]any{
+			"ChallengeName": "NEW_PASSWORD_REQUIRED",
+			"Session":       session,
+			"ClientId":      clientID,
+			"ChallengeResponses": map[string]any{
+				"USERNAME":     challengeUser,
+				"NEW_PASSWORD": newPass,
+			},
+		})
+	if status != 400 {
+		t.Fatalf("replayed session -> status %d, want 400", status)
+	}
+	cognitoAssertErrType(t, body, "NotAuthorizedException")
+
+	// Old temporary password no longer works; the new one does.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.InitiateAuth",
+		map[string]any{
+			"AuthFlow": "USER_PASSWORD_AUTH",
+			"AuthParameters": map[string]any{
+				"USERNAME": challengeUser,
+				"PASSWORD": tempPass,
+			},
+			"ClientId": clientID,
+		})
+	if status != 400 {
+		t.Fatalf("InitiateAuth with consumed temp password -> status %d, want 400", status)
+	}
+	cognitoAssertErrType(t, body, "NotAuthorizedException")
+
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.InitiateAuth",
+		map[string]any{
+			"AuthFlow": "USER_PASSWORD_AUTH",
+			"AuthParameters": map[string]any{
+				"USERNAME": challengeUser,
+				"PASSWORD": newPass,
+			},
+			"ClientId": clientID,
+		})
+	if status != 200 {
+		t.Fatalf("InitiateAuth with new password -> status %d, want 200; body %s", status, body)
+	}
+}
+
+// TestAWSCognitoAdminInitiateAuth covers the ADMIN_USER_PASSWORD_AUTH
+// subset of AdminInitiateAuth against the seeded force-change user, plus
+// AdminRespondToAuthChallenge, and the flow-separation error paths.
+func TestAWSCognitoAdminInitiateAuth(t *testing.T) {
+	base := cognitoServe(t)
+	const clientID = "admin-client"
+	const newUser = "Changed1Pass!"
+
+	// The seeded force-change user challenges on first admin login.
+	body, status := cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.AdminInitiateAuth",
+		map[string]any{
+			"UserPoolId": "us-east-1_mock",
+			"AuthFlow":   "ADMIN_USER_PASSWORD_AUTH",
+			"AuthParameters": map[string]any{
+				"USERNAME": "force-change-user",
+				"PASSWORD": "TempPass1A!",
+			},
+			"ClientId": clientID,
+		})
+	if status != 200 {
+		t.Fatalf("AdminInitiateAuth -> status %d, want 200; body %s", status, body)
+	}
+	var challenge map[string]any
+	if err := json.Unmarshal([]byte(body), &challenge); err != nil {
+		t.Fatalf("unmarshal AdminInitiateAuth: %v (body %s)", err, body)
+	}
+	if challenge["ChallengeName"] != "NEW_PASSWORD_REQUIRED" {
+		t.Fatalf("ChallengeName = %v, want NEW_PASSWORD_REQUIRED", challenge["ChallengeName"])
+	}
+	session := challenge["Session"].(string)
+
+	// AdminRespondToAuthChallenge completes the flow with tokens.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.AdminRespondToAuthChallenge",
+		map[string]any{
+			"UserPoolId":    "us-east-1_mock",
+			"ChallengeName": "NEW_PASSWORD_REQUIRED",
+			"Session":       session,
+			"ClientId":      clientID,
+			"ChallengeResponses": map[string]any{
+				"USERNAME":     "force-change-user",
+				"NEW_PASSWORD": newUser,
+			},
+		})
+	if status != 200 {
+		t.Fatalf("AdminRespondToAuthChallenge -> status %d, want 200; body %s", status, body)
+	}
+	var result map[string]any
+	if err := json.Unmarshal([]byte(body), &result); err != nil {
+		t.Fatalf("unmarshal AdminRespondToAuthChallenge: %v (body %s)", err, body)
+	}
+	adminAccess := result["AuthenticationResult"].(map[string]any)["AccessToken"].(string)
+	if adminAccess == "" {
+		t.Fatal("AdminRespondToAuthChallenge returned no AccessToken")
+	}
+
+	// The new password now works through the plain user flow too.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.InitiateAuth",
+		map[string]any{
+			"AuthFlow": "USER_PASSWORD_AUTH",
+			"AuthParameters": map[string]any{
+				"USERNAME": "force-change-user",
+				"PASSWORD": newUser,
+			},
+			"ClientId": clientID,
+		})
+	if status != 200 {
+		t.Fatalf("InitiateAuth after admin challenge -> status %d, want 200; body %s", status, body)
+	}
+
+	// Flow separation: InitiateAuth rejects the ADMIN_* flows.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.InitiateAuth",
+		map[string]any{
+			"AuthFlow": "ADMIN_USER_PASSWORD_AUTH",
+			"AuthParameters": map[string]any{
+				"USERNAME": "force-change-user",
+				"PASSWORD": newUser,
+			},
+			"ClientId": clientID,
+		})
+	if status != 400 {
+		t.Fatalf("InitiateAuth with ADMIN flow -> status %d, want 400", status)
+	}
+	cognitoAssertErrType(t, body, "InvalidParameterException")
+}
+
+// TestAWSCognitoForgotPassword walks the forgot-password round trip with the
+// deterministic code convention (last 6 digits of the username, zero-padded
+// — "forgot-user-42" → "000042"), including the InvalidPasswordException
+// and CodeMismatchException failure paths.
+func TestAWSCognitoForgotPassword(t *testing.T) {
+	base := cognitoServe(t)
+	const clientID = "forgot-client"
+	const forgotUser = "forgot-user-42"
+	const code = "000042" // digits of "forgot-user-42", zero-padded to 6
+
+	body, status := cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.SignUp",
+		map[string]any{
+			"ClientId": clientID,
+			"Username": forgotUser,
+			"Password": "OldPass123!",
+		})
+	if status != 200 {
+		t.Fatalf("SignUp -> status %d, want 200; body %s", status, body)
+	}
+
+	// ForgotPassword → delivery details.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.ForgotPassword",
+		map[string]any{"ClientId": clientID, "Username": forgotUser})
+	if status != 200 {
+		t.Fatalf("ForgotPassword -> status %d, want 200; body %s", status, body)
+	}
+	var fpResp map[string]any
+	if err := json.Unmarshal([]byte(body), &fpResp); err != nil {
+		t.Fatalf("unmarshal ForgotPassword: %v (body %s)", err, body)
+	}
+	delivery, ok := fpResp["CodeDeliveryDetails"].(map[string]any)
+	if !ok {
+		t.Fatalf("CodeDeliveryDetails = %v, want object", fpResp["CodeDeliveryDetails"])
+	}
+	if dest, _ := delivery["Destination"].(string); dest != "forgot-user-42@mock-cognito.com" {
+		t.Fatalf("Destination = %v, want the user's email", delivery["Destination"])
+	}
+
+	// Unknown user → UserNotFoundException.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.ForgotPassword",
+		map[string]any{"ClientId": clientID, "Username": "ghost-user"})
+	if status != 400 {
+		t.Fatalf("ForgotPassword unknown user -> status %d, want 400", status)
+	}
+	cognitoAssertErrType(t, body, "UserNotFoundException")
+
+	// Wrong code → CodeMismatchException.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.ConfirmForgotPassword",
+		map[string]any{
+			"ClientId":         clientID,
+			"Username":         forgotUser,
+			"ConfirmationCode": "999999",
+			"Password":         "NewPass1234!",
+		})
+	if status != 400 {
+		t.Fatalf("ConfirmForgotPassword wrong code -> status %d, want 400", status)
+	}
+	cognitoAssertErrType(t, body, "CodeMismatchException")
+
+	// Right code but weak password → InvalidPasswordException.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.ConfirmForgotPassword",
+		map[string]any{
+			"ClientId":         clientID,
+			"Username":         forgotUser,
+			"ConfirmationCode": code,
+			"Password":         "alllowercase1",
+		})
+	if status != 400 {
+		t.Fatalf("ConfirmForgotPassword weak password -> status %d, want 400", status)
+	}
+	cognitoAssertErrType(t, body, "InvalidPasswordException")
+
+	// Right code + policy password → success, then login with the new password.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.ConfirmForgotPassword",
+		map[string]any{
+			"ClientId":         clientID,
+			"Username":         forgotUser,
+			"ConfirmationCode": code,
+			"Password":         "NewPass1234!",
+		})
+	if status != 200 {
+		t.Fatalf("ConfirmForgotPassword -> status %d, want 200; body %s", status, body)
+	}
+
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.InitiateAuth",
+		map[string]any{
+			"AuthFlow": "USER_PASSWORD_AUTH",
+			"AuthParameters": map[string]any{
+				"USERNAME": forgotUser,
+				"PASSWORD": "NewPass1234!",
+			},
+			"ClientId": clientID,
+		})
+	if status != 200 {
+		t.Fatalf("InitiateAuth after reset -> status %d, want 200; body %s", status, body)
+	}
+}
+
+// TestAWSCognitoForgotPasswordLockout verifies the LimitExceededException
+// ladder: five wrong confirmation codes lock the reset attempt.
+func TestAWSCognitoForgotPasswordLockout(t *testing.T) {
+	base := cognitoServe(t)
+	const clientID = "lockout-client"
+	const lockUser = "lockout-user-3"
+	const rightCode = "000003" // digits of "lockout-user-3", zero-padded
+
+	body, status := cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.SignUp",
+		map[string]any{
+			"ClientId": clientID,
+			"Username": lockUser,
+			"Password": "LockPass123!",
+		})
+	if status != 200 {
+		t.Fatalf("SignUp -> status %d, want 200; body %s", status, body)
+	}
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.ForgotPassword",
+		map[string]any{"ClientId": clientID, "Username": lockUser})
+	if status != 200 {
+		t.Fatalf("ForgotPassword -> status %d, want 200; body %s", status, body)
+	}
+
+	for i := 0; i < 5; i++ {
+		body, status = cognitoPostTarget(t, base+"/",
+			"AWSCognitoIdentityProviderService.ConfirmForgotPassword",
+			map[string]any{
+				"ClientId":         clientID,
+				"Username":         lockUser,
+				"ConfirmationCode": "111111",
+				"Password":         "NewPass1234!",
+			})
+		if status != 400 {
+			t.Fatalf("wrong code attempt %d -> status %d, want 400", i+1, status)
+		}
+		cognitoAssertErrType(t, body, "CodeMismatchException")
+	}
+
+	// Even the RIGHT code is locked out after five failures (real Cognito
+	// returns LimitExceededException "Attempt limit exceeded").
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.ConfirmForgotPassword",
+		map[string]any{
+			"ClientId":         clientID,
+			"Username":         lockUser,
+			"ConfirmationCode": rightCode,
+			"Password":         "NewPass1234!",
+		})
+	if status != 400 {
+		t.Fatalf("locked-out confirm -> status %d, want 400; body %s", status, body)
+	}
+	cognitoAssertErrType(t, body, "LimitExceededException")
+}
+
+// TestAWSCognitoAdminUserGlobalSignOut covers the admin revocation variant.
+func TestAWSCognitoAdminUserGlobalSignOut(t *testing.T) {
+	base := cognitoServe(t)
+	const clientID = "admin-signout-client"
+	const user = "admin-signout-user"
+
+	body, status := cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.SignUp",
+		map[string]any{"ClientId": clientID, "Username": user, "Password": "SignOut123!"})
+	if status != 200 {
+		t.Fatalf("SignUp -> status %d, want 200; body %s", status, body)
+	}
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.ConfirmSignUp",
+		map[string]any{"ClientId": clientID, "Username": user, "ConfirmationCode": "000000"})
+	if status != 200 {
+		t.Fatalf("ConfirmSignUp -> status %d, want 200; body %s", status, body)
+	}
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.InitiateAuth",
+		map[string]any{
+			"AuthFlow": "USER_PASSWORD_AUTH",
+			"AuthParameters": map[string]any{
+				"USERNAME": user,
+				"PASSWORD": "SignOut123!",
+			},
+			"ClientId": clientID,
+		})
+	if status != 200 {
+		t.Fatalf("InitiateAuth -> status %d, want 200; body %s", status, body)
+	}
+	var authResp map[string]any
+	if err := json.Unmarshal([]byte(body), &authResp); err != nil {
+		t.Fatalf("unmarshal InitiateAuth: %v (body %s)", err, body)
+	}
+	access := authResp["AuthenticationResult"].(map[string]any)["AccessToken"].(string)
+
+	// Unknown username → ResourceNotFoundException.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.AdminUserGlobalSignOut",
+		map[string]any{"UserPoolId": "us-east-1_mock", "Username": "ghost-user"})
+	if status != 400 {
+		t.Fatalf("AdminUserGlobalSignOut unknown user -> status %d, want 400", status)
+	}
+	cognitoAssertErrType(t, body, "ResourceNotFoundException")
+
+	// Revoke by username → subsequent token use is rejected.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.AdminUserGlobalSignOut",
+		map[string]any{"UserPoolId": "us-east-1_mock", "Username": user})
+	if status != 200 {
+		t.Fatalf("AdminUserGlobalSignOut -> status %d, want 200; body %s", status, body)
+	}
+
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.GetUser",
+		map[string]any{"AccessToken": access})
+	if status != 400 {
+		t.Fatalf("GetUser after admin sign-out -> status %d, want 400", status)
+	}
+	cognitoAssertErrType(t, body, "NotAuthorizedException")
+}
+
+// TestAWSCognitoMalformedServiceBody posts garbage where the service API
+// expects x-amz-json-1.1: the handlers must fail with a Cognito error
+// envelope, never a 500 (undecodable bodies surface as an empty dict via
+// req.body, so handlers decode req.raw_body defensively).
+func TestAWSCognitoMalformedServiceBody(t *testing.T) {
+	base := cognitoServe(t)
+
+	req, err := http.NewRequest("POST", base+"/", strings.NewReader("{not json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+	req.Header.Set("X-Amz-Target", "AWSCognitoIdentityProviderService.InitiateAuth")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 400 {
+		t.Fatalf("malformed body InitiateAuth -> status %d, want 400; body %s", resp.StatusCode, b)
+	}
+	// The empty body surfaces as a missing-AuthFlow parameter error, not a 500.
+	cognitoAssertErrType(t, string(b), "InvalidParameterException")
+
+	// A malformed SigV4 Authorization header is rejected structurally.
+	req, err = http.NewRequest("POST", base+"/", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+	req.Header.Set("X-Amz-Target", "AWSCognitoIdentityProviderService.ListUsers")
+	req.Header.Set("Authorization", "Bearer nope")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ = io.ReadAll(resp.Body)
+	if resp.StatusCode != 400 {
+		t.Fatalf("malformed SigV4 -> status %d, want 400; body %s", resp.StatusCode, b)
+	}
+	cognitoAssertErrType(t, string(b), "UnrecognizedClientException")
+}
+
+// cognitoServe boots the aws-cognito-style adapter on a fresh test server
+// and returns its base URL.
+func cognitoServe(t *testing.T) string {
+	t.Helper()
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-cognito-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"cognito": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	t.Cleanup(func() { _ = e.Close() })
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	t.Cleanup(cancel)
+	time.Sleep(50 * time.Millisecond)
+	return addrs["cognito"]
+}
+
+// cognitoAssertErrType unmarshals a Cognito error envelope and asserts the
+// __type value.
+func cognitoAssertErrType(t *testing.T, body, wantType string) {
+	t.Helper()
+	var errResp map[string]any
+	if err := json.Unmarshal([]byte(body), &errResp); err != nil {
+		t.Fatalf("unmarshal error envelope: %v (body %s)", err, body)
+	}
+	if errResp["__type"] != wantType {
+		t.Fatalf("__type = %v, want %v (body %s)", errResp["__type"], wantType, body)
+	}
+	if msg, _ := errResp["message"].(string); msg == "" {
+		t.Fatalf("message = %v, want non-empty string (body %s)", errResp["message"], body)
+	}
+}
 
 // cognitoPrivateKeyPEM mirrors the adapter's documented fixed synthetic
 // RSA-2048 keypair (see adapters/aws-cognito-style/scripts/lib.star): the

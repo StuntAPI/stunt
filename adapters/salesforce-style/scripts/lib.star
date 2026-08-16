@@ -488,7 +488,8 @@ def _soql_in(term, doc):
     return False
 
 # _project builds a record dict with only the requested fields. If fields
-# contains "*", returns all fields from the source doc.
+# contains "*", returns all public fields from the source doc (internal keys
+# — the lowercase storage id and any underscore-prefixed key — are stripped).
 def _project(doc, fields, obj_type):
     rec = {}
     # attributes block
@@ -497,9 +498,10 @@ def _project(doc, fields, obj_type):
         "url": "/services/data/v60.0/sobjects/" + obj_type + "/" + doc.get("Id", ""),
     }
     if len(fields) == 0 or (len(fields) == 1 and fields[0] == "*"):
-        # Return all fields.
+        # Return all public fields.
         for k, v in doc.items():
-            rec[k] = v
+            if k != "id" and not k.startswith("_"):
+                rec[k] = v
         return rec
     for f in fields:
         if doc.get(f) != None:

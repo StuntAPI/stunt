@@ -25,9 +25,23 @@ endpoints:
     handler: scripts/oauth.star#on_token
 
   # --- Videos (upload + list) ---
+  # POST: direct create (JSON metadata), or with ?uploadType=resumable the
+  # initiation of a resumable session (200 + Location).
   - route: /upload/youtube/v3/videos
     method: POST
     handler: scripts/videos.star#on_upload_video
+  # PUT to the session URL (?upload_id=...): resumable chunks (strict
+  # Content-Range; 308 Resume Incomplete + Range until the final chunk).
+  # No bearer check — real upload session URLs are pre-authenticated.
+  - route: /upload/youtube/v3/videos/{upload_id}
+    method: PUT
+    handler: scripts/videos.star#on_resumable_chunk
+    concurrency_key: upload_id
+  # DELETE to the session URL: cancel the upload (499, the Google upload
+  # backend's cancel status) and discard the partial bytes.
+  - route: /upload/youtube/v3/videos/{upload_id}
+    method: DELETE
+    handler: scripts/videos.star#on_resumable_cancel
   - route: /youtube/v3/videos
     method: GET
     handler: scripts/videos.star#on_list_videos
@@ -68,6 +82,8 @@ resources:
   - name: codes
     kind: collection
   - name: videos
+    kind: collection
+  - name: upload_sessions
     kind: collection
   - name: playlists
     kind: collection

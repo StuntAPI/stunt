@@ -458,3 +458,136 @@ func TestDropboxStyleContentHashAndClock(t *testing.T) {
 		t.Fatalf("same content, different hash: %v vs %v", fileA2["content_hash"], fileA["content_hash"])
 	}
 }
+
+// TestDropboxStyleCascadeDelete proves files_v2 delete semantics: the delete
+// is permanent (no restore) and a FOLDER delete cascades to every nested
+// entry — no descendant survives under a deleted parent, and nothing is
+// left dangling in the tree.
+func TestDropboxStyleCascadeDelete(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "dropbox-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"dropbox": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["dropbox"]
+
+	// Tree: /Projects (+ /Projects/Archive subfolder), two files inside,
+	// plus a sibling file at the root that must survive.
+	must200 := func(action string, payload map[string]any) map[string]any {
+		t.Helper()
+		b, st := postJSON(t, base+"/2/files/"+action, payload)
+		if st != 200 {
+			t.Fatalf("POST %s %v -> %d; body %s", action, payload, st, b)
+		}
+		var out map[string]any
+		if err := json.Unmarshal([]byte(b), &out); err != nil {
+			t.Fatalf("unmarshal %s resp: %v (%s)", action, err, b)
+		}
+		return out
+	}
+
+	proj := must200("create_folder", map[string]any{"path": "/Projects"})
+	must200("create_folder", map[string]any{"path": "/Projects/Archive"})
+	plan := must200("upload", map[string]any{"path": "/Projects/plan.txt", "content": "cascade plan"})
+	old := must200("upload", map[string]any{"path": "/Projects/Archive/2019.txt", "content": "old stuff"})
+	keep := must200("upload", map[string]any{"path": "/keep-me.txt", "content": "survivor"})
+	_ = keep
+
+	// ===== DELETE the folder: everything beneath it goes too =====
+	del := must200("delete", map[string]any{"path": "/Projects"})
+	if del["id"] != proj["id"] {
+		t.Fatalf("delete response id = %v, want the folder %v", del["id"], proj["id"])
+	}
+
+	// Every cascaded entry is gone from every read path.
+	for _, path := range []string{"/Projects", "/Projects/plan.txt", "/Projects/Archive", "/Projects/Archive/2019.txt"} {
+		if _, st := postJSON(t, base+"/2/files/get_metadata", map[string]any{"path": path}); st != 409 {
+			t.Fatalf("get_metadata %s after folder delete -> %d, want 409", path, st)
+		}
+	}
+	if _, st := postJSON(t, base+"/2/files/download", map[string]any{"path": "/Projects/plan.txt"}); st != 409 {
+		t.Fatalf("download cascaded file -> %d, want 409", st)
+	}
+	// By id too: metadata rows were removed, not just path-indexed.
+	if _, st := postJSON(t, base+"/2/files/download", map[string]any{"id": plan["id"].(string)}); st != 409 {
+		t.Fatalf("download cascaded file by id -> %d, want 409", st)
+	}
+	if _, st := postJSON(t, base+"/2/files/download", map[string]any{"id": old["id"].(string)}); st != 409 {
+		t.Fatalf("download nested cascaded file by id -> %d, want 409", st)
+	}
+
+	// Root listing no longer contains the folder or its descendants, and the
+	// sibling file survives.
+	b, st := postJSON(t, base+"/2/files/list_folder", map[string]any{"path": ""})
+	if st != 200 {
+		t.Fatalf("list_folder -> %d; body %s", st, b)
+	}
+	var rootList map[string]any
+	json.Unmarshal([]byte(b), &rootList)
+	sawKept, sawAny := false, false
+	for _, e := range rootList["entries"].([]any) {
+		em := e.(map[string]any)
+		if em["path_display"] == "/keep-me.txt" {
+			sawKept = true
+		}
+		p, _ := em["path_display"].(string)
+		if strings.HasPrefix(p, "/Projects") {
+			sawAny = true
+		}
+	}
+	if sawAny {
+		t.Fatalf("/Projects subtree leaked into root listing: %s", b)
+	}
+	if !sawKept {
+		t.Fatalf("sibling /keep-me.txt disappeared from root listing: %s", b)
+	}
+
+	// Listing the deleted folder 409s (its entries cannot be listed either).
+	if _, st := postJSON(t, base+"/2/files/list_folder", map[string]any{"path": "/Projects"}); st != 409 {
+		t.Fatalf("list_folder deleted folder -> %d, want 409", st)
+	}
+
+	// ===== no restore: re-creating at a deleted path is a fresh entry =====
+	fresh := must200("upload", map[string]any{"path": "/Projects/plan.txt", "content": "new plan"})
+	if fresh["id"] == plan["id"] {
+		t.Fatalf("re-upload at deleted path reused the old id %v (delete is permanent, no tombstone reuse)", plan["id"])
+	}
+
+	// ===== single-file delete still works standalone =====
+	if _, st := postJSON(t, base+"/2/files/delete", map[string]any{"path": "/keep-me.txt"}); st != 200 {
+		t.Fatalf("delete sibling -> %d, want 200", st)
+	}
+	if _, st := postJSON(t, base+"/2/files/get_metadata", map[string]any{"path": "/keep-me.txt"}); st != 409 {
+		t.Fatalf("get_metadata deleted sibling -> %d, want 409", st)
+	}
+
+	// Failure path: deleting a missing path stays 409 path/not_found.
+	b, st = postJSON(t, base+"/2/files/delete", map[string]any{"path": "/Projects/Archive"})
+	if st != 409 {
+		t.Fatalf("delete missing -> %d, want 409", st)
+	}
+	var errBody map[string]any
+	json.Unmarshal([]byte(b), &errBody)
+	if es, _ := errBody["error_summary"].(string); !strings.HasPrefix(es, "path/not_found") {
+		t.Fatalf("delete missing error_summary = %v, want path/not_found/..", errBody["error_summary"])
+	}
+}

@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"io"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -219,6 +220,220 @@ func TestAzureStorageStyleAdapter(t *testing.T) {
 	if !strings.Contains(body, "ContainerNotFound") {
 		t.Fatalf("put nonexistent: missing ContainerNotFound; body %s", body)
 	}
+}
+
+// TestAzureStorageStyleBlockBlobLifecycle drives the real Azure block-blob
+// staging protocol:
+//
+//   - Put Block (?comp=block&blockid=<base64>) stages bytes out of order,
+//     each 201 carrying a Content-MD5 of the block bytes
+//   - Get Block List before commit shows them as UncommittedBlocks
+//   - Put Block List with a never-staged block id → 400 InvalidBlockList
+//   - Put Block List (correct, listed order) commits and assembles the
+//     blob — GET returns the assembled bytes byte-exact
+//   - Get Block List after commit shows CommittedBlocks in commit order
+//     and the staged blocks are consumed
+//   - blocklisttype validation: missing → 400 MissingRequiredQueryParameter,
+//     bogus value → 400 InvalidQueryParameterValue
+//   - Put Block without blockid → 400 MissingRequiredQueryParameter
+//   - Get Block List on an unknown blob → 404 BlobNotFound
+//   - deleting the blob discards staged blocks
+func TestAzureStorageStyleBlockBlobLifecycle(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "azure-storage-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"azure": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["azure"]
+
+	const sharedKey = "SharedKey stuntstorage:dHVudA=="
+
+	if _, status := azPut(t, base+"/blockcont", sharedKey, nil); status != 201 {
+		t.Fatalf("create container -> %d", status)
+	}
+
+	// Three multi-KB blocks staged OUT OF ORDER (c, a, b) — the committed
+	// order comes from the block LIST, not the staging order.
+	blockA := azTestBytes(5*1024, 1)
+	blockB := azTestBytes(4*1024, 2)
+	blockC := azTestBytes(3*1024, 3)
+	idA := base64.StdEncoding.EncodeToString([]byte("block-A"))
+	idB := base64.StdEncoding.EncodeToString([]byte("block-B"))
+	idC := base64.StdEncoding.EncodeToString([]byte("block-C"))
+	blobURL := base + "/blockcont/report.bin"
+
+	for _, tc := range []struct {
+		id   string
+		data []byte
+	}{
+		{idC, blockC}, {idA, blockA}, {idB, blockB},
+	} {
+		hdr, status := azPutHeaders(t, blobURL+"?comp=block&blockid="+url.QueryEscape(tc.id), sharedKey, tc.data)
+		if status != 201 {
+			t.Fatalf("put block %s -> %d", tc.id, status)
+		}
+		wantMD5 := base64.StdEncoding.EncodeToString(azSHA256(tc.data))
+		if got := hdr.Get("Content-MD5"); got != wantMD5 {
+			t.Fatalf("put block %s Content-MD5 = %q, want %q", tc.id, got, wantMD5)
+		}
+	}
+
+	// Missing blockid → 400 MissingRequiredQueryParameter.
+	if body, status := azPut(t, blobURL+"?comp=block", sharedKey, []byte("x")); status != 400 || !strings.Contains(body, "MissingRequiredQueryParameter") {
+		t.Fatalf("put block without blockid -> %d %q, want 400 MissingRequiredQueryParameter", status, body)
+	}
+
+	// Before commit: uncommitted blocks listed, nothing committed.
+	body, status := azGet(t, blobURL+"?comp=blocklist&blocklisttype=all", sharedKey)
+	if status != 200 {
+		t.Fatalf("get blocklist (uncommitted) -> %d; body %s", status, body)
+	}
+	for _, want := range []string{idA, idB, idC} {
+		if !strings.Contains(body, "<Name>"+want+"</Name>") {
+			t.Fatalf("blocklist missing staged block %s: %s", want, body)
+		}
+	}
+	if strings.Contains(body, "<CommittedBlocks>") == false || strings.Count(body, "<Block>") != 3 {
+		t.Fatalf("blocklist should show 3 uncommitted blocks only: %s", body)
+	}
+
+	// blocklisttype validation.
+	if body, status := azGet(t, blobURL+"?comp=blocklist", sharedKey); status != 400 || !strings.Contains(body, "MissingRequiredQueryParameter") {
+		t.Fatalf("blocklist without type -> %d %q, want 400 MissingRequiredQueryParameter", status, body)
+	}
+	if body, status := azGet(t, blobURL+"?comp=blocklist&blocklisttype=bogus", sharedKey); status != 400 || !strings.Contains(body, "InvalidQueryParameterValue") {
+		t.Fatalf("blocklist bogus type -> %d %q, want 400 InvalidQueryParameterValue", status, body)
+	}
+	if body, status := azGet(t, base+"/blockcont/noblocks.bin?comp=blocklist&blocklisttype=all", sharedKey); status != 404 || !strings.Contains(body, "BlobNotFound") {
+		t.Fatalf("blocklist unknown blob -> %d %q, want 404 BlobNotFound", status, body)
+	}
+
+	// Commit listing a never-staged block → 400 InvalidBlockList.
+	neverStaged := base64.StdEncoding.EncodeToString([]byte("never-staged"))
+	badList := azBlockListBody([]string{idA, neverStaged, idB})
+	if body, status := azPut(t, blobURL+"?comp=blocklist", sharedKey, []byte(badList)); status != 400 || !strings.Contains(body, "InvalidBlockList") {
+		t.Fatalf("blocklist with never-staged block -> %d %q, want 400 InvalidBlockList", status, body)
+	}
+
+	// Commit in the listed order (A, B, C — independent of staging order).
+	goodList := azBlockListBody([]string{idA, idB, idC})
+	hdr, status := azPutHeaders(t, blobURL+"?comp=blocklist", sharedKey, []byte(goodList))
+	if status != 201 {
+		t.Fatalf("put blocklist -> %d", status)
+	}
+	if hdr.Get("ETag") == "" || hdr.Get("Last-Modified") == "" {
+		t.Fatalf("put blocklist missing ETag/Last-Modified: %v %v", hdr.Get("ETag"), hdr.Get("Last-Modified"))
+	}
+
+	// Assembled blob downloads byte-exact: blockA + blockB + blockC.
+	body, status = azGet(t, blobURL, sharedKey)
+	if status != 200 {
+		t.Fatalf("get committed blob -> %d; body %s", status, body)
+	}
+	want := append(append(append([]byte{}, blockA...), blockB...), blockC...)
+	if !bytes.Equal([]byte(body), want) {
+		t.Fatalf("committed blob mismatch: got %d bytes, want %d", len(body), len(want))
+	}
+
+	// After commit: committed blocks in list order, staged blocks consumed.
+	body, status = azGet(t, blobURL+"?comp=blocklist&blocklisttype=all", sharedKey)
+	if status != 200 {
+		t.Fatalf("get blocklist (committed) -> %d", status)
+	}
+	aIdx := strings.Index(body, "<Name>"+idA+"</Name>")
+	bIdx := strings.Index(body, "<Name>"+idB+"</Name>")
+	cIdx := strings.Index(body, "<Name>"+idC+"</Name>")
+	if aIdx < 0 || bIdx < 0 || cIdx < 0 || !(aIdx < bIdx && bIdx < cIdx) {
+		t.Fatalf("committed blocks not in commit order: %s", body)
+	}
+	if strings.Contains(body, "<UncommittedBlocks>\n    <Block>") || strings.Count(body, "<Block>") != 3 {
+		t.Fatalf("staged blocks should be consumed by the commit: %s", body)
+	}
+	body, status = azGet(t, blobURL+"?comp=blocklist&blocklisttype=uncommitted", sharedKey)
+	if status != 200 || strings.Contains(body, "<Block>") {
+		t.Fatalf("uncommitted-only view should be empty: %d %s", status, body)
+	}
+
+	// Deleting the blob discards any freshly staged blocks.
+	if _, st := azPutHeaders(t, blobURL+"?comp=block&blockid="+url.QueryEscape(idA), sharedKey, blockA); st != 201 {
+		t.Fatalf("re-stage after commit -> %d", st)
+	}
+	resp := azDelete(t, blobURL, sharedKey)
+	if resp.StatusCode != 202 {
+		t.Fatalf("delete blob -> %d, want 202", resp.StatusCode)
+	}
+	if body, status := azGet(t, blobURL+"?comp=blocklist&blocklisttype=all", sharedKey); status != 404 || !strings.Contains(body, "BlobNotFound") {
+		t.Fatalf("blocklist after delete -> %d %q, want 404 BlobNotFound (staged blocks discarded)", status, body)
+	}
+}
+
+// azTestBytes returns n deterministic pseudo-random bytes for block/binary
+// round-trip tests.
+func azTestBytes(n int, seed int) []byte {
+	out := make([]byte, n)
+	x := uint32(seed)*2654435761 + 98765
+	for i := range out {
+		x = x*1664525 + 1013904223
+		out[i] = byte(x >> 17)
+	}
+	return out
+}
+
+// azSHA256 returns the raw SHA-256 digest of b.
+func azSHA256(b []byte) []byte {
+	sum := sha256.Sum256(b)
+	return sum[:]
+}
+
+// azBlockListBody builds a Put Block List XML body listing the block ids
+// (as <Latest> entries, the common Azure SDK form).
+func azBlockListBody(ids []string) string {
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="utf-8"?><BlockList>`)
+	for _, id := range ids {
+		b.WriteString("<Latest>" + id + "</Latest>")
+	}
+	b.WriteString("</BlockList>")
+	return b.String()
+}
+
+// azPutHeaders is azPut but also returns the response headers.
+func azPutHeaders(t *testing.T, rawurl, auth string, body []byte) (http.Header, int) {
+	t.Helper()
+	req, err := http.NewRequest("PUT", rawurl, bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.Header.Set("Content-Length", strconv.Itoa(len(body)))
+	req.Header.Set("x-ms-blob-type", "BlockBlob")
+	req.Header.Set("Authorization", azMaybeSign(req, auth))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	_, _ = io.ReadAll(resp.Body)
+	return resp.Header, resp.StatusCode
 }
 
 // === Azure Storage test helpers ===

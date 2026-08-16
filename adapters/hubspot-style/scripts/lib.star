@@ -171,12 +171,42 @@ def _get_query(req, key, default_val):
         return default_val
     return val
 
-# _get_body safely returns the request body dict.
-def _get_body(req):
-    body = req.get("body")
-    if body == None:
-        return {}
-    return body
+# _get_body is superseded by _json_body_or_error (below), which parses the
+# authoritative raw_body via json_safe_decode so undecodable bodies surface
+# as 400s instead of silently-empty dicts.
+
+# _json_body_or_error parses the request body from req["raw_body"] — the
+# verbatim request bytes, the authoritative source (an undecodable body
+# surfaces as an EMPTY dict via req["body"], so raw is checked first).
+# Returns (body_dict, None) or ({}, 400-response) when the body is not a
+# JSON object.
+def _json_body_or_error(req):
+    raw = req.get("raw_body", "")
+    if raw == None:
+        raw = ""
+    if raw == "":
+        return {}, None
+    parsed = json_safe_decode(raw)
+    if parsed == None:
+        return {}, _hs_error(400, "The request body contains invalid JSON and could not be parsed.", "VALIDATION")
+    if type(parsed) != "dict":
+        return {}, _hs_error(400, "The request body must be a JSON object.", "VALIDATION")
+    return parsed, None
+
+# _stringify_scalar renders a filter/property value as the string HubSpot
+# property storage uses (properties are stringly-typed in the CRM). Bools
+# use HubSpot's lowercase rendering; numbers use their plain decimal form.
+def _stringify_scalar(v):
+    if v == None:
+        return ""
+    t = type(v)
+    if t == "string":
+        return v
+    if t == "bool":
+        if v:
+            return "true"
+        return "false"
+    return str(v)
 
 # _paginate applies cursor-based pagination to a list of docs.
 # HubSpot uses "after" cursor (an integer offset) with "limit".
@@ -204,7 +234,8 @@ def _paginate(req, docs):
 
     return paged, next_after
 
-# _record_shape builds the HubSpot record shape from a stored doc.
+# _record_shape builds the HubSpot record shape from a stored doc. The shape
+# whitelists keys, so internal shadow fields (_f.* search shadows) never leak.
 def _record_shape(doc):
     return {
         "id": doc.get("id", ""),
@@ -212,6 +243,7 @@ def _record_shape(doc):
         "createdAt": doc.get("createdAt", _now()),
         "updatedAt": doc.get("updatedAt", _now()),
         "archived": doc.get("archived", False),
+        "archivedAt": doc.get("archivedAt", None),
     }
 
 # _project_properties narrows each record's nested properties object to the
@@ -235,6 +267,7 @@ def _project_properties(docs, wanted):
             "createdAt": d.get("createdAt", _now()),
             "updatedAt": d.get("updatedAt", _now()),
             "archived": d.get("archived", False),
+            "archivedAt": d.get("archivedAt", None),
         }
         out.append(nd)
     return out

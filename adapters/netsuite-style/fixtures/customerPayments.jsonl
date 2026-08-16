@@ -1,0 +1,2 @@
+{"id":"1","tranId":"PAY-001","customer":{"refName":"Initech LLC"},"payment":800.00,"status":"Deposited","trandate":"2024-02-15","currency":{"refName":"USD"},"applied":{"items":[{"doc":{"id":"2","refName":"INV-002"},"amount":800.00}]}}
+{"id":"2","tranId":"PAY-002","customer":{"refName":"Acme Corporation"},"payment":1000.00,"status":"Undeposited","trandate":"2024-03-01","currency":{"refName":"USD"},"applied":{"items":[{"doc":{"id":"1","refName":"INV-001"},"amount":1000.00}]}}

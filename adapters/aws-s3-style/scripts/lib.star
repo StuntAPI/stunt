@@ -50,6 +50,27 @@ def _xml_error(code, message, resource, status = 403):
     xml = xml + "<RequestId>" + _req_id() + "</RequestId></Error>"
     return respond(status, xml, {"Content-Type": "application/xml"})
 
+# _invalid_argument returns an S3 InvalidArgument XML error (400).
+def _invalid_argument(arg_name, arg_value, message):
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml = xml + "<Error><Code>InvalidArgument</Code>"
+    xml = xml + "<Message>" + _xml_escape(message) + "</Message>"
+    xml = xml + "<ArgumentName>" + _xml_escape(arg_name) + "</ArgumentName>"
+    xml = xml + "<ArgumentValue>" + _xml_escape(arg_value) + "</ArgumentValue>"
+    xml = xml + "<RequestId>" + _req_id() + "</RequestId></Error>"
+    return respond(400, xml, {"Content-Type": "application/xml"})
+
+# _no_such_bucket_error returns the real S3 404 NoSuchBucket XML error.
+# (objects.star previously carried a private copy, _no_such_bucket; the
+# multipart core in this file needs it too, so it lives here now.)
+def _no_such_bucket_error(bucket):
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml = xml + "<Error><Code>NoSuchBucket</Code>"
+    xml = xml + "<Message>The specified bucket does not exist.</Message>"
+    xml = xml + "<BucketName>" + _xml_escape(bucket) + "</BucketName>"
+    xml = xml + "<RequestId>" + _req_id() + "</RequestId></Error>"
+    return respond(404, xml, {"Content-Type": "application/xml"})
+
 # _req_id returns a synthetic AWS-style request ID.
 def _req_id():
     n = store_kv_incr("s3", "req_seq")
@@ -697,3 +718,449 @@ def _list_page(req, docs):
     if nxt != None:
         next_cursor = nxt
     return page, next_cursor
+
+# ====================================================================
+# Object store write path (shared by PutObject and CompleteMultipartUpload)
+# ====================================================================
+
+# _find_object returns the stored object doc for bucket/key, or None.
+def _find_object(bucket, key):
+    oc = store_collection("objects")
+    for o in oc.list():
+        if o.get("bucket", "") == bucket and o.get("key", "") == key:
+            return o
+    return None
+
+# _upsert_object writes an object's content bytes (reusing the existing
+# blob id when overwriting, so the blob store has one file per object) and
+# refreshes its metadata doc. Returns nothing; the ETag is derived by the
+# caller (it differs for simple vs multipart uploads).
+def _upsert_object(bucket, key, raw, ct, etag):
+    oc = store_collection("objects")
+    bid = ""
+    obj_id = ""
+    existing = _find_object(bucket, key)
+    if existing != None:
+        bid = existing.get("bid", "")
+        obj_id = existing.get("id", "")
+    if bid == None or bid == "":
+        bid = "obj_" + str(store_kv_incr("s3", "blob_seq"))
+    store_blob("s3-objects").put(bid, raw, ct)
+    now_unix = clock.now_unix()
+    doc = {
+        "bucket": bucket,
+        "key": key,
+        "bid": bid,
+        "contentType": ct,
+        "etag": etag,
+        "lastModified": _unix_to_iso8601(now_unix),
+        "lastModifiedUnix": now_unix,
+        "size": len(raw),
+    }
+    if obj_id != None and obj_id != "":
+        oc.update(obj_id, doc)
+    else:
+        oc.insert(doc)
+
+# ====================================================================
+# Multipart upload core
+# ====================================================================
+# Implements the real S3 multipart upload protocol on top of the object
+# store:
+#
+#   POST   /{bucket}/{key}?uploads                      create → UploadId
+#   PUT    /{bucket}/{key}?partNumber=N&uploadId=...    UploadPart → ETag
+#   POST   /{bucket}/{key}?uploadId=...                 complete (XML body)
+#   DELETE /{bucket}/{key}?uploadId=...                 abort
+#   GET    /{bucket}/{key}?uploadId=...                 ListParts
+#
+# Semantics enforced like the real service:
+#   - Parts may be uploaded OUT OF ORDER and re-uploaded (the newest bytes
+#     for a part number win).
+#   - Completion validates every listed part: a part number that was
+#     never uploaded (or whose ETag does not match) → 400 InvalidPart;
+#     a non-ascending part list → 400 InvalidPartOrder.
+#   - Completion assembles the parts, in ascending part-number order,
+#     into the object; abort discards every part and creates nothing.
+#   - Documented deviations: part ETags are SHA-256 digests (the crypto
+#     module has no MD5), the multipart object ETag is
+#     sha256(concat part etags)-N, and the 5 MiB minimum part size is
+#     NOT enforced so small chunks can be exercised in tests.
+
+# Real S3 allows part numbers 1..10k (assembled to keep digit runs short).
+_MPU_MAX_PART_NUMBER = 10 * 1000
+
+# _query_present returns True when the query string carries the key at all
+# (valueless flags like ?uploads count; the engine maps them to "").
+def _query_present(req, name):
+    query = req.get("query")
+    if query == None:
+        return False
+    for k in query:
+        if k == name:
+            return True
+    return False
+
+# _query_val returns the query value for key, or "".
+def _query_val(req, key):
+    query = req.get("query")
+    if query == None:
+        return ""
+    v = query.get(key, "")
+    if v == None:
+        return ""
+    return v
+
+# _mpu_find_upload returns the upload row for bucket/key/uploadId, or None
+# (an upload id is only valid for the bucket/key that created it).
+def _mpu_find_upload(bucket, key, upload_id):
+    for u in store_collection("mpu_uploads").list():
+        if u.get("id", "") == upload_id and u.get("bucket", "") == bucket and u.get("key", "") == key:
+            return u
+    return None
+
+# _mpu_no_such_upload returns the real S3 404 NoSuchUpload XML error.
+def _mpu_no_such_upload(upload_id):
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml = xml + "<Error><Code>NoSuchUpload</Code>"
+    xml = xml + "<Message>The specified upload does not exist. The upload ID may be invalid, or the upload may have been aborted or completed.</Message>"
+    xml = xml + "<UploadId>" + _xml_escape(upload_id) + "</UploadId>"
+    xml = xml + "<RequestId>" + _req_id() + "</RequestId></Error>"
+    return respond(404, xml, {"Content-Type": "application/xml"})
+
+# _mpu_create handles POST /{bucket}/{key}?uploads — mints an upload id and
+# records the in-progress upload (content type captured for completion).
+def _mpu_create(req, bucket, key):
+    bc = store_collection("buckets")
+    bucket_doc = None
+    for b in bc.list():
+        if b.get("name", "") == bucket:
+            bucket_doc = b
+            break
+    if bucket_doc == None:
+        return _no_such_bucket_error(bucket)
+
+    headers = req.get("headers")
+    if headers == None:
+        headers = {}
+    ct = headers.get("Content-Type", "application/octet-stream")
+    if ct == None or ct == "":
+        ct = "application/octet-stream"
+
+    upload_id = "mpu_" + str(store_kv_incr("s3", "mpu_seq"))
+    store_collection("mpu_uploads").insert({
+        "id": upload_id,
+        "bucket": bucket,
+        "key": key,
+        "contentType": ct,
+        "initiatedUnix": clock.now_unix(),
+    })
+
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml = xml + '<InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+    xml = xml + "<Bucket>" + _xml_escape(bucket) + "</Bucket>"
+    xml = xml + "<Key>" + _xml_escape(key) + "</Key>"
+    xml = xml + "<UploadId>" + _xml_escape(upload_id) + "</UploadId>"
+    xml = xml + "</InitiateMultipartUploadResult>"
+    return respond(200, xml, {"Content-Type": "application/xml", "x-amz-request-id": _req_id()})
+
+# _mpu_upload_part handles PUT /{bucket}/{key}?partNumber=N&uploadId=... —
+# stores the part bytes (out-of-order and re-uploads both fine) and returns
+# the part ETag (SHA-256 of the verbatim part bytes).
+def _mpu_upload_part(req, bucket, key):
+    part_raw = _query_val(req, "partNumber")
+    upload_id = _query_val(req, "uploadId")
+    if not _is_digits(part_raw):
+        return _invalid_argument("partNumber", part_raw, "Part number must be an integer between 1 and " + str(_MPU_MAX_PART_NUMBER) + ", inclusive")
+    n = _to_int(part_raw)
+    if n < 1 or n > _MPU_MAX_PART_NUMBER:
+        return _invalid_argument("partNumber", part_raw, "Part number must be an integer between 1 and " + str(_MPU_MAX_PART_NUMBER) + ", inclusive")
+
+    bc = store_collection("buckets")
+    bucket_doc = None
+    for b in bc.list():
+        if b.get("name", "") == bucket:
+            bucket_doc = b
+            break
+    if bucket_doc == None:
+        return _no_such_bucket_error(bucket)
+
+    if _mpu_find_upload(bucket, key, upload_id) == None:
+        return _mpu_no_such_upload(upload_id)
+
+    raw = req.get("raw_body", "")
+    if raw == None:
+        raw = ""
+    etag = crypto.sha256(raw)
+
+    # One blob per (upload, part number); re-uploading a part overwrites it.
+    bid = upload_id + "_p" + str(n)
+    store_blob("s3-objects").put(bid, raw, "application/octet-stream")
+
+    row_id = upload_id + "-" + str(n)
+    pc = store_collection("mpu_parts")
+    doc = {
+        "id": row_id,
+        "uploadId": upload_id,
+        "partNumber": n,
+        "etag": etag,
+        "size": len(raw),
+        "bid": bid,
+        "lastModifiedUnix": clock.now_unix(),
+    }
+    if pc.get(row_id) == None:
+        pc.insert(doc)
+    else:
+        pc.update(row_id, doc)
+
+    return respond(200, "", {
+        "ETag": '"' + etag + '"',
+        "x-amz-request-id": _req_id(),
+    })
+
+# _mpu_parts_for returns the upload's part rows sorted by part number.
+def _mpu_parts_for(upload_id):
+    rows = []
+    for p in store_collection("mpu_parts").list():
+        if p.get("uploadId", "") == upload_id:
+            rows.append(p)
+    # Insertion sort by part number (Starlark lists have no .sort()).
+    out = []
+    for r in rows:
+        i = 0
+        while i < len(out):
+            if _to_num(r.get("partNumber", 0)) < _to_num(out[i].get("partNumber", 0)):
+                break
+            i = i + 1
+        out.insert(i, r)
+    return out
+
+# _mpu_discard deletes every part row+blob of the upload (shared by abort
+# and the post-completion cleanup). Idempotent.
+def _mpu_discard(upload_id):
+    pc = store_collection("mpu_parts")
+    b = store_blob("s3-objects")
+    for p in _mpu_parts_for(upload_id):
+        bid = p.get("bid", "")
+        if bid != None and bid != "":
+            b.delete(bid)
+        pc.delete(p.get("id", ""))
+
+# _xml_tag_text extracts the text of the first <tag>...</tag> in s, or "".
+def _xml_tag_text(s, tag):
+    open_tag = "<" + tag + ">"
+    close_tag = "</" + tag + ">"
+    start = s.find(open_tag)
+    if start < 0:
+        return ""
+    start = start + len(open_tag)
+    end = s.find(close_tag, start)
+    if end < 0:
+        return ""
+    return s[start:end]
+
+# _strip_quotes removes every double quote from an ETag string (clients may
+# echo the ETag quoted, unquoted, or XML-escaped).
+def _strip_quotes(s):
+    out = ""
+    for i in range(len(s)):
+        if s[i] != '"':
+            out = out + s[i]
+    return out
+
+# _mpu_parse_complete parses the CompleteMultipartUpload XML body into an
+# ordered [(part_number, etag), ...] list, or None when malformed.
+def _mpu_parse_complete(raw):
+    if raw == None:
+        return None
+    parts = []
+    pos = 0
+    while True:
+        start = raw.find("<Part>", pos)
+        if start < 0:
+            break
+        end = raw.find("</Part>", start)
+        if end < 0:
+            return None
+        chunk = raw[start:end]
+        num_s = _strip(_xml_tag_text(chunk, "PartNumber"))
+        etag_s = _strip(_xml_tag_text(chunk, "ETag"))
+        if not _is_digits(num_s):
+            return None
+        parts.append((_to_int(num_s), _strip_quotes(etag_s)))
+        pos = end + len("</Part>")
+    if _find_substr(raw, "<CompleteMultipartUpload") < 0:
+        return None
+    return parts
+
+# _mpu_complete handles POST /{bucket}/{key}?uploadId=... — validates the
+# listed parts against what was actually uploaded, assembles them (in
+# ascending part-number order) into the object, and tears the upload down.
+def _mpu_complete(req, bucket, key):
+    upload_id = _query_val(req, "uploadId")
+
+    bc = store_collection("buckets")
+    bucket_doc = None
+    for b in bc.list():
+        if b.get("name", "") == bucket:
+            bucket_doc = b
+            break
+    if bucket_doc == None:
+        return _no_such_bucket_error(bucket)
+
+    upload = _mpu_find_upload(bucket, key, upload_id)
+    if upload == None:
+        return _mpu_no_such_upload(upload_id)
+
+    raw = req.get("raw_body", "")
+    if raw == None:
+        raw = ""
+    listed = _mpu_parse_complete(raw)
+    if listed == None or len(listed) == 0:
+        return _xml_error("MalformedXML", "The XML you provided was not well-formed or did not validate against our published schema", "/" + bucket + "/" + key, 400)
+
+    stored = {}
+    for p in _mpu_parts_for(upload_id):
+        stored[_to_num(p.get("partNumber", 0))] = p
+
+    # Parts must be listed in ascending order (real S3: InvalidPartOrder).
+    prev = 0
+    for entry in listed:
+        n = entry[0]
+        if n <= prev:
+            return _xml_error("InvalidPartOrder", "The list of parts was not in ascending order. Parts must be ordered by part number.", "/" + bucket + "/" + key, 400)
+        prev = n
+
+    # Every listed part must exist with a matching ETag (real S3: InvalidPart).
+    for entry in listed:
+        n = entry[0]
+        etag_req = entry[1]
+        row = stored.get(n, None)
+        if row == None:
+            return _xml_error("InvalidPart", "One or more of the specified parts could not be found. The part may not have been uploaded, or the specified entity tag may not match the part's entity tag.", "/" + bucket + "/" + key, 400)
+        if etag_req != "" and etag_req != row.get("etag", ""):
+            return _xml_error("InvalidPart", "One or more of the specified parts could not be found. The part may not have been uploaded, or the specified entity tag may not match the part's entity tag.", "/" + bucket + "/" + key, 400)
+
+    # Assemble: concatenate the part blobs in ascending part-number order.
+    b = store_blob("s3-objects")
+    full = ""
+    concat_etags = ""
+    for entry in listed:
+        row = stored[entry[0]]
+        content = b.get(row.get("bid", ""))
+        if content == None:
+            content = ""
+        full = full + content
+        concat_etags = concat_etags + row.get("etag", "")
+    etag = crypto.sha256(concat_etags) + "-" + str(len(listed))
+
+    ct = upload.get("contentType", "application/octet-stream")
+    if ct == None or ct == "":
+        ct = "application/octet-stream"
+    _upsert_object(bucket, key, full, ct, etag)
+
+    _mpu_discard(upload_id)
+    store_collection("mpu_uploads").delete(upload_id)
+
+    host = req.get("host", "")
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml = xml + '<CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+    xml = xml + "<Location>http://" + _xml_escape(host) + "/" + _xml_escape(bucket) + "/" + _xml_escape(key) + "</Location>"
+    xml = xml + "<Bucket>" + _xml_escape(bucket) + "</Bucket>"
+    xml = xml + "<Key>" + _xml_escape(key) + "</Key>"
+    xml = xml + "<ETag>&quot;" + _xml_escape(etag) + "&quot;</ETag>"
+    xml = xml + "</CompleteMultipartUploadResult>"
+    return respond(200, xml, {"Content-Type": "application/xml", "x-amz-request-id": _req_id()})
+
+# _mpu_abort handles DELETE /{bucket}/{key}?uploadId=... — discards every
+# part and the upload itself. Nothing is written to the object store.
+def _mpu_abort(req, bucket, key):
+    upload_id = _query_val(req, "uploadId")
+
+    bc = store_collection("buckets")
+    bucket_doc = None
+    for b in bc.list():
+        if b.get("name", "") == bucket:
+            bucket_doc = b
+            break
+    if bucket_doc == None:
+        return _no_such_bucket_error(bucket)
+
+    if _mpu_find_upload(bucket, key, upload_id) == None:
+        return _mpu_no_such_upload(upload_id)
+
+    _mpu_discard(upload_id)
+    store_collection("mpu_uploads").delete(upload_id)
+    return respond(204, "", {"x-amz-request-id": _req_id()})
+
+# _mpu_list_parts handles GET /{bucket}/{key}?uploadId=... — the
+# ListPartsResult XML, parts in ascending part-number order, with the real
+# max-parts / part-number-marker paging.
+def _mpu_list_parts(req, bucket, key):
+    upload_id = _query_val(req, "uploadId")
+
+    if _mpu_find_upload(bucket, key, upload_id) == None:
+        return _mpu_no_such_upload(upload_id)
+
+    parts = _mpu_parts_for(upload_id)
+
+    # part-number-marker: list parts with a higher part number.
+    marker = _to_int(_query_val(req, "part-number-marker"))
+    selected = []
+    for p in parts:
+        if _to_num(p.get("partNumber", 0)) > marker:
+            selected.append(p)
+
+    # max-parts: page size (S3 default 1000; 0/non-positive returns all).
+    max_parts = _to_int(_query_val(req, "max-parts"))
+    if max_parts <= 0:
+        max_parts = _S3_DEFAULT_MAX_KEYS
+    truncated = len(selected) > max_parts
+    page = selected
+    if truncated:
+        page = selected[:max_parts]
+
+    next_marker = 0
+    if len(page) > 0:
+        next_marker = _to_num(page[len(page) - 1].get("partNumber", 0))
+
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml = xml + '<ListPartsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+    xml = xml + "<Bucket>" + _xml_escape(bucket) + "</Bucket>"
+    xml = xml + "<Key>" + _xml_escape(key) + "</Key>"
+    xml = xml + "<UploadId>" + _xml_escape(upload_id) + "</UploadId>"
+    xml = xml + "<PartNumberMarker>" + str(marker) + "</PartNumberMarker>"
+    xml = xml + "<NextPartNumberMarker>" + str(next_marker) + "</NextPartNumberMarker>"
+    xml = xml + "<MaxParts>" + str(max_parts) + "</MaxParts>"
+    if truncated:
+        xml = xml + "<IsTruncated>true</IsTruncated>"
+    else:
+        xml = xml + "<IsTruncated>false</IsTruncated>"
+    for p in page:
+        xml = xml + "<Part>"
+        xml = xml + "<PartNumber>" + _to_int_str(p.get("partNumber", 0)) + "</PartNumber>"
+        xml = xml + "<LastModified>" + _obj_last_modified_iso_for_part(p) + "</LastModified>"
+        xml = xml + "<ETag>&quot;" + _xml_escape(p.get("etag", "")) + "&quot;</ETag>"
+        xml = xml + "<Size>" + _to_int_str(p.get("size", 0)) + "</Size>"
+        xml = xml + "</Part>"
+    xml = xml + "<Initiator><ID>stunt-owner-id-stunt-owner-id-stunt-owner-id</ID><DisplayName>stunt-owner</DisplayName></Initiator>"
+    xml = xml + "<Owner><ID>stunt-owner-id-stunt-owner-id-stunt-owner-id</ID><DisplayName>stunt-owner</DisplayName></Owner>"
+    xml = xml + "<StorageClass>STANDARD</StorageClass>"
+    xml = xml + "</ListPartsResult>"
+    return respond(200, xml, {"Content-Type": "application/xml", "x-amz-request-id": _req_id()})
+
+# _obj_last_modified_iso_for_part renders a part row's upload time in S3 XML
+# millis form (falling back to the clock for legacy rows).
+def _obj_last_modified_iso_for_part(p):
+    u = p.get("lastModifiedUnix")
+    if u == None or u == 0:
+        return _unix_to_iso8601(clock.now_unix())
+    return _unix_to_iso8601(u)
+
+# _to_num coerces a JSON-round-tripped number (int or float) to int.
+def _to_num(v):
+    if v == None:
+        return 0
+    if type(v) == "int":
+        return v
+    return int(v)

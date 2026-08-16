@@ -1,0 +1,273 @@
+# Shopify Admin GraphQL API (2024-10) schema — the surface this adapter
+# models, mapped onto the same stores as the REST surface.
+#
+# Conventions followed from the real API: gid:// global IDs on objects,
+# cursor-paginated connections (edges/nodes/pageInfo), userErrors arrays on
+# mutation payloads, Money objects for amounts, and first-after connection
+# arguments. Decimal/DateTime/URL are passthrough custom scalars (amounts
+# serialize as decimal strings, like the REST surface).
+
+scalar DateTime
+scalar Decimal
+scalar URL
+
+enum ProductSortKeys {
+  ID
+  TITLE
+  CREATED_AT
+  UPDATED_AT
+}
+
+enum ProductStatus {
+  ACTIVE
+  ARCHIVED
+  DRAFT
+}
+
+enum CustomerSortKeys {
+  ID
+  CREATED_AT
+}
+
+enum CurrencyCode {
+  USD
+  EUR
+  GBP
+}
+
+enum OrderCancelReason {
+  CUSTOMER
+  FRAUD
+  INVENTORY
+  DECLINED
+  OTHER
+}
+
+type Shop {
+  id: ID!
+  name: String!
+  myshopifyDomain: String!
+  description: String
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+type Money {
+  amount: Decimal!
+  currencyCode: CurrencyCode!
+}
+
+type ProductVariant {
+  id: ID!
+  title: String!
+  price: Money!
+  sku: String
+  inventoryQuantity: Int
+  product: Product!
+}
+
+type ProductVariantEdge {
+  node: ProductVariant!
+  cursor: String!
+}
+
+type ProductVariantConnection {
+  edges: [ProductVariantEdge!]!
+  nodes: [ProductVariant!]!
+}
+
+type ProductEdge {
+  node: Product!
+  cursor: String!
+}
+
+type ProductConnection {
+  edges: [ProductEdge!]!
+  nodes: [Product!]!
+  pageInfo: PageInfo!
+}
+
+type Product {
+  id: ID!
+  title: String!
+  handle: String!
+  description: String
+  descriptionHtml: String
+  status: ProductStatus!
+  vendor: String!
+  productType: String!
+  tags: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  variants(first: Int = 10): ProductVariantConnection!
+}
+
+type LineItem {
+  id: ID!
+  title: String!
+  quantity: Int!
+  sku: String
+  discountedTotalPrice: Money!
+  fulfillableQuantity: Int!
+}
+
+type LineItemEdge {
+  node: LineItem!
+  cursor: String!
+}
+
+type LineItemConnection {
+  edges: [LineItemEdge!]!
+  nodes: [LineItem!]!
+  pageInfo: PageInfo!
+}
+
+type CustomerEdge {
+  node: Customer!
+  cursor: String!
+}
+
+type CustomerConnection {
+  edges: [CustomerEdge!]!
+  nodes: [Customer!]!
+  pageInfo: PageInfo!
+}
+
+type Customer {
+  id: ID!
+  email: String
+  displayName: String!
+  firstName: String
+  lastName: String
+  phone: String
+  ordersCount: Int!
+  totalSpent: Money!
+  verifiedEmail: Boolean!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type OrderEdge {
+  node: Order!
+  cursor: String!
+}
+
+type OrderConnection {
+  edges: [OrderEdge!]!
+  nodes: [Order!]!
+  pageInfo: PageInfo!
+}
+
+type Order {
+  id: ID!
+  name: String!
+  email: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  closedAt: DateTime
+  cancelledAt: DateTime
+  cancelReason: String
+  totalPrice: Money!
+  lineItems(first: Int = 10, after: String): LineItemConnection!
+  customer: Customer
+}
+
+"""A user-input error on a mutation payload (Shopify's userErrors shape)."""
+type UserError {
+  field: [String!]
+  message: String!
+}
+
+input ProductVariantInput {
+  id: ID
+  title: String
+  price: Decimal
+  sku: String
+  inventoryQuantity: Int
+}
+
+input ProductInput {
+  id: ID
+  title: String
+  descriptionHtml: String
+  vendor: String
+  productType: String
+  tags: [String!]
+  status: ProductStatus
+  variants: [ProductVariantInput!]
+}
+
+type ProductCreatePayload {
+  product: Product
+  userErrors: [UserError!]!
+}
+
+type ProductUpdatePayload {
+  product: Product
+  userErrors: [UserError!]!
+}
+
+type ProductDeletePayload {
+  deletedProductId: ID
+  userErrors: [UserError!]!
+}
+
+input CustomerInput {
+  id: ID
+  email: String
+  firstName: String
+  lastName: String
+  note: String
+  phone: String
+}
+
+type CustomerCreatePayload {
+  customer: Customer
+  userErrors: [UserError!]!
+}
+
+type CustomerUpdatePayload {
+  customer: Customer
+  userErrors: [UserError!]!
+}
+
+type CustomerDeletePayload {
+  deletedCustomerId: ID
+  userErrors: [UserError!]!
+}
+
+type OrderCancelPayload {
+  order: Order
+  orderCancelUserErrors: [UserError!]!
+}
+
+type OrderClosePayload {
+  order: Order
+  orderCloseUserErrors: [UserError!]!
+}
+
+type Query {
+  shop: Shop!
+  product(id: ID!): Product
+  products(first: Int!, after: String, query: String, sortKey: ProductSortKeys, reverse: Boolean): ProductConnection!
+  order(id: ID!): Order
+  orders(first: Int!, after: String, query: String): OrderConnection!
+  customer(id: ID!): Customer
+  customers(first: Int!, after: String, query: String, sortKey: CustomerSortKeys, reverse: Boolean): CustomerConnection!
+}
+
+type Mutation {
+  productCreate(input: ProductInput!): ProductCreatePayload!
+  productUpdate(input: ProductInput!): ProductUpdatePayload!
+  productDelete(id: ID!): ProductDeletePayload!
+  customerCreate(input: CustomerInput!): CustomerCreatePayload!
+  customerUpdate(input: CustomerInput!): CustomerUpdatePayload!
+  customerDelete(id: ID!): CustomerDeletePayload!
+  orderCancel(orderId: ID!, reason: OrderCancelReason, refund: Boolean, restock: Boolean): OrderCancelPayload!
+  orderClose(orderId: ID!): OrderClosePayload!
+}

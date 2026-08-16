@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -66,19 +67,30 @@ func TestBraintreeStyleAdapter(t *testing.T) {
 	const merchantID = "merchant123"
 	txns := base + "/merchants/" + merchantID + "/transactions"
 
-	// ===== 401 without auth =====
+	// ===== GraphQL transport auth posture =====
+	//
+	// The graphql: transport dispatches before adapter endpoints and has no
+	// auth hook, so the query endpoint is served open (documented in the
+	// adapter README); REST endpoints still 401 without credentials.
 
-	_, status := btPostJSON(t, base+"/graphql", "", map[string]any{
-		"query": "{}",
+	body, status := btPostJSON(t, base+"/graphql", "", map[string]any{
+		"query": "{ ping }",
 	})
-	if status != 401 {
-		t.Fatalf("no-auth graphql -> %d, want 401", status)
+	if status != 200 {
+		t.Fatalf("no-auth graphql ping -> %d, want 200 (transport has no auth hook); body %s", status, body)
+	}
+	var pingResp map[string]any
+	if err := json.Unmarshal([]byte(body), &pingResp); err != nil {
+		t.Fatalf("unmarshal ping resp: %v (body %s)", err, body)
+	}
+	if pingResp["data"].(map[string]any)["ping"] != true {
+		t.Fatalf("ping = %v, want true", pingResp["data"])
 	}
 
-	// ===== GraphQL createCustomer =====
+	// ===== GraphQL createCustomer (real input type name + variables) =====
 
-	body, status := btPostJSON(t, base+"/graphql", "Bearer bt-token", map[string]any{
-		"query":     "mutation($input: CreateCustomerInput!) { createCustomer(input: $input) { customer { id email } } }",
+	body, status = btPostJSON(t, base+"/graphql", "Bearer bt-token", map[string]any{
+		"query":     "mutation($input: CustomerCreateInput!) { createCustomer(input: $input) { customer { id firstName lastName email createdAt } } }",
 		"variables": map[string]any{"input": map[string]any{"firstName": "John", "lastName": "Doe", "email": "john@example.com"}},
 	})
 	if status != 200 {
@@ -103,6 +115,9 @@ func TestBraintreeStyleAdapter(t *testing.T) {
 	customerID, _ := customer["id"].(string)
 	if customerID == "" {
 		t.Fatalf("customer id empty")
+	}
+	if customer["email"] != "john@example.com" || customer["createdAt"] == "" {
+		t.Fatalf("customer = %v, want the input values + createdAt", customer)
 	}
 
 	// ===== REST create with a non-positive amount → 422 =====
@@ -201,11 +216,11 @@ func TestBraintreeStyleAdapter(t *testing.T) {
 		"simulate_authorization_expiry": true,
 	})
 
-	// ===== GraphQL chargePaymentMethod → submitted_for_settlement (txnGQL) =====
+	// ===== GraphQL chargePaymentMethod → SUBMITTED_FOR_SETTLEMENT (txnGQL) =====
 
 	body, status = btPostJSON(t, base+"/graphql", "Bearer bt-token", map[string]any{
-		"query":     "mutation($input: ChargePaymentMethodInput!) { chargePaymentMethod(input: $input) { transaction { id status amount } } }",
-		"variables": map[string]any{"input": map[string]any{"paymentMethodId": "pm-1", "amount": "50.00"}},
+		"query":     "mutation($input: ChargePaymentMethodInput!) { chargePaymentMethod(input: $input) { transaction { id status type amount currencyISOCode creditCard { last4 cardType expirationDate } } } }",
+		"variables": map[string]any{"input": map[string]any{"paymentMethodId": "pm-1", "transaction": map[string]any{"amount": "50.00", "orderId": "gql-order-1"}}},
 	})
 	if status != 200 {
 		t.Fatalf("chargePaymentMethod -> %d, want 200; body %s", status, body)
@@ -226,8 +241,17 @@ func TestBraintreeStyleAdapter(t *testing.T) {
 	if txnGQLID == "" {
 		t.Fatalf("transaction id empty")
 	}
-	if txn["status"] != "submitted_for_settlement" {
-		t.Fatalf("status = %v, want submitted_for_settlement", txn["status"])
+	if txn["status"] != "SUBMITTED_FOR_SETTLEMENT" {
+		t.Fatalf("status = %v, want SUBMITTED_FOR_SETTLEMENT (uppercase enum)", txn["status"])
+	}
+	if txn["type"] != "SALE" {
+		t.Fatalf("type = %v, want SALE", txn["type"])
+	}
+	if txn["amount"] != "50.00" {
+		t.Fatalf("amount = %v, want 50.00 (Amount scalar string)", txn["amount"])
+	}
+	if card := txn["creditCard"].(map[string]any); card["last4"] != "1111" || card["cardType"] != "Visa" {
+		t.Fatalf("creditCard = %v, want the synthetic Visa", card)
 	}
 
 	// ===== Plans + subscriptions =====
@@ -325,7 +349,7 @@ func TestBraintreeStyleAdapter(t *testing.T) {
 	// ===== GraphQL refundTransaction of the now-settled charge =====
 
 	body, status = btPostJSON(t, base+"/graphql", "Bearer bt-token", map[string]any{
-		"query":     "mutation($input: RefundTransactionInput!) { refundTransaction(input: $input) { refund { id status } } }",
+		"query":     "mutation($input: RefundTransactionInput!) { refundTransaction(input: $input) { refund { id status type amount refundedTransactionId } } }",
 		"variables": map[string]any{"input": map[string]any{"transactionId": txnGQLID}},
 	})
 	if status != 200 {
@@ -345,6 +369,12 @@ func TestBraintreeStyleAdapter(t *testing.T) {
 	}
 	if r["id"] == "" {
 		t.Fatalf("refund id empty")
+	}
+	if r["status"] != "SETTLED" || r["type"] != "CREDIT" {
+		t.Fatalf("refund = %v, want a SETTLED CREDIT", r)
+	}
+	if r["refundedTransactionId"] != txnGQLID {
+		t.Fatalf("refundedTransactionId = %v, want %v", r["refundedTransactionId"], txnGQLID)
 	}
 
 	// ===== REST refunds on txnManual (50.00 settled) =====
@@ -575,4 +605,179 @@ func btGet(t *testing.T, rawurl, auth string) (string, int) {
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(resp.Body)
 	return string(b), resp.StatusCode
+}
+
+// btSetupGraphql serves the committed braintree-style adapter and returns
+// its HTTP base URL + cleanup.
+func btSetupGraphql(t *testing.T) (string, func()) {
+	t.Helper()
+
+	absDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "braintree-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"braintree": {Adapter: absDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		e.Close()
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	url := addrs["braintree"]
+	cleanup := func() {
+		cancel()
+		e.Close()
+	}
+	return url, cleanup
+}
+
+// btGraphql sends a GraphQL POST and returns data (failing on top-level
+// errors) — or returns the raw response when wantErrors is set.
+func btGraphql(t *testing.T, base, query string, variables map[string]any, wantErrors bool) (map[string]any, string) {
+	t.Helper()
+	body, status := btPostJSON(t, base+"/graphql", "Bearer bt-token", map[string]any{
+		"query":     query,
+		"variables": variables,
+	})
+	var resp map[string]any
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		t.Fatalf("unmarshal graphql resp: %v (body %s)", err, body)
+	}
+	if status != 200 {
+		t.Fatalf("graphql -> %d, want 200 (body %s)", status, body)
+	}
+	if !wantErrors {
+		if errs, ok := resp["errors"]; ok && errs != nil {
+			t.Fatalf("graphql errors: %v (query %s)", errs, query)
+		}
+	}
+	data, _ := resp["data"].(map[string]any)
+	return data, body
+}
+
+// TestBraintreeStyleGraphqlExecution exercises the real GraphQL executor:
+// variables + aliases on reads, the void lifecycle (authorized → voided,
+// double-void as errors[]), refund state guards, searchTransactions with
+// the search-criteria vocabulary, and validation failures.
+func TestBraintreeStyleGraphqlExecution(t *testing.T) {
+	base, cleanup := btSetupGraphql(t)
+	defer cleanup()
+
+	// ===== authorizePaymentMethod → AUTHORIZED, then voidTransaction =====
+
+	authMut := `mutation($input: AuthorizePaymentMethodInput!) {
+		authorizePaymentMethod(input: $input) { transaction { id status type amount } }
+	}`
+	data, _ := btGraphql(t, base, authMut, map[string]any{"input": map[string]any{
+		"paymentMethodId": "pm-1",
+		"transaction":     map[string]any{"amount": "80.00"},
+	}}, false)
+	txn := data["authorizePaymentMethod"].(map[string]any)["transaction"].(map[string]any)
+	authID := txn["id"].(string)
+	if txn["status"] != "AUTHORIZED" || txn["type"] != "AUTHORIZATION" {
+		t.Fatalf("authorization = %v, want AUTHORIZED/AUTHORIZATION", txn)
+	}
+
+	// Aliases + variables: the same transaction through two field aliases.
+	readQuery := `query($id: ID!) {
+		byId: transaction(id: $id) { id status amount currencyISOCode }
+	}
+	`
+	data, _ = btGraphql(t, base, readQuery, map[string]any{"id": authID}, false)
+	byID := data["byId"].(map[string]any)
+	if byID["id"] != authID || byID["status"] != "AUTHORIZED" {
+		t.Fatalf("transaction(id) = %v, want AUTHORIZED %s", byID, authID)
+	}
+
+	voidMut := `mutation($input: VoidTransactionInput!) {
+		voidTransaction(input: $input) { transaction { id status voidedAt } }
+	}`
+	data, _ = btGraphql(t, base, voidMut, map[string]any{"input": map[string]any{"transactionId": authID}}, false)
+	voided := data["voidTransaction"].(map[string]any)["transaction"].(map[string]any)
+	if voided["status"] != "VOIDED" || voided["voidedAt"] == "" {
+		t.Fatalf("voided transaction = %v", voided)
+	}
+
+	// Double void → errors[] with the REST guard message (not a 422).
+	data, raw := btGraphql(t, base, voidMut, map[string]any{"input": map[string]any{"transactionId": authID}}, true)
+	if _, ok := data["voidTransaction"]; data != nil && ok && data["voidTransaction"] != nil {
+		t.Fatalf("double void data = %v, want null field (raw %s)", data["voidTransaction"], raw)
+	}
+	if !strings.Contains(raw, "only be voided") {
+		t.Fatalf("double void errors = %s", raw)
+	}
+
+	// ===== Refund guards: a non-settled transaction cannot be refunded =====
+
+	data, _ = btGraphql(t, base, authMut, map[string]any{"input": map[string]any{
+		"paymentMethodId": "pm-1",
+		"transaction":     map[string]any{"amount": "12.00"},
+	}}, false)
+	pendingID := data["authorizePaymentMethod"].(map[string]any)["transaction"].(map[string]any)["id"].(string)
+
+	refundMut := `mutation($input: RefundTransactionInput!) {
+		refundTransaction(input: $input) { refund { id status } }
+	}`
+	data, raw = btGraphql(t, base, refundMut, map[string]any{"input": map[string]any{"transactionId": pendingID}}, true)
+	if !strings.Contains(raw, "only be refunded") {
+		t.Fatalf("refund-of-authorized errors = %s", raw)
+	}
+
+	// ===== searchTransactions: criteria vocabulary + amount range =====
+
+	// One more transaction so the amount range has something to exclude.
+	data, _ = btGraphql(t, base, authMut, map[string]any{"input": map[string]any{
+		"paymentMethodId": "pm-1",
+		"transaction":     map[string]any{"amount": "9.00"},
+	}}, false)
+
+	searchQuery := `query($s: TransactionSearchInput!) {
+		authorized: searchTransactions(search: $s) { totalCount edges { node { id status amount } } }
+		bigOnes: searchTransactions(search: {amount: {min: "50.00"}}) { totalCount }
+	}`
+	data, _ = btGraphql(t, base, searchQuery, map[string]any{"s": map[string]any{
+		"status": map[string]any{"is": "AUTHORIZED"},
+	}}, false)
+	authorized := data["authorized"].(map[string]any)
+	if authorized["totalCount"] != float64(2) {
+		t.Fatalf("status=AUTHORIZED count = %v, want 2 (the 9.00 and 12.00 auths; the 80.00 is voided)", authorized["totalCount"])
+	}
+	big := data["bigOnes"].(map[string]any)
+	if big["totalCount"] != float64(1) {
+		t.Fatalf("amount>=50 count = %v, want 1 (only the 80.00)", big["totalCount"])
+	}
+
+	// ===== Unknown field / unknown operation → validation errors =====
+
+	body, status := btPostJSON(t, base+"/graphql", "Bearer bt-token", map[string]any{
+		"query": `{ transaction(id: "t1") { bogusField } }`,
+	})
+	if status != 400 {
+		t.Fatalf("unknown field -> %d, want 400 (body %s)", status, body)
+	}
+	if !strings.Contains(body, "bogusField") {
+		t.Fatalf("unknown field error should name the field: %s", body)
+	}
+	body, status = btPostJSON(t, base+"/graphql", "Bearer bt-token", map[string]any{
+		"query": `mutation { captureTransaction(input: {transactionId: "t1"}) { transaction { id } } }`,
+	})
+	if status != 400 {
+		t.Fatalf("unknown mutation -> %d, want 400 (body %s)", status, body)
+	}
 }

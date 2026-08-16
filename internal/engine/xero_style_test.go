@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"testing"
 	"time"
@@ -327,6 +328,233 @@ func xeroPostJSON(t *testing.T, rawurl, auth, tenantID string, payload map[strin
 	if tenantID != "" {
 		req.Header.Set("xero-tenant-id", tenantID)
 	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return string(b), resp.StatusCode
+}
+
+// TestXeroStyleVoidAndArchive proves Xero's soft-delete states:
+//
+//   - DELETE /Invoices/{id} VOIDS the invoice (kept, Status VOIDED,
+//     AmountDue 0.00) instead of destroying it; a PAID or already-VOIDED
+//     invoice returns the 400 ValidationError envelope.
+//   - PUT /Contacts/{id} with ContactStatus ARCHIVED archives the contact
+//     (kept and still readable/listed, filterable via where), reactivatable;
+//     an invalid ContactStatus is a 400 and an unknown id the 404 envelope.
+func TestXeroStyleVoidAndArchive(t *testing.T) {
+	adapterDir := filepath.Join("..", "..", "adapters", "xero-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"xero": {Adapter: absAdapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["xero"]
+
+	const tenantID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+	const auth = "Bearer xero-token"
+
+	// ===== create an invoice to void =====
+	body, status := xeroPutJSON(t, base+"/api.xro/2.0/Invoices", auth, tenantID, map[string]any{
+		"Invoices": []map[string]any{{
+			"InvoiceNumber": "VOID-001",
+			"Status":        "AUTHORISED",
+			"LineItems":     []map[string]any{{"Description": "Void me", "LineAmount": "480.00"}},
+		}},
+	})
+	if status != 200 {
+		t.Fatalf("create invoice -> %d; body %s", status, body)
+	}
+	var created map[string]any
+	json.Unmarshal([]byte(body), &created)
+	invoices := created["Invoices"].([]any)
+	invoiceID := invoices[0].(map[string]any)["InvoiceID"].(string)
+
+	// ===== DELETE voids it (204, record kept) =====
+	body, status = xeroDelete(t, base+"/api.xro/2.0/Invoices/"+invoiceID, auth, tenantID)
+	if status != 204 {
+		t.Fatalf("DELETE (void) -> %d, want 204; body %s", status, body)
+	}
+
+	// Targeted read shows the VOIDED state.
+	body, status = xeroGet(t, base+"/api.xro/2.0/Invoices/"+invoiceID, auth, tenantID)
+	if status != 200 {
+		t.Fatalf("GET voided invoice -> %d, want 200; body %s", status, body)
+	}
+	var fetched map[string]any
+	json.Unmarshal([]byte(body), &fetched)
+	vrow := fetched["Invoices"].([]any)[0].(map[string]any)
+	if vrow["Status"] != "VOIDED" {
+		t.Fatalf("voided invoice Status = %v, want VOIDED", vrow["Status"])
+	}
+	if vrow["AmountDue"] != "0.00" {
+		t.Fatalf("voided invoice AmountDue = %v, want 0.00", vrow["AmountDue"])
+	}
+
+	// List default includes it; the Statuses=VOIDED filter selects it.
+	body, status = xeroGet(t, base+"/api.xro/2.0/Invoices?Statuses=VOIDED", auth, tenantID)
+	if status != 200 {
+		t.Fatalf("list Statuses=VOIDED -> %d; body %s", status, body)
+	}
+	var voidList map[string]any
+	json.Unmarshal([]byte(body), &voidList)
+	found := false
+	for _, iv := range voidList["Invoices"].([]any) {
+		if iv.(map[string]any)["InvoiceID"] == invoiceID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("voided invoice %s missing from Statuses=VOIDED result", invoiceID)
+	}
+
+	// Re-void is rejected with the 400 ValidationError envelope.
+	body, status = xeroDelete(t, base+"/api.xro/2.0/Invoices/"+invoiceID, auth, tenantID)
+	if status != 400 {
+		t.Fatalf("re-void -> %d, want 400; body %s", status, body)
+	}
+	var errResp map[string]any
+	json.Unmarshal([]byte(body), &errResp)
+	if errResp["ErrorNumber"] != "ValidationError" || errResp["Type"] != "BadRequest" {
+		t.Fatalf("re-void error = %v, want ValidationError/BadRequest", errResp)
+	}
+
+	// Unknown id -> 404 envelope.
+	body, status = xeroDelete(t, base+"/api.xro/2.0/Invoices/no-such-invoice", auth, tenantID)
+	if status != 404 {
+		t.Fatalf("void unknown -> %d, want 404; body %s", status, body)
+	}
+
+	// A PAID invoice cannot be voided.
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Invoices", auth, tenantID, map[string]any{
+		"Invoices": []map[string]any{{
+			"InvoiceNumber": "PAID-001",
+			"Status":        "AUTHORISED",
+			"LineItems":     []map[string]any{{"Description": "Pay me", "LineAmount": "120.00"}},
+		}},
+	})
+	if status != 200 {
+		t.Fatalf("create paid-candidate invoice -> %d; body %s", status, body)
+	}
+	var paid2 map[string]any
+	json.Unmarshal([]byte(body), &paid2)
+	paidID := paid2["Invoices"].([]any)[0].(map[string]any)["InvoiceID"].(string)
+	if _, status = xeroPostJSON(t, base+"/api.xro/2.0/Invoices/"+paidID+"/Payments", auth, tenantID,
+		map[string]any{"Amount": "120.00"}); status != 200 {
+		t.Fatalf("payment -> %d", status)
+	}
+	body, status = xeroDelete(t, base+"/api.xro/2.0/Invoices/"+paidID, auth, tenantID)
+	if status != 400 {
+		t.Fatalf("void PAID invoice -> %d, want 400; body %s", status, body)
+	}
+
+	// ===== contact archive =====
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Contacts", auth, tenantID, map[string]any{
+		"Contacts": []map[string]any{{"Name": "Archive Me", "EmailAddress": "arch@example.com"}},
+	})
+	if status != 200 {
+		t.Fatalf("create contact -> %d; body %s", status, body)
+	}
+	var ctResp map[string]any
+	json.Unmarshal([]byte(body), &ctResp)
+	contactID := ctResp["Contacts"].([]any)[0].(map[string]any)["ContactID"].(string)
+
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Contacts/"+contactID, auth, tenantID,
+		map[string]any{"ContactStatus": "ARCHIVED"})
+	if status != 200 {
+		t.Fatalf("archive contact -> %d; body %s", status, body)
+	}
+	var archResp map[string]any
+	json.Unmarshal([]byte(body), &archResp)
+	if archResp["Contacts"].([]any)[0].(map[string]any)["ContactStatus"] != "ARCHIVED" {
+		t.Fatalf("archived ContactStatus = %v, want ARCHIVED", archResp["Contacts"])
+	}
+
+	// Targeted read shows the archived state; the where filter selects it.
+	body, status = xeroGet(t, base+"/api.xro/2.0/Contacts/"+contactID, auth, tenantID)
+	if status != 200 {
+		t.Fatalf("GET archived contact -> %d; body %s", status, body)
+	}
+	var gotted map[string]any
+	json.Unmarshal([]byte(body), &gotted)
+	if gotted["Contacts"].([]any)[0].(map[string]any)["ContactStatus"] != "ARCHIVED" {
+		t.Fatalf("archived contact read = %v, want ARCHIVED", gotted["Contacts"])
+	}
+	body, status = xeroGet(t, base+"/api.xro/2.0/Contacts?where="+url.QueryEscape(`ContactStatus=="ARCHIVED"`), auth, tenantID)
+	if status != 200 {
+		t.Fatalf("list archived contacts -> %d; body %s", status, body)
+	}
+	var archList map[string]any
+	json.Unmarshal([]byte(body), &archList)
+	foundArchived := false
+	for _, ct := range archList["Contacts"].([]any) {
+		if ct.(map[string]any)["ContactID"] == contactID {
+			foundArchived = true
+		}
+	}
+	if !foundArchived {
+		t.Fatalf("archived contact %s missing from where=ContactStatus==ARCHIVED result", contactID)
+	}
+
+	// Reactivate.
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Contacts/"+contactID, auth, tenantID,
+		map[string]any{"ContactStatus": "ACTIVE"})
+	if status != 200 {
+		t.Fatalf("reactivate contact -> %d; body %s", status, body)
+	}
+	json.Unmarshal([]byte(body), &archResp)
+	if archResp["Contacts"].([]any)[0].(map[string]any)["ContactStatus"] != "ACTIVE" {
+		t.Fatalf("reactivated ContactStatus = %v, want ACTIVE", archResp["Contacts"])
+	}
+
+	// Failure paths: invalid ContactStatus -> 400; unknown id -> 404.
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Contacts/"+contactID, auth, tenantID,
+		map[string]any{"ContactStatus": "EXPUNGED"})
+	if status != 400 {
+		t.Fatalf("invalid ContactStatus -> %d, want 400; body %s", status, body)
+	}
+	body, status = xeroPutJSON(t, base+"/api.xro/2.0/Contacts/no-such-contact", auth, tenantID,
+		map[string]any{"ContactStatus": "ARCHIVED"})
+	if status != 404 {
+		t.Fatalf("archive unknown contact -> %d, want 404; body %s", status, body)
+	}
+	body, status = xeroGet(t, base+"/api.xro/2.0/Contacts/no-such-contact", auth, tenantID)
+	if status != 404 {
+		t.Fatalf("get unknown contact -> %d, want 404", status)
+	}
+}
+
+// xeroDelete performs an authorized DELETE with the tenant header.
+func xeroDelete(t *testing.T, rawurl, auth, tenantID string) (string, int) {
+	t.Helper()
+	req, err := http.NewRequest("DELETE", rawurl, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", auth)
+	req.Header.Set("xero-tenant-id", tenantID)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)

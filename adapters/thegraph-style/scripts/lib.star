@@ -1,13 +1,16 @@
 # Shared library for thegraph-style adapter scripts.
 #
-# This file is preloaded by stunt before each handler script. Its top-level
-# definitions are available to all handlers as predeclared builtins.
+# This file is preloaded by stunt before each handler script in this
+# directory. Its top-level definitions are available to all handlers as if
+# they were predeclared builtins — without Starlark's load() (which stunt does
+# not support).
 
 # --- seeded subgraph IDs ---
 
-# Uniswap V3 style subgraph.
-SUBGRAPH_UNISWAP_V3 = "5zvR82QoaXYxfyKOCH8Qfl6pUCWd7YFXq56Y3ZSDXx2W"
-# ENS style subgraph.
+# Uniswap V3 style subgraph (the canonical deployment this adapter serves
+# the real GraphQL transport at).
+SUBGRAPH_UNISWAP_V3 = "5zvR82QoaXYxfyKOCH8Qfl6p"
+# ENS style subgraph (its Domain entity set is served by the same schema).
 SUBGRAPH_ENS = "5XqPmWe6gZyrTtFjASCbxgykJ7KbAA8puFezV8vsJoEB"
 
 # --- optional API-key validation --------------------------------------------
@@ -15,12 +18,18 @@ SUBGRAPH_ENS = "5XqPmWe6gZyrTtFjASCbxgykJ7KbAA8puFezV8vsJoEB"
 # The Graph's hosted-service subgraph endpoints (the /subgraphs/id/{id}
 # shape this adapter models) are public — no auth required. The Graph
 # gateway, by contrast, authenticates requests with an API key sent as
-# "Authorization: Bearer <key>". This adapter mirrors both: a request
-# WITHOUT an Authorization header stays anonymous/public; a request WITH
-# one must present a known, unexpired key or gets a 401 GraphQL errors
-# envelope. Known keys live in the "graph" KV namespace under "tok:<key>"
-# with the expiry as unix seconds (far-future, computed at runtime — never
-# a hardcoded epoch).
+# "Authorization: Bearer <key>". The remaining REST surface (GET
+# /subgraphs/id/{id}/graphql) mirrors both: a request WITHOUT an
+# Authorization header stays anonymous/public; a request WITH one must
+# present a known, unexpired key or gets a 401 GraphQL errors envelope.
+# Known keys live in the "graph" KV namespace under "tok:<key>" with the
+# expiry as unix seconds (far-future, computed at runtime — never a
+# hardcoded epoch).
+#
+# NOTE: the engine's graphql: transport dispatches before adapter endpoints
+# and hands resolvers only {parent, args} — it has no auth hook — so the
+# GraphQL query endpoint itself is public, like the hosted-service
+# endpoints it models.
 
 # Well-known static test API key, seeded once on first request (see
 # _seed_api_keys) so clients that present a key have a working credential
@@ -84,7 +93,13 @@ def _contains(s, sub):
 # _to_int parses a decimal string to int. Returns 0 for None, empty, or
 # non-numeric input.
 def _to_int(s):
-    if s == None or s == "":
+    if s == None:
+        return 0
+    if type(s) == "int":
+        return s
+    if type(s) == "float":
+        return int(s)
+    if s == "":
         return 0
     n = 0
     for i in range(len(s)):
@@ -95,12 +110,14 @@ def _to_int(s):
             return 0
     return n
 
-# _str converts any value to string (handles None and numbers).
+# _str converts any scalar value to its decimal-string form (handles None,
+# ints, and floats) so filter values compare cleanly against the stored
+# decimal-string entity fields (the graph-node wire form for
+# BigInt/BigDecimal).
 def _str(v):
     if v == None:
         return ""
     if type(v) == "int" or type(v) == "float":
-        # Starlark's str() works, but we use the conversion for safety.
         return _int_to_str(int(v))
     return v
 
@@ -115,94 +132,11 @@ def _int_to_str(n):
         n = n // 10
     return out
 
-# --- GraphQL query parsing ---
-
-# _extract_fields extracts the list of requested field names from a GraphQL
-# query fragment like "pools(first:5, orderBy:volumeUSD){id token0{symbol} token1{symbol} totalValueLockedUSD}".
-# Returns a list of top-level field names (without nesting).
-def _extract_fields(fragment):
-    fields = []
-    i = 0
-    depth = 0
-    current = ""
-    started = False
-    while i < len(fragment):
-        ch = fragment[i]
-        if ch == "{":
-            if depth == 0 and started and current != "":
-                fields.append(_trim(current))
-            depth = depth + 1
-            current = ""
-            started = True
-        elif ch == "}":
-            depth = depth - 1
-            if depth == 0:
-                # Next entity or end.
-                pass
-            current = ""
-            started = False
-        elif depth > 0 and started:
-            if ch == "," or ch == "\n" or ch == " " or ch == "\t":
-                if current != "":
-                    fields.append(_trim(current))
-                    current = ""
-            else:
-                current = current + ch
-        else:
-            current = current + ch
-        i = i + 1
-    # Catch trailing field.
-    if current != "" and depth == 0:
-        fields.append(_trim(current))
-    return fields
-
-# _trim removes leading/trailing whitespace from a string.
-def _trim(s):
-    start = 0
-    end = len(s)
-    while start < end:
-        ch = s[start]
-        if ch == " " or ch == "\t" or ch == "\n" or ch == "\r":
-            start = start + 1
-        else:
-            break
-    while end > start:
-        ch = s[end - 1]
-        if ch == " " or ch == "\t" or ch == "\n" or ch == "\r":
-            end = end - 1
-        else:
-            break
-    return s[start:end]
-
-# _extract_arg_raw extracts an argument's raw string value from a GraphQL
-# field header, tolerating whitespace around the colon and separators.
-# e.g. from "pools(first: 5, orderBy: volumeUSD)" key="first" → "5".
-def _extract_arg_raw(header, key):
-    pattern = key + ":"
-    idx = _find_str(header, pattern)
-    if idx < 0:
-        return ""
-    i = idx + len(pattern)
-    while i < len(header) and (header[i] == " " or header[i] == "\t" or header[i] == "\n"):
-        i = i + 1
-    val = ""
-    while i < len(header):
-        ch = header[i]
-        if ch == "," or ch == ")":
-            break
-        val = val + ch
-        i = i + 1
-    return _trim(val)
-
-# _extract_arg_int extracts an integer argument from a GraphQL field header.
-# e.g. from "pools(first: 5, orderBy:volumeUSD)" with key="first" → 5.
-def _extract_arg_int(header, key):
-    return _to_int(_extract_arg_raw(header, key))
-
-# _extract_arg_str extracts a string argument from a GraphQL field header.
-# e.g. from "pools(orderBy: volumeUSD)" with key="orderBy" → "volumeUSD".
-def _extract_arg_str(header, key):
-    return _extract_arg_raw(header, key)
+# _ends_with reports whether s ends with suffix.
+def _ends_with(s, suffix):
+    if len(suffix) > len(s):
+        return False
+    return s[len(s) - len(suffix):] == suffix
 
 # _find_str finds the index of a substring, or -1.
 def _find_str(s, sub):
@@ -218,170 +152,73 @@ def _find_str(s, sub):
             return i
     return -1
 
-# _has_field checks if a field name appears in the GraphQL query fragment.
-def _has_field(query, field):
-    return _contains(query, field)
-
-# _ends_with reports whether s ends with suffix.
-def _ends_with(s, suffix):
-    if len(suffix) > len(s):
-        return False
-    return s[len(s) - len(suffix):] == suffix
-
-# --- GraphQL where/orderBy/orderDirection/skip support ---
+# --- graph-node entity collection arguments -> query_select ----------------
 #
-# The Graph entity queries accept collection-level args that this simulator
-# maps onto the query_select builtin:
-#   pools(first: 10, skip: 5, orderBy: volumeUSD, orderDirection: desc,
-#         where: { feeTier: "3000", token0: "0x...", txCount_gt: 100 })
+# The GraphQL executor resolves where/orderBy/orderDirection/first/skip into
+# plain dicts/strings before calling a resolver, so the where clause is a
+# proper {field_suffix: value} dict (no query-text parsing). This maps it
+# onto query_select triples following the real graph-node ordering: filter,
+# sort, then slice. Values are stringified so BigInt/BigDecimal variables
+# (JSON strings, matching graph-node) compare against the stored
+# decimal-string fields; numeric-string comparisons stay numeric inside
+# query_select.
 
-# _extract_where_block returns the raw text inside the where: { ... } block
-# belonging to the given entity's field, or "". The block may contain nested
-# braces in exotic queries; balanced-brace scanning handles that.
-def _extract_where_block(query, entity):
-    ent_idx = _find_str(query, entity)
-    if ent_idx < 0:
-        return ""
-    idx = _find_str(query[ent_idx:], "where:")
-    if idx < 0:
-        return ""
-    idx = ent_idx + idx
-    # Find the opening brace after "where:".
-    i = idx + 6
-    while i < len(query):
-        if query[i] == "{":
-            break
-        i = i + 1
-    if i >= len(query):
-        return ""
-    depth = 1
-    i = i + 1
-    out = ""
-    while i < len(query) and depth > 0:
-        ch = query[i]
-        if ch == "{":
-            depth = depth + 1
-        elif ch == "}":
-            depth = depth - 1
-            if depth == 0:
-                break
-        out = out + ch
-        i = i + 1
-    return out
+# _strip_suffix returns (field, op) for a graph-node where key, defaulting
+# to equality. Longest suffixes are checked first so _not_in is not
+# misread as _in.
+def _strip_suffix(key):
+    if _ends_with(key, "_not_in"):
+        return key[:len(key) - 7], "not_in"
+    if _ends_with(key, "_starts_with"):
+        return key[:len(key) - 12], "startswith"
+    if _ends_with(key, "_ends_with"):
+        return key[:len(key) - 10], "endswith"
+    if _ends_with(key, "_contains"):
+        return key[:len(key) - 9], "contains"
+    if _ends_with(key, "_gte"):
+        return key[:len(key) - 4], ">="
+    if _ends_with(key, "_lte"):
+        return key[:len(key) - 4], "<="
+    if _ends_with(key, "_not"):
+        return key[:len(key) - 4], "!="
+    if _ends_with(key, "_gt"):
+        return key[:len(key) - 3], ">"
+    if _ends_with(key, "_lt"):
+        return key[:len(key) - 3], "<"
+    if _ends_with(key, "_in"):
+        return key[:len(key) - 3], "in"
+    return key, "="
 
-# _parse_where parses a where block ("feeTier: \"3000\", txCount_gt: 100")
-# into query_select [field, op, value] triples. Supported field suffixes map
-# to query_select ops: _gt _gte _lt _lte _not _in (list or single value),
-# _contains, _starts_with, _ends_with. A list value under _not_in (or _not)
-# is tagged with the synthetic op "not_in", which _apply_graph_args resolves
-# via a manual exclusion pass (query_select has no not-in op). Unquoted
-# values are treated as strings (stored entity fields are strings).
-def _parse_where(block, entity):
+# _where_filters maps a graph-node where dict to (filters, excludes):
+# query_select [field, op, value] triples plus _not_in exclusion lists
+# (query_select has no not-in op — exclusions run as a manual pass BEFORE
+# query_select so filter-then-sort-then-slice ordering holds). Stored pool
+# docs keep referenced tokens as token0_id/token1_id.
+def _where_filters(where, entity):
     filters = []
-    i = 0
-    n = len(block)
-    while i < n:
-        ch = block[i]
-        if ch == " " or ch == "," or ch == "\n" or ch == "\t" or ch == "}":
-            i = i + 1
+    excludes = []
+    if where == None or type(where) != "dict":
+        return filters, excludes
+    for key in where:
+        val = where[key]
+        if val == None:
             continue
-        field = ""
-        while i < n and block[i] != ":":
-            field = field + block[i]
-            i = i + 1
-        if i >= n:
-            break
-        i = i + 1
-        while i < n and (block[i] == " " or block[i] == "\n" or block[i] == "\t"):
-            i = i + 1
-        if i >= n:
-            break
-        value = ""
-        is_list = False
-        if block[i] == '"':
-            i = i + 1
-            while i < n and block[i] != '"':
-                value = value + block[i]
-                i = i + 1
-            i = i + 1
-        elif block[i] == "[":
-            is_list = True
-            i = i + 1
-            items = []
-            while i < n and block[i] != "]":
-                if block[i] == '"':
-                    i = i + 1
-                    item = ""
-                    while i < n and block[i] != '"':
-                        item = item + block[i]
-                        i = i + 1
-                    i = i + 1
-                    items.append(item)
-                else:
-                    i = i + 1
-            i = i + 1
-            value = items
+        field, op = _strip_suffix(key)
+        if entity == "pools" and (field == "token0" or field == "token1"):
+            field = field + "_id"
+        if op == "not_in":
+            vals = []
+            for v in val:
+                vals.append(_str(v))
+            excludes.append([field, vals])
+        elif op == "in":
+            vals = []
+            for v in val:
+                vals.append(_str(v))
+            filters.append([field, "in", vals])
         else:
-            while i < n and block[i] != "," and block[i] != "}" and block[i] != " " and block[i] != "\n":
-                value = value + block[i]
-                i = i + 1
-
-        field = _trim(field)
-        f = field
-        op = "="
-        if _ends_with(field, "_gte"):
-            f = field[:len(field) - 4]
-            op = ">="
-        elif _ends_with(field, "_lte"):
-            f = field[:len(field) - 4]
-            op = "<="
-        elif _ends_with(field, "_gt"):
-            f = field[:len(field) - 3]
-            op = ">"
-        elif _ends_with(field, "_lt"):
-            f = field[:len(field) - 3]
-            op = "<"
-        elif _ends_with(field, "_not_in"):
-            f = field[:len(field) - 7]
-            op = "!="
-        elif _ends_with(field, "_not"):
-            f = field[:len(field) - 4]
-            op = "!="
-        elif _ends_with(field, "_contains"):
-            f = field[:len(field) - 9]
-            op = "contains"
-        elif _ends_with(field, "_starts_with"):
-            f = field[:len(field) - 12]
-            op = "startswith"
-        elif _ends_with(field, "_ends_with"):
-            f = field[:len(field) - 10]
-            op = "endswith"
-
-        if is_list:
-            # A list value under _not_in (or _not) means "exclude these".
-            # query_select has no not-in op, so mark it and let
-            # _apply_graph_args run a manual exclusion pass.
-            if op == "!=":
-                op = "not_in"
-            else:
-                op = "in"
-                # Positive list filters are written as field_in: [...] —
-                # strip the suffix (mirrors the scalar _in branch below,
-                # which this branch otherwise shadows). _not_in was already
-                # handled above, so do not re-strip it.
-                if _ends_with(field, "_in") and not _ends_with(field, "_not_in"):
-                    f = field[:len(field) - 3]
-        elif _ends_with(field, "_in") and not _ends_with(field, "_not_in"):
-            f = field[:len(field) - 3]
-            op = "in"
-            value = [value]
-
-        # Stored pool docs keep referenced tokens as token0_id/token1_id.
-        if entity == "pools" and (f == "token0" or f == "token1"):
-            f = f + "_id"
-
-        filters.append([f, op, value])
-    return filters
+            filters.append([field, op, _str(val)])
+    return filters, excludes
 
 # _exclude_in removes docs whose field value equals any entry in values.
 # Docs missing the field are kept (a missing value is not in the list).
@@ -392,42 +229,152 @@ def _exclude_in(docs, field, values):
         excluded = False
         if v != None:
             for j in range(len(values)):
-                if _str(v) == _str(values[j]):
+                if _str(v) == values[j]:
                     excluded = True
                     break
         if not excluded:
             out.append(d)
     return out
 
-# _apply_graph_args applies the entity collection-level GraphQL args
-# (where/orderBy/orderDirection/first/skip) to a raw stored-entity list via
-# query_select, before per-field projection. Mirrors the real Graph node
-# ordering: filter, sort, then slice. header is the entity's field header
-# (e.g. "pools(first:5, orderBy:volumeUSD)") as extracted by the caller.
-def _apply_graph_args(query, entity, docs, header):
-    where = _parse_where(_extract_where_block(query, entity), entity)
+# _apply_entity_args applies the graph-node collection arguments to a raw
+# stored-entity list via query_select: _not_in exclusions, where filters,
+# orderBy/orderDirection (mapped to the stored field name), then
+# first/skip. first/skip arrive already defaulted by the schema (100/0).
+_MAX_FIRST = 1000
 
-    # query_select has no not-in op: apply _not_in exclusions manually
-    # BEFORE query_select so filter-then-sort-then-slice ordering holds.
-    select_filters = []
-    for i in range(len(where)):
-        if where[i][1] == "not_in":
-            docs = _exclude_in(docs, where[i][0], where[i][2])
-        else:
-            select_filters.append(where[i])
+def _apply_entity_args(docs, where, entity, order_by, order_dir, first, skip):
+    filters, excludes = _where_filters(where, entity)
+    for i in range(len(excludes)):
+        docs = _exclude_in(docs, excludes[i][0], excludes[i][1])
 
-    order_by = _extract_arg_str(header, "orderBy")
-    order_dir = _extract_arg_str(header, "orderDirection")
-    first = _extract_arg_int(header, "first")
-    skip = _extract_arg_int(header, "skip")
-
-    if order_by == "":
+    if order_by == None or order_by == "":
         order_by = None
-    if order_dir == "":
-        order_dir = ""
-    if first <= 0:
-        first = None
-    if skip <= 0:
-        skip = None
+    else:
+        if entity == "pools" and (order_by == "token0" or order_by == "token1"):
+            order_by = order_by + "_id"
+    order_dir = order_dir if order_dir != None else "asc"
 
-    return query_select(docs, select_filters if len(select_filters) > 0 else None, order_by, order_dir, first, skip, None)
+    if skip == None or skip < 0:
+        skip = 0
+    else:
+        skip = _to_int(skip)
+    if first == None:
+        first = 100
+    else:
+        # Int variables arrive as JSON floats — coerce before query_select.
+        first = _to_int(first)
+    if first < 0:
+        fail("first parameter must be non-negative")
+    if first > _MAX_FIRST:
+        fail("first parameter cannot exceed " + _int_to_str(_MAX_FIRST) + ", you are requesting " + _int_to_str(first))
+
+    return query_select(docs, filters if len(filters) > 0 else None, order_by, order_dir, first, skip, None)
+
+# --- seeding ----------------------------------------------------------------
+#
+# Seed data lives here (not in a handler script) so both the REST SDL
+# endpoint and the graphql transport resolvers can trigger it.
+
+# _seed populates the synthetic entity collections on first access.
+def _seed():
+    if store_kv_get("graph", "seeded") == "yes":
+        return
+    store_kv_set("graph", "seeded", "yes")
+
+    # --- Seed tokens ---
+    tc = store_collection("tokens")
+    tc.insert({
+        "id": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        "symbol": "WETH",
+        "name": "Wrapped Ether",
+        "decimals": "18",
+        "totalSupply": "1000000000000000000000000",
+        "derivedETH": "1.0",
+    })
+    tc.insert({
+        "id": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "symbol": "USDC",
+        "name": "USD Coin",
+        "decimals": "6",
+        "totalSupply": "50000000000000000",
+        "derivedETH": "0.00045",
+    })
+    tc.insert({
+        "id": "0x2260fac5e5542a773aa44fbcfedf7c193bc2b5f0",
+        "symbol": "WBTC",
+        "name": "Wrapped BTC",
+        "decimals": "8",
+        "totalSupply": "150000000000000",
+        "derivedETH": "15.2",
+    })
+    tc.insert({
+        "id": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+        "symbol": "USDT",
+        "name": "Tether USD",
+        "decimals": "6",
+        "totalSupply": "45000000000000000",
+        "derivedETH": "0.00045",
+    })
+
+    # --- Seed pools ---
+    pc = store_collection("pools")
+    pc.insert({
+        "id": "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
+        "token0_id": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "token0_symbol": "USDC",
+        "token1_id": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        "token1_symbol": "WETH",
+        "feeTier": "500",
+        "totalValueLockedUSD": "325678901.234567",
+        "volumeUSD": "8912345678.901234",
+        "txCount": "1234567",
+    })
+    pc.insert({
+        "id": "0x11b815efb8f581194ae79006d24e0d814b7697f6",
+        "token0_id": "0x2260fac5e5542a773aa44fbcfedf7c193bc2b5f0",
+        "token0_symbol": "WBTC",
+        "token1_id": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+        "token1_symbol": "WETH",
+        "feeTier": "3000",
+        "totalValueLockedUSD": "178543210.123456",
+        "volumeUSD": "4567890123.456789",
+        "txCount": "567890",
+    })
+    pc.insert({
+        "id": "0x4e68ccd3e89f51c3074ca5072bbac773960dfa36",
+        "token0_id": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "token0_symbol": "USDC",
+        "token1_id": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+        "token1_symbol": "USDT",
+        "feeTier": "100",
+        "totalValueLockedUSD": "95678901.456789",
+        "volumeUSD": "2345678901.234567",
+        "txCount": "890123",
+    })
+
+    # --- Seed domains ---
+    dc = store_collection("domains")
+    dc.insert({
+        "id": "0xee6c4522aab0003e8d14cd40a6af439055fd25b7a09cd6162a9f6f6390d9c34d",
+        "name": "vitalik.eth",
+        "labelName": "vitalik",
+        "owner": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
+        "resolvedAddress": "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
+        "createdAt": "1580754177",
+    })
+    dc.insert({
+        "id": "0x49726cbb5d1a7c701cb8d7a6e3eb0e4e62b1e3b3a7a7a7a7a7a7a7a7a7a7a7a7",
+        "name": "brantly.eth",
+        "labelName": "brantly",
+        "owner": "0x9831103096dedb6c3d5ce6ca98c2c5d2c3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+        "resolvedAddress": "0x9831103096dedb6c3d5ce6ca98c2c5d2c3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f3f",
+        "createdAt": "1597134439",
+    })
+    dc.insert({
+        "id": "0xa2f3a4b5c6d7e8f9012345678901234567abcdeffedcba9876543210011223344",
+        "name": "paradigm.eth",
+        "labelName": "paradigm",
+        "owner": "0xfc40a5c358c6db7b37ee5802640e3c97d9d8a9d8",
+        "resolvedAddress": "0xfc40a5c358c6db7b37ee5802640e3c97d9d8a9d8",
+        "createdAt": "1605684623",
+    })

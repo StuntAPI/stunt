@@ -1,6 +1,7 @@
-# Invoice handlers — create and read.
+# Invoice handlers — create, read, void.
 #
 # POST /v3/company/{realmId}/invoice       { Line, CustomerRef, ... } -> { Invoice: {...} }
+# POST /v3/company/{realmId}/invoice?operation=void  { Id, SyncToken } -> { Invoice: {...} } (VOID)
 # GET  /v3/company/{realmId}/invoice/{id}  -> { Invoice: {...} }
 
 # Shared helpers (_bearer, _require_token, _realm_matches, _fault, _now,
@@ -18,6 +19,11 @@ def on_create_invoice(req):
     body = req["body"]
     if body == None:
         body = {}
+
+    # ?operation=void — QBO's documented void: POST with {Id, SyncToken}.
+    q = req.get("query")
+    if q != None and q.get("operation", "") == "void":
+        return _void_invoice(body)
 
     line = body.get("Line", [])
     if len(line) == 0:
@@ -58,6 +64,27 @@ def on_create_invoice(req):
     c = store_collection("invoices")
     c.insert(doc)
 
+    return respond(200, {"Invoice": doc, "time": _now()})
+
+# _void_invoice implements ?operation=void: the invoice is soft-deleted into
+# QBO's terminal VOIDED state — the record is kept, status flips to "Voided"
+# and the balance is zeroed — exactly the observable end state of the real
+# API's void. An unknown Id is the usual 620 Object Not Found fault; a missing
+# Id is a 610 parameter fault.
+def _void_invoice(body):
+    inv_id = body.get("Id", "")
+    if inv_id == "":
+        return _fault(400, "610", "Required parameter missing", "Id is required to void an invoice")
+
+    c = store_collection("invoices")
+    doc = c.get(inv_id)
+    if doc == None:
+        return _fault(404, "620", "Object Not Found", "Invoice " + inv_id + " not found")
+
+    doc["status"] = "Voided"
+    doc["Balance"] = 0
+    doc["SyncToken"] = _bump_sync(doc.get("SyncToken", "0"))
+    c.update(inv_id, doc)
     return respond(200, {"Invoice": doc, "time": _now()})
 
 def on_delete_invoice(req):

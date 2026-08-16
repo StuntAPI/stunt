@@ -1159,3 +1159,266 @@ func TestGitHubStyleCommentAndReviewWebhooks(t *testing.T) {
 	sink.mu.Unlock()
 	verifyGitHubSig(t, second.body, second.hdr, secret, "pull_request_review")
 }
+
+// ghSetupGraphql serves the committed github-style adapter and returns its
+// HTTP base URL + cleanup.
+func ghSetupGraphql(t *testing.T) (string, func()) {
+	t.Helper()
+
+	absDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "github-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"github": {Adapter: absDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		e.Close()
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+
+	url := addrs["github"]
+	cleanup := func() {
+		cancel()
+		e.Close()
+	}
+	return url, cleanup
+}
+
+// ghGraphql sends a GraphQL POST (with a valid PAT) and returns data + the
+// raw body, failing the test when the response carries top-level errors.
+func ghGraphql(t *testing.T, base, query string, variables map[string]any) (map[string]any, string) {
+	t.Helper()
+	body, status := ghPostBearer(t, base+"/graphql", "ghp_pat_token_mock", map[string]any{
+		"query":     query,
+		"variables": variables,
+	})
+	var resp map[string]any
+	if err := json.Unmarshal([]byte(body), &resp); err != nil {
+		t.Fatalf("unmarshal graphql response: %v (body %s)", err, body)
+	}
+	if errs, ok := resp["errors"]; ok && errs != nil {
+		t.Fatalf("graphql errors: %v (query %s)", errs, query)
+	}
+	if status != 200 {
+		t.Fatalf("graphql -> status %d, want 200 (body %s)", status, body)
+	}
+	data, ok := resp["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("graphql data = %v (body %s)", resp["data"], body)
+	}
+	return data, body
+}
+
+// TestGitHubStyleGraphqlExecution exercises the real GraphQL executor end
+// to end: nested repository/issue/PR joins, the Actor interface, variables +
+// aliases, mutations sharing the REST state machine (with REST parity), and
+// validation failures for unknown fields and bad global ids.
+func TestGitHubStyleGraphqlExecution(t *testing.T) {
+	base, cleanup := ghSetupGraphql(t)
+	defer cleanup()
+	const pat = "ghp_pat_token_mock"
+
+	// ===== Read: repository + issues + PRs with nested joins =====
+
+	query := `query($owner: String!, $name: String!, $n: Int!) {
+		a: repository(owner: $owner, name: $name) {
+			id
+			nameWithOwner
+			isPrivate
+			defaultBranchRef { name prefix }
+			issues(first: $n, states: OPEN, orderBy: {field: CREATED_AT, direction: ASC}) {
+				totalCount
+				nodes { number title state stateReason author { __typename login url } labels(first: 5) { nodes { id name color } } comments(first: 5) { totalCount } url createdAt }
+			}
+			pullRequests(first: $n) { totalCount nodes { number state headRefName baseRefName merged } }
+		}
+		b: viewer { login name }
+		miss: repository(owner: "octocat", name: "nope") { id }
+	}`
+	data, _ := ghGraphql(t, base, query, map[string]any{"owner": "octocat", "name": "hello-world", "n": 10})
+	repo := data["a"].(map[string]any)
+
+	repoGID, ok := repo["id"].(string)
+	if !ok || repoGID == "" {
+		t.Fatalf("repository.id = %v, want a base64 global id", repo["id"])
+	}
+	if repo["nameWithOwner"] != "octocat/hello-world" {
+		t.Fatalf("nameWithOwner = %v", repo["nameWithOwner"])
+	}
+	if ref := repo["defaultBranchRef"].(map[string]any); ref["name"] != "main" || ref["prefix"] != "refs/heads/" {
+		t.Fatalf("defaultBranchRef = %v", ref)
+	}
+
+	issues := repo["issues"].(map[string]any)
+	if issues["totalCount"] != float64(1) {
+		t.Fatalf("issues.totalCount = %v, want 1 (the seeded issue)", issues["totalCount"])
+	}
+	node := issues["nodes"].([]any)[0].(map[string]any)
+	if node["number"] != float64(1) || node["state"] != "OPEN" {
+		t.Fatalf("seeded issue = %v, want #1 OPEN", node)
+	}
+	author := node["author"].(map[string]any)
+	if author["__typename"] != "User" || author["login"] != "octocat" {
+		t.Fatalf("issue.author = %v, want a User actor 'octocat'", author)
+	}
+	labels := node["labels"].(map[string]any)["nodes"].([]any)
+	if len(labels) != 1 || labels[0].(map[string]any)["name"] != "documentation" {
+		t.Fatalf("issue labels = %v, want [documentation]", labels)
+	}
+	if !strings.HasPrefix(node["url"].(string), "https://github.com/octocat/hello-world/issues/1") {
+		t.Fatalf("issue url = %v", node["url"])
+	}
+
+	prs := repo["pullRequests"].(map[string]any)
+	pr := prs["nodes"].([]any)[0].(map[string]any)
+	if pr["state"] != "OPEN" || pr["headRefName"] != "develop" || pr["baseRefName"] != "main" || pr["merged"] != false {
+		t.Fatalf("seeded PR = %v, want OPEN develop→main unmerged", pr)
+	}
+
+	if data["b"].(map[string]any)["login"] != "stunt-dev" {
+		t.Fatalf("viewer.login = %v", data["b"])
+	}
+	if miss := data["miss"]; miss != nil {
+		t.Fatalf("repository(octocat/nope) = %v, want null", miss)
+	}
+
+	// ===== Mutations: createIssue → updateIssue → addComment =====
+
+	createMut := `mutation($rid: ID!) {
+		createIssue(input: {repositoryId: $rid, title: "From GraphQL", body: "created via the executor", labels: ["graphql"]}) {
+			issue { number title state author { __typename login } labels(first: 5) { nodes { name } } }
+		}
+	}`
+	data, _ = ghGraphql(t, base, createMut, map[string]any{"rid": repoGID})
+	created := data["createIssue"].(map[string]any)["issue"].(map[string]any)
+	number := created["number"].(float64)
+	if number != 2 {
+		t.Fatalf("created issue number = %v, want 2 (per-repo sequence)", number)
+	}
+	if created["author"].(map[string]any)["__typename"] != "Bot" {
+		t.Fatalf("created author = %v, want a Bot actor", created["author"])
+	}
+	if got := created["labels"].(map[string]any)["nodes"].([]any); len(got) != 1 || got[0].(map[string]any)["name"] != "graphql" {
+		t.Fatalf("created labels = %v, want [graphql]", got)
+	}
+
+	// REST parity: the GraphQL-created issue is visible through REST.
+	body, status := ghGetBearer(t, base+"/repos/octocat/hello-world/issues", pat)
+	if status != 200 {
+		t.Fatalf("REST list issues -> %d", status)
+	}
+	var restIssues []any
+	json.Unmarshal([]byte(body), &restIssues)
+	found := false
+	for _, i := range restIssues {
+		if i.(map[string]any)["number"] == number && i.(map[string]any)["title"] == "From GraphQL" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("GraphQL-created issue %v not visible via REST (body %s)", number, body)
+	}
+
+	// The issue global id round-trips through the schema's id field.
+	gqlIDQuery := `query($n: Int!) { repository(owner: "octocat", name: "hello-world") { issue(number: $n) { id } } }`
+	data, _ = ghGraphql(t, base, gqlIDQuery, map[string]any{"n": number})
+	issueGID := data["repository"].(map[string]any)["issue"].(map[string]any)["id"].(string)
+
+	updateMut := `mutation($id: ID!) {
+		updateIssue(input: {id: $id, state: CLOSED, stateReason: COMPLETED}) { issue { number state stateReason closedAt } }
+	}`
+	data, _ = ghGraphql(t, base, updateMut, map[string]any{"id": issueGID})
+	updated := data["updateIssue"].(map[string]any)["issue"].(map[string]any)
+	if updated["state"] != "CLOSED" || updated["stateReason"] != "COMPLETED" {
+		t.Fatalf("updated issue = %v, want CLOSED/COMPLETED", updated)
+	}
+	if updated["closedAt"] == nil {
+		t.Fatalf("closedAt = nil after closing via GraphQL")
+	}
+
+	commentMut := `mutation($sid: ID!) {
+		addComment(input: {subjectId: $sid, body: "comment via GraphQL"}) {
+			commentEdge { node { id body author { login } } }
+			subject { number }
+		}
+	}`
+	data, _ = ghGraphql(t, base, commentMut, map[string]any{"sid": issueGID})
+	payload := data["addComment"].(map[string]any)
+	comment := payload["commentEdge"].(map[string]any)["node"].(map[string]any)
+	if comment["body"] != "comment via GraphQL" {
+		t.Fatalf("comment = %v", comment)
+	}
+	if payload["subject"].(map[string]any)["number"] != number {
+		t.Fatalf("subject number = %v, want %v", payload["subject"], number)
+	}
+
+	// The comment shows up through the nested connection.
+	data, _ = ghGraphql(t, base, `query($n: Int!) { repository(owner: "octocat", name: "hello-world") { issue(number: $n) { comments(first: 5) { totalCount nodes { body author { __typename } } } } } }`, map[string]any{"n": number})
+	comments := data["repository"].(map[string]any)["issue"].(map[string]any)["comments"].(map[string]any)
+	if comments["totalCount"] != float64(1) {
+		t.Fatalf("comments.totalCount = %v, want 1", comments["totalCount"])
+	}
+	if comments["nodes"].([]any)[0].(map[string]any)["author"].(map[string]any)["__typename"] != "Bot" {
+		t.Fatalf("comment author = %v, want a Bot actor", comments["nodes"])
+	}
+
+	// ===== Failure paths =====
+
+	// Unknown field → 400 + errors[] naming the field.
+	body, status = ghPostBearer(t, base+"/graphql", pat, map[string]any{
+		"query": `{ viewer { login nonexistentField } }`,
+	})
+	if status != 400 {
+		t.Fatalf("unknown field -> %d, want 400 (body %s)", status, body)
+	}
+	if !strings.Contains(body, "nonexistentField") {
+		t.Fatalf("unknown field error should name the field: %s", body)
+	}
+
+	// Unknown root operation → 400.
+	body, status = ghPostBearer(t, base+"/graphql", pat, map[string]any{
+		"query": `{ repositories(first: 5) { id } }`,
+	})
+	if status != 400 {
+		t.Fatalf("unknown root field -> %d, want 400 (body %s)", status, body)
+	}
+
+	// createIssue with an unresolvable repositoryId → GraphQL errors[]
+	// (GitHub's "Could not resolve to a Repository" message).
+	body, status = ghPostBearer(t, base+"/graphql", pat, map[string]any{
+		"query":     `mutation { createIssue(input: {repositoryId: "gid-bogus", title: "x"}) { issue { number } } }`,
+		"variables": map[string]any{},
+	})
+	if status != 200 {
+		t.Fatalf("bogus repositoryId -> %d, want 200 with errors[] (body %s)", status, body)
+	}
+	var errResp map[string]any
+	json.Unmarshal([]byte(body), &errResp)
+	if errs, ok := errResp["errors"].([]any); !ok || len(errs) == 0 || !strings.Contains(body, "Could not resolve to a Repository") {
+		t.Fatalf("bogus repositoryId errors = %v", errs)
+	}
+
+	// addComment with an unresolvable subjectId → GraphQL errors[].
+	body, _ = ghPostBearer(t, base+"/graphql", pat, map[string]any{
+		"query": `mutation { addComment(input: {subjectId: "bm90LWEtZ2lk", body: "x"}) { commentEdge { node { id } } } }`,
+	})
+	if !strings.Contains(body, "Could not resolve") {
+		t.Fatalf("bogus subjectId errors = %s", body)
+	}
+}

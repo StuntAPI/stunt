@@ -20,21 +20,51 @@ unblock accounting/billing integrations during local development:
 - **Refresh-token churn:** Each refresh returns a **NEW** `refresh_token`; the old
   one is invalidated (modeling QBO's infamous refresh rotation).
 - **QSQL query:** `GET/POST /v3/company/{realmId}/query?query=SELECT * FROM
-  Customer` → `{QueryResponse:{Customer:[...]}, time}`. Pattern-matches entity
-  name (Customer, Invoice, etc.) — no real SQL parsing.
-- **Customer CRUD:** `POST /v3/company/{realmId}/customer`, `GET
+  Customer` → `{QueryResponse:{Customer:[...]}, time}`. The FROM entity token
+  is matched first (so `... FROM Invoice WHERE CustomerRef.value = '5'` is an
+  Invoice query), with a substring fallback for malformed input.
+- **Customer CRUD:** `POST /v3/company/{realmId}/customer` (no `Id` creates;
+  with `Id` performs a QBO-style full/sparse UPDATE), `GET
   /v3/company/{realmId}/customer` (with `?id=` or list-all), `GET/DELETE
   /v3/company/{realmId}/customer/{id}`.
-- **Invoice CRUD:** `POST /v3/company/{realmId}/invoice`, `GET/DELETE
+- **Invoice CRUD:** `POST /v3/company/{realmId}/invoice` (create, or
+  `?operation=void` to void), `GET/DELETE
   /v3/company/{realmId}/invoice/{id}`.
-- **Delete responses:** Both DELETE endpoints return
-  `{Customer|Invoice: {Id, domain:"QBO", status:"Deleted"}, time}` (a hard
-  delete from the store, not QBO's sparse-update deactivation).
+- **Customer delete is DEACTIVATION, not destruction** (see below).
+- **Invoice void:** `POST /v3/company/{realmId}/invoice?operation=void` with
+  `{Id, SyncToken}` flips the invoice to `status:"Voided"` and zeroes its
+  `Balance` — the record is kept (QBO's soft-delete terminal state).
 - **Fault errors:** QBO's distinctive `{Fault:{Error:[{Message, code, Detail}],
   type}}` envelope. 401 on expired/invalid token → `code:"32001"`.
 
 Customers and invoices are **stateful** — a seed customer and seed invoice are
 pre-loaded so queries return data immediately.
+
+## Soft delete (deactivation + void)
+
+QBO never hard-deletes customers or voids invoices by destruction; stunt
+reproduces the observable end states:
+
+- **`DELETE /v3/company/{realmId}/customer/{id}`** deactivates the customer:
+  the stored record is kept with `Active=false` and a bumped `SyncToken`
+  (the same end state a sparse `POST /v3/company/{realmId}/customer` with
+  `{"Id": …, "sparse": true, "Active": false}` produces — the real-QBO way to
+  deactivate). The response is `{Customer: {Id, domain:"QBO", Active:false,
+  status:"Deleted"}, time}`.
+  - `GET /customer/{id}` and `GET /customer?id=` still return the deactivated
+    customer (with `Active:false`).
+  - `GET /customer` (list-all) returns only **active** customers.
+  - `query?query=select * from Customer` returns only active customers by
+    default; an explicit `WHERE Active = False` surfaces the deactivated ones
+    (any `WHERE` mentioning `Active` replaces the implicit `Active = True`).
+  - Invoices keep their `CustomerRef` — deactivating a customer orphans
+    nothing.
+- **`POST /v3/company/{realmId}/invoice?operation=void`** with `{Id,
+  SyncToken}` voids the invoice: the record is kept, `status:"Voided"`,
+  `Balance: 0`. Unknown `Id` → `404` Fault `code:"620"`; missing `Id` → `400`
+  Fault `code:"610"`.
+- `DELETE /invoice/{id}` remains a hard delete of the invoice record itself
+  (QBO permits deleting draft invoices).
 
 ## Auth
 
@@ -55,11 +85,11 @@ Fault envelope below (`code:"32001"`).
 | GET | `/oauth/v2/authorize` | `oauth.star#on_authorize` | 302 redirect with code+state+realmId |
 | POST | `/oauth/v2/tokens/bearer` | `oauth.star#on_token` | Token exchange + refresh |
 | GET/POST | `/v3/company/{realmId}/query` | `query.star#on_query` | SQL-like query (honors `WHERE` = != > >= < <= LIKE IN, `ORDER BY` ASC/DESC and `MAXRESULTS n`) |
-| POST | `/v3/company/{realmId}/customer` | `customer.star#on_create_customer` | Create customer |
-| GET | `/v3/company/{realmId}/customer` | `customer.star#on_read_customer` | List/get customer |
-| GET | `/v3/company/{realmId}/customer/{id}` | `customer.star#on_read_customer_by_id` | Get customer by ID |
-| DELETE | `/v3/company/{realmId}/customer/{id}` | `customer.star#on_delete_customer_by_id` | Delete customer (returns `status:"Deleted"`) |
-| POST | `/v3/company/{realmId}/invoice` | `invoice.star#on_create_invoice` | Create invoice |
+| POST | `/v3/company/{realmId}/customer` | `customer.star#on_create_customer` | Create customer (with `Id`: update / sparse deactivation) |
+| GET | `/v3/company/{realmId}/customer` | `customer.star#on_read_customer` | List/get customer (list returns active only) |
+| GET | `/v3/company/{realmId}/customer/{id}` | `customer.star#on_read_customer_by_id` | Get customer by ID (also inactive) |
+| DELETE | `/v3/company/{realmId}/customer/{id}` | `customer.star#on_delete_customer_by_id` | Deactivate customer (`Active:false`, record kept) |
+| POST | `/v3/company/{realmId}/invoice` | `invoice.star#on_create_invoice` | Create invoice (`?operation=void` to void) |
 | GET | `/v3/company/{realmId}/invoice/{id}` | `invoice.star#on_read_invoice` | Get invoice by ID |
 | DELETE | `/v3/company/{realmId}/invoice/{id}` | `invoice.star#on_delete_invoice` | Delete invoice (returns `status:"Deleted"`) |
 

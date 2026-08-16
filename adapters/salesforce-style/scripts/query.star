@@ -1,8 +1,13 @@
-# SOQL Query handler — Salesforce query endpoint.
+# SOQL Query handler — Salesforce query + queryAll endpoints.
 #
 # GET /services/data/v60.0/query?q=SELECT+Id,+Name+FROM+Account
 # GET /services/data/v60.0/queryAll?q=...
 # -> { totalSize, records:[{attributes:{type,url}, Id, Name, ...}], done:true }
+#
+# query and queryAll differ exactly as in the real API: query EXCLUDES
+# soft-deleted records (IsDeleted, set by DELETE /sobjects/{type}/{id}),
+# while queryAll INCLUDES them so clients can read recycle-bin rows
+# (typically with WHERE IsDeleted = true).
 #
 # SOQL parsing: we pattern-match the FROM <Entity> token and the SELECT
 # field list. We do NOT implement a full SOQL parser. For "WHERE Id = '...'",
@@ -31,7 +36,18 @@ def on_query(req):
     if col == None:
         return _sf_error(400, "Entity type '" + entity + "' is not accessible", "INVALID_TYPE")
 
+    # queryAll (path-routed) sees recycle-bin rows; plain query does not.
+    include_deleted = _contains(req["path"], "queryAll")
+
     docs = col.list()
+
+    # Records created before IsDeleted was tracked (seeds) are live rows.
+    for d in docs:
+        if d.get("IsDeleted", None) == None:
+            d["IsDeleted"] = False
+
+    if not include_deleted:
+        docs = [d for d in docs if not d["IsDeleted"]]
 
     # WHERE (comparators, IN, LIKE, AND/OR).
     if where != "":

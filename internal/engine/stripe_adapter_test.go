@@ -301,7 +301,7 @@ func TestStripeStyleAdapter(t *testing.T) {
 		t.Fatalf("updated name = %v, want 'Test Company' (should be preserved)", updated["name"])
 	}
 
-	// DELETE /v1/customers/{id} → 200
+	// DELETE /v1/customers/{id} → 200 {"id","object":"customer","deleted":true}
 	body, status = deleteAuth(t, base+"/v1/customers/"+customerID, devToken)
 	if status != 200 {
 		t.Fatalf("DELETE customer -> status %d, want 200; body %s", status, body)
@@ -313,11 +313,75 @@ func TestStripeStyleAdapter(t *testing.T) {
 	if deleted["deleted"] != true {
 		t.Fatalf("deleted = %v, want true", deleted["deleted"])
 	}
+	if deleted["id"] != customerID || deleted["object"] != "customer" {
+		t.Fatalf("delete response = %v, want id/object echo", deleted)
+	}
 
-	// GET after delete → 404
-	_, status = getAuth(t, base+"/v1/customers/"+customerID, devToken)
+	// GET after delete → 200 with deleted:true (Stripe keeps deleted
+	// customers retrievable; only lists hide them).
+	body, status = getAuth(t, base+"/v1/customers/"+customerID, devToken)
+	if status != 200 {
+		t.Fatalf("GET deleted customer -> status %d, want 200; body %s", status, body)
+	}
+	var retrievedDeleted map[string]any
+	if err := json.Unmarshal([]byte(body), &retrievedDeleted); err != nil {
+		t.Fatalf("unmarshal retrieved deleted customer: %v", err)
+	}
+	if retrievedDeleted["deleted"] != true {
+		t.Fatalf("retrieved deleted customer deleted = %v, want true", retrievedDeleted["deleted"])
+	}
+	if retrievedDeleted["name"] != "Test Company" {
+		t.Fatalf("retrieved deleted customer name = %v, want preserved", retrievedDeleted["name"])
+	}
+
+	// Default list excludes the deleted customer.
+	body, status = getAuth(t, base+"/v1/customers", devToken)
+	if status != 200 {
+		t.Fatalf("GET /v1/customers after delete -> status %d, want 200", status)
+	}
+	if err := json.Unmarshal([]byte(body), &customerList); err != nil {
+		t.Fatalf("unmarshal customer list after delete: %v", err)
+	}
+	cdata, _ = customerList["data"].([]any)
+	for _, c := range cdata {
+		if cm, ok := c.(map[string]any); ok && cm["id"] == customerID {
+			t.Fatalf("deleted customer %s leaked into default list", customerID)
+		}
+	}
+
+	// Update after delete → 404 (no mutations on a deleted customer).
+	_, status = postJSONAuth(t, base+"/v1/customers/"+customerID, devToken, map[string]any{
+		"description": "should fail",
+	})
 	if status != 404 {
-		t.Fatalf("GET deleted customer -> status %d, want 404", status)
+		t.Fatalf("POST update deleted customer -> status %d, want 404", status)
+	}
+
+	// customer.deleted event is recorded in the events collection.
+	body, status = getAuth(t, base+"/v1/events?type=customer.deleted", devToken)
+	if status != 200 {
+		t.Fatalf("GET /v1/events?type=customer.deleted -> status %d, want 200", status)
+	}
+	var evList map[string]any
+	if err := json.Unmarshal([]byte(body), &evList); err != nil {
+		t.Fatalf("unmarshal events list: %v", err)
+	}
+	evData, _ := evList["data"].([]any)
+	foundDeletedEvent := false
+	for _, e := range evData {
+		ev := e.(map[string]any)
+		if payload, ok := ev["data"].(map[string]any)["object"].(map[string]any); ok && payload["id"] == customerID {
+			foundDeletedEvent = true
+		}
+	}
+	if !foundDeletedEvent {
+		t.Fatalf("no customer.deleted event for %s in %d events", customerID, len(evData))
+	}
+
+	// starting_after naming the deleted customer → 400 (stale cursor).
+	_, status = getAuth(t, base+"/v1/customers?starting_after="+customerID, devToken)
+	if status != 400 {
+		t.Fatalf("list starting_after deleted customer -> status %d, want 400", status)
 	}
 
 	// DELETE unknown → 404
