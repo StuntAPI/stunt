@@ -1,0 +1,114 @@
+# stunt adapter — SmartBill-style API simulator (unofficial)
+# Docs: https://stuntapi.com/stunt
+#
+# Mimics the *structure* of the SmartBill Cloud API (ws.smartbill.ro) for
+# LOCAL TESTING ONLY. It does not call the real API. All data is synthetic.
+# See DISCLAIMER.
+#
+# NOTE: the real API has no version segment — resources hang directly off the
+# base path (…/api/invoice, …/api/estimate, …). Routes here mirror that.
+id: smartbill-style
+name: "SmartBill-style API simulator (unofficial)"
+version: "0.2.0"
+
+api:
+  name: "SmartBill Cloud API"
+  version: "1.0"
+
+endpoints:
+  # --- invoices (sales) ---
+  - route: /invoice
+    method: POST
+    handler: scripts/smartbill.star#on_invoice_create
+  - route: /invoice
+    method: GET
+    handler: scripts/smartbill.star#on_invoice_get
+  - route: /invoice/cancel
+    method: PUT
+    handler: scripts/smartbill.star#on_invoice_cancel
+  - route: /invoice/restore
+    method: PUT
+    handler: scripts/smartbill.star#on_invoice_restore
+  - route: /invoice/paymentstatus
+    method: GET
+    handler: scripts/smartbill.star#on_invoice_paymentstatus
+
+  # --- estimates (proforma) ---
+  - route: /estimate
+    method: POST
+    handler: scripts/smartbill.star#on_estimate_create
+  - route: /estimate
+    method: GET
+    handler: scripts/smartbill.star#on_estimate_get
+  - route: /estimate/cancel
+    method: PUT
+    handler: scripts/smartbill.star#on_estimate_cancel
+
+  # --- purchase invoices (the spend side) ---
+  - route: /purchase
+    method: POST
+    handler: scripts/smartbill.star#on_purchase_create
+  - route: /purchase
+    method: GET
+    handler: scripts/smartbill.star#on_purchase_get
+
+  # --- payments ---
+  - route: /payment
+    method: POST
+    handler: scripts/smartbill.star#on_payment_add
+  - route: /payment/v2
+    method: DELETE
+    handler: scripts/smartbill.star#on_payment_delete
+
+  # --- stocks ---
+  - route: /stocks
+    method: GET
+    handler: scripts/smartbill.star#on_stocks_list
+
+  # --- document send ---
+  - route: /document/send
+    method: POST
+    handler: scripts/smartbill.star#on_document_send
+
+  # --- metadata ---
+  - route: /tax
+    method: GET
+    handler: scripts/smartbill.star#on_tax_list
+  - route: /series
+    method: GET
+    handler: scripts/smartbill.star#on_series_list
+
+  # --- simulator affordances (NOT real endpoints; clearly namespaced) ---
+  - route: /sim/company
+    method: POST
+    handler: scripts/smartbill.star#on_sim_company_create
+  - route: /sim/stocks/movement
+    method: POST
+    handler: scripts/smartbill.star#on_sim_stock_movement
+
+resources:
+  - name: sb_companies
+    kind: collection
+  - name: sb_invoices
+    kind: collection
+  - name: sb_estimates
+    kind: collection
+  - name: sb_purchases
+    kind: collection
+  - name: sb_payments
+    kind: collection
+  - name: sb_stocks
+    kind: collection
+  - name: sb_stock_movements
+    kind: collection
+  - name: sb_messages
+    kind: collection
+
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          errorText: "Not Found"
