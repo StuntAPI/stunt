@@ -314,7 +314,7 @@ def on_productCreate(args):
         "variants": built,
     }
     pc.insert(prod)
-    _emit_if_subscribed("products/create", _gql_product_view(prod))
+    _emit_if_subscribed("products/create", _product_view(prod))
     return respond(200, {"product": prod, "userErrors": []})
 
 # productUpdate(input {id, ...}) → ProductUpdatePayload
@@ -377,7 +377,7 @@ def on_productUpdate(args):
 
     prod["updated_at"] = _now()
     pc.update(pid, prod)
-    _emit_if_subscribed("products/update", _gql_product_view(prod))
+    _emit_if_subscribed("products/update", _product_view(prod))
     return respond(200, {"product": prod, "userErrors": []})
 
 # productDelete(id: gid) → ProductDeletePayload
@@ -390,7 +390,7 @@ def on_productDelete(args):
         return respond(200, {"deletedProductId": None, "userErrors": [
             {"field": ["id"], "message": "Product not found"},
         ]})
-    view = _gql_product_view(prod)
+    view = _product_view(prod)
     pc.delete(pid)
     _emit_if_subscribed("products/delete", view)
     return respond(200, {"deletedProductId": _gid("Product", pid), "userErrors": []})
@@ -430,7 +430,7 @@ def on_customerCreate(args):
         "updated_at": _now(),
     }
     cc.insert(doc)
-    _emit_if_subscribed("customers/create", _gql_customer_view(doc))
+    _emit_if_subscribed("customers/create", _customer_view(doc))
     return respond(200, {"customer": doc, "userErrors": []})
 
 # customerUpdate(input {id, ...}) → CustomerUpdatePayload
@@ -471,7 +471,7 @@ def on_customerUpdate(args):
 
     cust["updated_at"] = _now()
     cc.update(cid, cust)
-    _emit_if_subscribed("customers/update", _gql_customer_view(cust))
+    _emit_if_subscribed("customers/update", _customer_view(cust))
     return respond(200, {"customer": cust, "userErrors": []})
 
 # customerDelete(id: gid) → CustomerDeletePayload (REST parity: archives
@@ -485,7 +485,7 @@ def on_customerDelete(args):
         return respond(200, {"deletedCustomerId": None, "userErrors": [
             {"field": ["id"], "message": "Customer not found"},
         ]})
-    view = _gql_customer_view(cust)
+    view = _customer_view(cust)
     cust["_archived"] = True
     cust["updated_at"] = _now()
     cc.update(cid, cust)
@@ -524,7 +524,7 @@ def on_orderCancel(args):
             if remaining > 0:
                 _gql_restock_variant(li, remaining)
     oc.update(oid, order)
-    _emit_if_subscribed("orders/cancelled", _gql_order_view(order))
+    _emit_if_subscribed("orders/cancelled", _order_view(order))
     return respond(200, {"order": order, "orderCancelUserErrors": []})
 
 # orderClose(orderId) → OrderClosePayload. A cancelled order cannot be closed.
@@ -545,7 +545,7 @@ def on_orderClose(args):
         order["closed_at"] = _now()
         order["updated_at"] = _now()
         oc.update(oid, order)
-        _emit_if_subscribed("orders/updated", _gql_order_view(order))
+        _emit_if_subscribed("orders/updated", _order_view(order))
     return respond(200, {"order": order, "orderCloseUserErrors": []})
 
 # ---------------------------------------------------------------------------

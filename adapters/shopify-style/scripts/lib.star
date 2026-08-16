@@ -319,3 +319,91 @@ def _next_link(req, next_cursor, limit):
     if limit > 0:
         url = url + "&limit=" + str(limit)
     return "<" + url + '>; rel="next"'
+
+# ── REST payload views (shared: handler scripts AND the GraphQL resolvers
+# emit these for webhooks — receivers get ONE schema per topic, regardless
+# of which surface triggered the change) ─────────────────────────────────────
+
+
+def _line_item_view(li):
+    qty = li.get("quantity", 0)
+    ful = li.get("_fulfilled", 0)
+    if ful > qty:
+        ful = qty
+    remaining = qty - ful
+    line_status = None
+    if ful > 0:
+        if remaining == 0:
+            line_status = "fulfilled"
+        else:
+            line_status = "partial"
+    vid = li.get("variant_id", None)
+    if vid != None:
+        vid = _num_id(str(vid))
+    return {
+        "id": _num_id(li["id"]),
+        "title": li.get("title", ""),
+        "quantity": qty,
+        "price": li.get("price", "0.00"),
+        "sku": li.get("sku", ""),
+        "variant_id": vid,
+        "fulfillable_quantity": remaining,
+        "fulfillment_status": line_status,
+    }
+
+
+def _order_view(o):
+    lines = o.get("line_items", [])
+    line_views = []
+    for li in lines:
+        line_views.append(_line_item_view(li))
+    return {
+        "id": _num_id(o["id"]),
+        "email": o.get("email", ""),
+        "financial_status": o.get("financial_status", "pending"),
+        "fulfillment_status": o.get("fulfillment_status", None),
+        "total_price": o.get("total_price", "0.00"),
+        "currency": o.get("currency", "USD"),
+        "line_items": line_views,
+        "customer": o.get("customer", {}),
+        "order_number": o.get("order_number", 0),
+        "name": o.get("name", ""),
+        "closed_at": o.get("closed_at", None),
+        "cancelled_at": o.get("cancelled_at", None),
+        "cancel_reason": o.get("cancel_reason", None),
+        "created_at": o.get("created_at", _now()),
+        "updated_at": o.get("updated_at", _now()),
+    }
+
+
+def _product_view(p):
+    return {
+        "id": _num_id(p["id"]),
+        "title": p.get("title", ""),
+        "product_type": p.get("product_type", ""),
+        "body_html": p.get("body_html", ""),
+        "vendor": p.get("vendor", ""),
+        "status": p.get("status", "active"),
+        "tags": p.get("tags", ""),
+        "created_at": p.get("created_at", _now()),
+        "updated_at": p.get("updated_at", _now()),
+        "variants": p.get("variants", []),
+    }
+
+
+def _customer_view(c):
+    return {
+        "id": _num_id(c["id"]),
+        "email": c.get("email", ""),
+        "first_name": c.get("first_name", ""),
+        "last_name": c.get("last_name", ""),
+        "orders_count": c.get("orders_count", 0),
+        "total_spent": c.get("total_spent", "0.00"),
+        "phone": c.get("phone", ""),
+        "note": c.get("note", ""),
+        "tags": c.get("tags", ""),
+        "state": c.get("state", "enabled"),
+        "verified_email": c.get("verified_email", True),
+        "created_at": c.get("created_at", _now()),
+        "updated_at": c.get("updated_at", _now()),
+    }

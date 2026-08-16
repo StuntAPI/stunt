@@ -33,14 +33,25 @@ def on_posts(args):
     total = len(docs)
 
     # NEWEST/FEATURED_AT both order by creation: ids are the store sequence,
-    # so newest = highest id first (stored ids are decimal strings).
+    # so newest = highest numeric id first. Sort numerically — ids are
+    # unpadded decimal strings, so lexicographic order puts "10" between
+    # "1" and "2" (and GraphQL Int variables arrive as floats).
     order = a.get("order")
     if order == None or order == "":
         order = "NEWEST"
-    docs = query_select(docs, None, "id", "desc")
+    pairs = []
+    for d in docs:
+        n = _to_int(d.get("id", "0"))
+        if n < 0:
+            n = 0
+        pairs.append([n, d])
+    pairs = sorted(pairs)
+    docs = []
+    for i in range(len(pairs) - 1, -1, -1):
+        docs.append(pairs[i][1])
 
-    first = a.get("first")
-    if first == None:
+    first = _to_int(a.get("first"))
+    if first <= 0:
         first = 20
     after = a.get("after")
     offset = 0

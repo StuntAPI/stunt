@@ -33,12 +33,13 @@ endpoints:
   # PUT to the session URL (?upload_id=...): resumable chunks (strict
   # Content-Range; 308 Resume Incomplete + Range until the final chunk).
   # No bearer check — real upload session URLs are pre-authenticated.
-  - route: /upload/youtube/v3/videos
+  - route: /upload/youtube/v3/videos/{upload_id}
     method: PUT
     handler: scripts/videos.star#on_resumable_chunk
+    concurrency_key: upload_id
   # DELETE to the session URL: cancel the upload (499, the Google upload
   # backend's cancel status) and discard the partial bytes.
-  - route: /upload/youtube/v3/videos
+  - route: /upload/youtube/v3/videos/{upload_id}
     method: DELETE
     handler: scripts/videos.star#on_resumable_cancel
   - route: /youtube/v3/videos

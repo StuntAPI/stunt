@@ -158,7 +158,7 @@ def _public_video(doc):
 _YT_RESUME_TTL_SECONDS = 7 * 24 * 60 * 60
 
 def _yt_session_url(req, sid):
-    return "http://" + req.get("host", "") + "/upload/youtube/v3/videos?uploadType=resumable&upload_id=" + sid
+    return "http://" + req.get("host", "") + "/upload/youtube/v3/videos/" + sid
 
 # _yt_err renders a YouTube Data API error envelope.
 def _yt_err(status_code, message, status_kind):
@@ -241,7 +241,9 @@ def _yt_parse_content_range(h):
 # the chunk/status-probe endpoint. No bearer check: the session URL is
 # pre-authenticated by the initiating request.
 def on_resumable_chunk(req):
-    sid = _query_get(req, "upload_id", "")
+    sid = req.get("params", {}).get("upload_id", "")
+    if sid == None or sid == "":
+        sid = _query_get(req, "upload_id", "")
     if sid == "":
         return _yt_err(400, "The 'upload_id' parameter is required", "INVALID_ARGUMENT")
     sess = _yt_resume_session(sid)
@@ -324,7 +326,9 @@ def on_resumable_chunk(req):
 # — cancels the session (the Google upload backend answers 499): partial
 # bytes and the session row are discarded, and no video is created.
 def on_resumable_cancel(req):
-    sid = _query_get(req, "upload_id", "")
+    sid = req.get("params", {}).get("upload_id", "")
+    if sid == None or sid == "":
+        sid = _query_get(req, "upload_id", "")
     if sid == "":
         return _yt_err(400, "The 'upload_id' parameter is required", "INVALID_ARGUMENT")
     sc = store_collection("upload_sessions")

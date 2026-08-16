@@ -159,8 +159,8 @@ func TestDriveStyleResumableUpload(t *testing.T) {
 		t.Fatalf("initiate body = %q, want empty", bodyBytes)
 	}
 	loc := initResp.Header.Get("Location")
-	if loc == "" || !strings.Contains(loc, "upload_id=") {
-		t.Fatalf("initiate Location = %q, want session URL with upload_id", loc)
+	if loc == "" || !strings.Contains(loc, "/upload/") {
+		t.Fatalf("initiate Location = %q, want keyed session URL", loc)
 	}
 
 	// ===== Status probe before any bytes: 308, no Range =====
@@ -317,7 +317,7 @@ func TestDriveStyleResumableUpload(t *testing.T) {
 	}
 
 	// Unknown session id → 404.
-	missing := drivePutAuthBody(t, "PUT", base+"/upload/drive/v3/files?uploadType=resumable&upload_id=sid_nope", token, "", nil)
+	missing := drivePutAuthBody(t, "PUT", base+"/upload/drive/v3/files/sid_nope", token, "", nil)
 	io.ReadAll(missing.Body)
 	missing.Body.Close()
 	if missing.StatusCode != 404 {

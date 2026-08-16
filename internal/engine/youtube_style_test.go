@@ -430,7 +430,7 @@ func TestYouTubeStyleResumableUpload(t *testing.T) {
 	}
 
 	// Unknown session id → 404.
-	probe = youtubePutChunk(t, base+"/upload/youtube/v3/videos?uploadType=resumable&upload_id=ytup_nope", "", "")
+	probe = youtubePutChunk(t, base+"/upload/youtube/v3/videos/ytup_nope", "", "")
 	io.ReadAll(probe.Body)
 	probe.Body.Close()
 	if probe.StatusCode != 404 {
@@ -461,8 +461,8 @@ func youtubeInitiateUpload(t *testing.T, base, token string, metadata map[string
 		t.Fatalf("initiate body = %q, want empty", body)
 	}
 	loc := resp.Header.Get("Location")
-	if loc == "" || !strings.Contains(loc, "upload_id=") {
-		t.Fatalf("initiate Location = %q, want session URL with upload_id", loc)
+	if loc == "" || !strings.Contains(loc, "/upload/") {
+		t.Fatalf("initiate Location = %q, want keyed session URL", loc)
 	}
 	return loc
 }

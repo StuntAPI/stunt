@@ -537,7 +537,7 @@ _RESUME_TTL_SECONDS = 7 * 24 * 60 * 60
 
 # _session_url builds the resumable session URL for a session id.
 def _session_url(req, sid):
-    return "http://" + req.get("host", "") + "/upload/drive/v3/files?uploadType=resumable&upload_id=" + sid
+    return "http://" + req.get("host", "") + "/upload/drive/v3/files/" + sid
 
 # _resumable_initiate mints a session row and returns the 200 + Location.
 def _resumable_initiate(req, body, query):
@@ -626,7 +626,9 @@ def _resume_to_int(s):
 # the chunk/status-probe endpoint of a resumable session. No bearer check:
 # real upload URLs are pre-authenticated.
 def on_resumable_chunk(req):
-    sid = _get_query(req).get("upload_id", "")
+    sid = req.get("params", {}).get("upload_id", "")
+    if sid == None or sid == "":
+        sid = _get_query(req).get("upload_id", "")
     if sid == None or sid == "":
         return _drive_err(400, "The 'upload_id' parameter is required", "INVALID_ARGUMENT")
     sess = _resume_session(sid)
@@ -707,7 +709,9 @@ def on_resumable_chunk(req):
 # cancels the session (the Google upload backend answers 499): the partial
 # bytes and the session row are discarded and no file is created.
 def on_resumable_cancel(req):
-    sid = _get_query(req).get("upload_id", "")
+    sid = req.get("params", {}).get("upload_id", "")
+    if sid == None or sid == "":
+        sid = _get_query(req).get("upload_id", "")
     if sid == None or sid == "":
         return _drive_err(400, "The 'upload_id' parameter is required", "INVALID_ARGUMENT")
     sc = store_collection("upload_sessions")
