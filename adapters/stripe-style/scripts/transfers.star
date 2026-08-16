@@ -83,6 +83,10 @@ def on_create_transfer(req):
     if err != None:
         return err
 
+    cached = _idempotent_lookup(req, "transfers")
+    if cached != None:
+        return respond(cached["status"], _transfer_view(cached["doc"]))
+
     body = req["body"]
     if body == None:
         body = {}
@@ -134,6 +138,7 @@ def on_create_transfer(req):
     # Emit webhook event (fire-and-forget).
     _signed_emit("transfer.created", _transfer_view(doc))
 
+    _idempotent_remember(req, "transfers", 201, transfer_id)
     return respond(201, _transfer_view(doc))
 
 # GET /v1/transfers/{id} — retrieve a single transfer.

@@ -561,6 +561,10 @@ func TestStripeCkCheckoutSetupMode(t *testing.T) {
 	if cs["status"] != "complete" {
 		t.Fatalf("setup session status = %v, want complete", cs["status"])
 	}
+	// setup mode never moves money — payment_status must SURVIVE completion.
+	if cs["payment_status"] != "no_payment_required" {
+		t.Fatalf("setup payment_status after completion = %v, want no_payment_required", cs["payment_status"])
+	}
 	setiID, _ := cs["setup_intent"].(string)
 	if !strings.HasPrefix(setiID, "seti_") {
 		t.Fatalf("session.setup_intent = %v, want seti_*", cs["setup_intent"])

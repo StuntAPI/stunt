@@ -96,6 +96,10 @@ def on_create_file(req):
     if err != None:
         return err
 
+    cached = _idempotent_lookup(req, "files")
+    if cached != None:
+        return respond(cached["status"], _files_public(cached["doc"]))
+
     h = req.get("headers")
     ct = ""
     if h != None:
@@ -152,6 +156,7 @@ def on_create_file(req):
         "_sha256": crypto.sha256(data),
     }
     store_collection("files").insert(doc)
+    _idempotent_remember(req, "files", 201, doc["id"])
     return respond(201, _files_public(doc))
 
 # GET /v1/files — list uploads (filter purpose; newest first).

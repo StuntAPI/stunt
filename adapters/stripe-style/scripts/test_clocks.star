@@ -29,15 +29,8 @@ def _tc_public(doc):
         out[k] = doc[k]
     return out
 
-# _tc_bad_body reports a malformed JSON body authoritatively: a body that
 # fails to parse arrives as an EMPTY dict via req.body, so req.raw_body is
 # the source of truth.
-def _tc_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
 # _tc_missing_param is the real Stripe 400 for a missing required param.
 def _tc_missing_param(param):
     return respond(400, {"error": {"type": "invalid_request_error", "message": "Missing required param: " + param + ".", "param": param}})
@@ -67,7 +60,7 @@ def on_create_test_clock(req):
     if cached != None:
         return respond(cached["status"], _tc_public(cached["doc"]))
 
-    if _tc_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     body = req["body"]
     if body == None:
@@ -144,7 +137,7 @@ def on_advance_test_clock(req):
         out["status"] = "advancing"
         return respond(cached["status"], out)
 
-    if _tc_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
 
     id = req["params"]["id"]

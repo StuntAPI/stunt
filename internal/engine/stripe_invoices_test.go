@@ -141,7 +141,7 @@ func TestStripeInvManualLifecycle(t *testing.T) {
 	if inv["subscription"] != nil {
 		t.Fatalf("manual invoice subscription = %v, want null", inv["subscription"])
 	}
-	lines, _ := inv["lines"].([]any)
+	lines, _ := inv["lines"].(map[string]any)["data"].([]any)
 	if len(lines) != 2 {
 		t.Fatalf("draft lines = %d, want 2", len(lines))
 	}
@@ -355,7 +355,7 @@ func TestStripeInvManualLifecycle(t *testing.T) {
 
 	// Unknown invoice -> the real Stripe 404 message.
 	body, status = getAuth(t, base+"/v1/invoices/in_nope", devToken)
-	if status != 404 || stripeInvErr(t, body)["message"] != "No such invoice: in_nope" {
+	if status != 404 || stripeInvErr(t, body)["message"] != "No such invoice: 'in_nope'" {
 		t.Fatalf("missing invoice -> %d; body %s", status, body)
 	}
 }
@@ -603,7 +603,7 @@ func TestStripeInvUpcomingPreview(t *testing.T) {
 			t.Fatalf("upcoming %s = %d, want %d", k, got, want)
 		}
 	}
-	upLines, _ := up["lines"].([]any)
+	upLines, _ := up["lines"].(map[string]any)["data"].([]any)
 	if len(upLines) != 2 {
 		t.Fatalf("upcoming lines = %d, want 2", len(upLines))
 	}
@@ -644,7 +644,7 @@ func TestStripeInvUpcomingPreview(t *testing.T) {
 	if got := stripeInvInt(sup, "total"); got != 6270 {
 		t.Fatalf("subscription upcoming total = %d, want 6270", got)
 	}
-	supLines, _ := sup["lines"].([]any)
+	supLines, _ := sup["lines"].(map[string]any)["data"].([]any)
 	if len(supLines) != 3 {
 		t.Fatalf("subscription upcoming lines = %d, want 3", len(supLines))
 	}

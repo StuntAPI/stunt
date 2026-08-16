@@ -83,6 +83,7 @@ def on_create_webhook_endpoint(req):
         "url": url,
     }
     store_collection("webhook_endpoints").insert(doc)
+    _idempotent_remember(req, "webhook_endpoints", 201, doc["id"])
     return respond(201, _we_public(doc))
 
 # GET /v1/webhook_endpoints — list registered endpoints (newest first).

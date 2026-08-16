@@ -57,15 +57,8 @@ _DISP_EVIDENCE_FIELDS = [
 # can never collide with it).
 _DISP_ABSENT = {}
 
-# _disp_bad_body reports a malformed JSON body authoritatively: a body that
 # fails to parse arrives as an EMPTY dict via req.body, so req.raw_body is the
 # source of truth.
-def _disp_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
 # _disp_known_field reports whether key is one of the accepted evidence
 # fields. Unknown evidence fields are ignored (Stripe rejects unknown params
 # with parameter_unknown; this adapter's convention is to ignore).
@@ -226,7 +219,7 @@ def on_update_dispute(req):
     if cached != None:
         return respond(cached["status"], _dispute_public(cached["doc"]))
 
-    if _disp_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     body = req["body"]
     if body == None:
@@ -288,7 +281,7 @@ def on_close_dispute(req):
     if cached != None:
         return respond(cached["status"], _dispute_public(cached["doc"]))
 
-    if _disp_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
 
     id = req["params"]["id"]

@@ -24,14 +24,7 @@
 # _newest_first, _list_page, _idempotent_lookup, _idempotent_remember, _now,
 # _num, _signed_emit) are in lib.star.
 
-# _si_bad_body reports a malformed JSON body authoritatively (req.body
 # arrives as an empty dict for unparseable bodies; req.raw_body is the truth).
-def _si_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
 def _si_missing(param):
     return respond(400, {"error": {"type": "invalid_request_error", "message": "Missing required param: " + param + ".", "param": param}})
 
@@ -88,7 +81,7 @@ def on_create_subscription_item(req):
     if err != None:
         return err
 
-    if _si_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     body = req["body"]
     if body == None:
@@ -152,7 +145,7 @@ def on_update_subscription_item(req):
     if err != None:
         return err
 
-    if _si_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     id = req["params"]["id"]
     sub, idx = _si_find(id)
@@ -231,7 +224,7 @@ def on_create_usage_record(req):
     if cached != None:
         return respond(cached["status"], cached["doc"])
 
-    if _si_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     body = req["body"]
     if body == None:

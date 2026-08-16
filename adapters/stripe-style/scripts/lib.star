@@ -163,6 +163,25 @@ def _get_query(req, key):
         return ""
     return v
 
+# _coupon_public renders a stored coupon (internal keys stripped).
+def _coupon_public(doc):
+    out = {}
+    for k in doc:
+        if k.startswith("_"):
+            continue
+        out[k] = doc[k]
+    return out
+
+
+# _bad_body reports a malformed JSON body authoritatively: undecodable bodies
+# arrive as EMPTY DICTS via req.body, so the raw bytes are the only reliable
+# signal (json_safe_decode returns None on malformed). Empty body = not bad.
+def _bad_body(req):
+    raw = req.get("raw_body", "")
+    if raw == None or raw == "":
+        return False
+    return json_safe_decode(raw) == None
+
 # _created_filters maps Stripe's `created` / `created[gt|gte|lt|lte]` query
 # params (exact timestamp or bracketed range, form-encoded) to query_select
 # triples against the int `created` field. Appends to the clause list in
@@ -259,7 +278,7 @@ def _set_balance(acct_id, amount):
 
 # _not_found returns a standard Stripe-style 404 error response.
 def _not_found(resource, id):
-    return respond(404, {"error": {"message": "No such " + resource + ": " + id, "type": "invalid_request_error"}})
+    return respond(404, {"error": {"message": "No such " + resource + ": '" + id + "'", "type": "invalid_request_error"}})
 
 # _list_page applies Stripe cursor pagination (limit + starting_after) to a list
 # of docs via the paginate builtin. Returns (page, has_more, error_response).
@@ -291,7 +310,7 @@ def _list_page(req, docs, resource):
                     found = True
                     break
             if not found:
-                err = respond(400, {"error": {"type": "invalid_request_error", "message": "No such " + resource + ": " + sa, "param": "starting_after"}})
+                err = respond(400, {"error": {"type": "invalid_request_error", "message": "No such " + resource + ": '" + sa + "'", "param": "starting_after"}})
                 return None, False, err
     page, nxt = paginate(docs, limit, offset)
     return page, nxt != None, None
@@ -360,7 +379,7 @@ def _num(v):
 # Real Stripe reserves specific test card numbers for deterministic outcomes:
 # declines (with the real decline_code) and SCA cards that force 3DS
 # authentication. The digit strings are assembled at runtime from <=4-digit
-# chunks so no literal in this file ever contains 5+ consecutive digits.
+# chunks so no card number ever appears as a contiguous literal.
 
 _DECLINE_CARDS = {
     "4000" + "0000" + "0000" + "0002": {"code": "card_declined", "decline_code": "generic_decline", "message": "Your card was declined."},
@@ -472,13 +491,18 @@ def _refunds_for(field, val):
     docs = store_collection("refunds").list()
     return query_select(docs, [[field, "=", val]])
 
-# _refunded_total sums the amounts of every non-failed refund (pending
-# refunds count — Stripe reserves the unrefunded balance immediately).
+# _refunded_total sums the amounts of every refund that still counts against
+# the unrefunded balance: pending (Stripe reserves it immediately) and
+# succeeded. failed refunds never counted; canceled ones are rolled back
+# (funds returned), so they must not count either — otherwise a canceled
+# refund permanently locks the remaining balance out of re-refund.
 def _refunded_total(docs):
     total = 0
     for r in docs:
-        if r.get("status") != "failed":
-            total = total + _num(r.get("amount", 0))
+        st = r.get("status", "")
+        if st == "failed" or st == "canceled":
+            continue
+        total = total + _num(r.get("amount", 0))
     return total
 
 # _usd renders integer cents as a "$dollars.cents" string for error messages.
@@ -671,6 +695,7 @@ def _maybe_record_fee(ch, body):
         "created": _now(),
     }
     store_collection("application_fees").insert(doc)
+    _signed_emit("application_fee.created", doc)
     return doc
 
 # ============================================================================
@@ -678,7 +703,7 @@ def _maybe_record_fee(ch, body):
 # ============================================================================
 # The documented dispute test cards (docs.stripe.com/testing): charging with
 # these SUCCEEDS and immediately raises a dispute. Real Stripe now mints du_*
-# dispute ids; this simulator uses the dp_* prefix shared across the billing
+# dispute ids; this simulator uses the du_* prefix shared across the billing
 # domains' doc contracts.
 #   4000 0000 0000 0259 -> reason fraudulent
 #   4000 0000 0000 2685 -> reason product_not_received
@@ -711,7 +736,7 @@ def _maybe_create_dispute(ch, number):
     now = _now()
     due_by = now + 7 * 24 * 3600  # evidence window: created + 7 days
     dp = {
-        "id": _next_id("dp"),
+        "id": _next_id("du"),
         "object": "dispute",
         "amount": _num(ch.get("amount", 0)),
         "balance_transactions": [],
@@ -840,10 +865,10 @@ def _dispute_close(doc):
     return doc
 
 # _dispute_submit records an evidence submission (the dispute-update endpoint
-# calls this). winning True schedules the merchant-favor ruling for
-# _settle_at = submit time + 1 day; losing evidence resolves immediately via
-# _dispute_close. The needs_response -> under_review transition is derived
-# right away so the submit response reflects it.
+# calls this). It schedules the ruling for _settle_at = submit time + 1 day;
+# the mock always rules in the merchant's favor when evidence is submitted.
+# The needs_response -> under_review transition is derived right away so the
+# submit response reflects it.
 def _dispute_submit(doc, winning, evidence):
     now = _now()
     doc["_submit_at"] = now
@@ -1026,10 +1051,19 @@ def _subscription_invoice(sub, line_dicts, discount_amt, tax_cents, inclusive):
     return inv
 
 # _invoice_public renders a stored invoice doc, stripping internal "_" keys.
+# lines is stored as a bare array but rendered in a list envelope — real
+# Stripe's invoice object wraps it, and typed SDKs read invoice.lines.data.
 def _invoice_public(doc):
     out = {}
     for k in doc:
         if k.startswith("_"):
             continue
         out[k] = doc[k]
+    out["lines"] = {
+        "object": "list",
+        "data": doc.get("lines", []),
+        "has_more": False,
+        "total_count": len(doc.get("lines", [])),
+        "url": "/v1/invoices/" + doc.get("id", "") + "/lines",
+    }
     return out

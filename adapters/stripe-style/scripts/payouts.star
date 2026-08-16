@@ -136,6 +136,10 @@ def on_create_payout(req):
     if err != None:
         return err
 
+    cached = _idempotent_lookup(req, "payouts")
+    if cached != None:
+        return respond(cached["status"], _payout_view(cached["doc"]))
+
     body = req["body"]
     if body == None:
         body = {}
@@ -191,6 +195,7 @@ def on_create_payout(req):
     # Emit webhook event (fire-and-forget).
     _signed_emit("payout.created", _payout_view(doc))
 
+    _idempotent_remember(req, "payouts", 201, doc["id"])
     return respond(201, _payout_view(doc))
 
 # GET /v1/payouts — list all payouts (optionally ?destination=/?status=).

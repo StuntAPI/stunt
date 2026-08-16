@@ -9,15 +9,8 @@
 # _created_filters, _created_check, _newest_first, _list_page, _idempotent_lookup,
 # _idempotent_remember, _now, _num, _signed_emit) are in lib.star.
 
-# _prod_bad_body reports a malformed JSON body authoritatively: a body that
 # fails to parse arrives as an EMPTY dict via req.body, so req.raw_body is
 # the source of truth.
-def _prod_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
 def _prod_missing(param):
     return respond(400, {"error": {"type": "invalid_request_error", "message": "Missing required param: " + param + ".", "param": param}})
 
@@ -49,7 +42,7 @@ def on_create_product(req):
     if cached != None:
         return respond(cached["status"], _prod_public(cached["doc"]))
 
-    if _prod_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     body = req["body"]
     if body == None:
@@ -145,7 +138,7 @@ def on_update_product(req):
     if err != None:
         return err
 
-    if _prod_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     id = req["params"]["id"]
     doc = _prod_get(id)

@@ -24,14 +24,7 @@ def _ii_err(msg, param):
 def _ii_missing(param):
     return _ii_err("Missing required param: " + param + ".", param)
 
-# _ii_bad_body reports a malformed JSON body authoritatively (an unparseable
 # body arrives as an EMPTY dict via req.body; req.raw_body is the truth).
-def _ii_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
 # _ii_price resolves the price dict for an item: an inline price_data object
 # or a stored price id (read from the prices collection the subscriptions
 # domain owns; unknown ids yield None). Internal _ keys are stripped.
@@ -77,7 +70,7 @@ def on_create_invoice_item(req):
     if cached != None:
         return respond(cached["status"], _ii_public(cached["doc"]))
 
-    if _ii_bad_body(req):
+    if _bad_body(req):
         return _ii_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:
@@ -209,7 +202,7 @@ def on_update_invoice_item(req):
     if doc == None:
         return _not_found("invoiceitem", id)
 
-    if _ii_bad_body(req):
+    if _bad_body(req):
         return _ii_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:

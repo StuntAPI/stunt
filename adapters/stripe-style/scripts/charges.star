@@ -118,7 +118,7 @@ def on_retrieve_charge(req):
     c = store_collection("charges")
     doc = c.get(id)
     if doc == None:
-        return respond(404, {"error": {"message": "No such charge: " + id, "type": "invalid_request_error"}})
+        return _not_found("charge", id)
     return respond(200, doc)
 
 # GET /v1/charges — list all charges.
@@ -163,7 +163,7 @@ def on_capture_charge(req):
     c = store_collection("charges")
     doc = c.get(id)
     if doc == None:
-        return respond(404, {"error": {"message": "No such charge: " + id, "type": "invalid_request_error"}})
+        return _not_found("charge", id)
 
     body = req["body"]
     if body == None:
@@ -198,7 +198,7 @@ def on_refund_charge(req):
     c = store_collection("charges")
     doc = c.get(id)
     if doc == None:
-        return respond(404, {"error": {"message": "No such charge: " + id, "type": "invalid_request_error"}})
+        return _not_found("charge", id)
 
     body = req["body"]
     if body == None:

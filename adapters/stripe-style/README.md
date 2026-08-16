@@ -468,7 +468,7 @@ Deliberate simplifications (all also commented in the scripts):
 - Checkout's hosted page runs 3DS for SCA cards (succeeds) rather than
   challenging.
 - `POST /v1/files` returns `201` (adapter-wide create convention).
-- Dispute ids are `dp_*` (real Stripe currently mints `du_*`).
+
 - Webhook delivery goes to the single configured sink; endpoint
   registration gates *which* event types deliver (not per-endpoint URLs).
 

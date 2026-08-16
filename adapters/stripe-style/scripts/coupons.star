@@ -24,22 +24,6 @@ def _coupon_err(msg, param):
         e["param"] = param
     return respond(400, {"error": e})
 
-# _coupon_bad_body reports a malformed JSON body authoritatively.
-def _coupon_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
-# _coupon_public renders a stored coupon (internal keys stripped).
-def _coupon_public(doc):
-    out = {}
-    for k in doc:
-        if k.startswith("_"):
-            continue
-        out[k] = doc[k]
-    return out
-
 # POST /v1/coupons — create a coupon.
 #
 # Exactly one of percent_off / amount_off(+currency) is required. duration
@@ -53,7 +37,7 @@ def on_create_coupon(req):
     if cached != None:
         return respond(cached["status"], _coupon_public(cached["doc"]))
 
-    if _coupon_bad_body(req):
+    if _bad_body(req):
         return _coupon_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:
@@ -174,7 +158,7 @@ def on_update_coupon(req):
     if doc.get("deleted", False) == True:
         return _coupon_err("This coupon has been deleted and can no longer be updated.", None)
 
-    if _coupon_bad_body(req):
+    if _bad_body(req):
         return _coupon_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:

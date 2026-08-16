@@ -117,9 +117,11 @@ endpoints:
   - route: /v1/payment_methods/{id}/attach
     method: POST
     handler: scripts/payment_methods.star#on_attach_payment_method
+    concurrency_key: id # read-modify-write on the PM doc
   - route: /v1/payment_methods/{id}/detach
     method: POST
     handler: scripts/payment_methods.star#on_detach_payment_method
+    concurrency_key: id
   - route: /v1/payment_methods/{id}
     method: GET
     handler: scripts/payment_methods.star#on_retrieve_payment_method
@@ -155,6 +157,7 @@ endpoints:
   - route: /v1/customers/{id}
     method: POST
     handler: scripts/customers.star#on_update_customer
+    concurrency_key: id # read-modify-write, serialized per customer
   - route: /v1/customers/{id}
     method: DELETE
     handler: scripts/customers.star#on_delete_customer
@@ -521,6 +524,7 @@ endpoints:
   - route: /v1/accounts/{id}
     method: POST
     handler: scripts/accounts.star#on_update_account
+    concurrency_key: id # read-modify-write on the account doc
   - route: /v1/accounts
     method: GET
     handler: scripts/accounts.star#on_list_accounts
@@ -591,6 +595,7 @@ endpoints:
   - route: /v1/transfers/{id}/reversals
     method: POST
     handler: scripts/transfers.star#on_reverse_transfer
+    concurrency_key: id # partial reversals accumulate amount_reversed
   - route: /v1/transfers/{id}/reversals
     method: GET
     handler: scripts/transfers.star#on_list_transfer_reversals

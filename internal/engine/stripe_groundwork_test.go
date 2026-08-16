@@ -296,8 +296,8 @@ func TestStripeGroundworkDisputes(t *testing.T) {
 		t.Fatalf("dispute-card charge = %v, want succeeded+captured", ch)
 	}
 	dpID, _ := ch["dispute"].(string)
-	if dpID == "" || !strings.HasPrefix(dpID, "dp_") {
-		t.Fatalf("charge dispute = %v, want dp_* id", ch["dispute"])
+	if dpID == "" || !strings.HasPrefix(dpID, "du_") {
+		t.Fatalf("charge dispute = %v, want du_* id", ch["dispute"])
 	}
 	if bt, _ := ch["balance_transaction"].(string); bt == "" || !strings.HasPrefix(bt, "txn_") {
 		t.Fatalf("charge balance_transaction = %v, want txn_* id", ch["balance_transaction"])
@@ -414,8 +414,8 @@ func TestStripeGroundworkPaymentIntentCharge(t *testing.T) {
 	if pich["payment_intent"] != pi["id"] || pich["status"] != "succeeded" {
 		t.Fatalf("PI charge = %v", pich)
 	}
-	if dp, _ := pich["dispute"].(string); dp == "" || !strings.HasPrefix(dp, "dp_") {
-		t.Fatalf("PI charge dispute = %v, want dp_*", pich["dispute"])
+	if dp, _ := pich["dispute"].(string); dp == "" || !strings.HasPrefix(dp, "du_") {
+		t.Fatalf("PI charge dispute = %v, want du_*", pich["dispute"])
 	}
 	if bt, _ := pich["balance_transaction"].(string); !strings.HasPrefix(bt, "txn_") {
 		t.Fatalf("PI charge balance_transaction = %v, want txn_*", pich["balance_transaction"])

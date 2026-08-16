@@ -21,15 +21,8 @@
 
 _INV_COLLECTION = "invoices"
 
-# _inv_bad_body reports a malformed JSON body authoritatively: a body that
 # fails to parse arrives as an EMPTY dict via req.body, so req.raw_body is
 # the source of truth.
-def _inv_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
 # _inv_err builds the real Stripe error envelope with status 400.
 def _inv_err(msg, param):
     e = {"type": "invalid_request_error", "message": msg}
@@ -322,7 +315,7 @@ def on_create_invoice(req):
     if cached != None:
         return respond(cached["status"], _invoice_public(cached["doc"]))
 
-    if _inv_bad_body(req):
+    if _bad_body(req):
         return _inv_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:
@@ -487,7 +480,7 @@ def on_update_invoice(req):
     if doc == None:
         return _not_found("invoice", id)
 
-    if _inv_bad_body(req):
+    if _bad_body(req):
         return _inv_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:
@@ -684,7 +677,7 @@ def on_pay_invoice(req):
     if cached != None:
         return respond(cached["status"], _invoice_public(cached["doc"]))
 
-    if _inv_bad_body(req):
+    if _bad_body(req):
         return _inv_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:
@@ -888,7 +881,15 @@ def _inv_preview_doc(customer, subscription, sub_lines, item_lines, collection_m
         "status": "open",
         "collection_method": collection_method,
         "currency": currency,
-        "lines": lines,
+        # same list envelope as _invoice_public — upcoming previews are
+        # invoice-shaped responses too
+        "lines": {
+            "object": "list",
+            "data": lines,
+            "has_more": False,
+            "total_count": len(lines),
+            "url": "/v1/invoices/upcoming",
+        },
         "subtotal": subtotal,
         "discount": discount,
         "tax": tax,

@@ -36,15 +36,8 @@
 # _card_number_for, _card_outcome, _charge_settle_hooks, _subscription_invoice,
 # _invoice_public, _add_months, _signed_emit) are in lib.star.
 
-# _sub_bad_body reports a malformed JSON body authoritatively: a body that
 # fails to parse arrives as an EMPTY dict via req.body, so req.raw_body is
 # the source of truth.
-def _sub_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
 def _sub_missing(param):
     return respond(400, {"error": {"type": "invalid_request_error", "message": "Missing required param: " + param + ".", "param": param}})
 
@@ -610,7 +603,7 @@ def on_create_subscription(req):
     if cached != None:
         return respond(cached["status"], _sub_public(cached["doc"]))
 
-    if _sub_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     body = req["body"]
     if body == None:
@@ -829,7 +822,7 @@ def on_update_subscription(req):
     if err != None:
         return err
 
-    if _sub_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     id = req["params"]["id"]
     doc = _sub_get(id)
@@ -1010,7 +1003,7 @@ def on_cancel_subscription(req):
     if err != None:
         return err
 
-    if _sub_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     id = req["params"]["id"]
     doc = _sub_get(id)

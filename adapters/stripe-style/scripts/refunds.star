@@ -32,30 +32,8 @@ def _ref_public(doc):
         out["failure_balance_transaction"] = doc["failure_balance_transaction"]
     return out
 
-# _ref_bad_body reports a malformed JSON body authoritatively: a body that
 # fails to parse arrives as an EMPTY dict via req.body, so req.raw_body is the
 # source of truth.
-def _ref_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
-# _ref_active_total sums the amounts of every refund that still counts against
-# the unrefunded balance: pending (Stripe reserves it immediately) and
-# succeeded. failed refunds never counted; canceled ones are rolled back by
-# on_cancel_refund, so they must not count either. (lib._refunded_total treats
-# everything non-failed as active — kept for other callers; this local copy
-# adds the canceled case for this file's guard.)
-def _ref_active_total(docs):
-    total = 0
-    for r in docs:
-        st = r.get("status", "")
-        if st == "failed" or st == "canceled":
-            continue
-        total = total + _num(r.get("amount", 0))
-    return total
-
 # _ref_apply_charge_recompute recomputes a charge's refund bookkeeping from the
 # still-active refunds (used after a cancel rolls one back). Mirrors lib's
 # _apply_charge_refund flags: fully refunded -> refunded True + status
@@ -124,7 +102,7 @@ def on_create_refund(req):
     if cached != None:
         return respond(cached["status"], _ref_public(cached["doc"]))
 
-    if _ref_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     body = req["body"]
     if body == None:
@@ -151,7 +129,7 @@ def on_create_refund(req):
         if pi.get("status", "") == "requires_capture":
             return respond(400, {"error": {"code": "payment_intent_unexpected_state", "type": "invalid_request_error", "message": "This PaymentIntent could not be refunded because it has a status of requires_capture. You can cancel it instead with the PaymentIntents API.", "param": "payment_intent"}})
         base = _num(pi.get("amount", 0))
-        remaining = base - _ref_active_total(_refunds_for("payment_intent", pi_id))
+        remaining = base - _refunded_total(_refunds_for("payment_intent", pi_id))
         if amount == 0:
             amount = remaining
         if amount > remaining or amount <= 0:
@@ -163,7 +141,7 @@ def on_create_refund(req):
         if ch == None:
             return _not_found("charge", charge_id)
         base = _num(ch.get("amount", 0))
-        already = _ref_active_total(_refunds_for("charge", charge_id))
+        already = _refunded_total(_refunds_for("charge", charge_id))
         remaining = base - already
         if amount == 0:
             amount = remaining
@@ -246,7 +224,7 @@ def on_cancel_refund(req):
     if cached != None:
         return respond(cached["status"], _ref_public(cached["doc"]))
 
-    if _ref_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
 
     id = req["params"]["id"]
@@ -282,7 +260,7 @@ def on_cancel_refund(req):
         chs = store_collection("charges")
         ch = chs.get(ch_id)
         if ch != None:
-            _ref_apply_charge_recompute(ch, _ref_active_total(_refunds_for("charge", ch_id)))
+            _ref_apply_charge_recompute(ch, _refunded_total(_refunds_for("charge", ch_id)))
             chs.update(ch_id, ch)
 
     _signed_emit("refund.updated", _ref_public(doc))

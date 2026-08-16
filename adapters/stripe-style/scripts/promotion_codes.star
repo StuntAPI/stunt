@@ -21,29 +21,12 @@ def _promo_err(msg, param):
         e["param"] = param
     return respond(400, {"error": e})
 
-# _promo_bad_body reports a malformed JSON body authoritatively.
-def _promo_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
 # _promo_gen_code mints a Stripe-style code: 8 uppercase alphanumerics
 # derived from an HMAC of the KV sequence (runtime data, no long literals).
 def _promo_gen_code():
     seq = store_kv_incr("stripe", "promo_code_seq")
     h = crypto.hmac_sha256("stunt-promo", str(seq))
     return h[0:8].upper()
-
-# _promo_coupon_public renders the embedded coupon (strips internal keys).
-# Local twin of coupons.star's _coupon_public — hoist candidate for lib.star.
-def _promo_coupon_public(doc):
-    out = {}
-    for k in doc:
-        if k.startswith("_"):
-            continue
-        out[k] = doc[k]
-    return out
 
 # _promo_public renders a stored promotion code with the coupon EXPANDED
 # (internal keys stripped).
@@ -55,7 +38,7 @@ def _promo_public(doc):
         if k == "coupon":
             coupon = store_collection("coupons").get(doc["coupon"])
             if coupon != None:
-                out["coupon"] = _promo_coupon_public(coupon)
+                out["coupon"] = _coupon_public(coupon)
             else:
                 out["coupon"] = doc["coupon"]
         else:
@@ -73,7 +56,7 @@ def on_create_promotion_code(req):
     if cached != None:
         return respond(cached["status"], _promo_public(cached["doc"]))
 
-    if _promo_bad_body(req):
+    if _bad_body(req):
         return _promo_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:
@@ -201,7 +184,7 @@ def on_update_promotion_code(req):
     if doc == None:
         return _not_found("promotion_code", id)
 
-    if _promo_bad_body(req):
+    if _bad_body(req):
         return _promo_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:

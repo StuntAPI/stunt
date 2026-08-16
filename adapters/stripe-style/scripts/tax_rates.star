@@ -25,13 +25,6 @@ def _txr_err(msg, param):
 def _txr_missing(param):
     return _txr_err("Missing required param: " + param + ".", param)
 
-# _txr_bad_body reports a malformed JSON body authoritatively.
-def _txr_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
 # _txr_percentage parses a percentage into a float: numbers pass through,
 # numeric strings ("16", "8.875") are split manually (Starlark float()
 # raises on bad input and there is no try/except). Returns None when the
@@ -91,7 +84,7 @@ def on_create_tax_rate(req):
     if cached != None:
         return respond(cached["status"], _txr_public(cached["doc"]))
 
-    if _txr_bad_body(req):
+    if _bad_body(req):
         return _txr_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:
@@ -186,7 +179,7 @@ def on_update_tax_rate(req):
     if doc.get("deleted", False) == True:
         return _txr_err("This tax rate has been deleted and can no longer be updated.", None)
 
-    if _txr_bad_body(req):
+    if _bad_body(req):
         return _txr_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:

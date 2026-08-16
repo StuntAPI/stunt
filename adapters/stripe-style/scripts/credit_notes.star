@@ -26,14 +26,7 @@ def _cn_err(msg, param):
         e["param"] = param
     return respond(400, {"error": e})
 
-# _cn_bad_body reports a malformed JSON body authoritatively (an unparseable
 # body arrives as an EMPTY dict via req.body; req.raw_body is the truth).
-def _cn_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
 # _cn_reason normalizes the credit-note reason: the four documented values
 # pass through, the legacy duplicated/product_unacceptable spellings map to
 # their modern forms, anything else is a 400 (or None when absent).
@@ -80,7 +73,7 @@ def _cn_build_lines(invoice, body):
                         il = inv_lines[j]
                         break
                 if il == None:
-                    return [], 0, _cn_err("No such line_item: " + str(ref), "lines")
+                    return [], 0, _cn_err("No such line_item: '" + str(ref) + "'", "lines")
                 unit = _num(il.get("amount", 0))
                 qty = _num(entry.get("quantity", il.get("quantity", 1)))
                 if qty < 1:
@@ -294,7 +287,7 @@ def on_create_credit_note(req):
     if cached != None:
         return respond(cached["status"], _cn_public(cached["doc"]))
 
-    if _cn_bad_body(req):
+    if _bad_body(req):
         return _cn_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:
@@ -401,7 +394,7 @@ def on_update_credit_note(req):
     if doc == None:
         return _not_found("credit_note", id)
 
-    if _cn_bad_body(req):
+    if _bad_body(req):
         return _cn_err("Invalid request body: could not parse as JSON.", None)
     body = req["body"]
     if body == None:

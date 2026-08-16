@@ -301,7 +301,7 @@ func TestStripeSubMeteredUsage(t *testing.T) {
 	if sub2["latest_invoice"] != inv2["id"] {
 		t.Fatalf("metered latest_invoice = %v", sub2["latest_invoice"])
 	}
-	lines, _ := inv2["lines"].([]any)
+	lines, _ := inv2["lines"].(map[string]any)["data"].([]any)
 	if len(lines) != 1 {
 		t.Fatalf("metered invoice#2 lines = %v", inv2["lines"])
 	}

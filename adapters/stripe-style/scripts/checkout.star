@@ -220,7 +220,7 @@ def on_create_checkout_session(req):
     if cached != None:
         return respond(cached["status"], _ck_public(cached["doc"]))
 
-    if _ck_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
 
     body = req["body"]
@@ -298,15 +298,8 @@ def on_create_checkout_session(req):
     _idempotent_remember(req, "checkout_sessions", 201, sid)
     return respond(201, _ck_public(doc))
 
-# _ck_bad_body reports a malformed JSON body authoritatively: a body that
 # fails to parse arrives as an EMPTY dict via req.body, so req.raw_body is
 # the source of truth.
-def _ck_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
 # GET /v1/checkout/sessions — list sessions (filters customer, status,
 # payment_intent, subscription, created; newest first; cursor pagination).
 def on_list_checkout_sessions(req):
@@ -697,7 +690,7 @@ def on_pay_checkout_session(req):
     id = req["params"]["id"]
     doc = _ck_get(id)
     if doc == None:
-        return respond(404, {"error": {"message": "No such checkout_session: " + id, "type": "invalid_request_error"}})
+        return _not_found("checkout_session", id)
     doc = _ck_advance(doc)
 
     status = doc.get("status", "")
@@ -742,7 +735,10 @@ def on_pay_checkout_session(req):
         doc["payment_intent"] = pi["id"]
 
     doc["status"] = "complete"
-    doc["payment_status"] = "paid"
+    # setup mode never moves money: the session stays no_payment_required
+    # (real Stripe's enum reserves "paid" for funds received).
+    if doc.get("mode", "payment") != "setup":
+        doc["payment_status"] = "paid"
     doc["url"] = None
     doc["_paid_pm"] = pm
     store_collection("checkout_sessions").update(id, doc)

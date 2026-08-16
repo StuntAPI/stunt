@@ -17,7 +17,7 @@ import (
 
 // stripeDisputeOnCard charges `amount` cents with a raw card number and
 // returns the parsed charge doc (the dispute test cards raise a dispute on
-// capture, so the charge carries a dp_* id).
+// capture, so the charge carries a du_* id).
 func stripeDisputeOnCard(t *testing.T, base, number string, amount float64) map[string]any {
 	t.Helper()
 	tok := mintStripeCardToken(t, base, number)
@@ -61,8 +61,8 @@ func TestStripeDisputeSurface(t *testing.T) {
 
 	ch := stripeDisputeOnCard(t, base, stripeCardNum("4000", "0000", "0000", "0259"), 4400)
 	dpID, _ := ch["dispute"].(string)
-	if dpID == "" || !strings.HasPrefix(dpID, "dp_") {
-		t.Fatalf("charge dispute = %v, want dp_*", ch["dispute"])
+	if dpID == "" || !strings.HasPrefix(dpID, "du_") {
+		t.Fatalf("charge dispute = %v, want du_*", ch["dispute"])
 	}
 
 	// ===== List: newest first, list envelope, the fresh dispute on top =====
@@ -113,8 +113,8 @@ func TestStripeDisputeSurface(t *testing.T) {
 	}
 
 	// 404 with the real message.
-	body, status = getAuth(t, base+"/v1/disputes/dp_nope", devToken)
-	if status != 404 || !strings.Contains(body, "No such dispute: dp_nope") {
+	body, status = getAuth(t, base+"/v1/disputes/du_nope", devToken)
+	if status != 404 || !strings.Contains(body, "No such dispute: 'du_nope'") {
 		t.Fatalf("GET unknown dispute -> %d %s, want 404 with real message", status, body)
 	}
 
@@ -323,8 +323,8 @@ func TestStripeDisputeClose(t *testing.T) {
 	}
 
 	// 404s keep the real message.
-	body, status = postJSONAuth(t, base+"/v1/disputes/dp_nope/close", devToken, map[string]any{})
-	if status != 404 || !strings.Contains(body, "No such dispute: dp_nope") {
+	body, status = postJSONAuth(t, base+"/v1/disputes/du_nope/close", devToken, map[string]any{})
+	if status != 404 || !strings.Contains(body, "No such dispute: 'du_nope'") {
 		t.Fatalf("close unknown dispute -> %d %s, want 404 with real message", status, body)
 	}
 
@@ -396,7 +396,7 @@ func TestStripeDisBalanceTransactions(t *testing.T) {
 
 	// 404 with the real resource name.
 	body, status = getAuth(t, base+"/v1/balance_transactions/txn_nope", devToken)
-	if status != 404 || !strings.Contains(body, "No such balance_transaction: txn_nope") {
+	if status != 404 || !strings.Contains(body, "No such balance_transaction: 'txn_nope'") {
 		t.Fatalf("GET unknown bt -> %d %s, want 404 with real message", status, body)
 	}
 
@@ -683,7 +683,7 @@ func TestStripeDisRefundCancel(t *testing.T) {
 
 	// 404 + malformed body.
 	body, status = postJSONAuth(t, base+"/v1/refunds/re_nope/cancel", devToken, map[string]any{})
-	if status != 404 || !strings.Contains(body, "No such refund: re_nope") {
+	if status != 404 || !strings.Contains(body, "No such refund: 're_nope'") {
 		t.Fatalf("cancel unknown refund -> %d %s, want 404 with real message", status, body)
 	}
 	if _, status = stripeGroundPostRaw(t, base+"/v1/refunds/"+re3ID+"/cancel", devToken, `{"refund": `); status != 400 {

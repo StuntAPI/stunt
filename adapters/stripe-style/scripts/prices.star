@@ -10,14 +10,7 @@
 # metered prices bill reported usage (see subscription_items usage_records).
 # Shared helpers are in lib.star (see products.star header for the list).
 
-# _price_bad_body reports a malformed JSON body authoritatively (req.body
 # arrives as an empty dict for unparseable bodies; req.raw_body is the truth).
-def _price_bad_body(req):
-    raw = req.get("raw_body", "")
-    if raw == None or raw == "":
-        return False
-    return json_safe_decode(raw) == None
-
 def _price_missing(param):
     return respond(400, {"error": {"type": "invalid_request_error", "message": "Missing required param: " + param + ".", "param": param}})
 
@@ -54,7 +47,7 @@ def on_create_price(req):
     if cached != None:
         return respond(cached["status"], _price_public(cached["doc"]))
 
-    if _price_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     body = req["body"]
     if body == None:
@@ -203,7 +196,7 @@ def on_update_price(req):
     if err != None:
         return err
 
-    if _price_bad_body(req):
+    if _bad_body(req):
         return respond(400, {"error": {"type": "invalid_request_error", "message": "Invalid request body: could not parse as JSON."}})
     id = req["params"]["id"]
     doc = store_collection("prices").get(id)
