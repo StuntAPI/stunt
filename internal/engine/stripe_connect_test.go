@@ -1085,7 +1085,10 @@ func TestStripeCnCapabilities(t *testing.T) {
 	}
 
 	// One day later the review window closes: capabilities activate.
-	stripeCnAdvanceClock(t, base, clockID, t0+24*3600+5)
+	// Anchored to the account's own created stamp (same CI second-boundary
+	// guard as the payout lifecycle test).
+	acctCreated := int64(acct["created"].(float64))
+	stripeCnAdvanceClock(t, base, clockID, acctCreated+24*3600+5)
 	body, status = getAuth(t, base+"/v1/accounts/"+acctID, devToken)
 	if status != 200 {
 		t.Fatalf("GET account after advance -> %d; %s", status, body)
@@ -1458,15 +1461,19 @@ func TestStripeCnPayoutLifecycle(t *testing.T) {
 		return po
 	}
 
-	// Standard payout: pending at t0, arrival = t0 + 4 days, destination
-	// implicitly the default external account.
+	// Standard payout: pending at creation, arrival = created + 4 days,
+	// destination implicitly the default external account. All thresholds are
+	// anchored to the payout's OWN created stamp: the test clock offsets from
+	// real time at activation, so created = t0 + real elapsed — under CI load
+	// a second boundary can cross and t0-anchored exact assertions flake.
 	p1 := createPayout(4000, "standard")
 	p1ID, _ := p1["id"].(string)
+	p1Created := int64(p1["created"].(float64))
 	if p1["status"] != "pending" {
-		t.Fatalf("payout status at t0 = %v, want pending", p1["status"])
+		t.Fatalf("payout status at creation = %v, want pending", p1["status"])
 	}
-	if p1["arrival_date"].(float64) != float64(t0+4*24*3600) {
-		t.Fatalf("standard arrival_date = %v, want %d", p1["arrival_date"], t0+4*24*3600)
+	if p1["arrival_date"].(float64) != float64(p1Created+4*24*3600) {
+		t.Fatalf("standard arrival_date = %v, want %d", p1["arrival_date"], p1Created+4*24*3600)
 	}
 	if dest, _ := p1["destination"].(string); !strings.HasPrefix(dest, "ba_") {
 		t.Fatalf("payout destination = %v, want the default external account ba_*", p1["destination"])
@@ -1479,7 +1486,7 @@ func TestStripeCnPayoutLifecycle(t *testing.T) {
 	}
 
 	// +5s: still pending.
-	stripeCnAdvanceClock(t, base, clockID, t0+5)
+	stripeCnAdvanceClock(t, base, clockID, p1Created+5)
 	body, status := getAuth(t, base+"/v1/payouts/"+p1ID, devToken)
 	if status != 200 {
 		t.Fatalf("GET payout (+5s) -> %d; %s", status, body)
@@ -1491,7 +1498,7 @@ func TestStripeCnPayoutLifecycle(t *testing.T) {
 	}
 
 	// +15s: in_transit.
-	stripeCnAdvanceClock(t, base, clockID, t0+15)
+	stripeCnAdvanceClock(t, base, clockID, p1Created+15)
 	body, _ = getAuth(t, base+"/v1/payouts/"+p1ID, devToken)
 	_ = json.Unmarshal([]byte(body), &po)
 	if po["status"] != "in_transit" {
@@ -1502,7 +1509,7 @@ func TestStripeCnPayoutLifecycle(t *testing.T) {
 	}
 
 	// +61s: paid — exactly once, even across repeated reads.
-	stripeCnAdvanceClock(t, base, clockID, t0+61)
+	stripeCnAdvanceClock(t, base, clockID, p1Created+61)
 	for i := 0; i < 3; i++ {
 		body, status = getAuth(t, base+"/v1/payouts/"+p1ID, devToken)
 		if status != 200 {

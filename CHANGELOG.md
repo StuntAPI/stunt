@@ -6,6 +6,20 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.39.0] — 2026-08-16
+
+### Adapters
+
+- **threads-style**: TEXT media containers finish processing immediately.
+  Real Threads only requires polling container status for video/image
+  uploads — text posts are finished at creation, so real-world clients
+  create and publish back-to-back. The simulator was enforcing a 3-second
+  processing window on text too, rejecting `threads_publish` with the
+  "not finished processing" error. Found by dogfooding a production
+  threads client end-to-end against stunt; the
+  `simulate_fail` branch and the status-poll endpoint keep the
+  derive-on-read machinery.
+
 ## [0.38.0] — 2026-08-16
 
 ### Adapters
