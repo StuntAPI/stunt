@@ -6,6 +6,28 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.40.0] — 2026-08-16
+
+### Engine
+
+- **`events_emit_raw` builtin + `Emitter.EmitRaw`** — deliver an exact
+  pre-marshaled webhook body instead of the `{type, payload}` envelope.
+  Providers whose receivers parse the delivery as the provider's own event
+  object (Stripe's `id/object/type/data`, GitHub's event JSON) need the real
+  shape on the wire for their SDK parsers; same retry/header/validation
+  semantics as `events_emit`, which is unchanged. Found by dogfooding a real
+  stripe-node webhook receiver against the stripe-style adapter.
+- `stunt llm` reference corrected: the predeclared json module exposes
+  `json.decode` / `json.encode`, not `loads` / `dumps`.
+
+### Adapters
+
+- **stripe-style**: webhook deliveries now carry the full Stripe event
+  object — the same serialized bytes are HMAC'd and POSTed, so receiver-side
+  `webhooks.constructEvent(payload, signature, secret)` both verifies the
+  `Stripe-Signature` and parses `event.data.object` like production. Events
+  remain recorded in `/v1/events` either way; registration gating unchanged.
+
 ## [0.39.0] — 2026-08-16
 
 ### Adapters
