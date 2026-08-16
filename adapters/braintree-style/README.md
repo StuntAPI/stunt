@@ -17,18 +17,18 @@ curl -X POST http://localhost:8080/graphql \
   -H "Authorization: Bearer your-token" \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "mutation($input: CreateCustomerInput!) { createCustomer(input: $input) { customer { id email } } }",
+    "query": "mutation($input: CustomerCreateInput!) { createCustomer(input: $input) { customer { id email } } }",
     "variables": { "input": { "firstName": "John", "lastName": "Doe", "email": "john@example.com" } }
   }'
 
-# GraphQL — charge a payment method (created submitted_for_settlement,
+# GraphQL — charge a payment method (created SUBMITTED_FOR_SETTLEMENT,
 # settles 3s later, derived on read)
 curl -X POST http://localhost:8080/graphql \
   -H "Authorization: Bearer your-token" \
   -H "Content-Type: application/json" \
   -d '{
     "query": "mutation($input: ChargePaymentMethodInput!) { chargePaymentMethod(input: $input) { transaction { id status amount } } }",
-    "variables": { "input": { "paymentMethodId": "pm-token", "amount": "50.00" } }
+    "variables": { "input": { "paymentMethodId": "pm-token", "transaction": { "amount": "50.00" } } }
   }'
 
 # REST — create a transaction (authorized; amount must be positive)
@@ -126,9 +126,40 @@ operator object — mapped onto typed filtering:
 
 Supported criteria: `id`, `status`, `type`, `amount`, `currency`,
 `created_at`/`createdAt`, `customer_id`/`customerId`, and
-`credit_card_number` (`ends_with` — matches the card last 4). The response is
-`{"transactions": [...], "total_count": n}`. GraphQL `searchTransactions`
-accepts the same criteria via `variables.search`.
+`credit_card_number`/`creditCardLast4` (`ends_with` — matches the card
+last 4). The response is `{"transactions": [...], "total_count": n}`.
+GraphQL `searchTransactions` accepts the same criteria via the
+`TransactionSearchInput` (camelCase fields), with enum values normalized to
+the store's vocabulary and results shaped as `{edges: [{node}], totalCount}`.
+
+## GraphQL operations
+
+`POST /graphql` is served by stunt's **real GraphQL executor** from
+[`schemas/schema.graphql`](schemas/schema.graphql) — documents are parsed,
+validated, and executed: arguments, variables, aliases, fragments,
+introspection, and spec-shaped `errors[]`. Unknown fields/operations are
+rejected at validation time (the previous handler pattern-matched the query
+string and returned canned data). The modeled surface:
+
+| Operation | Kind | Notes |
+|-----------|------|-------|
+| `ping` | Query | Liveness probe. |
+| `customer(id)` / `transaction(id)` | Query | Lookups (derive-on-read applies). |
+| `searchTransactions(search)` | Query | The search-criteria vocabulary above. |
+| `createCustomer(input)` | Mutation | `CustomerCreateInput`. |
+| `chargePaymentMethod` / `chargeCreditCard` | Mutation | Created `SUBMITTED_FOR_SETTLEMENT`, settles +3s. |
+| `authorizePaymentMethod` / `authorizeCreditCard` | Mutation | Created `AUTHORIZED` (or auto-submit with `options.submitForSettlement`). |
+| `voidTransaction(input)` | Mutation | `authorized` only; violations surface in `errors[]`. |
+| `refundTransaction(input)` | Mutation | `settled` only; same over-refund guard as REST. |
+
+`Amount` is a decimal-string scalar ("50.00"), and `TransactionStatus` /
+`TransactionType` serialize as uppercase enum values while the REST surface
+keeps its lowercase snake_case wire vocabulary — both map onto the same
+store and state machine.
+
+> The `graphql:` transport dispatches before adapter endpoints and hands
+> resolvers only `{parent, args}` — it has no auth hook — so this endpoint
+> is served without the Bearer/basic check the REST surface enforces.
 
 ## Subscriptions (recurring billing)
 
@@ -158,22 +189,11 @@ key replays the original transaction response instead of creating a duplicate.
 Keys are scoped by method + path + collection, so a reused key never collides
 across endpoints. This makes client retry/idempotency logic testable.
 
-## GraphQL Operations
-
-| Mutation | Description |
-|----------|-------------|
-| `createCustomer` | Create a customer |
-| `chargePaymentMethod` / `chargeCreditCard` | Charge → `submitted_for_settlement`, settles at +3s |
-| `authorizePaymentMethod` / `authorizeCreditCard` | Authorize → `authorized` |
-| `refundTransaction` | Refund a settled transaction (over-refund guarded) |
-| `voidTransaction` | Void an authorized transaction |
-| `searchTransactions` | Search with the REST search-criteria vocabulary |
-
 ## REST Endpoints
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| POST | `/graphql` | GraphQL endpoint |
+| POST | `/graphql` | GraphQL endpoint (real execution — see "GraphQL operations") |
 | POST | `/merchants/{id}/transactions` | Create transaction |
 | POST | `/merchants/{id}/transactions/advanced_search` | Search transactions |
 | GET | `/merchants/{id}/transactions/{id}` | Get transaction |

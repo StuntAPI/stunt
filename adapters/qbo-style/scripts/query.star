@@ -34,7 +34,10 @@ def on_query(req):
 
     if entity == "Customer":
         c = store_collection("customers")
-        docs = _q_apply(parsed, c.list())
+        # Default reads exclude deactivated customers (Active=false), like the
+        # bare read endpoint; an explicit WHERE on Active widens the view so
+        # `WHERE Active = False` surfaces deactivated customers.
+        docs = _q_apply(_q_default_active(parsed), c.list())
         return respond(200, {"QueryResponse": {"Customer": docs, "maxResults": len(docs)}, "time": _now()})
 
     if entity == "Invoice":
@@ -44,6 +47,24 @@ def on_query(req):
 
     # Unsupported entity → empty response.
     return respond(200, {"QueryResponse": {"maxResults": 0}, "time": _now()})
+
+# _q_default_active adds an implicit Active = True clause to a parsed query
+# UNLESS its WHERE already constrains Active (an explicit filter replaces the
+# default, mirroring how QBO clients opt into deactivated rows). Returns the
+# (possibly amended) parsed dict; a None filter means "no WHERE" and becomes
+# the single Active clause.
+def _q_default_active(parsed):
+    if parsed["filter"] != None:
+        for t in parsed["filter"]:
+            if _lower(t[0]) == "active":
+                return parsed
+    amended = {"filter": [["Active", "=", True]], "order_by": parsed["order_by"], "order_dir": parsed["order_dir"], "limit": parsed["limit"]}
+    if parsed["filter"] != None:
+        clauses = [["Active", "=", True]]
+        for t in parsed["filter"]:
+            clauses.append(t)
+        amended["filter"] = clauses
+    return amended
 
 # --- SQL clause parsing (QBO v3 query grammar subset) ---
 

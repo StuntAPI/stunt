@@ -1,0 +1,85 @@
+# Product Hunt API v2-style GraphQL schema (the surface this adapter models).
+#
+# Modeled on the provider's documented shapes: Relay-style post connection
+# (edges/nodes/pageInfo), the Post entity with votesCount, and the
+# verb+Noun mutation convention — postCreate returns a payload carrying
+# either the created post or per-field errors.
+
+scalar DateTime
+
+"""Order for the posts connection."""
+enum PostsOrder {
+  """Returns Posts in descending order of creation date."""
+  NEWEST
+  """Returns Posts in descending order of featured date."""
+  FEATURED_AT
+}
+
+"""A Product Hunt post."""
+type Post {
+  id: ID!
+  name: String!
+  tagline: String!
+  description: String
+  url: String!
+  votesCount: Int!
+  createdAt: DateTime!
+  featuredAt: DateTime
+  user: User
+}
+
+"""The maker credited with a post."""
+type User {
+  id: ID!
+  name: String!
+  username: String!
+  createdAt: DateTime!
+}
+
+"""Information about pagination in a connection."""
+type PageInfo {
+  endCursor: String
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+}
+
+type PostEdge {
+  cursor: String!
+  node: Post!
+}
+
+type PostConnection {
+  edges: [PostEdge!]!
+  nodes: [Post!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+"""A user-input error on a mutation payload (per-field, not a GraphQL error)."""
+type MutationError {
+  attribute: String
+  message: String!
+  path: [String!]
+}
+
+input PostCreateInput {
+  name: String
+  tagline: String
+  description: String
+  url: String
+}
+
+type PostCreatePayload {
+  post: Post
+  errors: [MutationError!]!
+}
+
+type Query {
+  post(id: ID!): Post
+  posts(first: Int = 20, after: String, order: PostsOrder = NEWEST): PostConnection!
+}
+
+type Mutation {
+  postCreate(input: PostCreateInput!): PostCreatePayload!
+}

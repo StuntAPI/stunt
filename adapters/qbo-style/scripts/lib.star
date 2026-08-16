@@ -73,6 +73,20 @@ def _next_id(prefix):
     n = store_kv_incr("qbo", prefix + "_seq")
     return str(n)
 
+# _bump_sync increments a QBO SyncToken ("3" -> "4"; a malformed value
+# restarts the sequence at "1"). Shared by the customer update/deactivate
+# paths and the invoice void.
+def _bump_sync(tok):
+    n = 0
+    if tok != None:
+        for i in range(len(tok)):
+            ch = tok[i]
+            if ch >= "0" and ch <= "9":
+                n = n * 10 + (ord(ch) - ord("0"))
+            else:
+                return "1"
+    return str(n + 1)
+
 # _realm_matches checks whether a token belongs to a realm. Returns True if
 # the token's realmId matches.
 def _realm_matches(token_doc, realm_id):
@@ -97,22 +111,40 @@ def _get_query(req):
             return val
     return ""
 
-# _detect_entity pattern-matches the SQL-like query to determine the entity.
-# QBO queries look like: "SELECT * FROM Customer" or "select * from Invoice
-# WHERE ..." — we just match on the entity name (case-insensitive).
+# _detect_entity determines the entity a QBO query addresses. The token
+# immediately after FROM is matched against the known entities first (so
+# "select * from Invoice where CustomerRef.value = '5'" is an Invoice query,
+# not a Customer query); a substring scan is kept as the fallback for
+# malformed input without a usable FROM clause.
+_ENTITIES = ["Customer", "Invoice", "Item", "Account", "Payment"]
+
 def _detect_entity(query_str):
     if query_str == "":
         return ""
-    q = _lower(query_str)
-    if "customer" in q:
+    low = _lower(query_str)
+    fi = _index(low, " from ")
+    if fi >= 0:
+        i = fi + 6
+        word = ""
+        while i < len(query_str):
+            ch = query_str[i]
+            if ch == " " or ch == "\t" or ch == "\n":
+                break
+            word = word + ch
+            i = i + 1
+        wlow = _lower(word)
+        for name in _ENTITIES:
+            if _lower(name) == wlow:
+                return name
+    if "customer" in low:
         return "Customer"
-    if "invoice" in q:
+    if "invoice" in low:
         return "Invoice"
-    if "item" in q:
+    if "item" in low:
         return "Item"
-    if "account" in q:
+    if "account" in low:
         return "Account"
-    if "payment" in q:
+    if "payment" in low:
         return "Payment"
     return ""
 

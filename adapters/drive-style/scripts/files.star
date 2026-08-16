@@ -15,13 +15,18 @@ def _next_id(prefix):
 def _now():
     return "2024-01-15T12:00:00Z"
 
-# POST /upload/drive/v3/files — create a file or folder.
+# POST /upload/drive/v3/files — create a file or folder, or (with
+# ?uploadType=resumable) initiate a resumable upload session.
 #
-# Accepts BOTH request shapes:
+# Accepts BOTH request shapes for the direct create:
 #  - JSON body  {"name","content","mimeType","parents"}       (convenience form)
 #  - a real simple media upload: raw bytes as the request body with
 #    ?uploadType=media&name=<filename> (Content-Type application/octet-stream).
 #    The raw bytes arrive in req["raw_body"]; the name comes from the query.
+#
+# With ?uploadType=resumable the JSON body is the file METADATA and the
+# response is 200 + a Location header pointing at the chunk-upload session
+# URL (see on_resumable_chunk below).
 #
 # For a folder: set body.mimeType to "application/vnd.google-apps.folder".
 # Folders have no blob content — only metadata.
@@ -38,6 +43,11 @@ def on_upload(req):
     raw = req.get("raw_body")
     if raw == None:
         raw = ""
+
+    # Resumable initiation: metadata in, session URL out.
+    upload_type = query.get("uploadType", "")
+    if upload_type == "resumable":
+        return _resumable_initiate(req, body, query)
 
     mime_type = body.get("mimeType", "application/octet-stream")
     # Name precedence: JSON body, then ?name= query, then a default.
@@ -496,3 +506,214 @@ def on_delete(req):
     c.delete(id)
     _record_change(id, None, True)
     return respond(204, None)
+
+# ====================================================================
+# Resumable upload sessions (POST initiate -> PUT chunks -> 308/200)
+# ====================================================================
+# The real Google resumable protocol, enforced STRICTLY (the lenient-sim
+# failure mode is client protocol bugs hiding behind the mock):
+#
+#   POST /upload/drive/v3/files?uploadType=resumable (JSON metadata)
+#       -> 200, Location: <session URL> (empty body)
+#   PUT <session URL> with Content-Range "bytes {start}-{end}/{total}"
+#       -> 308 Resume Incomplete + "Range: bytes=0-{end}" for every chunk
+#          whose end < total-1 (start must equal the session's next
+#          expected offset: chunks are sequential and contiguous)
+#       -> 200 + file resource when end == total-1 (the final chunk)
+#   PUT <session URL> empty (or Content-Range "bytes */{total}")
+#       -> 308 status probe with the current "Range: bytes=0-{next-1}"
+#          (no Range header when no bytes have been accepted yet)
+#   DELETE <session URL>
+#       -> 499 (the Google upload backend's cancel status): session and
+#          partial bytes are discarded, no file is ever created
+#
+# Protocol violations (gap in start, differing total, end past total,
+# body length != range length) are 400s, not silent accepts. Sessions are
+# pre-authenticated (the upload URL carries its own capability, like real
+# Google session URLs) and expire after a week of session age.
+
+# Real Drive sessions live about a week.
+_RESUME_TTL_SECONDS = 7 * 24 * 60 * 60
+
+# _session_url builds the resumable session URL for a session id.
+def _session_url(req, sid):
+    return "http://" + req.get("host", "") + "/upload/drive/v3/files?uploadType=resumable&upload_id=" + sid
+
+# _resumable_initiate mints a session row and returns the 200 + Location.
+def _resumable_initiate(req, body, query):
+    name = body.get("name", None)
+    if name == None:
+        name = query.get("name", "untitled")
+    mime_type = body.get("mimeType", "application/octet-stream")
+    if mime_type == None:
+        mime_type = "application/octet-stream"
+    parents = body.get("parents", None)
+
+    sid = "sid_" + str(store_kv_incr("drive", "upload_session_seq"))
+    doc = {
+        "id": sid,
+        "name": name,
+        "mimeType": mime_type,
+        "next": 0,
+        "total": -1,
+        "created_unix": clock.now_unix(),
+    }
+    if parents != None:
+        doc["parents"] = parents
+    store_collection("upload_sessions").insert(doc)
+
+    return respond(200, "", {"Location": _session_url(req, sid)})
+
+# _resume_session loads a live session, or None (expired sessions are
+# reaped here: partial blob + row).
+def _resume_session(sid):
+    sc = store_collection("upload_sessions")
+    sess = sc.get(sid)
+    if sess == None:
+        return None
+    created = _to_num(sess.get("created_unix", 0))
+    if clock.now_unix() > created + _RESUME_TTL_SECONDS:
+        store_blob("drive").delete("up-" + sid)
+        sc.delete(sid)
+        return None
+    return sess
+
+# _resume_308 renders the 308 Resume Incomplete response for a session
+# with `received` accepted bytes (no Range header before the first byte).
+def _resume_308(received):
+    headers = {"Content-Length": "0"}
+    if received > 0:
+        headers["Range"] = "bytes=0-" + str(received - 1)
+    return respond(308, None, headers)
+
+# _resume_400 is the strict-protocol violation response (Google envelope).
+def _resume_400(detail):
+    return _drive_err(400, "The Content-Range is not valid for this session: " + detail, "INVALID_ARGUMENT")
+
+# _parse_content_range parses "bytes {start}-{end}/{total}" into a
+# (start, end, total) tuple, or None when malformed. The status-probe form
+# "bytes */{total}" is handled by the caller before this runs.
+def _parse_content_range(h):
+    if h == None or not h.startswith("bytes "):
+        return None
+    rest = h[6:]
+    dash = rest.find("-")
+    slash = rest.find("/")
+    if dash < 0 or slash < 0 or slash < dash:
+        return None
+    start_s = rest[:dash].strip()
+    end_s = rest[dash + 1:slash].strip()
+    total_s = rest[slash + 1:].strip()
+    if not _resume_is_digits(start_s) or not _resume_is_digits(end_s) or not _resume_is_digits(total_s):
+        return None
+    return (_resume_to_int(start_s), _resume_to_int(end_s), _resume_to_int(total_s))
+
+def _resume_is_digits(s):
+    if len(s) == 0:
+        return False
+    for i in range(len(s)):
+        if s[i] < "0" or s[i] > "9":
+            return False
+    return True
+
+def _resume_to_int(s):
+    n = 0
+    for i in range(len(s)):
+        n = n * 10 + (ord(s[i]) - ord("0"))
+    return n
+
+# on_resumable_chunk handles PUT /upload/drive/v3/files?upload_id=... —
+# the chunk/status-probe endpoint of a resumable session. No bearer check:
+# real upload URLs are pre-authenticated.
+def on_resumable_chunk(req):
+    sid = _get_query(req).get("upload_id", "")
+    if sid == None or sid == "":
+        return _drive_err(400, "The 'upload_id' parameter is required", "INVALID_ARGUMENT")
+    sess = _resume_session(sid)
+    if sess == None:
+        return _drive_err(404, "Upload session not found or already completed", "NOT_FOUND")
+
+    headers = req.get("headers")
+    if headers == None:
+        headers = {}
+    content_range = headers.get("Content-Range", "")
+    if content_range == None:
+        content_range = ""
+    raw = req.get("raw_body")
+    if raw == None:
+        raw = ""
+
+    # Status probe: no Content-Range, or the "bytes */{total}" form, with
+    # an empty body → 308 + the accepted-byte Range.
+    if content_range == "" or content_range.startswith("bytes */"):
+        return _resume_308(_to_num(sess.get("next", 0)))
+
+    parsed = _parse_content_range(content_range)
+    if parsed == None:
+        return _drive_err(400, "Missing or malformed Content-Range header (expected 'bytes {start}-{end}/{total}').", "INVALID_ARGUMENT")
+    start = parsed[0]
+    end = parsed[1]
+    total = parsed[2]
+    sess_total = _to_num(sess.get("total", -1))
+    sess_next = _to_num(sess.get("next", 0))
+
+    if end < start:
+        return _resume_400("Range end precedes range start.")
+    if total <= 0:
+        return _resume_400("Total size must be positive.")
+    if sess_total >= 0 and total != sess_total:
+        return _resume_400("Total size differs from earlier chunks.")
+    if end >= total:
+        return _resume_400("Range end exceeds the declared total size.")
+    if start != sess_next:
+        return _resume_400("Chunk start does not match the next expected offset " + str(sess_next) + ". Chunks must be sequential and contiguous.")
+    if len(raw) != end - start + 1:
+        return _resume_400("Body length does not match the declared Content-Range.")
+
+    # Append the accepted bytes (O(chunk), never re-reading the partial).
+    b = store_blob("drive")
+    b.append("up-" + sid, raw)
+
+    if end == total - 1:
+        # Final chunk: assemble the file, record the change, drop the session.
+        full = b.get("up-" + sid)
+        if full == None:
+            full = ""
+        file_id = _next_id("file")
+        b.put(file_id, full)
+        doc = {
+            "id": file_id,
+            "name": sess.get("name", "untitled"),
+            "mimeType": sess.get("mimeType", "application/octet-stream"),
+            "size": len(full),
+            "createdTime": _now(),
+            "modifiedTime": _now(),
+            "trashed": False,
+        }
+        if "parents" in sess:
+            doc["parents"] = sess["parents"]
+        store_collection("files").insert(doc)
+        _record_change(file_id, doc, False)
+        b.delete("up-" + sid)
+        store_collection("upload_sessions").delete(sid)
+        return respond(200, doc)
+
+    sess["next"] = end + 1
+    sess["total"] = total
+    store_collection("upload_sessions").update(sid, sess)
+    return _resume_308(end + 1)
+
+# on_resumable_cancel handles DELETE /upload/drive/v3/files?upload_id=... —
+# cancels the session (the Google upload backend answers 499): the partial
+# bytes and the session row are discarded and no file is created.
+def on_resumable_cancel(req):
+    sid = _get_query(req).get("upload_id", "")
+    if sid == None or sid == "":
+        return _drive_err(400, "The 'upload_id' parameter is required", "INVALID_ARGUMENT")
+    sc = store_collection("upload_sessions")
+    sess = sc.get(sid)
+    if sess == None:
+        return _drive_err(404, "Upload session not found or already completed", "NOT_FOUND")
+    store_blob("drive").delete("up-" + sid)
+    sc.delete(sid)
+    return respond(499, "")

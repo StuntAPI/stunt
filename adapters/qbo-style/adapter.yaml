@@ -44,6 +44,7 @@ endpoints:
   - route: /v3/company/{realmId}/customer/{id}
     method: DELETE
     handler: scripts/customer.star#on_delete_customer_by_id
+    concurrency_key: id # read-then-deactivate read-modify-write, serialized per customer
 
   # Invoice CRUD.
   - route: /v3/company/{realmId}/invoice

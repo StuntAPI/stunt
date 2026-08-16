@@ -105,8 +105,39 @@ Path-style URLs: `/{container}/{blob}`.
 | GET | `/{container}/{blob}?comp=properties` | Get blob properties (headers). |
 | GET | `/{container}/{blob}?comp=metadata` | Get blob metadata. |
 | PUT | `/{container}/{blob}?comp=metadata` | Set blob metadata. |
-| PUT | `/{container}/{blob}?comp=block` | Upload block. |
-| GET | `/{container}/{blob}?comp=blocklist` | Get block list. |
+| PUT | `/{container}/{blob}?comp=block&blockid=<base64>` | Put Block — stage an uncommitted block. |
+| PUT | `/{container}/{blob}?comp=blocklist` | Put Block List — commit the blob from the listed blocks. |
+| GET | `/{container}/{blob}?comp=blocklist&blocklisttype=all\|committed\|uncommitted` | Get Block List (XML). |
+
+## Block staging (Put Block / Put Block List / Get Block List)
+
+The real Azure block-blob assembly model, stateful and byte-exact:
+
+1. **Put Block** (`PUT /{container}/{blob}?comp=block&blockid=<base64>`,
+   body = block bytes) stages the block as *uncommitted*. Blocks may be
+   staged **in any order**, and re-staging an id replaces its bytes. Each
+   `201` carries a `Content-MD5` header (base64 SHA-256 of the block — the
+   crypto module has no MD5, a documented deviation, the same trade the S3
+   adapter makes for its ETags).
+2. **Get Block List** (`GET ...?comp=blocklist&blocklisttype=...`) returns
+   the `<CommittedBlocks>` (commit order) and `<UncommittedBlocks>`
+   (staged, sorted by block id). `blocklisttype` is required — missing is
+   `400 MissingRequiredQueryParameter`, anything but
+   `committed|uncommitted|all` is `400 InvalidQueryParameterValue`. With no
+   committed blob and no staged blocks it is `404 BlobNotFound`.
+3. **Put Block List** (`PUT ...?comp=blocklist`, XML body) commits the
+   blob: the listed blocks (`<Latest>`/`<Uncommitted>` staged ids,
+   `<Committed>` previously committed ids) are concatenated **in list
+   order** into the blob content. A listed id that was never staged is
+   `400 InvalidBlockList`; an unparseable body is `400 InvalidXMLDocument`.
+   Committing consumes the staged blocks (unlisted ones are discarded,
+   like the real service) and records the committed list — visible via
+   Get Block List and byte-exact on `GET /{container}/{blob}`.
+
+Block ids follow the real rules: non-empty base64, at most 64 decoded
+bytes (`400 InvalidQueryParameterValue` otherwise). Deleting a blob (or
+its container) discards its staged blocks. A single-shot `PUT` blob has
+no addressable committed blocks — its committed list is empty.
 
 ## Response format
 
@@ -166,4 +197,31 @@ Authorization: SharedKey stuntstorage:uZ8...base64...==
 
 # SAS token query form also works:
 GET /mycontainer/report.json?sv=2024-08-04&ss=b&srt=co&sp=r&sig=abc&se=2025-01-01T00:00:00Z
+```
+
+Block assembly example (ids are base64; order comes from the LIST):
+
+```
+PUT /mycontainer/report.bin?comp=block&blockid=YmxvY2stQQ==
+Authorization: SharedKey stuntstorage:...
+<body>                          → 201, Content-MD5: <base64 sha256 of block>
+
+PUT /mycontainer/report.bin?comp=block&blockid=YmxvY2stQg==
+Authorization: SharedKey stuntstorage:...
+<body>                          → 201
+
+GET /mycontainer/report.bin?comp=blocklist&blocklisttype=all
+Authorization: SharedKey stuntstorage:...
+→ 200 <BlockList><CommittedBlocks /><UncommittedBlocks>
+        <Block><Name>YmxvY2stQQ==</Name><Size>5120</Size></Block>
+        <Block><Name>YmxvY2stQg==</Name><Size>4096</Size></Block>
+      </UncommittedBlocks></BlockList>
+
+PUT /mycontainer/report.bin?comp=blocklist
+Authorization: SharedKey stuntstorage:...
+<?xml version="1.0" encoding="utf-8"?><BlockList>
+  <Latest>YmxvY2stQQ==</Latest><Latest>YmxvY2stQg==</Latest>
+</BlockList>                    → 201, ETag + Content-MD5 of the assembled bytes
+
+GET /mycontainer/report.bin     → 200, block A bytes followed by block B bytes
 ```

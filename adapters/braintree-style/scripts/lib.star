@@ -549,7 +549,8 @@ def _crit(f, field, spec):
     f.append([field, "=", spec])
 
 # _search_filters maps a Braintree search-criteria object to query_select
-# [field, op, value] triples.
+# [field, op, value] triples. Field aliases cover both the REST body
+# vocabulary (snake_case) and the GraphQL search input (camelCase).
 def _search_filters(search):
     f = []
     _crit(f, "id", search.get("id", None))
@@ -562,4 +563,5 @@ def _search_filters(search):
     _crit(f, "customer.id", search.get("customer_id", None))
     _crit(f, "customer.id", search.get("customerId", None))
     _crit(f, "creditCard.last4", search.get("credit_card_number", None))
+    _crit(f, "creditCard.last4", search.get("creditCardLast4", None))
     return f

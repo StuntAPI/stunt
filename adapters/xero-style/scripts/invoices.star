@@ -1,4 +1,4 @@
-# Invoices handlers — list, create, get, payment.
+# Invoices handlers — list, create, get, payment, void.
 #
 # Requires Bearer + xero-tenant-id.
 # STATEFUL invoices stored in the "invoices" collection.
@@ -6,7 +6,7 @@
 # GET    /api.xro/2.0/Invoices           → { Id, Status, Invoices: [...] }
 # PUT    /api.xro/2.0/Invoices           → { Id, Status, Invoices: [...] }
 # GET    /api.xro/2.0/Invoices/{id}      → { Id, Status, Invoices: [...] }
-# DELETE /api.xro/2.0/Invoices/{id}      → 204 No Content
+# DELETE /api.xro/2.0/Invoices/{id}      → 204 No Content (VOID, not destroy)
 # POST   /api.xro/2.0/Invoices/{id}/Payments → { Id, Status, Payments: [...] }
 
 # on_list_invoices lists all invoices.
@@ -140,7 +140,11 @@ def on_get_invoice(req):
 
     return _xero_err(404, "NotFound", "NotFound", "The invoice was not found")
 
-# on_delete_invoice deletes a single invoice by ID.
+# on_delete_invoice VOIDS a single invoice by ID (real Xero invoices are not
+# destroyed — the terminal soft-delete state is VOIDED). Like the real API's
+# void, the record is kept with Status "VOIDED" and the outstanding balance
+# zeroed; a PAID or already-VOIDED invoice cannot be voided again (400
+# ValidationError), and the invoice remains retrievable by id afterwards.
 def on_delete_invoice(req):
     err = _require_auth(req)
     if err != None:
@@ -158,7 +162,13 @@ def on_delete_invoice(req):
 
     for doc in docs:
         if doc.get("InvoiceID", "") == invoice_id:
-            c.delete(doc.get("id", doc.get("InvoiceID", "")))
+            status = doc.get("Status", "DRAFT")
+            if status == "VOIDED" or status == "PAID":
+                return _xero_err(400, "BadRequest", "ValidationError", "Invoice with InvoiceID " + invoice_id + " is not deletable (status " + status + ")")
+            doc["Status"] = "VOIDED"
+            doc["AmountDue"] = "0.00"
+            doc["UpdatedDateUTC"] = _now_dt()
+            c.update(doc.get("id", doc.get("InvoiceID", "")), doc)
             return respond(204)
 
     return _xero_err(404, "NotFound", "NotFound", "The invoice was not found")

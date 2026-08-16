@@ -30,6 +30,13 @@ endpoints:
   - route: /api.xro/2.0/Contacts
     method: PUT
     handler: scripts/contacts.star#on_put_contacts
+  - route: /api.xro/2.0/Contacts/{id}
+    method: GET
+    handler: scripts/contacts.star#on_get_contact
+  - route: /api.xro/2.0/Contacts/{id}
+    method: PUT
+    handler: scripts/contacts.star#on_put_contact
+    concurrency_key: id # read-merge-write update, serialized per contact
 
   # --- Invoices ---
   - route: /api.xro/2.0/Invoices
@@ -44,6 +51,7 @@ endpoints:
   - route: /api.xro/2.0/Invoices/{id}
     method: DELETE
     handler: scripts/invoices.star#on_delete_invoice
+    concurrency_key: id # read-then-void read-modify-write, serialized per invoice
   - route: /api.xro/2.0/Invoices/{id}/Payments
     method: POST
     handler: scripts/invoices.star#on_post_payment

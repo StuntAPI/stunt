@@ -15,7 +15,13 @@ unblock ERP integrations during local development:
 
 - **Record CRUD:** `GET/POST /services/rest/record/v1/customer`, `GET/PATCH/DELETE
   .../customer/{id}` — and the same pattern for `salesOrder`, `invoice`, `item`,
-  `employee`, `vendor`.
+  `employee`, `vendor`, `opportunity`, `customerPayment`.
+- **Record transforms:** `POST
+  /services/rest/record/v1/{recordType}/{id}/!transform/{targetType}` — see
+  [Record transforms (!transform)](#record-transforms-transform).
+- **Create validation:** missing required fields and unresolvable references are
+  rejected with NetSuite's real error codes (`USER_ERROR`,
+  `INVALID_KEY_OR_REF`) — see [Create validation](#create-validation).
 - **Idempotent creates:** POSTs carrying an `externalId` are deduped — see
   [Idempotent creates (externalId upsert)](#idempotent-creates-externalid-upsert).
 - **SuiteQL:** `POST /services/rest/query/v1/suiteql` with body `{"q":"SELECT *
@@ -93,6 +99,52 @@ NetSuite uses a distinctive error envelope with `o:` prefixed keys:
 }
 ```
 
+## Record transforms (!transform)
+
+NetSuite creates follow-on documents from an existing record via the
+`!transform` POST operation; this adapter implements the realistic chain:
+
+| Source | Target | Mapping highlights |
+|--------|--------|--------------------|
+| `salesOrder` | `invoice` | copies `entity`, `currency`, `terms`, `items`, `total`; sets `trandate` (today), `dueDate` (+30d), `status: "Open"`, `createdFrom` |
+| `invoice` | `customerPayment` | copies `entity` -> `customer`, `total` -> `payment`; builds the `applied` sublist; sets `status: "Undeposited"`; **flips the source invoice to `"Paid in Full"`** |
+| `opportunity` | `salesOrder` | copies `entity`, `currency`, `items`; `projectedTotal` -> `total`; sets `status: "Pending Approval"`, `createdFrom` |
+
+```bash
+curl -X POST \
+  http://localhost:8080/services/rest/record/v1/salesOrder/1/\!transform/invoice \
+  -H "Authorization: NLAuth realm=TSTDRV123, email=admin@example.com, password=secret"
+# 204 No Content
+# Location: /services/rest/record/v1/invoice/101
+```
+
+The request body carries additional fields to set on the new record and
+**overrides** the mapped defaults (NetSuite semantics). The new record gets a
+fresh internal ID plus a `tranId` document number (`INV-101`, `PAY-102`,
+`SO-103`). Like the real service, success is `204 No Content` with the new
+record's URL in the `Location` header; the resulting record is a real stored
+record (GET/PATCH/list/SuiteQL all see it).
+
+Transform errors use the real codes: transforming a nonexistent record ->
+`404 RCRD_DSNT_EXIST`; a source/target pair outside the chains above (e.g.
+`customer -> invoice`) -> `400 USER_ERROR` ("You can not transform a record of
+type customer to invoice."); body overrides that strip a required field or add
+an unresolvable reference fail exactly like a create (below).
+
+## Create validation
+
+Creates (`POST`) and transforms enforce NetSuite's mandatory-field and
+reference rules with the real error codes:
+
+- Missing required fields -> `400` `USER_ERROR` — "You have not defined any
+  value for the following fields: entity". Required: `entity` on `salesOrder`,
+  `invoice`, `opportunity`; `customer` + `payment` on `customerPayment`.
+- Unresolvable references -> `400` `INVALID_KEY_OR_REF` — "Invalid record
+  reference key 9999.". `entity`/`customer` references must resolve to a
+  stored customer (by `id`, `entityId`, or `companyName`/`refName`).
+- A request body that is not a JSON object (malformed JSON or a JSON array) ->
+  `400 INVALID_REQUEST` — "The request body is not valid JSON."
+
 ## Endpoints
 
 | Method | Route | Description |
@@ -107,6 +159,9 @@ NetSuite uses a distinctive error envelope with `o:` prefixed keys:
 | GET/POST/PATCH/DELETE | `/services/rest/record/v1/item[/{id}]` | Item CRUD |
 | GET/POST/PATCH/DELETE | `/services/rest/record/v1/employee[/{id}]` | Employee CRUD |
 | GET/POST/PATCH/DELETE | `/services/rest/record/v1/vendor[/{id}]` | Vendor CRUD |
+| GET/POST/PATCH/DELETE | `/services/rest/record/v1/opportunity[/{id}]` | Opportunity CRUD |
+| GET/POST/PATCH/DELETE | `/services/rest/record/v1/customerPayment[/{id}]` | Customer Payment CRUD |
+| POST | `/services/rest/record/v1/{recordType}/{id}/!transform/{target}` | Transform a record (see table above) |
 | POST | `/services/rest/query/v1/suiteql` | SuiteQL query |
 | POST | `/services/rest/v1/suiteql` | SuiteQL query (alt path) |
 | GET | `/services/rest/record/v1/metadata-catalog` | Record type catalog |
@@ -146,7 +201,9 @@ remain.
 ## Write response shape
 
 Successful `POST` (create), `PATCH` (update), and `DELETE` return `204 No
-Content`; creates and `externalId` dedupe hits carry the record's URL in the
-`Location` header. Unknown record types return `404` with
+Content`; creates, `externalId` dedupe hits, and transforms carry the record's
+URL in the `Location` header. Unknown record types return `404` with
 `o:errorCode: RCRD_TYPE_DSNT_EXIST`; unknown record IDs return `404` with
-`RCRD_DSNT_EXIST`.
+`RCRD_DSNT_EXIST`. Validation failures return `400` with `USER_ERROR`
+(missing required field / impossible transform) or `INVALID_KEY_OR_REF`
+(dangling record reference).

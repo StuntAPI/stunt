@@ -101,6 +101,8 @@ _COLLECTIONS = {
     "item": "items",
     "employee": "employees",
     "vendor": "vendors",
+    "opportunity": "opportunities",
+    "customerPayment": "customerPayments",
 }
 
 # _SUITEQL_TABLES maps a lowercased SuiteQL table name to (record_type,
@@ -112,6 +114,8 @@ _SUITEQL_TABLES = {
     "item": ("item", "items"),
     "employee": ("employees", "employees"),
     "vendor": ("vendors", "vendors"),
+    "opportunity": ("opportunity", "opportunities"),
+    "customerpayment": ("customerPayment", "customerPayments"),
 }
 
 def _collection(record_type):
@@ -219,11 +223,44 @@ def _replace(haystack, needle, replacement):
 # Body helper
 # ====================================================================
 
+# _has_content reports whether s contains any non-whitespace character.
+def _has_content(s):
+    if s == None:
+        return False
+    for i in range(len(s)):
+        ch = s[i]
+        if ch != " " and ch != "\t" and ch != "\r" and ch != "\n":
+            return True
+    return False
+
+# _get_body returns the request body decoded from the VERBATIM raw body
+# (req.raw_body). Undecodable bodies surface as EMPTY DICTS via req.body, so
+# raw_body is the authoritative source. A non-empty raw body that does not
+# decode to a dict (malformed JSON, or a JSON array/scalar) yields {} — call
+# _body_parse_error(req, body) to turn that into a 400.
 def _get_body(req):
-    body = req.get("body")
-    if body == None:
+    raw = req.get("raw_body", "")
+    if not _has_content(raw):
         return {}
-    return body
+    decoded = json_safe_decode(raw)
+    if decoded == None:
+        return {}
+    if type(decoded) != type({}):
+        return {}
+    return decoded
+
+# _body_parse_error returns the 400 response for a body that was sent but
+# could not be decoded to a JSON OBJECT (an explicit {} is valid; malformed
+# JSON and JSON arrays/scalars are not), or None when the body is fine.
+def _body_parse_error(req, body):
+    raw = req.get("raw_body", "")
+    if not _has_content(raw):
+        return None
+    decoded = json_safe_decode(raw)
+    if decoded == None or type(decoded) != type({}):
+        return _netsuite_error(400, "Bad Request", "INVALID_REQUEST",
+            "The request body is not valid JSON.")
+    return None
 
 # ====================================================================
 # Pagination (NetSuite REST shape)
@@ -863,3 +900,202 @@ def _ns_order_parts(order_by):
     if d == "asc":
         return [field, "asc"]
     return [field, ""]
+
+# ====================================================================
+# Create / transform field validation (real NetSuite error codes)
+# ====================================================================
+#
+# NetSuite rejects a create whose required fields are missing with 400
+# USER_ERROR ("You have not defined any value for the following fields: ...")
+# and a body reference that does not resolve to a stored record with 400
+# INVALID_KEY_OR_REF ("Invalid record reference key 123."). Both are enforced
+# here on POST creates and on !transform requests (body fields override the
+# mapped defaults and are validated with the same rules).
+
+# _REQUIRED_FIELDS maps a record type to body fields that must be present and
+# non-empty on create. customer/item/employee/vendor accept NetSuite's
+# defaults, so they have no locally-enforced required fields.
+_REQUIRED_FIELDS = {
+    "salesOrder": ["entity"],
+    "invoice": ["entity"],
+    "opportunity": ["entity"],
+    "customerPayment": ["customer", "payment"],
+}
+
+# _REF_FIELDS maps a record type to [field, target_record_type] pairs whose
+# value must resolve to a stored record of the target type. A reference is a
+# dict ({"id": ...} or {"refName": ...}) or a bare id string.
+_REF_FIELDS = {
+    "salesOrder": [["entity", "customer"]],
+    "invoice": [["entity", "customer"]],
+    "opportunity": [["entity", "customer"]],
+    "customerPayment": [["customer", "customer"]],
+}
+
+# _ref_id extracts the lookup key from a reference value: the dict's "id",
+# else its "refName", else the value itself.
+def _ref_id(ref):
+    if ref == None:
+        return ""
+    if type(ref) == type({}):
+        v = ref.get("id", None)
+        if v == None:
+            v = ref.get("refName", None)
+        if v == None:
+            return ""
+        return v
+    return ref
+
+# _resolve_ref reports whether key resolves to a stored record of
+# target_type. Customers also resolve by entityId/companyName (NetSuite
+# resolves refName against the record's entity name).
+def _resolve_ref(target_type, key):
+    if key == None or key == "":
+        return False
+    col = _collection(target_type)
+    if col == None:
+        return False
+    k = key
+    if type(k) != type(""):
+        k = str(k)
+    for d in col.list():
+        if d.get("id", "") == k:
+            return True
+        if target_type == "customer":
+            if d.get("entityId", "") == k or d.get("companyName", "") == k:
+                return True
+    return False
+
+# _validate_create checks required fields then reference fields for a new
+# record of record_type. Returns the error response, or None when valid.
+def _validate_create(record_type, body):
+    for f in _REQUIRED_FIELDS.get(record_type, []):
+        v = body.get(f, None)
+        if v == None or v == "":
+            return _netsuite_error(400,
+                "An error occurred while updating records. Please try again.",
+                "USER_ERROR",
+                "You have not defined any value for the following fields: " + f)
+    for pair in _REF_FIELDS.get(record_type, []):
+        field = pair[0]
+        target = pair[1]
+        if field not in body:
+            continue
+        key = _ref_id(body.get(field))
+        if key != "" and key != None:
+            if not _resolve_ref(target, key):
+                return _netsuite_error(400,
+                    "An error occurred while updating records. Please try again.",
+                    "INVALID_KEY_OR_REF",
+                    "Invalid record reference key " + str(key) + ".")
+    return None
+
+# ====================================================================
+# !transform support
+# ====================================================================
+
+# _TRANSFORMS lists the supported transform chains (source -> targets):
+#   salesOrder    -> invoice         (billing a sales order)
+#   invoice       -> customerPayment (applying payment to an invoice)
+#   opportunity   -> salesOrder      (converting a won opportunity)
+_TRANSFORMS = {
+    "salesOrder": ["invoice"],
+    "invoice": ["customerPayment"],
+    "opportunity": ["salesOrder"],
+}
+
+# _TRAN_PREFIXES maps a target record type to the tranId prefix NetSuite
+# assigns to the generated document number.
+_TRAN_PREFIXES = {
+    "invoice": "INV-",
+    "customerPayment": "PAY-",
+    "salesOrder": "SO-",
+}
+
+# _transform_doc maps a source record onto a new target-type record. The
+# request body (fields to set on the new record) overrides the mapped
+# defaults afterwards (NetSuite semantics).
+def _transform_doc(record_type, target, src, body):
+    today = _today()
+    doc = {}
+    if target == "invoice":
+        doc = {
+            "trandate": today,
+            "dueDate": _today_plus(30 * 24 * 3600),
+            "entity": _copy_ref(src.get("entity")),
+            "currency": _copy_ref(src.get("currency")),
+            "terms": _copy_ref(src.get("terms")),
+            "items": _copy_items(src.get("items")),
+            "total": src.get("total", 0),
+            "status": "Open",
+            "createdFrom": {
+                "id": src.get("id", ""),
+                "refName": "Sales Order " + src.get("tranId", ""),
+            },
+            "memo": "Invoice created from Sales Order " + src.get("tranId", "") + ".",
+        }
+    elif target == "customerPayment":
+        doc = {
+            "trandate": today,
+            "customer": _copy_ref(src.get("entity")),
+            "payment": src.get("total", 0),
+            "currency": _copy_ref(src.get("currency")),
+            "status": "Undeposited",
+            "applied": {
+                "items": [{
+                    "doc": {"id": src.get("id", ""), "refName": src.get("tranId", "")},
+                    "amount": src.get("total", 0),
+                    "apply": True,
+                }],
+            },
+            "memo": "Payment for invoice " + src.get("tranId", "") + ".",
+        }
+    elif target == "salesOrder":
+        doc = {
+            "trandate": today,
+            "entity": _copy_ref(src.get("entity")),
+            "currency": _copy_ref(src.get("currency")),
+            "items": _copy_items(src.get("items")),
+            "total": src.get("projectedTotal", 0),
+            "status": "Pending Approval",
+            "createdFrom": {
+                "id": src.get("id", ""),
+                "refName": "Opportunity " + src.get("title", ""),
+            },
+            "memo": "Sales Order created from Opportunity " + src.get("title", "") + ".",
+        }
+    for k, v in body.items():
+        doc[k] = v
+    return doc
+
+# _copy_ref deep-copies a reference dict (or passes other values through).
+def _copy_ref(v):
+    if type(v) != type({}):
+        return v
+    out = {}
+    for k, vv in v.items():
+        out[k] = vv
+    return out
+
+# _copy_items deep-copies an item sublist (a list of dicts).
+def _copy_items(v):
+    if type(v) != type([]):
+        return v
+    out = []
+    for it in v:
+        if type(it) == type({}):
+            row = {}
+            for k, vv in it.items():
+                row[k] = vv
+            out.append(row)
+        else:
+            out.append(it)
+    return out
+
+# _today returns today's date (YYYY-MM-DD) from the engine clock.
+def _today():
+    return clock.unix_to_rfc3339(clock.now_unix())[0:10]
+
+# _today_plus returns the date offset_seconds from now.
+def _today_plus(offset_seconds):
+    return clock.unix_to_rfc3339(clock.now_unix() + offset_seconds)[0:10]

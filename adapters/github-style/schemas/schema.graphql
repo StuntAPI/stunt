@@ -1,0 +1,257 @@
+# GitHub GraphQL API v4 (2022-11-28) schema — the surface this adapter
+# models, mapped onto the same collections as the REST surface.
+#
+# Conventions followed from the real API: base64 global IDs
+# (base64("04:Issue<number>") etc.), cursor connections
+# (edges/nodes/pageInfo/totalCount), connection filters/order inputs, the
+# Actor interface with User/Bot implementors, and payload types on
+# mutations. DateTime/URI are passthrough custom scalars.
+
+scalar DateTime
+scalar URI
+
+enum IssueState {
+  OPEN
+  CLOSED
+}
+
+enum IssueStateReason {
+  COMPLETED
+  NOT_PLANNED
+  REOPENED
+}
+
+enum PullRequestState {
+  OPEN
+  CLOSED
+  MERGED
+}
+
+enum OrderDirection {
+  ASC
+  DESC
+}
+
+enum IssueOrderField {
+  CREATED_AT
+  UPDATED_AT
+  COMMENTS
+}
+
+input IssueOrder {
+  field: IssueOrderField!
+  direction: OrderDirection
+}
+
+input IssueFilters {
+  assignee: String
+  createdBy: String
+  labels: [String!]
+  mentioned: String
+  since: DateTime
+  states: [IssueState!]
+}
+
+interface Actor {
+  login: String!
+  id: ID!
+  url: URI
+}
+
+type User implements Actor {
+  login: String!
+  id: ID!
+  name: String
+  url: URI
+}
+
+type Bot implements Actor {
+  login: String!
+  id: ID!
+  url: URI
+}
+
+type Viewer implements Actor {
+  login: String!
+  id: ID!
+  name: String
+  url: URI
+}
+
+type Ref {
+  name: String!
+  prefix: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+type Label {
+  id: ID!
+  name: String!
+  color: String!
+}
+
+type LabelEdge {
+  node: Label!
+  cursor: String!
+}
+
+type LabelConnection {
+  edges: [LabelEdge!]!
+  nodes: [Label!]!
+  pageInfo: PageInfo!
+}
+
+type IssueComment {
+  id: ID!
+  body: String!
+  author: Actor
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  url: URI!
+}
+
+type IssueCommentEdge {
+  node: IssueComment!
+  cursor: String!
+}
+
+type IssueCommentConnection {
+  edges: [IssueCommentEdge!]!
+  nodes: [IssueComment!]!
+  totalCount: Int!
+  pageInfo: PageInfo!
+}
+
+type Issue {
+  id: ID!
+  number: Int!
+  title: String!
+  body: String
+  state: IssueState!
+  stateReason: IssueStateReason
+  closedAt: DateTime
+  author: Actor
+  labels(first: Int = 10): LabelConnection!
+  comments(first: Int = 10): IssueCommentConnection!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  url: URI!
+}
+
+type IssueEdge {
+  node: Issue!
+  cursor: String!
+}
+
+type IssueConnection {
+  edges: [IssueEdge!]!
+  nodes: [Issue!]!
+  totalCount: Int!
+  pageInfo: PageInfo!
+}
+
+type PullRequest {
+  id: ID!
+  number: Int!
+  title: String!
+  body: String
+  state: PullRequestState!
+  merged: Boolean!
+  mergedAt: DateTime
+  closedAt: DateTime
+  baseRefName: String!
+  headRefName: String!
+  author: Actor
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  url: URI!
+}
+
+type PullRequestEdge {
+  node: PullRequest!
+  cursor: String!
+}
+
+type PullRequestConnection {
+  edges: [PullRequestEdge!]!
+  nodes: [PullRequest!]!
+  totalCount: Int!
+  pageInfo: PageInfo!
+}
+
+type Repository {
+  id: ID!
+  name: String!
+  nameWithOwner: String!
+  description: String
+  isPrivate: Boolean!
+  defaultBranchRef: Ref
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  url: URI!
+  issues(
+    first: Int = 30
+    after: String
+    orderBy: IssueOrder
+    filterBy: IssueFilters
+    states: [IssueState!]
+  ): IssueConnection!
+  issue(number: Int!): Issue
+  pullRequests(
+    first: Int = 30
+    after: String
+    orderBy: IssueOrder
+    states: [PullRequestState!]
+  ): PullRequestConnection!
+  pullRequest(number: Int!): PullRequest
+}
+
+input CreateIssueInput {
+  repositoryId: ID!
+  title: String!
+  body: String
+  labels: [String!]
+}
+
+type CreateIssuePayload {
+  issue: Issue
+}
+
+input UpdateIssueInput {
+  id: ID!
+  title: String
+  body: String
+  state: IssueState
+  stateReason: IssueStateReason
+}
+
+type UpdateIssuePayload {
+  issue: Issue
+}
+
+input AddCommentInput {
+  subjectId: ID!
+  body: String!
+}
+
+type AddCommentPayload {
+  commentEdge: IssueCommentEdge
+  subject: Issue
+}
+
+type Query {
+  viewer: Viewer!
+  repository(owner: String!, name: String!): Repository
+}
+
+type Mutation {
+  createIssue(input: CreateIssueInput!): CreateIssuePayload!
+  updateIssue(input: UpdateIssueInput!): UpdateIssuePayload!
+  addComment(input: AddCommentInput!): AddCommentPayload!
+}

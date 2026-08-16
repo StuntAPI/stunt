@@ -98,6 +98,263 @@ func driveFileIDs(t *testing.T, list map[string]any) []string {
 	return ids
 }
 
+// TestDriveStyleResumableUpload drives the real Drive resumable protocol:
+//
+//   - POST ?uploadType=resumable → 200 with a Location session URL and an
+//     empty body
+//   - status probe (empty PUT, and the "bytes */N" form) → 308 Resume
+//     Incomplete with a Range header tracking accepted bytes (no Range
+//     before the first byte)
+//   - three chunks (8 KiB + 4 KiB + 3 KiB binary) → 308s with
+//     "Range: bytes=0-…" after each, then the final chunk (end == total-1)
+//     → 200 with the file resource
+//   - the assembled file downloads byte-exact via ?alt=media
+//   - strict Content-Range violations → 400 (chunk start gap, differing
+//     total, body shorter than the declared range)
+//   - chunks on an unknown session id → 404
+//   - cancel (DELETE session URL) → 499: session gone, no file created
+func TestDriveStyleResumableUpload(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "drive-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"drive": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["drive"]
+	const token = "ya29.mock_test_token_drive"
+
+	// ===== Initiate =====
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(map[string]any{
+		"name":     "resumable.bin",
+		"mimeType": "application/octet-stream",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	initResp := drivePutAuthBody(t, "POST", base+"/upload/drive/v3/files?uploadType=resumable", token, buf.String(), map[string]string{"Content-Type": "application/json"})
+	if initResp.StatusCode != 200 {
+		t.Fatalf("initiate -> %d", initResp.StatusCode)
+	}
+	bodyBytes, _ := io.ReadAll(initResp.Body)
+	initResp.Body.Close()
+	if len(bodyBytes) != 0 {
+		t.Fatalf("initiate body = %q, want empty", bodyBytes)
+	}
+	loc := initResp.Header.Get("Location")
+	if loc == "" || !strings.Contains(loc, "upload_id=") {
+		t.Fatalf("initiate Location = %q, want session URL with upload_id", loc)
+	}
+
+	// ===== Status probe before any bytes: 308, no Range =====
+	probe := drivePutAuthBody(t, "PUT", loc, token, "", nil)
+	if probe.StatusCode != 308 {
+		t.Fatalf("probe -> %d, want 308", probe.StatusCode)
+	}
+	io.ReadAll(probe.Body)
+	probe.Body.Close()
+	if got := probe.Header.Get("Range"); got != "" {
+		t.Fatalf("probe before first byte Range = %q, want none", got)
+	}
+	probe = drivePutAuthBody(t, "PUT", loc, token, "", map[string]string{"Content-Range": "bytes */15360"})
+	if probe.StatusCode != 308 || probe.Header.Get("Range") != "" {
+		t.Fatalf("star-form probe -> %d Range=%q, want 308 no Range", probe.StatusCode, probe.Header.Get("Range"))
+	}
+	io.ReadAll(probe.Body)
+	probe.Body.Close()
+
+	// ===== Chunks: 8 KiB + 4 KiB + final 3 KiB (total 15360) =====
+	chunk1 := driveTestBytes(8*1024, 1)
+	chunk2 := driveTestBytes(4*1024, 2)
+	chunk3 := driveTestBytes(3*1024, 3)
+	full := append(append(append([]byte{}, chunk1...), chunk2...), chunk3...)
+
+	resp308 := drivePutAuthBody(t, "PUT", loc, token, string(chunk1),
+		map[string]string{"Content-Range": "bytes 0-8191/15360"})
+	if resp308.StatusCode != 308 || resp308.Header.Get("Range") != "bytes=0-8191" {
+		t.Fatalf("chunk 1 -> %d Range=%q, want 308 bytes=0-8191", resp308.StatusCode, resp308.Header.Get("Range"))
+	}
+	io.ReadAll(resp308.Body)
+	resp308.Body.Close()
+
+	resp308 = drivePutAuthBody(t, "PUT", loc, token, string(chunk2),
+		map[string]string{"Content-Range": "bytes 8192-12287/15360"})
+	if resp308.StatusCode != 308 || resp308.Header.Get("Range") != "bytes=0-12287" {
+		t.Fatalf("chunk 2 -> %d Range=%q, want 308 bytes=0-12287", resp308.StatusCode, resp308.Header.Get("Range"))
+	}
+	io.ReadAll(resp308.Body)
+	resp308.Body.Close()
+
+	// Progress is queryable mid-session.
+	probe = drivePutAuthBody(t, "PUT", loc, token, "", nil)
+	if probe.StatusCode != 308 || probe.Header.Get("Range") != "bytes=0-12287" {
+		t.Fatalf("mid probe -> %d Range=%q, want 308 bytes=0-12287", probe.StatusCode, probe.Header.Get("Range"))
+	}
+	io.ReadAll(probe.Body)
+	probe.Body.Close()
+
+	// ===== Final chunk: 200 + file resource =====
+	finalResp := drivePutAuthBody(t, "PUT", loc, token, string(chunk3),
+		map[string]string{"Content-Range": "bytes 12288-15359/15360"})
+	finalBody, _ := io.ReadAll(finalResp.Body)
+	finalResp.Body.Close()
+	if finalResp.StatusCode != 200 {
+		t.Fatalf("final chunk -> %d; body %s", finalResp.StatusCode, finalBody)
+	}
+	var file map[string]any
+	if err := json.Unmarshal(finalBody, &file); err != nil {
+		t.Fatalf("unmarshal final chunk response: %v (body %s)", err, finalBody)
+	}
+	fileID, _ := file["id"].(string)
+	if fileID == "" || file["name"] != "resumable.bin" {
+		t.Fatalf("final chunk file = %v, want id + name resumable.bin", file)
+	}
+	if file["size"] != float64(len(full)) {
+		t.Fatalf("final chunk size = %v, want %d", file["size"], len(full))
+	}
+
+	// Byte-exact download.
+	content, status := getAuth(t, base+"/drive/v3/files/"+fileID+"?alt=media", token)
+	if status != 200 {
+		t.Fatalf("download -> %d", status)
+	}
+	if !bytes.Equal([]byte(content), full) {
+		t.Fatalf("downloaded content mismatch: got %d bytes, want %d", len(content), len(full))
+	}
+
+	// The session is gone after completion.
+	again := drivePutAuthBody(t, "PUT", loc, token, "", nil)
+	io.ReadAll(again.Body)
+	again.Body.Close()
+	if again.StatusCode != 404 {
+		t.Fatalf("probe after completion -> %d, want 404", again.StatusCode)
+	}
+
+	// ===== Strict protocol violations on a fresh session =====
+	var buf2 bytes.Buffer
+	if err := json.NewEncoder(&buf2).Encode(map[string]any{
+		"name":     "resumable-cancel.bin",
+		"mimeType": "application/octet-stream",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	initResp = drivePutAuthBody(t, "POST", base+"/upload/drive/v3/files?uploadType=resumable", token, buf2.String(), map[string]string{"Content-Type": "application/json"})
+	io.ReadAll(initResp.Body)
+	initResp.Body.Close()
+	loc2 := initResp.Header.Get("Location")
+
+	// Skipping ahead (start != next expected) → 400.
+	bad := drivePutAuthBody(t, "PUT", loc2, token, string(chunk2),
+		map[string]string{"Content-Range": "bytes 8192-12287/15360"})
+	if bad.StatusCode != 400 {
+		t.Fatalf("chunk with gap -> %d, want 400", bad.StatusCode)
+	}
+	io.ReadAll(bad.Body)
+	bad.Body.Close()
+
+	// First chunk fine; a differing total on the next chunk → 400.
+	if r := drivePutAuthBody(t, "PUT", loc2, token, string(chunk1), map[string]string{"Content-Range": "bytes 0-8191/15360"}); r.StatusCode != 308 {
+		t.Fatalf("chunk 1 (second session) -> %d, want 308", r.StatusCode)
+	} else {
+		io.ReadAll(r.Body)
+		r.Body.Close()
+	}
+	bad = drivePutAuthBody(t, "PUT", loc2, token, string(chunk2),
+		map[string]string{"Content-Range": "bytes 8192-12287/99999"})
+	if bad.StatusCode != 400 {
+		t.Fatalf("differing total -> %d, want 400", bad.StatusCode)
+	}
+	io.ReadAll(bad.Body)
+	bad.Body.Close()
+
+	// Body shorter than the declared range → 400.
+	bad = drivePutAuthBody(t, "PUT", loc2, token, "short",
+		map[string]string{"Content-Range": "bytes 8192-12287/15360"})
+	if bad.StatusCode != 400 {
+		t.Fatalf("short body -> %d, want 400", bad.StatusCode)
+	}
+	io.ReadAll(bad.Body)
+	bad.Body.Close()
+
+	// ===== Cancel: 499, session discarded, no file created =====
+	_, cancelStatus := driveDeleteAuth(t, loc2, token)
+	if cancelStatus != 499 {
+		t.Fatalf("cancel -> %d, want 499", cancelStatus)
+	}
+	after := drivePutAuthBody(t, "PUT", loc2, token, "", nil)
+	io.ReadAll(after.Body)
+	after.Body.Close()
+	if after.StatusCode != 404 {
+		t.Fatalf("probe after cancel -> %d, want 404", after.StatusCode)
+	}
+	listBody, status := getAuth(t, base+"/drive/v3/files?q="+url.QueryEscape("name = 'resumable-cancel.bin'"), token)
+	if status != 200 {
+		t.Fatalf("list after cancel -> %d", status)
+	}
+	var list map[string]any
+	if err := json.Unmarshal([]byte(listBody), &list); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(list["files"].([]any)); n != 0 {
+		t.Fatalf("canceled session created %d files, want 0", n)
+	}
+
+	// Unknown session id → 404.
+	missing := drivePutAuthBody(t, "PUT", base+"/upload/drive/v3/files?uploadType=resumable&upload_id=sid_nope", token, "", nil)
+	io.ReadAll(missing.Body)
+	missing.Body.Close()
+	if missing.StatusCode != 404 {
+		t.Fatalf("unknown session -> %d, want 404", missing.StatusCode)
+	}
+}
+
+// drivePutAuthBody issues an authorized request with a string body and
+// extra headers, returning the raw response.
+func drivePutAuthBody(t *testing.T, method, urlStr, token, body string, headers map[string]string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest(method, urlStr, strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return resp
+}
+
+// driveTestBytes returns n deterministic pseudo-random bytes.
+func driveTestBytes(n int, seed int) []byte {
+	out := make([]byte, n)
+	x := uint32(seed)*2654435761 + 55555
+	for i := range out {
+		x = x*1664525 + 1013904223
+		out[i] = byte(x >> 19)
+	}
+	return out
+}
+
 // TestDriveStyleAdapter exercises the broader Google-Drive-style reference
 // adapter end-to-end: OAuth2 (authorize → token → refresh, 401s), file
 // upload → get metadata → download content → list (q grammar subset,

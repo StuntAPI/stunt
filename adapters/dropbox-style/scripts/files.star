@@ -49,7 +49,8 @@ def _error(tag):
     }
 
 # _api_arg parses the Dropbox-API-Arg header (a JSON string) into a dict.
-# Returns {} if the header is absent or unparseable.
+# Returns {} if the header is absent or unparseable (json_safe_decode returns
+# None for malformed JSON — untrusted header input must never raise).
 def _api_arg(req):
     headers = req.get("headers")
     if headers == None:
@@ -57,12 +58,10 @@ def _api_arg(req):
     raw = headers.get("Dropbox-Api-Arg", headers.get("Dropbox-API-Arg", ""))
     if raw == None or raw == "":
         return {}
-    ok = _try_decode(raw)
-    return ok if ok != None else {}
-
-def _try_decode(s):
-    # json.decode raises on malformed input; guard defensively.
-    return json.decode(s)
+    ok = json_safe_decode(raw)
+    if ok == None or type(ok) != "dict":
+        return {}
+    return ok
 
 # POST /2/files/upload — upload a file.
 #
@@ -167,11 +166,13 @@ def on_download(req):
 #
 # Body: {path, limit, cursor}. Returns {entries, cursor, has_more}. When
 # path is empty or "/", all entries are returned. Otherwise, entries whose
-# path is equal to or nested under the given path are returned. Paging is
-# applied AFTER the path filter: limit is the page size and cursor is the
-# opaque token returned by a prior call (round-tripped via the response
-# cursor field). When limit is absent or <= 0 paging is disabled and the
-# whole (filtered) list is returned with has_more:false.
+# path is equal to or nested under the given path are returned — and, like
+# the real API, a path that does not exist is a 409 path/not_found while a
+# file path is a 409 path/not_folder (a folder listing needs a folder).
+# Paging is applied AFTER the path filter: limit is the page size and cursor
+# is the opaque token returned by a prior call (round-tripped via the
+# response cursor field). When limit is absent or <= 0 paging is disabled
+# and the whole (filtered) list is returned with has_more:false.
 def on_list_folder(req):
     err = _require_auth(req)
     if err != None:
@@ -188,6 +189,11 @@ def on_list_folder(req):
     if path == None or path == "" or path == "/":
         entries = docs
     else:
+        target = _find_by_path(path)
+        if target == None:
+            return respond(409, _error("path/not_found"))
+        if target.get(".tag", None) == "file":
+            return respond(409, _error("path/not_folder"))
         prefix = path.lower()
         entries = []
         for d in docs:
@@ -255,10 +261,14 @@ def on_create_folder(req):
     c.insert(doc)
     return respond(200, doc)
 
-# POST /2/files/delete — delete an entry and its content.
+# POST /2/files/delete — delete an entry, cascading to a folder's descendants.
 #
-# Body: {path}. Deletes the entry metadata and its blob content (if any).
-# Returns the metadata of the deleted entry.
+# Body: {path}. Real files_v2 delete is PERMANENT: the entry (and, for a
+# folder, every nested entry) leaves the tree and its content is dropped.
+# The removed metadata rows are moved to the internal "trash" collection as
+# tombstones so the cascade is auditable and no child is ever orphaned under
+# a missing parent (each tombstone records the batch root that took it out).
+# There is no restore endpoint — matching the real API.
 def on_delete(req):
     err = _require_auth(req)
     if err != None:
@@ -273,13 +283,34 @@ def on_delete(req):
     if doc == None:
         return respond(409, _error("path/not_found"))
 
-    file_id = doc["id"]
-    if doc.get(".tag", None) != "folder":
-        b = store_blob("dropbox")
-        b.delete(file_id)
-
+    # Everything removed in this delete: the target plus, for a folder, every
+    # entry nested anywhere beneath it (path prefix match, case-insensitive
+    # like every other path lookup here).
     c = store_collection("entries")
-    c.delete(file_id)
+    docs = c.list()
+    removed = [doc]
+    if doc.get(".tag", None) == "folder":
+        prefix = doc.get("path_lower", "") + "/"
+        for d in docs:
+            d_path = d.get("path_lower", "")
+            if d_path != "" and d_path.startswith(prefix):
+                removed.append(d)
+
+    b = store_blob("dropbox")
+    trash = store_collection("trash")
+    now = _now()
+    root_id = doc.get("id", "")
+    for victim in removed:
+        tomb = {}
+        for k, v in victim.items():
+            tomb[k] = v
+        tomb["_deleted_at"] = now
+        tomb["_batch_root"] = root_id
+        trash.insert(tomb)
+        if victim.get(".tag", None) != "folder":
+            b.delete(victim["id"])
+        c.delete(victim["id"])
+
     return respond(200, doc)
 
 # POST /2/files/get_temporary_link — return a synthetic temporary download link.

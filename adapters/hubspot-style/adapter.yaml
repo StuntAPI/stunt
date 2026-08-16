@@ -6,7 +6,7 @@
 # synthetic. See DISCLAIMER.
 id: hubspot-style
 name: "HubSpot CRM API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "HubSpot CRM API"
@@ -23,29 +23,31 @@ endpoints:
   - route: /crm/v3/objects/contacts
     method: POST
     handler: scripts/objects.star#on_create
-  - route: /crm/v3/objects/contacts/batch/create
-    method: POST
-    handler: scripts/batch.star#on_batch_create
-  - route: /crm/v3/objects/contacts/batch/read
-    method: POST
-    handler: scripts/batch.star#on_batch_read
-  - route: /crm/v3/objects/contacts/batch/update
-    method: POST
-    handler: scripts/batch.star#on_batch_update
   - route: /crm/v3/objects/contacts/{id}
     method: GET
     handler: scripts/objects.star#on_get
   - route: /crm/v3/objects/contacts/{id}
     method: PATCH
     handler: scripts/objects.star#on_update
+    concurrency_key: id
   - route: /crm/v3/objects/contacts/{id}
     method: DELETE
     handler: scripts/objects.star#on_delete
+    concurrency_key: id
 
   # --- contacts associations ---
+  - route: /crm/v3/objects/contacts/{id}/associations/{toObjectType}/batch/create
+    method: POST
+    handler: scripts/associations.star#on_batch_associations_create
+    concurrency_key: id
+  - route: /crm/v3/objects/contacts/{id}/associations/{toObjectType}/batch/archive
+    method: POST
+    handler: scripts/associations.star#on_batch_associations_archive
+    concurrency_key: id
   - route: /crm/v3/objects/contacts/{id}/associations/{toObjectType}/{toObjectId}/{associationType}
     method: PUT
     handler: scripts/associations.star#on_associate
+    concurrency_key: id
   - route: /crm/v3/objects/contacts/{id}/associations/{toObjectType}
     method: GET
     handler: scripts/associations.star#on_list_associations
@@ -63,9 +65,11 @@ endpoints:
   - route: /crm/v3/objects/companies/{id}
     method: PATCH
     handler: scripts/objects.star#on_update
+    concurrency_key: id
   - route: /crm/v3/objects/companies/{id}
     method: DELETE
     handler: scripts/objects.star#on_delete
+    concurrency_key: id
 
   # --- deals CRUD ---
   - route: /crm/v3/objects/deals
@@ -80,9 +84,11 @@ endpoints:
   - route: /crm/v3/objects/deals/{id}
     method: PATCH
     handler: scripts/objects.star#on_update
+    concurrency_key: id
   - route: /crm/v3/objects/deals/{id}
     method: DELETE
     handler: scripts/objects.star#on_delete
+    concurrency_key: id
 
   # --- tickets CRUD ---
   - route: /crm/v3/objects/tickets
@@ -97,9 +103,52 @@ endpoints:
   - route: /crm/v3/objects/tickets/{id}
     method: PATCH
     handler: scripts/objects.star#on_update
+    concurrency_key: id
   - route: /crm/v3/objects/tickets/{id}
     method: DELETE
     handler: scripts/objects.star#on_delete
+    concurrency_key: id
+
+  # --- search (all object types) — filterGroups model ---
+  - route: /crm/v3/objects/{objectType}/search
+    method: POST
+    handler: scripts/search.star#on_search
+
+  # --- batch (all object types) — create / read / update / archive ---
+  - route: /crm/v3/objects/{objectType}/batch/create
+    method: POST
+    handler: scripts/batch.star#on_batch_create
+  - route: /crm/v3/objects/{objectType}/batch/read
+    method: POST
+    handler: scripts/batch.star#on_batch_read
+  - route: /crm/v3/objects/{objectType}/batch/update
+    method: POST
+    handler: scripts/batch.star#on_batch_update
+    concurrency_key: objectType
+  - route: /crm/v3/objects/{objectType}/batch/archive
+    method: POST
+    handler: scripts/batch.star#on_batch_archive
+    concurrency_key: objectType
+
+  # --- restore (all object types) — un-archive a soft-deleted record ---
+  - route: /crm/v3/objects/{objectType}/{id}/restore
+    method: POST
+    handler: scripts/objects.star#on_restore
+    concurrency_key: id
+
+  # --- associations for the remaining object types (DELETE + batch) ---
+  - route: /crm/v3/objects/{objectType}/{id}/associations/{toObjectType}/batch/create
+    method: POST
+    handler: scripts/associations.star#on_batch_associations_create
+    concurrency_key: id
+  - route: /crm/v3/objects/{objectType}/{id}/associations/{toObjectType}/batch/archive
+    method: POST
+    handler: scripts/associations.star#on_batch_associations_archive
+    concurrency_key: id
+  - route: /crm/v3/objects/{objectType}/{id}/associations/{toObjectType}/{toObjectId}/{associationType}
+    method: DELETE
+    handler: scripts/associations.star#on_delete_association
+    concurrency_key: id
 
 # Backing stores — collections for stateful data.
 resources:

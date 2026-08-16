@@ -22,6 +22,11 @@ integration testing without a real AWS account:
 - **Download object:** `GET /{bucket}/{key}` → `200` with raw body.
 - **Object metadata:** `HEAD /{bucket}/{key}` → `200` with `Content-Length`, `ETag`, `Last-Modified`.
 - **Delete object:** `DELETE /{bucket}/{key}` → `204` (idempotent).
+- **Multipart upload:** `POST /{bucket}/{key}?uploads` → `UploadId`; parts
+  via `PUT ...?partNumber=N&uploadId=...` (out-of-order accepted, per-part
+  `ETag`); `POST ?uploadId=...` completes (assembles the parts into the
+  object), `DELETE ?uploadId=...` aborts, `GET ?uploadId=...` lists parts —
+  see [Multipart upload](#multipart-upload).
 - **ListObjectsV2:** `GET /{bucket}?list-type=2&max-keys=N&prefix=...` → **XML** `<ListBucketResult>`.
 - **Bucket location:** `GET /{bucket}?location` → **XML** `<LocationConstraint>`.
 
@@ -47,6 +52,41 @@ ListObjectsV2 supports S3 cursor pagination:
   and `<NextContinuationToken>`, plus `<KeyCount>` for `list-type=2` requests.
 
 Prefix filtering (`prefix=...`) is applied **before** pagination, as in real S3.
+
+### Multipart upload
+
+The real S3 multipart upload protocol, stateful on the object store:
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| POST | `/{bucket}/{key}?uploads` | CreateMultipartUpload → XML `<UploadId>` |
+| PUT | `/{bucket}/{key}?partNumber=N&uploadId=...` | UploadPart → `ETag` header (quoted SHA-256 of the part bytes) |
+| GET | `/{bucket}/{key}?uploadId=...` | ListParts XML (`max-parts` / `part-number-marker` paging) |
+| POST | `/{bucket}/{key}?uploadId=...` | CompleteMultipartUpload (XML body listing the parts) |
+| DELETE | `/{bucket}/{key}?uploadId=...` | AbortMultipartUpload → 204 |
+
+Semantics enforced like the real service:
+
+- **Part numbers** must be integers in `1..10000` (else `400 InvalidArgument`),
+  and parts may be uploaded **out of order**; re-uploading a part number
+  replaces its bytes (the newest upload wins).
+- **Completion validates the listed parts**: a part number that was never
+  uploaded — or whose `<ETag>` does not match — is `400 InvalidPart`; a
+  non-ascending part list is `400 InvalidPartOrder`; an unparseable body is
+  `400 MalformedXML`. On success the parts are assembled **in ascending
+  part-number order** into the object (200 with
+  `<CompleteMultipartUploadResult>`), and the upload is torn down — later
+  part/complete/list calls get `404 NoSuchUpload`.
+- **Abort** discards every part and creates nothing: the object key stays
+  absent (`404 NoSuchKey` on GET).
+- **ListParts** returns the parts in ascending part-number order with the
+  real paging (`max-parts`, default 1000; `part-number-marker` →
+  `<NextPartNumberMarker>`/`<IsTruncated>`).
+
+Documented deviations: part ETags and the assembled object's ETag are
+SHA-256 based (`sha256(concat part etags)-N` for the multipart object, like
+real S3's `md5(md5s)-N` shape), and the 5 MiB minimum part size is **not**
+enforced so small chunks can be exercised in local tests.
 
 ListObjectsV2 also honors the real S3 list params:
 
@@ -189,6 +229,17 @@ curl -X PUT "http://localhost:PORT/mybucket/photo.jpg" \
   -H "Content-Type: image/jpeg" \
   --data-binary @photo.jpg
 curl "http://localhost:PORT/mybucket/photo.jpg" -H "Authorization: ..." > out.jpg  # byte-identical
+
+# Multipart upload (parts may arrive out of order)
+curl -X POST "http://localhost:PORT/mybucket/big.bin?uploads" -H "Authorization: ..." \
+  -H "x-amz-date: 20260120T000000Z"
+# → <InitiateMultipartUploadResult>...<UploadId>mpu_1</UploadId></InitiateMultipartUploadResult>
+curl -X PUT "http://localhost:PORT/mybucket/big.bin?partNumber=1&uploadId=mpu_1" \
+  -H "Authorization: ..." --data-binary @part1.bin        # → ETag: "sha256-of-part1"
+curl -X POST "http://localhost:PORT/mybucket/big.bin?uploadId=mpu_1" \
+  -H "Authorization: ..." \
+  -d '<CompleteMultipartUpload><Part><PartNumber>1</PartNumber><ETag>"..."</ETag></Part></CompleteMultipartUpload>'
+# → <CompleteMultipartUploadResult>...<ETag>"sha256-of-etags-1"</ETag>...</CompleteMultipartUploadResult>
 ```
 
 ## Error responses
@@ -205,9 +256,14 @@ All errors use S3-shaped XML:
 | `InvalidAccessKeyId` | 403 | Access key is not the documented synthetic AKID |
 | `RequestTimeTooSkewed` | 403 | `x-amz-date` outside the ±15-minute window |
 | `XAmzContentSHA256Mismatch` | 400 | `x-amz-content-sha256` header does not match the body bytes |
-| `InvalidArgument` | 400 | `encoding-type` other than `url` on a list request; invalid `x-amz-content-sha256` |
+| `InvalidArgument` | 400 | `encoding-type` other than `url` on a list request; invalid `x-amz-content-sha256`; `partNumber` outside `1..10000` |
+| `InvalidPart` | 400 | CompleteMultipartUpload lists a part that was never uploaded, or whose ETag does not match |
+| `InvalidPartOrder` | 400 | CompleteMultipartUpload part list is not in ascending order |
+| `MalformedXML` | 400 | CompleteMultipartUpload body is not valid `CompleteMultipartUpload` XML |
+| `MethodNotAllowed` | 405 | POST to an object without `?uploads`/`?uploadId` |
 | `NoSuchBucket` | 404 | Bucket doesn't exist |
 | `NoSuchKey` | 404 | Object key doesn't exist |
+| `NoSuchUpload` | 404 | Unknown/completed/aborted `uploadId` |
 | `BucketAlreadyOwnedByYou` | 409 | Bucket already exists on PUT |
 | `BucketNotEmpty` | 409 | `DELETE /{bucket}` on a bucket that still contains objects |
 

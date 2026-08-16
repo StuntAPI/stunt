@@ -40,6 +40,16 @@ _RECORD_CATALOG = [
         "pluralName": "vendors",
         "label": "Vendor",
     },
+    {
+        "name": "opportunity",
+        "pluralName": "opportunities",
+        "label": "Opportunity",
+    },
+    {
+        "name": "customerPayment",
+        "pluralName": "customerPayments",
+        "label": "Customer Payment",
+    },
 ]
 
 def on_catalog(req):

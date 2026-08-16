@@ -62,12 +62,17 @@ def _process_sub_request(sub_req):
         doc = col.get(record_id)
         if doc == None:
             return _sub_response(ref_id, 404, None)
+        if doc.get("IsDeleted", False) == True:
+            # Recycle-bin rows 404 on retrieval, exactly like the direct API.
+            return _sub_response(ref_id, 404, None)
         return _sub_response(ref_id, 200, doc)
 
     if method == "GET" and record_id == "":
         docs = col.list()
         recs = []
         for d in docs:
+            if d.get("IsDeleted", False) == True:
+                continue
             recs.append(_project(d, [], obj_type))
         return _sub_response(ref_id, 200, {"totalSize": len(recs), "records": recs, "done": True})
 
@@ -78,6 +83,7 @@ def _process_sub_request(sub_req):
             doc[k] = v
         doc["Id"] = record_id
         doc["id"] = record_id
+        doc["IsDeleted"] = False
         col.insert(doc)
         return _sub_response(ref_id, 201, {"id": record_id, "success": True, "errors": []})
 
@@ -85,6 +91,8 @@ def _process_sub_request(sub_req):
         doc = col.get(record_id)
         if doc == None:
             return _sub_response(ref_id, 404, None)
+        if doc.get("IsDeleted", False) == True:
+            return _sub_response(ref_id, 404, [{"errorCode": "ENTITY_IS_DELETED", "message": "entity is deleted"}])
         merged = {}
         for k, v in doc.items():
             merged[k] = v
@@ -97,8 +105,12 @@ def _process_sub_request(sub_req):
 
     if method == "DELETE" and record_id != "":
         doc = col.get(record_id)
-        if doc != None:
-            col.delete(record_id)
+        if doc != None and doc.get("IsDeleted", False) != True:
+            # Soft delete into the recycle bin, same as the direct API
+            # (the row is kept and flagged IsDeleted, not destroyed).
+            doc["IsDeleted"] = True
+            doc["DeletedDate"] = _now()
+            col.update(record_id, doc)
         return _sub_response(ref_id, 204, None)
 
     return _sub_response(ref_id, 405, None)

@@ -37,6 +37,16 @@ def on_create(req):
             "Record type '" + record_type + "' does not exist.")
 
     body = _get_body(req)
+    perr = _body_parse_error(req, body)
+    if perr != None:
+        return perr
+
+    # Field validation with NetSuite's real error codes: missing required
+    # fields -> 400 USER_ERROR; unresolvable references -> 400
+    # INVALID_KEY_OR_REF.
+    verr = _validate_create(record_type, body)
+    if verr != None:
+        return verr
 
     # Idempotent upsert by externalId: if a record with this externalId already
     # exists, return its Location instead of creating a duplicate (NetSuite
@@ -104,6 +114,9 @@ def on_update(req):
             "That record does not exist.")
 
     body = _get_body(req)
+    perr = _body_parse_error(req, body)
+    if perr != None:
+        return perr
     merged = {}
     for k, v in existing.items():
         merged[k] = v

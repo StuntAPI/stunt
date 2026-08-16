@@ -6,7 +6,7 @@
 # API. All data is synthetic. See DISCLAIMER.
 id: shopify-style
 name: "Shopify Admin-style API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Shopify Admin REST + GraphQL API"
@@ -95,10 +95,18 @@ endpoints:
     method: DELETE
     handler: scripts/webhooks.star#on_delete_webhook
 
-  # --- GraphQL (pattern-match common operations) ---
-  - route: /admin/api/2024-10/graphql.json
-    method: POST
-    handler: scripts/graphql.star#on_graphql
+# GraphQL service — served from the SDL schema + convention-named Starlark
+# resolvers by the engine's REAL GraphQL executor (validation, variables,
+# fragments, introspection, errors[]). Objects map onto the same collections
+# as the REST surface, with gid:// global IDs and cursor connections.
+#
+# NOTE: the graphql: transport dispatches before adapter endpoints and hands
+# resolvers only {parent, args} — it has no auth hook — so this endpoint is
+# served without the X-Shopify-Access-Token check the REST surface enforces.
+graphql:
+  schema: schemas/schema.graphql
+  resolvers: scripts/resolvers.star
+  path: /admin/api/2024-10/graphql.json
 
 # Backing stores — collections for stateful data.
 resources:

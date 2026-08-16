@@ -154,6 +154,7 @@ def on_create(req):
     now = _now()
     doc["CreatedDate"] = now
     doc["LastModifiedDate"] = now
+    doc["IsDeleted"] = False
 
     col.insert(doc)
 
@@ -182,10 +183,15 @@ def on_retrieve(req):
     if doc == None:
         return _sf_error(404, "The requested resource does not exist", "NOT_FOUND")
 
-    # Strip internal id; return API-shaped record.
+    # Deleted records live in the recycle bin: retrieval 404s like a missing
+    # record (queryAll is the surface that still sees them).
+    if doc.get("IsDeleted", False) == True:
+        return _sf_error(404, "The requested resource does not exist", "NOT_FOUND")
+
+    # Strip internal id + underscore-prefixed keys; return API-shaped record.
     result = {}
     for k, v in doc.items():
-        if k != "id":
+        if k != "id" and not k.startswith("_"):
             result[k] = v
     return respond(200, result)
 
@@ -204,6 +210,10 @@ def on_update(req):
     if doc == None:
         return _sf_error(404, "The requested resource does not exist", "NOT_FOUND")
 
+    # Deleted records cannot be mutated — Salesforce's ENTITY_IS_DELETED.
+    if doc.get("IsDeleted", False) == True:
+        return _sf_error(404, "entity is deleted", "ENTITY_IS_DELETED")
+
     body = _get_body(req)
     merged = {}
     for k, v in doc.items():
@@ -218,6 +228,10 @@ def on_update(req):
     # Salesforce returns 204 No Content on successful PATCH.
     return respond(204)
 
+# on_delete soft-deletes the record into the recycle bin, like the real API:
+# the row is kept and flagged IsDeleted (plus a DeletedDate stamp), plain
+# retrieval/PATCH/SOQL-query treat it as gone, and queryAll still returns it
+# (with IsDeleted true) until it ages out of the bin.
 def on_delete(req):
     _, err = _require_token(req)
     if err != None:
@@ -233,5 +247,12 @@ def on_delete(req):
     if doc == None:
         return _sf_error(404, "The requested resource does not exist", "NOT_FOUND")
 
-    col.delete(record_id)
+    if doc.get("IsDeleted", False) == True:
+        # Already in the recycle bin; Salesforce reports the same
+        # ENTITY_IS_DELETED error for repeated deletes.
+        return _sf_error(404, "entity is deleted", "ENTITY_IS_DELETED")
+
+    doc["IsDeleted"] = True
+    doc["DeletedDate"] = _now()
+    col.update(record_id, doc)
     return respond(204)

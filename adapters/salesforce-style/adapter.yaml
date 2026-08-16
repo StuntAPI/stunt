@@ -51,9 +51,11 @@ endpoints:
   - route: /services/data/v60.0/sobjects/Account/{id}
     method: PATCH
     handler: scripts/sobjects.star#on_update
+    concurrency_key: id # read-merge-write, serialized per record
   - route: /services/data/v60.0/sobjects/Account/{id}
     method: DELETE
     handler: scripts/sobjects.star#on_delete
+    concurrency_key: id # read-then-flag read-modify-write, serialized per record
 
   # --- Contact CRUD ---
   - route: /services/data/v60.0/sobjects/Contact
@@ -65,9 +67,11 @@ endpoints:
   - route: /services/data/v60.0/sobjects/Contact/{id}
     method: PATCH
     handler: scripts/sobjects.star#on_update
+    concurrency_key: id # read-merge-write, serialized per record
   - route: /services/data/v60.0/sobjects/Contact/{id}
     method: DELETE
     handler: scripts/sobjects.star#on_delete
+    concurrency_key: id # read-then-flag read-modify-write, serialized per record
 
   # --- Opportunity CRUD ---
   - route: /services/data/v60.0/sobjects/Opportunity
@@ -82,6 +86,7 @@ endpoints:
   - route: /services/data/v60.0/sobjects/Opportunity/{id}
     method: DELETE
     handler: scripts/sobjects.star#on_delete
+    concurrency_key: id # read-then-flag read-modify-write, serialized per record
 
   # --- SOQL query ---
   - route: /services/data/v60.0/query

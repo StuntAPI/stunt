@@ -396,7 +396,7 @@ The connected account's balance is debited by the payout amount.
 | GET | `/v1/customers/{id}` | `customers.star#on_retrieve_customer` | Retrieve a customer |
 | GET | `/v1/customers` | `customers.star#on_list_customers` | List customers (`?email=`, `created` exact/range filters, paginated) |
 | POST | `/v1/customers/{id}` | `customers.star#on_update_customer` | Update a customer |
-| DELETE | `/v1/customers/{id}` | `customers.star#on_delete_customer` | Delete a customer |
+| DELETE | `/v1/customers/{id}` | `customers.star#on_delete_customer` | Delete a customer (soft delete: `deleted:true`) |
 | GET | `/v1/balance` | `balance.star#on_get_balance` | Return account balance (supports `Stripe-Account` header) |
 | POST | `/v1/accounts` | `accounts.star#on_create_account` | Create a connected account |
 | GET | `/v1/accounts/{id}` | `accounts.star#on_retrieve_account` | Retrieve a connected account |
@@ -413,6 +413,16 @@ The connected account's balance is debited by the payout amount.
 Any unmatched route returns `404 {"error":"resource_not_found"}`.
 
 List endpoints Stripe documents as newest-first (`charges`, `customers`, `payment_intents`, `refunds`, `payouts`, `transfers`) return the most recently created objects first, like the real API. A non-numeric `created` / `created[gt|gte|lt|lte]` filter value returns Stripe's `400 parameter_invalid_integer` error.
+
+### Deleted customers (soft delete)
+
+Real Stripe never destroys a customer object: `DELETE /v1/customers/{id}` marks it deleted, and stunt reproduces the full observable behavior:
+
+- `DELETE /v1/customers/{id}` → `200 {"id": "cus_…", "object": "customer", "deleted": true}` and a signed `customer.deleted` event (webhook delivery + the `events` collection).
+- `GET /v1/customers/{id}` after delete → `200` with the full customer object including `"deleted": true` (deleted customers stay retrievable).
+- `GET /v1/customers` (with any filter combination) → deleted customers are excluded; real Stripe lists never return deleted customers.
+- `POST /v1/customers/{id}` on a deleted customer → `404 invalid_request_error` ("No such customer"), matching Stripe's resource_missing behavior for mutations on deleted objects.
+- A `starting_after` cursor naming the deleted customer → `400` (the id no longer appears in list results, so the cursor is stale, exactly like Stripe's resource_missing).
 
 ## Backing stores
 

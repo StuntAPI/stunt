@@ -33,8 +33,30 @@ A faithful behavioral mock of GitHub's App API surface:
 - **Webhooks:** `POST /repos/{owner}/{repo}/hooks` (register). Events emitted via
   `events_emit` using GitHub event types (`push`, `pull_request`, `issues`), signed
   with the per-hook `config.secret` — see below.
-- **GraphQL:** `POST /graphql` with pattern-matched operations (`viewer`,
-  `repository`, `issues`).
+- **GraphQL (real execution):** `POST /graphql` is served by stunt's real
+  GraphQL executor from [`schemas/schema.graphql`](schemas/schema.graphql) —
+  documents are parsed, validated, and executed: arguments, variables,
+  aliases, fragments, introspection, and spec-shaped `errors[]`. Unknown
+  fields/operations are rejected at validation time (the old pattern matcher
+  returned canned data for anything containing `viewer`/`repository`).
+  Modeled surface:
+  - `viewer` (the synthetic bot identity) and
+    `repository(owner, name)` with `issues`/`pullRequests` connections
+    (`first`/`after`, `orderBy`, `filterBy`/`states`) and `issue(number)` /
+    `pullRequest(number)` lookups.
+  - GitHub base64 global IDs — `base64("04:Issue<number>")` etc. — with
+    nested joins: `Issue.author` (the Actor interface: `User`/`Bot` selected
+    by `__typename`), `Issue.comments`, `Issue.labels`, and
+    `PullRequest.baseRefName`/`headRefName`.
+  - Mutations sharing the REST state machine: `createIssue` (repositoryId
+    gid, per-repo numbers, signed `issues` webhook), `updateIssue`
+    (state/stateReason validation, `closed_at` bookkeeping, issue events),
+    and `addComment` (subject may be an issue or a PR; signed
+    `issue_comment` webhook).
+
+  > The `graphql:` transport dispatches before adapter endpoints and hands
+  > resolvers only `{parent, args}` — it has no auth hook — so this endpoint
+  > is served without the Bearer/PAT check the REST surface enforces.
 
 ## Auth model
 
@@ -259,7 +281,7 @@ real vocabulary) and the usual `workflow_run` `completed` delivery.
 | GET | `/repos/{owner}/{repo}/actions/runs/{run_id}` | `actions.star#on_get_run` | Get a workflow run |
 | POST | `/repos/{owner}/{repo}/hooks` | `hooks.star#on_create_hook` | Register webhook (201) |
 | POST | `/webhooks/receive` | `hooks.star#on_receive_webhook` | Local webhook receiver — verifies `X-Hub-Signature-256` (200 ok / 401 bad signature) |
-| POST | `/graphql` | `graphql.star#on_graphql` | GraphQL (pattern-matched) |
+| POST/GET | `/graphql` | `graphql:` transport → `resolvers.star` | Real GraphQL execution (see above) |
 
 ## Synthetic data
 

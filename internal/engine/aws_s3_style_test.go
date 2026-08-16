@@ -574,6 +574,248 @@ func s3Delete(t *testing.T, rawurl string, at time.Time) *http.Response {
 	return resp
 }
 
+// TestAwsS3StyleMultipartUpload drives the full S3 multipart upload
+// protocol with real SigV4-signed requests:
+//
+//   - POST ?uploads → 200 InitiateMultipartUploadResult with an UploadId
+//   - UploadPart (out of order: 3, then 1, then 2) → per-part ETags that
+//     equal the quoted SHA-256 of the part bytes
+//   - ListParts → parts in ascending order with max-parts /
+//     part-number-marker paging
+//   - CompleteMultipartUpload with a missing part → 400 InvalidPart
+//   - CompleteMultipartUpload with a non-ascending list → 400 InvalidPartOrder
+//   - CompleteMultipartUpload (correct) → 200 with the multipart ETag
+//     ("...-3"), and the assembled object round-trips byte-exact via GET
+//   - AbortMultipartUpload → 204 and the object stays absent (404 NoSuchKey),
+//     with every later part/complete/list call 404 NoSuchUpload
+//   - partNumber=0 → 400 InvalidArgument
+func TestAwsS3StyleMultipartUpload(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/mpubucket", nil, now); status != 200 {
+		t.Fatalf("create bucket -> %d", status)
+	}
+
+	// Multi-KB binary payload split into three unequal parts (5 KiB + 4 KiB
+	// + 3 KiB = 12 KiB). Parts 3 and 1 are swapped below to prove out-of-order
+	// acceptance.
+	part1 := s3TestBytes(5*1024, 1)
+	part2 := s3TestBytes(4*1024, 2)
+	part3 := s3TestBytes(3*1024, 3)
+	full := append(append(append([]byte{}, part1...), part2...), part3...)
+
+	// ===== Create multipart upload =====
+	body, status := s3Post(t, base+"/mpubucket/multi.bin?uploads", nil, now)
+	if status != 200 {
+		t.Fatalf("create mpu -> %d; body %s", status, body)
+	}
+	uploadID := s3XMLTag(t, body, "UploadId")
+	if uploadID == "" {
+		t.Fatalf("create mpu: no UploadId in %s", body)
+	}
+	partURL := base + "/mpubucket/multi.bin?uploadId=" + uploadID
+
+	// ===== UploadPart, deliberately out of order (3, then 1, then 2) =====
+	etags := map[int]string{}
+	for _, tc := range []struct {
+		n    int
+		data []byte
+	}{
+		{3, part3}, {1, part1}, {2, part2},
+	} {
+		etag, st := s3PutETag(t, fmt.Sprintf("%s&partNumber=%d", partURL, tc.n), tc.data, now)
+		if st != 200 {
+			t.Fatalf("upload part %d -> %d", tc.n, st)
+		}
+		want := `"` + awsSHA256Hex(tc.data) + `"`
+		if etag != want {
+			t.Fatalf("upload part %d ETag = %q, want %q", tc.n, etag, want)
+		}
+		etags[tc.n] = strings.Trim(etag, `"`)
+	}
+
+	// partNumber out of range → 400 InvalidArgument.
+	body, status = s3Put(t, partURL+"&partNumber=0", []byte("x"), now)
+	if status != 400 || !strings.Contains(body, "InvalidArgument") {
+		t.Fatalf("partNumber=0 -> %d %q, want 400 InvalidArgument", status, body)
+	}
+
+	// Unknown upload id → 404 NoSuchUpload.
+	body, status = s3Put(t, base+"/mpubucket/multi.bin?partNumber=1&uploadId=mpu_nope", []byte("x"), now)
+	if status != 404 || !strings.Contains(body, "NoSuchUpload") {
+		t.Fatalf("part to unknown upload -> %d %q, want 404 NoSuchUpload", status, body)
+	}
+
+	// ===== ListParts: ascending order + paging =====
+	body, status = s3Get(t, partURL+"&max-parts=2", now)
+	if status != 200 {
+		t.Fatalf("list parts -> %d; body %s", status, body)
+	}
+	if !strings.Contains(body, "<PartNumber>1</PartNumber>") || !strings.Contains(body, "<PartNumber>2</PartNumber>") {
+		t.Fatalf("list parts page 1 missing parts 1,2: %s", body)
+	}
+	if strings.Contains(body, "<PartNumber>3</PartNumber>") {
+		t.Fatalf("list parts page 1 should not contain part 3: %s", body)
+	}
+	if !strings.Contains(body, "<IsTruncated>true</IsTruncated>") || !strings.Contains(body, "<NextPartNumberMarker>2</NextPartNumberMarker>") {
+		t.Fatalf("list parts page 1 paging elements wrong: %s", body)
+	}
+	body, status = s3Get(t, partURL+"&max-parts=2&part-number-marker=2", now)
+	if status != 200 || !strings.Contains(body, "<PartNumber>3</PartNumber>") || strings.Contains(body, "<IsTruncated>true") {
+		t.Fatalf("list parts page 2 wrong: %d %s", status, body)
+	}
+
+	// ===== Complete: missing part → 400 InvalidPart =====
+	missingBody := s3CompleteBody([][2]string{{"1", etags[1]}, {"2", etags[2]}, {"4", etags[3]}})
+	body, status = s3Post(t, partURL, []byte(missingBody), now)
+	if status != 400 || !strings.Contains(body, "InvalidPart") {
+		t.Fatalf("complete with missing part -> %d %q, want 400 InvalidPart", status, body)
+	}
+
+	// ===== Complete: non-ascending list → 400 InvalidPartOrder =====
+	outOfOrder := s3CompleteBody([][2]string{{"3", etags[3]}, {"1", etags[1]}, {"2", etags[2]}})
+	body, status = s3Post(t, partURL, []byte(outOfOrder), now)
+	if status != 400 || !strings.Contains(body, "InvalidPartOrder") {
+		t.Fatalf("complete out of order -> %d %q, want 400 InvalidPartOrder", status, body)
+	}
+
+	// ===== Complete: wrong part ETag → 400 InvalidPart =====
+	wrongEtag := s3CompleteBody([][2]string{{"1", etags[1]}, {"2", strings.Repeat("0", 64)}, {"3", etags[3]}})
+	body, status = s3Post(t, partURL, []byte(wrongEtag), now)
+	if status != 400 || !strings.Contains(body, "InvalidPart") {
+		t.Fatalf("complete with wrong etag -> %d %q, want 400 InvalidPart", status, body)
+	}
+
+	// ===== Complete: correct → 200, assembled object byte-exact =====
+	completeBody := s3CompleteBody([][2]string{{"1", etags[1]}, {"2", etags[2]}, {"3", etags[3]}})
+	body, status = s3Post(t, partURL, []byte(completeBody), now)
+	if status != 200 {
+		t.Fatalf("complete -> %d; body %s", status, body)
+	}
+	etag := strings.ReplaceAll(s3XMLTag(t, body, "ETag"), "&quot;", "")
+	if !strings.HasSuffix(etag, "-3") {
+		t.Fatalf("complete ETag = %q, want multipart form ending in -3", etag)
+	}
+
+	got, status := s3Get(t, base+"/mpubucket/multi.bin", now)
+	if status != 200 {
+		t.Fatalf("get assembled object -> %d", status)
+	}
+	if !bytes.Equal([]byte(got), full) {
+		t.Fatalf("assembled object mismatch: got %d bytes, want %d", len(got), len(full))
+	}
+	hdr := s3Head(t, base+"/mpubucket/multi.bin", now)
+	if hdr.Header.Get("Content-Length") != strconv.Itoa(len(full)) {
+		t.Fatalf("assembled HEAD Content-Length = %q, want %d", hdr.Header.Get("Content-Length"), len(full))
+	}
+	if hdr.Header.Get("ETag") != `"`+strings.Trim(etag, `"`)+`"` {
+		t.Fatalf("assembled HEAD ETag = %q, want %q", hdr.Header.Get("ETag"), etag)
+	}
+
+	// The upload is gone after completion.
+	body, status = s3Get(t, partURL, now)
+	if status != 404 || !strings.Contains(body, "NoSuchUpload") {
+		t.Fatalf("list parts after complete -> %d %q, want 404 NoSuchUpload", status, body)
+	}
+
+	// ===== Abort discards the upload and leaves the object absent =====
+	body, status = s3Post(t, base+"/mpubucket/aborted.bin?uploads", nil, now)
+	if status != 200 {
+		t.Fatalf("create mpu (abort case) -> %d", status)
+	}
+	uploadID2 := s3XMLTag(t, body, "UploadId")
+	abortURL := base + "/mpubucket/aborted.bin?uploadId=" + uploadID2
+	if _, st := s3PutETag(t, abortURL+"&partNumber=1", part1, now); st != 200 {
+		t.Fatalf("upload part (abort case) -> %d", st)
+	}
+	resp := s3Delete(t, abortURL, now)
+	if resp.StatusCode != 204 {
+		t.Fatalf("abort -> %d, want 204", resp.StatusCode)
+	}
+	if body, status = s3Get(t, base+"/mpubucket/aborted.bin", now); status != 404 || !strings.Contains(body, "NoSuchKey") {
+		t.Fatalf("get aborted object -> %d %q, want 404 NoSuchKey", status, body)
+	}
+	if body, status = s3Get(t, abortURL, now); status != 404 || !strings.Contains(body, "NoSuchUpload") {
+		t.Fatalf("list parts after abort -> %d %q, want 404 NoSuchUpload", status, body)
+	}
+	// Completing an aborted upload fails closed.
+	if body, status = s3Post(t, abortURL, []byte(s3CompleteBody([][2]string{{"1", etags[1]}})), now); status != 404 || !strings.Contains(body, "NoSuchUpload") {
+		t.Fatalf("complete after abort -> %d %q, want 404 NoSuchUpload", status, body)
+	}
+}
+
+// s3TestBytes returns n deterministic pseudo-random bytes seeded by tag
+// (multi-KB payloads with invalid-UTF-8 patterns for the round-trip tests).
+func s3TestBytes(n int, seed int) []byte {
+	out := make([]byte, n)
+	x := uint32(seed)*2654435761 + 12345
+	for i := range out {
+		x = x*1664525 + 1013904223
+		out[i] = byte(x >> 13)
+	}
+	return out
+}
+
+// s3XMLTag extracts the first <tag>…</tag> text from an S3 XML body.
+func s3XMLTag(t *testing.T, body, tag string) string {
+	t.Helper()
+	open := "<" + tag + ">"
+	close := "</" + tag + ">"
+	i := strings.Index(body, open)
+	if i < 0 {
+		return ""
+	}
+	i += len(open)
+	j := strings.Index(body[i:], close)
+	if j < 0 {
+		return ""
+	}
+	return body[i : i+j]
+}
+
+// s3CompleteBody builds a CompleteMultipartUpload request body from ordered
+// (part number, etag) pairs.
+func s3CompleteBody(parts [][2]string) string {
+	var b strings.Builder
+	b.WriteString("<CompleteMultipartUpload>")
+	for _, p := range parts {
+		b.WriteString("<Part><PartNumber>" + p[0] + "</PartNumber><ETag>\"" + p[1] + "\"</ETag></Part>")
+	}
+	b.WriteString("</CompleteMultipartUpload>")
+	return b.String()
+}
+
+// s3Post issues a SigV4-signed POST with an optional body.
+func s3Post(t *testing.T, rawurl string, body []byte, at time.Time) (string, int) {
+	t.Helper()
+	return s3Do(t, s3SignedReq(t, "POST", rawurl, body, at, awsStyleAccessKey, awsStyleSecretKey))
+}
+
 // TestAWSS3StyleBinaryRoundTrip proves binary content round-trips byte-exact:
 // invalid-UTF-8 bytes (0xff/0xfe) that a JSON-backed collection would corrupt
 // survive PUT then GET unchanged, with a correct Content-Length and a

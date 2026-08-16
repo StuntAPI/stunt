@@ -6,7 +6,7 @@
 # synthetic. See DISCLAIMER.
 id: apple-music-style
 name: "Apple Music API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Apple Music API"
@@ -16,25 +16,84 @@ api:
 # NOTE: literal routes must come BEFORE parameterized routes so they are
 # matched first (the dispatch engine checks in declaration order).
 endpoints:
-  # --- Catalog: search (literal 4th segment) ---
+  # --- Catalog (developer JWT): literal 4th segments first ---
   - route: /v1/catalog/{storefront}/search
     method: GET
     handler: scripts/catalog.star#on_search
 
-  # --- Catalog: songs (4th segment literal, 5th param) ---
+  - route: /v1/catalog/{storefront}/charts
+    method: GET
+    handler: scripts/catalog.star#on_charts
+
+  - route: /v1/catalog/{storefront}/songs
+    method: GET
+    handler: scripts/catalog.star#on_list_songs
+
+  - route: /v1/catalog/{storefront}/albums
+    method: GET
+    handler: scripts/catalog.star#on_list_albums
+
+  - route: /v1/catalog/{storefront}/artists
+    method: GET
+    handler: scripts/catalog.star#on_list_artists
+
+  - route: /v1/catalog/{storefront}/playlists
+    method: GET
+    handler: scripts/catalog.star#on_list_playlists
+
+  # --- Catalog (developer JWT): parameterized 5th segments ---
   - route: /v1/catalog/{storefront}/songs/{id}
     method: GET
     handler: scripts/catalog.star#on_get_song
 
-  # --- Catalog: albums (4th segment literal, 5th param) ---
   - route: /v1/catalog/{storefront}/albums/{id}
     method: GET
     handler: scripts/catalog.star#on_get_album
 
-  # --- User library (literal path) ---
+  - route: /v1/catalog/{storefront}/artists/{id}
+    method: GET
+    handler: scripts/catalog.star#on_get_artist
+
+  # --- User library (JWT + Music-User-Token): literal paths first ---
   - route: /v1/me/library/songs
     method: GET
     handler: scripts/library.star#on_library_songs
+
+  - route: /v1/me/library/albums
+    method: GET
+    handler: scripts/library.star#on_library_albums
+
+  - route: /v1/me/library/playlists
+    method: GET
+    handler: scripts/library.star#on_library_playlists
+
+  - route: /v1/me/library/recently-added
+    method: GET
+    handler: scripts/library.star#on_recently_added
+
+  # Add catalog resources to the library (ids[songs]=… query params or body).
+  - route: /v1/me/library
+    method: POST
+    handler: scripts/library.star#on_add_library
+
+  # Remove a library resource (songs | albums | playlists).
+  - route: /v1/me/library/{type}/{id}
+    method: DELETE
+    handler: scripts/library.star#on_delete_library
+
+  # Mark a song played ({"id": ..., "type": "songs"}) → 204.
+  - route: /v1/me/played
+    method: POST
+    handler: scripts/library.star#on_played
+
+  # Personal ratings (love/dislike): value -1 | 0 | 1.
+  - route: /v1/me/ratings/{type}/{id}
+    method: GET
+    handler: scripts/library.star#on_get_rating
+
+  - route: /v1/me/ratings/{type}/{id}
+    method: PUT
+    handler: scripts/library.star#on_put_rating
 
 # Backing stores — collections for stateful data.
 resources:
@@ -42,7 +101,17 @@ resources:
     kind: collection
   - name: albums
     kind: collection
+  - name: artists
+    kind: collection
+  - name: catalog_playlists
+    kind: collection
   - name: library_songs
+    kind: collection
+  - name: library_albums
+    kind: collection
+  - name: library_playlists
+    kind: collection
+  - name: ratings
     kind: collection
 
 # Auth scheme metadata.

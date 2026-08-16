@@ -1,0 +1,233 @@
+# The Graph subgraph GraphQL schema (graph-node conventions).
+#
+# Entity queries mirror graph-node's generated collection API: every entity
+# type gets a plural collection field plus a singular id lookup, with the
+# standard block/first/skip/where/orderBy/orderDirection arguments.
+# BigInt/BigDecimal serialize as decimal strings (the graph-node wire form)
+# and are declared as custom scalars so literals pass through uncoerced.
+#
+# The schema carries both seeded subgraph themes: the Uniswap V3-style
+# pools/tokens entity set and the ENS-style domains entity set.
+
+scalar Bytes
+scalar BigInt
+scalar BigDecimal
+
+"""Sort direction for entity collections (graph-node uses lowercase values)."""
+enum OrderDirection {
+  asc
+  desc
+}
+
+enum Pool_orderBy {
+  id
+  token0
+  token1
+  feeTier
+  totalValueLockedUSD
+  volumeUSD
+  txCount
+}
+
+enum Token_orderBy {
+  id
+  symbol
+  name
+  decimals
+  totalSupply
+  derivedETH
+}
+
+enum Domain_orderBy {
+  id
+  name
+  labelName
+  owner
+  resolvedAddress
+  createdAt
+}
+
+"""Filter for the Pool entity collection (graph-node suffix operators)."""
+input Pool_filter {
+  id: String
+  id_not: String
+  id_in: [String!]
+  id_not_in: [String!]
+  id_contains: String
+  id_starts_with: String
+  token0: String
+  token0_not: String
+  token0_in: [String!]
+  token0_not_in: [String!]
+  token1: String
+  token1_not: String
+  token1_in: [String!]
+  token1_not_in: [String!]
+  feeTier: BigInt
+  feeTier_not: BigInt
+  feeTier_gt: BigInt
+  feeTier_lt: BigInt
+  feeTier_gte: BigInt
+  feeTier_lte: BigInt
+  feeTier_in: [BigInt!]
+  feeTier_not_in: [BigInt!]
+  totalValueLockedUSD: BigDecimal
+  totalValueLockedUSD_gt: BigDecimal
+  totalValueLockedUSD_lt: BigDecimal
+  totalValueLockedUSD_gte: BigDecimal
+  totalValueLockedUSD_lte: BigDecimal
+  volumeUSD: BigDecimal
+  volumeUSD_gt: BigDecimal
+  volumeUSD_lt: BigDecimal
+  volumeUSD_gte: BigDecimal
+  volumeUSD_lte: BigDecimal
+  txCount: BigInt
+  txCount_gt: BigInt
+  txCount_lt: BigInt
+  txCount_gte: BigInt
+  txCount_lte: BigInt
+}
+
+"""Filter for the Token entity collection."""
+input Token_filter {
+  id: String
+  id_not: String
+  id_in: [String!]
+  id_not_in: [String!]
+  id_contains: String
+  id_starts_with: String
+  symbol: String
+  symbol_not: String
+  symbol_in: [String!]
+  symbol_not_in: [String!]
+  symbol_contains: String
+  symbol_starts_with: String
+  name: String
+  name_contains: String
+  decimals: Int
+  decimals_gt: Int
+  decimals_lt: Int
+  decimals_gte: Int
+  decimals_lte: Int
+  totalSupply: BigDecimal
+  totalSupply_gt: BigDecimal
+  totalSupply_lte: BigDecimal
+  derivedETH: BigDecimal
+  derivedETH_gt: BigDecimal
+  derivedETH_lte: BigDecimal
+}
+
+"""Filter for the Domain entity collection."""
+input Domain_filter {
+  id: String
+  id_not: String
+  id_in: [String!]
+  id_not_in: [String!]
+  name: String
+  name_not: String
+  name_contains: String
+  name_starts_with: String
+  name_ends_with: String
+  labelName: String
+  labelName_contains: String
+  owner: String
+  owner_in: [String!]
+  owner_not_in: [String!]
+  resolvedAddress: String
+  resolvedAddress_in: [String!]
+  createdAt: BigInt
+  createdAt_gt: BigInt
+  createdAt_lt: BigInt
+  createdAt_gte: BigInt
+  createdAt_lte: BigInt
+}
+
+"""Block height for historical queries (accepted, resolved at head)."""
+input Block_height {
+  number: Int
+  hash: Bytes
+}
+
+"""An Ethereum account (ENS schema)."""
+type Account {
+  id: ID!
+}
+
+"""A Uniswap V3-style liquidity pool."""
+type Pool {
+  id: ID!
+  token0: Token!
+  token1: Token!
+  feeTier: BigInt!
+  totalValueLockedUSD: BigDecimal!
+  volumeUSD: BigDecimal!
+  txCount: BigInt!
+}
+
+"""An ERC-20 token."""
+type Token {
+  id: ID!
+  symbol: String!
+  name: String!
+  decimals: Int!
+  totalSupply: BigDecimal!
+  derivedETH: BigDecimal!
+  """Pools where this token is token0 or token1."""
+  pools: [Pool!]!
+}
+
+"""An ENS-style domain."""
+type Domain {
+  id: ID!
+  name: String
+  labelName: String
+  owner: Account!
+  resolvedAddress: Account
+  createdAt: BigInt!
+}
+
+"""Subgraph indexing metadata (graph-node serves this on every subgraph)."""
+type _Block_ {
+  number: Int!
+  hash: Bytes
+  timestamp: Int!
+}
+
+type _Meta_ {
+  deployment: ID!
+  network: String!
+  block: _Block_!
+  hasIndexingErrors: Boolean!
+  genesis: _Block_!
+}
+
+type Query {
+  _meta(block: Block_height): _Meta_!
+  pools(
+    block: Block_height
+    first: Int = 100
+    skip: Int = 0
+    where: Pool_filter
+    orderBy: Pool_orderBy
+    orderDirection: OrderDirection
+  ): [Pool!]!
+  pool(id: ID!, block: Block_height): Pool
+  tokens(
+    block: Block_height
+    first: Int = 100
+    skip: Int = 0
+    where: Token_filter
+    orderBy: Token_orderBy
+    orderDirection: OrderDirection
+  ): [Token!]!
+  token(id: ID!, block: Block_height): Token
+  domains(
+    block: Block_height
+    first: Int = 100
+    skip: Int = 0
+    where: Domain_filter
+    orderBy: Domain_orderBy
+    orderDirection: OrderDirection
+  ): [Domain!]!
+  domain(id: ID!, block: Block_height): Domain
+}

@@ -2,22 +2,30 @@
 # Docs: https://stuntapi.com/stunt
 #
 # This adapter mimics the *structure* of a Product Hunt GraphQL API
-# for LOCAL TESTING ONLY. It does not call the real Product Hunt API. All
+# for LOCAL TESTING ONLY. It does not call any real Product Hunt API. All
 # data is synthetic. See DISCLAIMER.
 id: producthunt-style
 name: "Product Hunt-style GraphQL API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Product Hunt GraphQL API"
   version: "2"
 
-# Endpoints — each maps a route + method to a Starlark handler.
-endpoints:
-  # --- GraphQL (single endpoint; pattern-matches operation) ---
-  - route: /v2/api/graphql.json
-    method: POST
-    handler: scripts/graphql.star#on_graphql
+# GraphQL service — served from the SDL schema + convention-named Starlark
+# resolvers by the engine's REAL GraphQL executor (validation, variables,
+# fragments, introspection, errors[]). The real provider endpoint is
+# /v2/api/graphql; this adapter keeps its historical /v2/api/graphql.json
+# route (the path its reference client sends) as the transport path.
+#
+# NOTE: the graphql: transport dispatches before adapter endpoints and hands
+# resolvers only {parent, args} — it has no auth hook — so the query
+# endpoint is served open. The bearer credential store in scripts/lib.star
+# documents the provider's OAuth scheme and backs handler-backed routes.
+graphql:
+  schema: schemas/schema.graphql
+  resolvers: scripts/resolvers.star
+  path: /v2/api/graphql.json
 
 # Backing stores — collections for stateful data.
 resources:

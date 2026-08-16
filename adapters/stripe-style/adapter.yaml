@@ -113,6 +113,7 @@ endpoints:
   - route: /v1/customers/{id}
     method: DELETE
     handler: scripts/customers.star#on_delete_customer
+    concurrency_key: id # read-then-flag read-modify-write, serialized per customer
 
   # --- Balance ---
   - route: /v1/balance

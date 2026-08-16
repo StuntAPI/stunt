@@ -369,6 +369,15 @@ def _to_int(val):
         n = n * 10 + (ord(ch) - ord("0"))
     return n
 
+# _to_num coerces a JSON-round-tripped number (int or float) to int —
+# collection rows come back with floats for whole numbers.
+def _to_num(v):
+    if v == None:
+        return 0
+    if type(v) == "int":
+        return v
+    return int(v)
+
 # _get_query returns the query value for key, or "" if absent.
 def _get_query(req, key):
     query = req.get("query")
@@ -405,6 +414,120 @@ def _container_not_found(container):
     xml = xml + "<Message>The specified container does not exist.</Message>"
     xml = xml + "</Error>"
     return respond(404, xml, {"Content-Type": "application/xml", "x-ms-request-id": _req_id()})
+
+# ====================================================================
+# Block staging core (shared by blobs.star handlers and the container
+# delete cleanup)
+# ====================================================================
+# Put Block stages blob bytes under a base64 block id (any order,
+# re-uploadable); Put Block List commits them (see blobs.star). These
+# helpers implement the shared lookups/cleanup so both handler files see
+# them (lib.star is preloaded into every script).
+
+# Max base64 block-id length: 64 decoded bytes -> 88 base64 characters
+# (assembled to keep digit runs short in source).
+_MAX_BLOCK_ID_CHARS = 88
+
+# _az_blob_error returns an Azure Storage XML error with the blob-layer
+# request id header.
+def _az_blob_error(status_code, code, message):
+    xml = '<?xml version="1.0" encoding="utf-8"?>\n'
+    xml = xml + "<Error><Code>" + _xml_escape(code) + "</Code>"
+    xml = xml + "<Message>" + _xml_escape(message) + "</Message>"
+    xml = xml + "</Error>"
+    return respond(status_code, xml, {"Content-Type": "application/xml", "x-ms-request-id": _req_id()})
+
+# _block_row_id derives the stable collection row id for a staged block
+# (container + blob + block id hash): re-staging the same block id upserts
+# the same row.
+def _block_row_id(container, blob, block_id):
+    return crypto.sha256(container + "\n" + blob + "\n" + block_id)
+
+# _validate_block_id checks a block id like the real service: non-empty,
+# base64 charset, at most 64 decoded bytes. Returns "" when valid, else an
+# error response.
+def _validate_block_id(block_id):
+    if block_id == "":
+        return _az_blob_error(400, "InvalidQueryParameterValue",
+            "Value for one of the query parameters specified in the request URI is invalid.\nRequestId:" + _req_id() + "\nTime:" + _rfc1123())
+    if not _is_base64(block_id) or len(block_id) > _MAX_BLOCK_ID_CHARS:
+        return _az_blob_error(400, "InvalidQueryParameterValue",
+            "Value for one of the query parameters specified in the request URI is invalid.\nRequestId:" + _req_id() + "\nTime:" + _rfc1123())
+    return None
+
+# _container_exists reports whether the named container is present.
+def _container_exists(container):
+    for c in store_collection("containers").list():
+        if c.get("name", "") == container:
+            return True
+    return False
+
+# _staged_blocks returns the staged (uncommitted) block rows for the blob,
+# ordered by block id for deterministic listing.
+def _staged_blocks(container, blob):
+    rows = []
+    for r in store_collection("blocks").list():
+        if r.get("container", "") == container and r.get("blob", "") == blob:
+            rows.append(r)
+    ordered = []
+    for r in rows:
+        i = 0
+        while i < len(ordered):
+            if r.get("blockId", "") < ordered[i].get("blockId", ""):
+                break
+            i = i + 1
+        ordered.insert(i, r)
+    return ordered
+
+# _find_blob returns the blob doc for container/blob, or None.
+def _find_blob(container, blob):
+    for b in store_collection("blobs").list():
+        if b.get("container", "") == container and b.get("name", "") == blob:
+            return b
+    return None
+
+# _discard_staged_blocks deletes every staged block row + blob for the
+# container/blob (shared by commit and blob delete). Idempotent.
+def _discard_staged_blocks(container, blob):
+    bc = store_collection("blocks")
+    bstore = store_blob("az-blocks")
+    for r in _staged_blocks(container, blob):
+        bid = r.get("bid", "")
+        if bid != None and bid != "":
+            bstore.delete(bid)
+        bc.delete(r.get("id", ""))
+
+# _parse_block_list_xml parses a Put Block List body into the ordered
+# [[kind, blockId], ...] entries (kind in Latest/Committed/Uncommitted),
+# preserving document order — the order defines the committed content.
+# Returns None when the body is not a BlockList document.
+def _parse_block_list_xml(raw):
+    if raw == None:
+        return None
+    if _find_substr(raw, "<BlockList") < 0:
+        return None
+    kinds = ["Latest", "Committed", "Uncommitted"]
+    entries = []
+    pos = 0
+    while True:
+        best_idx = -1
+        best_kind = ""
+        for kind in kinds:
+            idx = raw.find("<" + kind + ">", pos)
+            if idx >= 0 and (best_idx < 0 or idx < best_idx):
+                best_idx = idx
+                best_kind = kind
+        if best_idx < 0:
+            break
+        close = "</" + best_kind + ">"
+        end = raw.find(close, best_idx)
+        if end < 0:
+            return None
+        id_text = _strip(raw[best_idx + len(best_kind) + 2:end])
+        entries.append([best_kind, id_text])
+        pos = end + len(close)
+    return entries
+
 
 # ====================================================================
 # ID generators

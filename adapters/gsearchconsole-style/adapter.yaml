@@ -6,7 +6,7 @@
 # synthetic. See DISCLAIMER.
 id: gsearchconsole-style
 name: "Google Search Console API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Google Search Console API"
@@ -21,24 +21,66 @@ endpoints:
     method: GET
     handler: scripts/sites.star#on_list_sites
 
+  # --- Site lifecycle (add / get / delete). concurrency_key: siteUrl — the
+  # verification transition and delete are read-modify-writes on the site
+  # doc, serialized per property. ---
+  - route: /webmasters/v3/sites/{siteUrl}
+    method: GET
+    handler: scripts/sites.star#on_get_site
+    concurrency_key: siteUrl
+
+  - route: /webmasters/v3/sites/{siteUrl}
+    method: PUT
+    handler: scripts/sites.star#on_add_site
+    concurrency_key: siteUrl
+
+  - route: /webmasters/v3/sites/{siteUrl}
+    method: DELETE
+    handler: scripts/sites.star#on_delete_site
+    concurrency_key: siteUrl
+
   # --- Search analytics query (literal 5th segment) ---
   - route: /webmasters/v3/sites/{siteUrl}/searchAnalytics/query
     method: POST
     handler: scripts/analytics.star#on_query
+    concurrency_key: siteUrl
 
-  # --- Sitemaps (literal 5th segment) ---
+  # --- Sitemaps (literal 5th segment, then feedpath). concurrency_key:
+  # siteUrl — submit/delete read-modify-write the property's sitemap docs. ---
   - route: /webmasters/v3/sites/{siteUrl}/sitemaps
     method: GET
     handler: scripts/sites.star#on_list_sitemaps
 
-  # --- URL inspection (literal 5th segment) ---
+  - route: /webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}
+    method: GET
+    handler: scripts/sites.star#on_get_sitemap
+
+  - route: /webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}
+    method: PUT
+    handler: scripts/sites.star#on_submit_sitemap
+    concurrency_key: siteUrl
+
+  - route: /webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}
+    method: DELETE
+    handler: scripts/sites.star#on_delete_sitemap
+    concurrency_key: siteUrl
+
+  # --- URL inspection: the real URL Inspection API endpoint ---
+  - route: /v1/urlInspection/index:inspect
+    method: POST
+    handler: scripts/inspect.star#on_index_inspect
+
+  # --- URL inspection (legacy simulator route) ---
   - route: /webmasters/v3/sites/{siteUrl}/inspect
     method: POST
-    handler: scripts/sites.star#on_inspect
+    handler: scripts/inspect.star#on_site_inspect
+    concurrency_key: siteUrl
 
 # Backing stores — collections for stateful data.
 resources:
   - name: sites
+    kind: collection
+  - name: sitemaps
     kind: collection
 
 # Auth scheme metadata.

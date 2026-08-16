@@ -1,17 +1,22 @@
 # Object handlers — stateful PUT/GET/HEAD/DELETE + ListObjectsV2.
 #
 # PUT   /{bucket}/{key}             -> 200, store object (body=content)
+# PUT   /{bucket}/{key}?partNumber=N&uploadId=... -> 200, UploadPart (ETag)
 # GET   /{bucket}/{key}             -> 200, return object content (RawBody)
+# GET   /{bucket}/{key}?uploadId=... -> 200, ListParts XML
 # HEAD  /{bucket}/{key}             -> 200, metadata headers only
 # DELETE /{bucket}/{key}            -> 204
+# DELETE /{bucket}/{key}?uploadId=... -> 204, AbortMultipartUpload
 # GET   /{bucket}?list-type=2       -> ListObjectsV2 XML
 # GET   /{bucket}?location          -> LocationConstraint XML
 #
 # Objects are STATEFUL: an object PUT via the first endpoint appears in
 # ListObjectsV2 for the same bucket, enabling round-trip testing.
 
-# Shared helpers (_require_auth, _xml_*, _check_*) are preloaded from
-# scripts/lib.star.
+# Shared helpers (_require_auth, _xml_*, _check_*, the multipart-upload
+# core _mpu_* and the object write path _upsert_object) are preloaded from
+# scripts/lib.star. The POST multipart entry point lives in
+# scripts/multipart.star.
 
 # _etag derives the object ETag from the content itself: the SHA-256 hex
 # digest of the raw body (real S3 uses the MD5 digest for non-multipart
@@ -40,7 +45,9 @@ def _obj_last_modified_iso(obj):
         return _unix_to_iso8601(clock.now_unix())
     return _unix_to_iso8601(u)
 
-# on_put_object stores an object in the given bucket+key.
+# on_put_object stores an object in the given bucket+key, or — when the
+# request carries an uploadId — accepts a multipart-upload part instead
+# (see _mpu_upload_part in lib.star).
 def on_put_object(req):
     err = _require_auth(req)
     if err != None:
@@ -48,6 +55,10 @@ def on_put_object(req):
 
     bucket = req["params"]["bucket"]
     key = req["params"]["key"]
+
+    # Multipart upload part (?partNumber=N&uploadId=...).
+    if _query_present(req, "uploadId"):
+        return _mpu_upload_part(req, bucket, key)
 
     # Check that the bucket exists.
     bc = store_collection("buckets")
@@ -57,7 +68,7 @@ def on_put_object(req):
             bucket_doc = b
             break
     if bucket_doc == None:
-        return _no_such_bucket(bucket)
+        return _no_such_bucket_error(bucket)
 
     # Content goes in the byte-exact blob store (filesystem-backed), keyed by
     # bucket/key; the collection holds metadata only. raw_body is the verbatim
@@ -73,47 +84,18 @@ def on_put_object(req):
     if ct == None:
         ct = "application/octet-stream"
 
-    size = len(raw)
-    # Content-derived ETag (SHA-256 of the verbatim bytes) and the real
-    # upload time from the engine clock.
+    # Content-derived ETag (SHA-256 of the verbatim bytes); the write path
+    # (blob + metadata doc) is shared with CompleteMultipartUpload.
     etag = _etag(raw)
-    now_unix = clock.now_unix()
-
-    oc = store_collection("objects")
-    # Reuse the existing blob id on overwrite; otherwise mint a path-safe one
-    # (the blob store forbids '/' in names to prevent path traversal).
-    bid = None
-    obj_id = None
-    for o in oc.list():
-        if o.get("bucket", "") == bucket and o.get("key", "") == key:
-            bid = o.get("bid", "")
-            obj_id = o.get("id", "")
-            break
-    if bid == None or bid == "":
-        bid = "obj_" + str(store_kv_incr("s3", "blob_seq"))
-    store_blob("s3-objects").put(bid, raw, ct)
-
-    doc = {
-        "bucket": bucket,
-        "key": key,
-        "bid": bid,
-        "contentType": ct,
-        "etag": etag,
-        "lastModified": _unix_to_iso8601(now_unix),
-        "lastModifiedUnix": now_unix,
-        "size": size,
-    }
-    if obj_id != None and obj_id != "":
-        oc.update(obj_id, doc)
-    else:
-        oc.insert(doc)
+    _upsert_object(bucket, key, raw, ct, etag)
 
     return respond(200, "", {
         "ETag": '"' + etag + '"',
         "x-amz-request-id": _req_id(),
     })
 
-# on_get_object returns the object content (raw body).
+# on_get_object returns the object content (raw body), or the ListParts XML
+# when the request carries an uploadId.
 def on_get_object(req):
     err = _require_auth(req)
     if err != None:
@@ -122,12 +104,11 @@ def on_get_object(req):
     bucket = req["params"]["bucket"]
     key = req["params"]["key"]
 
-    oc = store_collection("objects")
-    obj = None
-    for o in oc.list():
-        if o.get("bucket", "") == bucket and o.get("key", "") == key:
-            obj = o
-            break
+    # ListParts (?uploadId=...).
+    if _query_present(req, "uploadId"):
+        return _mpu_list_parts(req, bucket, key)
+
+    obj = _find_object(bucket, key)
     if obj == None:
         return _no_such_key(bucket, key)
 
@@ -158,12 +139,7 @@ def on_head_object(req):
     bucket = req["params"]["bucket"]
     key = req["params"]["key"]
 
-    oc = store_collection("objects")
-    obj = None
-    for o in oc.list():
-        if o.get("bucket", "") == bucket and o.get("key", "") == key:
-            obj = o
-            break
+    obj = _find_object(bucket, key)
     if obj == None:
         return _no_such_key(bucket, key)
 
@@ -185,7 +161,8 @@ def on_head_object(req):
         "x-amz-request-id": _req_id(),
     })
 
-# on_delete_object removes an object. Returns 204.
+# on_delete_object removes an object, or aborts an in-progress multipart
+# upload when the request carries an uploadId. Returns 204.
 def on_delete_object(req):
     err = _require_auth(req)
     if err != None:
@@ -193,6 +170,10 @@ def on_delete_object(req):
 
     bucket = req["params"]["bucket"]
     key = req["params"]["key"]
+
+    # AbortMultipartUpload (?uploadId=...).
+    if _query_present(req, "uploadId"):
+        return _mpu_abort(req, bucket, key)
 
     oc = store_collection("objects")
     obj_id = None
@@ -228,7 +209,7 @@ def on_list_or_location(req):
             bucket_doc = b
             break
     if bucket_doc == None:
-        return _no_such_bucket(bucket)
+        return _no_such_bucket_error(bucket)
 
     query = req.get("query")
     if query == None:
@@ -290,16 +271,6 @@ def _url_encode(s):
             else:
                 out = out + "%" + _hex2(0xE0 | (v >> 12)) + "%" + _hex2(0x80 | ((v >> 6) & 0x3F)) + "%" + _hex2(0x80 | (v & 0x3F))
     return out
-
-# _invalid_argument returns an S3 InvalidArgument XML error (400).
-def _invalid_argument(arg_name, arg_value, message):
-    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml = xml + "<Error><Code>InvalidArgument</Code>"
-    xml = xml + "<Message>" + _xml_escape(message) + "</Message>"
-    xml = xml + "<ArgumentName>" + _xml_escape(arg_name) + "</ArgumentName>"
-    xml = xml + "<ArgumentValue>" + _xml_escape(arg_value) + "</ArgumentValue>"
-    xml = xml + "<RequestId>" + _req_id() + "</RequestId></Error>"
-    return respond(400, xml, {"Content-Type": "application/xml"})
 
 # _list_objects_v2 returns a ListObjectsV2 XML response. All list params are
 # applied BEFORE the max-keys/continuation-token paging, like real S3:
@@ -464,13 +435,7 @@ def _list_objects_v2(bucket, req):
 # S3-shaped XML errors
 # ====================================================================
 
-def _no_such_bucket(bucket):
-    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
-    xml = xml + "<Error><Code>NoSuchBucket</Code>"
-    xml = xml + "<Message>The specified bucket does not exist.</Message>"
-    xml = xml + "<BucketName>" + _xml_escape(bucket) + "</BucketName>"
-    xml = xml + "<RequestId>" + _req_id() + "</RequestId></Error>"
-    return respond(404, xml, {"Content-Type": "application/xml"})
+# _no_such_bucket now lives in lib.star (shared with the multipart core).
 
 def _no_such_key(bucket, key):
     xml = '<?xml version="1.0" encoding="UTF-8"?>\n'

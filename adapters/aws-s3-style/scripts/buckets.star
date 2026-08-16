@@ -3,10 +3,9 @@
 # PUT    /{bucket} -> 200, create bucket
 # DELETE /{bucket} -> 204, delete bucket (must be empty, per S3 semantics)
 #
-# Shared helpers (_require_auth, _xml_*, _no_such_bucket) are preloaded from
-# scripts/lib.star. Note: _no_such_bucket is defined in objects.star which
-# is loaded after this file; we define a local equivalent here to avoid
-# cross-file dependencies.
+# Shared helpers (_require_auth, _xml_*, _no_such_bucket_error) are
+# preloaded from scripts/lib.star (a local _bucket_err equivalent is kept
+# below for the bucket-scoped errors this file raises).
 
 # _bucket_err returns a NoSuchBucket XML error.
 def _bucket_err(bucket):

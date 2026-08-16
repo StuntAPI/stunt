@@ -637,3 +637,167 @@ func TestSalesforceStyleLiveTimestamps(t *testing.T) {
 		t.Fatalf("CreatedDate %v not live (start %v)", ts, start)
 	}
 }
+
+// TestSalesforceStyleSoftDeleteQueryAll proves the recycle-bin model: DELETE
+// flags the row IsDeleted instead of destroying it — plain retrieve/PATCH
+// 404 (ENTITY_IS_DELETED for mutations), /query excludes the row, and
+// /queryAll surfaces it with IsDeleted true until it is wanted no more.
+func TestSalesforceStyleSoftDeleteQueryAll(t *testing.T) {
+	adapterDir := err2(filepath.Abs(filepath.Join("..", "..", "adapters", "salesforce-style")))
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"salesforce": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["salesforce"]
+
+	tb, status := sfPostForm(t, base+"/services/oauth2/token", url.Values{
+		"grant_type": {"password"}, "client_id": {"k"}, "client_secret": {"s"},
+		"username": {"u@example.com"}, "password": {"p"},
+	})
+	if status != 200 {
+		t.Fatalf("token -> %d; body %s", status, tb)
+	}
+	var tok map[string]any
+	json.Unmarshal([]byte(tb), &tok)
+	accessToken, _ := tok["access_token"].(string)
+
+	mk := func(name string) string {
+		t.Helper()
+		b, st := sfAuthPostJSON(t, base+"/services/data/v60.0/sobjects/Account", accessToken,
+			map[string]any{"Name": name})
+		if st != 201 {
+			t.Fatalf("create %s -> %d; body %s", name, st, b)
+		}
+		var cr map[string]any
+		json.Unmarshal([]byte(b), &cr)
+		return cr["id"].(string)
+	}
+	gone := mk("Bin Me")
+	kept := mk("Keep Me")
+
+	// ===== DELETE -> soft delete (204) =====
+	if b, st := sfAuthDelete(t, base+"/services/data/v60.0/sobjects/Account/"+gone, accessToken); st != 204 {
+		t.Fatalf("DELETE -> %d, want 204; body %s", st, b)
+	}
+
+	// Retrieve 404s like a missing record.
+	if _, st := sfAuthGet(t, base+"/services/data/v60.0/sobjects/Account/"+gone, accessToken); st != 404 {
+		t.Fatalf("retrieve deleted -> %d, want 404", st)
+	}
+	// Kept record is untouched.
+	if _, st := sfAuthGet(t, base+"/services/data/v60.0/sobjects/Account/"+kept, accessToken); st != 200 {
+		t.Fatalf("retrieve live -> %d, want 200", st)
+	}
+
+	// PATCH on the deleted record -> 404 ENTITY_IS_DELETED.
+	body, st := sfAuthPatchJSON(t, base+"/services/data/v60.0/sobjects/Account/"+gone, accessToken,
+		map[string]any{"Name": "nope"})
+	if st != 404 {
+		t.Fatalf("PATCH deleted -> %d, want 404; body %s", st, body)
+	}
+	if cat := sfErrCode(t, body); cat != "ENTITY_IS_DELETED" {
+		t.Fatalf("PATCH deleted errorCode = %v, want ENTITY_IS_DELETED", cat)
+	}
+	// Double DELETE -> same error.
+	if body, st = sfAuthDelete(t, base+"/services/data/v60.0/sobjects/Account/"+gone, accessToken); st != 404 {
+		t.Fatalf("double DELETE -> %d, want 404; body %s", st, body)
+	} else if cat := sfErrCode(t, body); cat != "ENTITY_IS_DELETED" {
+		t.Fatalf("double DELETE errorCode = %v, want ENTITY_IS_DELETED", cat)
+	}
+
+	soql := func(endpoint, q string) []map[string]any {
+		t.Helper()
+		b, st2 := sfAuthGet(t, base+"/services/data/v60.0/"+endpoint+"?q="+url.QueryEscape(q), accessToken)
+		if st2 != 200 {
+			t.Fatalf("%s %q -> %d; body %s", endpoint, q, st2, b)
+		}
+		var r map[string]any
+		json.Unmarshal([]byte(b), &r)
+		recs, _ := r["records"].([]any)
+		out := []map[string]any{}
+		for _, rec := range recs {
+			out = append(out, rec.(map[string]any))
+		}
+		return out
+	}
+
+	// /query excludes the deleted row but keeps live + seeded accounts.
+	for _, rec := range soql("query", "SELECT Id, IsDeleted FROM Account") {
+		if rec["Id"] == gone {
+			t.Fatalf("deleted record %s leaked into /query", gone)
+		}
+		if rec["IsDeleted"] == true {
+			t.Fatalf("record %v from /query has IsDeleted=true", rec["Id"])
+		}
+	}
+
+	// /queryAll includes it, flagged IsDeleted=true.
+	qa := soql("queryAll", "SELECT Id, IsDeleted FROM Account WHERE IsDeleted = true")
+	if len(qa) != 1 || qa[0]["Id"] != gone {
+		t.Fatalf("queryAll IsDeleted=true -> %d records, want exactly [%s]", len(qa), gone)
+	}
+
+	// queryAll's default view still contains live rows; IsDeleted=false works.
+	live := soql("queryAll", "SELECT Id FROM Account WHERE IsDeleted = false AND Name = 'Keep Me'")
+	if len(live) != 1 || live[0]["Id"] != kept {
+		t.Fatalf("queryAll IsDeleted=false -> %v, want [%s]", live, kept)
+	}
+
+	// /query with the same WHERE cannot see the bin (empty).
+	if recs := soql("query", "SELECT Id FROM Account WHERE IsDeleted = true"); len(recs) != 0 {
+		t.Fatalf("query IsDeleted=true -> %d records, want 0 (bin invisible to /query)", len(recs))
+	}
+
+	// DeletedDate is stamped and IsDeleted selectable on the bin row.
+	dt := soql("queryAll", "SELECT Id, IsDeleted, DeletedDate FROM Account WHERE Id = '"+gone+"'")
+	if len(dt) != 1 {
+		t.Fatalf("queryAll by Id -> %d records, want 1", len(dt))
+	}
+	if dd, _ := dt[0]["DeletedDate"].(string); dd == "" {
+		t.Fatalf("deleted record DeletedDate = %v, want a timestamp", dt[0]["DeletedDate"])
+	}
+
+	// Failure path: DELETE unknown id -> 404 NOT_FOUND envelope.
+	body, st = sfAuthDelete(t, base+"/services/data/v60.0/sobjects/Account/001doesnotexist", accessToken)
+	if st != 404 {
+		t.Fatalf("DELETE unknown -> %d, want 404; body %s", st, body)
+	}
+	if cat := sfErrCode(t, body); cat != "NOT_FOUND" {
+		t.Fatalf("DELETE unknown errorCode = %v, want NOT_FOUND", cat)
+	}
+}
+
+// sfErrCode digs errorCode out of a Salesforce array error envelope.
+func sfErrCode(t *testing.T, body string) string {
+	t.Helper()
+	var arr []any
+	if err := json.Unmarshal([]byte(body), &arr); err != nil || len(arr) == 0 {
+		t.Fatalf("unmarshal SF error %q: %v", body, err)
+	}
+	code, _ := arr[0].(map[string]any)["errorCode"].(string)
+	return code
+}
+
+// err2 fails the test on a non-nil error and returns the wrapped value.
+func err2(v string, err error) string {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}

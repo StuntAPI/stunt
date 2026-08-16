@@ -384,3 +384,279 @@ func qboExtractParam(rawurl, param string) string {
 	}
 	return u.Query().Get(param)
 }
+
+// TestQBOStyleCustomerDeactivation proves QBO's customer soft delete: DELETE
+// deactivates (Active=false) instead of destroying — the record stays
+// readable by id, disappears from the bare list and the default query, and
+// an explicit `WHERE Active = False` surfaces it. Also covers the real-QBO
+// update path (POST with Id) and the invoice void operation.
+func TestQBOStyleCustomerDeactivation(t *testing.T) {
+	adapterDir := filepath.Join("..", "..", "adapters", "qbo-style")
+	absAdapterDir, err := filepath.Abs(adapterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"qbo": {Adapter: absAdapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["qbo"]
+
+	// authorize + token (reuse the main flow's helpers).
+	resp := qboGetNoRedirect(t, base+"/oauth/v2/authorize?client_id=cid&redirect_uri="+
+		url.QueryEscape("http://localhost:3000/cb")+"&state=s&response_type=code&scope=com.intuit.quickbooks.accounting")
+	if resp.StatusCode != 302 {
+		t.Fatalf("authorize -> %d", resp.StatusCode)
+	}
+	location := resp.Header.Get("Location")
+	authCode := qboExtractParam(location, "code")
+	realmID := qboExtractParam(location, "realmId")
+	body, status := qboPostForm(t, base+"/oauth/v2/tokens/bearer", url.Values{
+		"grant_type": {"authorization_code"}, "code": {authCode},
+		"client_id": {"cid"}, "client_secret": {"csecret"},
+	})
+	if status != 200 {
+		t.Fatalf("token -> %d; body %s", status, body)
+	}
+	var tokResp map[string]any
+	json.Unmarshal([]byte(body), &tokResp)
+	token, _ := tokResp["access_token"].(string)
+
+	// ===== create two customers =====
+	var ids []string
+	for _, name := range []string{"Deactivate Me", "Keep Me"} {
+		body, status = qboAuthPostJSON(t, base+"/v3/company/"+realmID+"/customer", token, map[string]any{
+			"DisplayName": name,
+		})
+		if status != 200 {
+			t.Fatalf("create %s -> %d; body %s", name, status, body)
+		}
+		var cr map[string]any
+		json.Unmarshal([]byte(body), &cr)
+		cust, _ := cr["Customer"].(map[string]any)
+		if cust["Active"] != true {
+			t.Fatalf("created customer Active = %v, want true", cust["Active"])
+		}
+		ids = append(ids, cust["Id"].(string))
+	}
+	gone, kept := ids[0], ids[1]
+
+	// ===== DELETE deactivates (soft delete), keeps the record =====
+	body, status = qboAuthDelete(t, base+"/v3/company/"+realmID+"/customer/"+gone, token)
+	if status != 200 {
+		t.Fatalf("DELETE customer -> %d, want 200; body %s", status, body)
+	}
+	var delResp map[string]any
+	json.Unmarshal([]byte(body), &delResp)
+	delCust, _ := delResp["Customer"].(map[string]any)
+	if delCust["status"] != "Deleted" || delCust["Active"] != false {
+		t.Fatalf("DELETE response Customer = %v, want status Deleted + Active false", delCust)
+	}
+
+	// Read by id STILL returns the deactivated customer.
+	body, status = qboAuthGet(t, base+"/v3/company/"+realmID+"/customer/"+gone, token)
+	if status != 200 {
+		t.Fatalf("GET deactivated customer -> %d, want 200; body %s", status, body)
+	}
+	var got map[string]any
+	json.Unmarshal([]byte(body), &got)
+	if got["Customer"].(map[string]any)["Active"] != false {
+		t.Fatalf("deactivated customer Active = %v, want false", got["Customer"].(map[string]any)["Active"])
+	}
+
+	// Bare list excludes the inactive customer.
+	listActive := func() []string {
+		t.Helper()
+		b, st := qboAuthGet(t, base+"/v3/company/"+realmID+"/customer", token)
+		if st != 200 {
+			t.Fatalf("GET customer list -> %d; body %s", st, b)
+		}
+		var lr map[string]any
+		json.Unmarshal([]byte(b), &lr)
+		qr, _ := lr["QueryResponse"].(map[string]any)
+		rows, _ := qr["Customer"].([]any)
+		out := []string{}
+		for _, r := range rows {
+			out = append(out, r.(map[string]any)["Id"].(string))
+		}
+		return out
+	}
+	for _, id := range listActive() {
+		if id == gone {
+			t.Fatalf("deactivated customer %s leaked into default list", gone)
+		}
+	}
+
+	// Default query also excludes it...
+	query := func(q string) []string {
+		t.Helper()
+		b, st := qboAuthGet(t, base+"/v3/company/"+realmID+"/query?query="+url.QueryEscape(q), token)
+		if st != 200 {
+			t.Fatalf("query %q -> %d; body %s", q, st, b)
+		}
+		var qr2 map[string]any
+		json.Unmarshal([]byte(b), &qr2)
+		resp2, _ := qr2["QueryResponse"].(map[string]any)
+		rows, _ := resp2["Customer"].([]any)
+		out := []string{}
+		for _, r := range rows {
+			out = append(out, r.(map[string]any)["Id"].(string))
+		}
+		return out
+	}
+	for _, id := range query("select * from Customer") {
+		if id == gone {
+			t.Fatalf("deactivated customer %s leaked into default query", gone)
+		}
+	}
+	if len(query("select * from Customer")) == 0 {
+		t.Fatal("default query excluded everything; the active customer must remain")
+	}
+
+	// ...but WHERE Active = False surfaces exactly the deactivated one.
+	inactive := query("select * from Customer where Active = False")
+	if len(inactive) != 1 || inactive[0] != gone {
+		t.Fatalf("WHERE Active = False -> %v, want exactly [%s]", inactive, gone)
+	}
+	// WHERE Active = True keeps the live ones (seed + created), never the
+	// deactivated row.
+	active := query("select * from Customer where Active = True")
+	activeHasKept, activeHasGone := false, false
+	for _, id := range active {
+		if id == kept {
+			activeHasKept = true
+		}
+		if id == gone {
+			activeHasGone = true
+		}
+	}
+	if !activeHasKept || activeHasGone {
+		t.Fatalf("WHERE Active = True -> %v, want %s present and %s absent", active, kept, gone)
+	}
+
+	// ===== the real-QBO way: sparse POST with Id deactivates too =====
+	body, status = qboAuthPostJSON(t, base+"/v3/company/"+realmID+"/customer", token, map[string]any{
+		"Id": kept, "sparse": true, "Active": false,
+	})
+	if status != 200 {
+		t.Fatalf("sparse update -> %d; body %s", status, body)
+	}
+	var ur map[string]any
+	json.Unmarshal([]byte(body), &ur)
+	if ur["Customer"].(map[string]any)["Active"] != false {
+		t.Fatalf("sparse update Active = %v, want false", ur["Customer"])
+	}
+	remaining := listActive()
+	for _, id := range remaining {
+		if id == gone || id == kept {
+			t.Fatalf("list after sparse deactivation still shows %s (both created customers are inactive)", id)
+		}
+	}
+
+	// POST with an unknown Id -> 404 Fault 620.
+	body, status = qboAuthPostJSON(t, base+"/v3/company/"+realmID+"/customer", token, map[string]any{
+		"Id": "999999", "sparse": true, "Active": false,
+	})
+	if status != 404 {
+		t.Fatalf("update unknown id -> %d, want 404; body %s", status, body)
+	}
+	if code := qboFaultCode(t, body); code != "620" {
+		t.Fatalf("update unknown id code = %v, want 620", code)
+	}
+
+	// ===== invoice void (?operation=void) =====
+	body, status = qboAuthPostJSON(t, base+"/v3/company/"+realmID+"/invoice", token, map[string]any{
+		"Line":        []map[string]any{{"Amount": 900.0, "DetailType": "SalesItemLineDetail"}},
+		"CustomerRef": map[string]any{"value": gone, "name": "Deactivate Me"},
+	})
+	if status != 200 {
+		t.Fatalf("create invoice -> %d; body %s", status, body)
+	}
+	var ir map[string]any
+	json.Unmarshal([]byte(body), &ir)
+	invID := ir["Invoice"].(map[string]any)["Id"].(string)
+
+	body, status = qboAuthPostJSON(t, base+"/v3/company/"+realmID+"/invoice?operation=void", token, map[string]any{
+		"Id": invID, "SyncToken": "0",
+	})
+	if status != 200 {
+		t.Fatalf("void invoice -> %d, want 200; body %s", status, body)
+	}
+	var vr map[string]any
+	json.Unmarshal([]byte(body), &vr)
+	voided := vr["Invoice"].(map[string]any)
+	if voided["status"] != "Voided" {
+		t.Fatalf("voided invoice status = %v, want Voided", voided["status"])
+	}
+	if voided["Balance"] != float64(0) {
+		t.Fatalf("voided invoice Balance = %v, want 0", voided["Balance"])
+	}
+
+	// The voided invoice is still readable by id (soft delete).
+	body, status = qboAuthGet(t, base+"/v3/company/"+realmID+"/invoice/"+invID, token)
+	if status != 200 {
+		t.Fatalf("GET voided invoice -> %d, want 200; body %s", status, body)
+	}
+
+	// Void failure paths: unknown id -> 404 620; missing Id -> 400 610.
+	body, status = qboAuthPostJSON(t, base+"/v3/company/"+realmID+"/invoice?operation=void", token, map[string]any{
+		"Id": "999999",
+	})
+	if status != 404 || qboFaultCode(t, body) != "620" {
+		t.Fatalf("void unknown invoice -> %d code %v, want 404 620; body %s", status, qboFaultCode(t, body), body)
+	}
+	body, status = qboAuthPostJSON(t, base+"/v3/company/"+realmID+"/invoice?operation=void", token, map[string]any{})
+	if status != 400 || qboFaultCode(t, body) != "610" {
+		t.Fatalf("void missing Id -> %d code %v, want 400 610; body %s", status, qboFaultCode(t, body), body)
+	}
+}
+
+// qboAuthDelete performs an authorized DELETE and returns body + status.
+func qboAuthDelete(t *testing.T, rawurl, token string) (string, int) {
+	t.Helper()
+	req, err := http.NewRequest("DELETE", rawurl, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(resp.Body)
+	return string(b), resp.StatusCode
+}
+
+// qboFaultCode digs the first Fault.Error[].code out of a QBO error body.
+func qboFaultCode(t *testing.T, body string) string {
+	t.Helper()
+	var f map[string]any
+	if err := json.Unmarshal([]byte(body), &f); err != nil {
+		t.Fatalf("unmarshal fault %q: %v", body, err)
+	}
+	fault, _ := f["Fault"].(map[string]any)
+	errs, _ := fault["Error"].([]any)
+	if len(errs) == 0 {
+		return ""
+	}
+	code, _ := errs[0].(map[string]any)["code"].(string)
+	return code
+}
