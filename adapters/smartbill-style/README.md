@@ -27,13 +27,13 @@ invoices ("what does this company spend, and on what?").
 
 | Family | Endpoints |
 | --- | --- |
-| company | `GET /v1/company` |
-| invoices | `POST /v1/invoice`, `GET /v1/invoice`, `GET /v1/invoice/list`, `PUT /v1/invoice/cancel` |
-| payments | `POST /v1/invoice/payment`, `DELETE /v1/invoice/payment` |
-| estimates (proforma) | `POST /v1/estimate`, `GET /v1/estimate/list`, `PUT /v1/estimate/cancel` |
-| purchase invoices (spend) | `POST /v1/purchase`, `GET /v1/purchase/list` |
-| stocks | `GET /v1/stocks`, `POST /v1/stocks/movement` |
-| messages | `POST /v1/message/email` (recorded; no delivery) |
+| company | `GET /company` |
+| invoices | `POST /invoice`, `GET /invoice`, `GET /invoice/list`, `PUT /invoice/cancel` |
+| payments | `POST /invoice/payment`, `DELETE /invoice/payment` |
+| estimates (proforma) | `POST /estimate`, `GET /estimate/list`, `PUT /estimate/cancel` |
+| purchase invoices (spend) | `POST /purchase`, `GET /purchase/list` |
+| stocks | `GET /stocks`, `POST /stocks/movement` |
+| messages | `POST /message/email` (recorded; no delivery) |
 
 Purchase invoice **product lines** carry an explicit `category` — the
 classification in the customer's books, and the natural unit of spend: one
@@ -60,11 +60,26 @@ services:
 CRED=$(printf 'user:token' | base64)
 curl -X POST localhost:4210/sim/company -H "Authorization: Basic $CRED" \
      -H 'Content-Type: application/json' -d '{"cif": "RO12345678", "name": "Acme SRL"}'
-curl -X POST "localhost:4210/v1/purchase?cif=RO12345678" \
+curl -X POST "localhost:4210/purchase?cif=RO12345678" \
      -H "Authorization: Basic $CRED" -H 'Content-Type: application/json' \
      -d '{"issueDate": "2026-06-05", "supplierName": "Metro",
           "products": [{"name": "Beans", "category": "groceries",
                         "quantity": "10", "price": "98.00"}]}'
 curl -H "Authorization: Basic $CRED" \
-     "localhost:4210/v1/purchase/list?cif=RO12345678&startDate=2026-06-01&endDate=2026-06-30"
+     "localhost:4210/purchase/list?cif=RO12345678&startDate=2026-06-01&endDate=2026-06-30"
 ```
+
+## Corrections (review)
+
+The real SmartBill Cloud API has **no version segment** (base
+`…/api/`), uses `seriesname` (not `series`), `client`/`supplier` objects
+(not buyer/supplier scalar fields), the `{payment: {companyVatCode,
+value, type, isCash, invoicesList}}` envelope, `{list: [...]}` for stocks
+and metadata, `errorText` errors, and **JSON numbers** for all money and
+quantities. Amounts are NOT decimal strings. There are no list endpoints
+for invoices/estimates/purchases — documents are read by
+`?cif=&seriesname=&number=`. `GET /invoice/paymentstatus` reports
+`{invoiceTotalAmount, paidAmount, unpaidAmount, paid}`. The
+`paymentId` disclosed by `POST /payment` is a simulator extension so the
+delete flow is driveable. `/sim/*` routes are simulator affordances, not
+API surface.

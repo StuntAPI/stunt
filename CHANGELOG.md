@@ -15,7 +15,7 @@ All notable changes to **stunt** are documented here. The format is based on
   Models the v1 conventions: Basic auth with genuine 401s, bare-JSON
   envelopes (empty body on create, like the real API), plain page/pageSize
   pagination with totalPages, cif scoping where a foreign cif is an
-  indistinguishable 404, and decimal-string money and quantities. Includes a
+  indistinguishable 404, and numeric JSON money and quantities. Includes a
   pure-Starlark base64 decoder (for runtimes without the crypto builtin) and
   a conformance test.
 

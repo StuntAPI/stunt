@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,16 +16,24 @@ import (
 	"stuntapi.com/stunt/internal/manifest"
 )
 
-// TestSmartBillStyleAdapter exercises the v1 invoicing surface:
+// sbillAuth is a valid Basic header for the adapter (any user:token pair).
+func sbillAuth() string {
+	return "Basic " + base64.StdEncoding.EncodeToString([]byte("sbuser:sbtoken"))
+}
+
+// TestSmartBillStyleAdapter exercises the real SmartBill surface (version-free
+// paths, client/supplier objects, numeric amounts, errorText errors):
 //
-//   - 401 without Basic credentials
-//   - company bootstrap, then cif scoping (unknown cif is a 404)
-//   - invoice create returns an empty body; list paginates with plain
-//     page/pageSize and totalPages
-//   - invoice cancel flips status
-//   - purchase invoice lines carry the book classification; the list
-//     filters by startDate/endDate on the issue date
-//   - decimal-string money survives the round-trip
+//   - 401 without Basic credentials (and for malformed base64 / non-Basic)
+//   - company bootstrap via /sim/company; unknown cif is a 404
+//   - invoice create (empty body) + GET by seriesname/number with the real
+//     client object, numeric products, and computed totals
+//   - paymentstatus: unpaid -> partial -> paid as payments land; payment
+//     delete by paymentId un-pays
+//   - invoice cancel/restore; estimate create/get/cancel; purchase create/get
+//   - stocks GET grouped by warehouse; document/send records the message
+//   - tax/series metadata lists
+//   - malformed JSON -> 400 (errorText), never a 500
 func TestSmartBillStyleAdapter(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "smartbill-style")
 	absAdapterDir, err := filepath.Abs(adapterDir)
@@ -59,94 +66,209 @@ func TestSmartBillStyleAdapter(t *testing.T) {
 
 	base := addrs["smartbill"]
 	const cif = "RO12345678"
-	auth := "Basic " + base64.StdEncoding.EncodeToString([]byte("user:token"))
 
-	// ===== 401 without credentials =====
-	resp, err := http.Get(base + "/v1/company")
+	// ===== auth negatives =====
+	r, _ := http.Get(base + "/tax")
+	r.Body.Close()
+	if r.StatusCode != 401 {
+		t.Fatalf("no-auth /tax -> %d, want 401", r.StatusCode)
+	}
+	reqBad, _ := http.NewRequest("GET", base+"/tax", nil)
+	reqBad.Header.Set("Authorization", "Bearer nope")
+	rBad, _ := http.DefaultClient.Do(reqBad)
+	var eBody map[string]any
+	_ = json.NewDecoder(rBad.Body).Decode(&eBody)
+	rBad.Body.Close()
+	if rBad.StatusCode != 401 {
+		t.Fatalf("non-Basic -> %d, want 401", rBad.StatusCode)
+	}
+	if _, ok := eBody["errorText"].(string); !ok {
+		t.Fatalf("401 body = %v, want errorText", eBody)
+	}
+	// Malformed base64 must not 5xx.
+	reqMB, _ := http.NewRequest("GET", base+"/tax", nil)
+	reqMB.Header.Set("Authorization", "Basic !!!not-base64!!!")
+	rMB, err := http.DefaultClient.Do(reqMB)
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
-	if resp.StatusCode != 401 {
-		t.Fatalf("no-auth /v1/company -> %d, want 401", resp.StatusCode)
+	rMB.Body.Close()
+	if rMB.StatusCode >= 500 {
+		t.Fatalf("malformed base64 -> %d, want 4xx", rMB.StatusCode)
 	}
 
-	// ===== bootstrap the company =====
-	sbillPost(t, base, "/sim/company", auth, map[string]any{"cif": cif, "name": "Acme SRL"}, 201)
-
-	// ===== unknown cif is a 404 =====
-	req, _ := http.NewRequest("GET", base+"/v1/invoice/list?cif=RO99999999", nil)
-	req.Header.Set("Authorization", auth)
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != 404 {
-		t.Fatalf("unknown cif -> %d, want 404", resp.StatusCode)
+	// ===== company bootstrap (simulator affordance) =====
+	if _, st := sbillPost(t, base, "/sim/company", map[string]any{"cif": cif, "name": "Acme SRL"}, 201); st != 201 {
+		t.Fatalf("company bootstrap -> %d", st)
 	}
 
-	// ===== invoice create: empty body, like the real API =====
-	body, _ := sbillPost(t, base, "/v1/invoice?cif="+cif, auth, map[string]any{
-		"issueDate": "2026-06-10", "buyerName": "Buyer Co",
-		"products": []map[string]any{{"name": "Site", "price": "1000.00", "quantity": "1"}},
-	}, 200)
-	if strings.TrimSpace(body) != "" {
-		t.Fatalf("invoice create returned a body (%q); the real API returns empty", body)
+	// ===== malformed JSON -> 400 with errorText =====
+	reqBad2, _ := http.NewRequest("POST", base+"/invoice", strings.NewReader(`{"seriesName": "FCT"`))
+	reqBad2.Header.Set("Authorization", sbillAuth())
+	reqBad2.Header.Set("Content-Type", "application/json")
+	rBad2, _ := http.DefaultClient.Do(reqBad2)
+	var eBad map[string]any
+	_ = json.NewDecoder(rBad2.Body).Decode(&eBad)
+	rBad2.Body.Close()
+	if rBad2.StatusCode != 400 {
+		t.Fatalf("malformed JSON -> %d, want 400", rBad2.StatusCode)
+	}
+	if _, ok := eBad["errorText"].(string); !ok {
+		t.Fatalf("400 body = %v, want errorText", eBad)
 	}
 
-	// ===== list + pagination =====
-	for i := 0; i < 3; i++ {
-		sbillPost(t, base, "/v1/invoice?cif="+cif, auth, map[string]any{
-			"issueDate": "2026-06-1" + fmt.Sprint(i), "buyerName": "Buyer Co", "products": []map[string]any{},
-		}, 200)
-	}
-	list := sbillGet(t, base, "/v1/invoice/list?cif="+cif+"&pageSize=2&page=1", auth)
-	if list["totalRecords"].(float64) != 4 || list["totalPages"].(float64) != 2 {
-		t.Fatalf("invoice list: total %v pages %v, want 4/2", list["totalRecords"], list["totalPages"])
-	}
-	firstInvoice := list["invoices"].([]any)[0].(map[string]any)
-	if _, ok := firstInvoice["currency"].(string); !ok {
-		t.Fatalf("currency is %T, want string", firstInvoice["currency"])
-	}
-
-	// ===== purchase invoices: line-level classification, date filter =====
-	sbillPost(t, base, "/v1/purchase?cif="+cif, auth, map[string]any{
-		"issueDate": "2026-06-05", "supplierName": "Metro",
+	// ===== invoice create: empty body, real field names, numeric amounts =====
+	if _, st := sbillPost(t, base, "/invoice", map[string]any{
+		"companyVatCode": cif,
+		"seriesName":     "FCT",
+		"currency":       "RON",
+		"client":         map[string]any{"name": "Beta Corp", "vatCode": "RO98765432", "city": "Cluj"},
 		"products": []map[string]any{
-			{"name": "Beans", "category": "groceries", "quantity": "10", "price": "98.00"},
-			{"name": "Power", "category": "utilities", "quantity": "1", "price": "1450.40"},
+			{"name": "Consultanta", "price": 100.0, "quantity": 2.0, "taxPercentage": 19.0},
+			{"name": "Suport", "price": 50.0, "quantity": 1.0, "taxPercentage": 0.0},
+		},
+	}, 200); st != 200 {
+		t.Fatalf("invoice create -> %d", st)
+	}
+
+	inv := sbillGet(t, base, "/invoice?cif="+cif+"&seriesname=FCT&number=1")
+	if inv["seriesName"] != "FCT" || fmt.Sprint(inv["number"]) != "1" {
+		t.Fatalf("invoice round-trip: %v", inv)
+	}
+	client, _ := inv["client"].(map[string]any)
+	if client["name"] != "Beta Corp" || client["vatCode"] != "RO98765432" {
+		t.Fatalf("client object = %v", inv["client"])
+	}
+	// Numeric amounts: totals computed as JSON numbers.
+	if inv["totalNet"].(float64) != 250.0 || inv["totalVAT"].(float64) != 38.0 || inv["invoiceTotalAmount"].(float64) != 288.0 {
+		t.Fatalf("totals = net %v vat %v total %v, want 250/38/288", inv["totalNet"], inv["totalVAT"], inv["invoiceTotalAmount"])
+	}
+	if _, hasID := inv["id"]; hasID {
+		t.Fatal("internal id must not leak")
+	}
+
+	// ===== paymentstatus: unpaid -> paid =====
+	ps := sbillGet(t, base, "/invoice/paymentstatus?cif="+cif+"&seriesname=FCT&number=1")
+	if ps["paid"] != false || ps["unpaidAmount"].(float64) != 288.0 {
+		t.Fatalf("initial paymentstatus = %v", ps)
+	}
+	payBody := map[string]any{"payment": map[string]any{
+		"companyVatCode": cif,
+		"value":          288.0,
+		"type":           "CHITANTA",
+		"isCash":         true,
+		"invoicesList":   []map[string]any{{"seriesName": "FCT", "number": "1"}},
+	}}
+	payResp, st := sbillPost(t, base, "/payment", payBody, 200)
+	if st != 200 {
+		t.Fatalf("payment add -> %d", st)
+	}
+	var payOut map[string]any
+	_ = json.Unmarshal([]byte(payResp), &payOut)
+	payID := fmt.Sprint(payOut["paymentId"])
+	if payID == "" || payID == "<nil>" {
+		t.Fatalf("payment create must disclose paymentId: %s", payResp)
+	}
+	ps = sbillGet(t, base, "/invoice/paymentstatus?cif="+cif+"&seriesname=FCT&number=1")
+	if ps["paid"] != true || ps["paidAmount"].(float64) != 288.0 || ps["unpaidAmount"].(float64) != 0 {
+		t.Fatalf("paid paymentstatus = %v", ps)
+	}
+
+	// Payment delete un-pays.
+	sbillDelete(t, base, "/payment/v2", map[string]any{"companyVatCode": cif, "paymentId": payID}, 200)
+	ps = sbillGet(t, base, "/invoice/paymentstatus?cif="+cif+"&seriesname=FCT&number=1")
+	if ps["paid"] != false {
+		t.Fatalf("after delete paymentstatus = %v", ps)
+	}
+	sbillDelete(t, base, "/payment/v2", map[string]any{"companyVatCode": cif, "paymentId": "999"}, 404)
+
+	// ===== cancel + restore =====
+	sbillPut(t, base, "/invoice/cancel", map[string]any{"companyVatCode": cif, "seriesName": "FCT", "number": "1", "cancellationTax": 0.0}, 200)
+	inv = sbillGet(t, base, "/invoice?cif="+cif+"&seriesname=FCT&number=1")
+	if inv["status"] != "canceled" {
+		t.Fatalf("canceled status = %v", inv["status"])
+	}
+	sbillPut(t, base, "/invoice/restore", map[string]any{"companyVatCode": cif, "seriesName": "FCT", "number": "1"}, 200)
+	inv = sbillGet(t, base, "/invoice?cif="+cif+"&seriesname=FCT&number=1")
+	if inv["status"] != "active" {
+		t.Fatalf("restored status = %v", inv["status"])
+	}
+
+	// ===== estimate create/get/cancel =====
+	sbillPost(t, base, "/estimate", map[string]any{
+		"companyVatCode": cif, "seriesName": "PRO",
+		"client":   map[string]any{"name": "Gamma"},
+		"products": []map[string]any{{"name": "Work", "price": 10.0, "quantity": 1.0, "taxPercentage": 19.0}},
+	}, 200)
+	est := sbillGet(t, base, "/estimate?cif="+cif+"&seriesname=PRO&number=1")
+	if est["invoiceTotalAmount"].(float64) != 11.9 {
+		t.Fatalf("estimate total = %v, want 11.9", est["invoiceTotalAmount"])
+	}
+	sbillPut(t, base, "/estimate/cancel", map[string]any{"companyVatCode": cif, "seriesName": "PRO", "number": "1"}, 200)
+	est = sbillGet(t, base, "/estimate?cif="+cif+"&seriesname=PRO&number=1")
+	if est["status"] != "canceled" {
+		t.Fatalf("estimate canceled = %v", est["status"])
+	}
+
+	// ===== purchase (spend side) =====
+	sbillPost(t, base, "/purchase", map[string]any{
+		"companyVatCode": cif, "seriesName": "ACH",
+		"supplier": map[string]any{"name": "Metro", "vatCode": "RO11112222"},
+		"products": []map[string]any{{"name": "Birocuri", "price": 5.0, "quantity": 4.0, "taxPercentage": 19.0}},
+	}, 200)
+	pur := sbillGet(t, base, "/purchase?cif="+cif+"&seriesname=ACH&number=1")
+	sup, _ := pur["supplier"].(map[string]any)
+	if sup["name"] != "Metro" || pur["invoiceTotalAmount"].(float64) != 23.8 {
+		t.Fatalf("purchase = %v", pur)
+	}
+
+	// ===== stocks: seed via sim movement, then the real grouped read =====
+	sbillPost(t, base, "/sim/stocks/movement", map[string]any{
+		"cif": cif, "productCode": "SKU-1", "productName": "Birocuri", "quantity": 10.0, "warehouseName": "Depot A",
+	}, 200)
+	stocks := sbillGet(t, base, "/stocks?cif="+cif)
+	list, _ := stocks["list"].([]any)
+	if len(list) != 1 {
+		t.Fatalf("stocks list = %v", stocks)
+	}
+	group := list[0].(map[string]any)
+	wh, _ := group["warehouse"].(map[string]any)
+	if wh["warehouseName"] != "Depot A" {
+		t.Fatalf("warehouse group = %v", group)
+	}
+	prods, _ := group["products"].([]any)
+	if prods[0].(map[string]any)["quantity"].(float64) != 10.0 {
+		t.Fatalf("stock quantity = %v", prods[0])
+	}
+	filtered := sbillGet(t, base, "/stocks?cif="+cif+"&warehouseName=Nowhere")
+	if n := len(filtered["list"].([]any)); n != 0 {
+		t.Fatalf("warehouse filter -> %d groups, want 0", n)
+	}
+
+	// ===== document/send =====
+	sbillPost(t, base, "/document/send", map[string]any{
+		"sendDocumentRequest": map[string]any{
+			"companyVatCode": cif, "seriesName": "FCT", "number": "1",
+			"type": "factura", "subject": "Factura ta", "to": "client@example.test",
 		},
 	}, 200)
-	purl := base + "/v1/purchase/list?" + url.Values{"cif": {cif}, "startDate": {"2026-06-01"}, "endDate": {"2026-06-30"}}.Encode()
-	purchases := sbillGet(t, base, strings.TrimPrefix(purl, base), auth)
-	invs := purchases["invoices"].([]any)
-	if purchases["totalRecords"].(float64) != 1 || len(invs) != 1 {
-		t.Fatalf("purchase list: %v records", purchases["totalRecords"])
-	}
-	lines := invs[0].(map[string]any)["products"].([]any)
-	if len(lines) != 2 {
-		t.Fatalf("purchase lines: %d, want 2", len(lines))
-	}
-	if lines[0].(map[string]any)["price"] != "98.00" {
-		t.Fatalf("line price is %v, want decimal string \"98.00\"", lines[0].(map[string]any)["price"])
-	}
 
-	// ===== invoice cancel flips status =====
-	number := fmt.Sprint(firstInvoice["number"])
-	series := fmt.Sprint(firstInvoice["series"])
-	sbillPut(t, base, "/v1/invoice/cancel?cif="+cif+"&series="+series+"&number="+number, auth, map[string]any{}, 200)
-	got := sbillGet(t, base, "/v1/invoice?cif="+cif+"&series="+series+"&number="+number, auth)
-	if got["status"] != "canceled" {
-		t.Fatalf("invoice status after cancel: %v", got["status"])
+	// ===== metadata =====
+	tax := sbillGet(t, base, "/tax")
+	if n := len(tax["list"].([]any)); n < 3 {
+		t.Fatalf("tax list = %v", tax)
+	}
+	ser := sbillGet(t, base, "/series")
+	if n := len(ser["list"].([]any)); n < 2 {
+		t.Fatalf("series list = %v", ser)
 	}
 }
 
-func sbillPost(t *testing.T, base, path, auth string, body map[string]any, want int) (string, int) {
+func sbillPost(t *testing.T, base, path string, body map[string]any, want int) (string, int) {
 	t.Helper()
 	buf, _ := json.Marshal(body)
 	req, _ := http.NewRequest("POST", base+path, bytes.NewReader(buf))
-	req.Header.Set("Authorization", auth)
+	req.Header.Set("Authorization", sbillAuth())
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -155,16 +277,16 @@ func sbillPost(t *testing.T, base, path, auth string, body map[string]any, want 
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != want {
-		t.Fatalf("POST %s -> %d, want %d; body %s", path, resp.StatusCode, want, raw)
+		t.Fatalf("POST %s -> %d (want %d): %s", path, resp.StatusCode, want, raw)
 	}
 	return string(raw), resp.StatusCode
 }
 
-func sbillPut(t *testing.T, base, path, auth string, body map[string]any, want int) {
+func sbillPut(t *testing.T, base, path string, body map[string]any, want int) {
 	t.Helper()
 	buf, _ := json.Marshal(body)
 	req, _ := http.NewRequest("PUT", base+path, bytes.NewReader(buf))
-	req.Header.Set("Authorization", auth)
+	req.Header.Set("Authorization", sbillAuth())
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -173,21 +295,39 @@ func sbillPut(t *testing.T, base, path, auth string, body map[string]any, want i
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != want {
-		t.Fatalf("PUT %s -> %d, want %d; body %s", path, resp.StatusCode, want, raw)
+		t.Fatalf("PUT %s -> %d (want %d): %s", path, resp.StatusCode, want, raw)
 	}
 }
 
-func sbillGet(t *testing.T, base, path, auth string) map[string]any {
+func sbillDelete(t *testing.T, base, path string, body map[string]any, want int) {
+	t.Helper()
+	buf, _ := json.Marshal(body)
+	req, _ := http.NewRequest("DELETE", base+path, bytes.NewReader(buf))
+	req.Header.Set("Authorization", sbillAuth())
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != want {
+		t.Fatalf("DELETE %s -> %d (want %d): %s", path, resp.StatusCode, want, raw)
+	}
+}
+
+func sbillGet(t *testing.T, base, path string) map[string]any {
 	t.Helper()
 	req, _ := http.NewRequest("GET", base+path, nil)
-	req.Header.Set("Authorization", auth)
+	req.Header.Set("Authorization", sbillAuth())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		t.Fatalf("GET %s -> %d, want 200", path, resp.StatusCode)
+		raw, _ := io.ReadAll(resp.Body)
+		t.Fatalf("GET %s -> %d: %s", path, resp.StatusCode, raw)
 	}
 	var out map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {

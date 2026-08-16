@@ -1,18 +1,34 @@
-# Shared helpers, preloaded into every handler (D55). SmartBill v1 conventions:
-# Basic auth (username:token, base64), bare-JSON envelopes (arrays for lists,
-# no {data} wrapper), decimal-string money, plain page/pageSize pagination.
+# Shared helpers, preloaded into every handler. SmartBill conventions: Basic
+# auth (username:token, base64), bare-JSON envelopes, NUMERIC amounts (the
+# real API uses JSON numbers, not decimal strings), version-free paths, and
+# errorText errors.
 
-def api_error(status, code, message):
-    return respond(status, {"error": {"code": code, "message": message}})
+def api_error(status, message):
+    # Real SmartBill errors carry errorText/message, no nested code object.
+    return respond(status, {"errorText": message, "message": message})
 
 def body_of(req):
+    # Parsed JSON body, an empty dict, or None when the body is non-empty but
+    # undecodable (callers answer 400 — never a 500 from a raising decode).
+    # raw_body is authoritative: undecodable bodies surface as EMPTY DICTS
+    # via req.body, which would silently pass the defaults.
+    raw = req.get("raw_body", "")
+    if raw == None:
+        raw = ""
+    if raw != "":
+        decoded = json_safe_decode(raw)
+        if decoded == None or type(decoded) != "dict":
+            return None
+        return decoded
     b = req.get("body")
     if b == None:
-        raw = req.get("raw_body", "")
-        if raw == "":
-            return {}
-        return json.loads(raw)
+        return {}
+    if type(b) != "dict":
+        return None
     return b
+
+def bad_body():
+    return api_error(400, "Request body is not valid JSON.")
 
 def q1(query, name, default=""):
     v = query.get(name, default)
@@ -21,7 +37,6 @@ def q1(query, name, default=""):
     return str(v)
 
 def to_int(s, fallback):
-    # No try/except and strings are not iterable here — isdigit() carries it.
     t = str(s)
     if t.startswith("-"):
         t = t[1:]
@@ -29,151 +44,137 @@ def to_int(s, fallback):
         return fallback
     return int(t)
 
-def _split_first(s, sep):
-    # Starlark here has no str.split with maxsplit guarantees we can lean on
-    # for credentials; slice on the first separator instead.
-    for i in range(len(s)):
-        if s[i] == sep:
-            return s[:i], s[i + 1:]
-    return s, ""
+def to_num(v, fallback=0.0):
+    # JSON numbers arrive as int or float; numeric strings accepted too.
+    if type(v) == "int":
+        return v * 1.0
+    if type(v) == "float":
+        return v
+    t = str(v)
+    if t == "":
+        return fallback
+    n = ""
+    seen_dot = False
+    for i in range(len(t)):
+        ch = t[i]
+        if ch == "." and not seen_dot:
+            seen_dot = True
+            n = n + ch
+        elif ch >= "0" and ch <= "9":
+            n = n + ch
+        else:
+            return fallback
+    return float(n)
 
-
-# --- standard base64 decode (pure Starlark: the local stunt build predates
-# the crypto builtin, and strings are not iterable) ---
-_CHARS = "\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
-_B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-
-def _b64_val(ch):
-    return _B64.find(ch)
-
-def _b64_decode(seg):
-    seg = seg.replace("=", "")
-    vals = []
-    for i in range(len(seg)):
-        v = _b64_val(seg[i])
-        if v < 0:
-            return ""
-        vals.append(v)
-    while len(vals) % 4 != 0:
-        vals.append(0)
-    result = ""
-    i = 0
-    orig_len = len(seg)
-    while i < len(vals):
-        v1 = vals[i]
-        v2 = vals[i + 1]
-        v3 = vals[i + 2]
-        v4 = vals[i + 3]
-        b1 = v1 * 4 + v2 // 16
-        result = result + _CHARS[b1 - 32]
-        if orig_len > i + 2:
-            b2 = (v2 % 16) * 16 + v3 // 4
-            result = result + _CHARS[b2 - 32]
-        if orig_len > i + 3:
-            b3 = (v3 % 4) * 64 + v4
-            result = result + _CHARS[b3 - 32]
-        i = i + 4
-    return result
+def round2(v):
+    return (v * 100.0 + 0.5) // 1 / 100.0
 
 def require_auth(req):
     """Valid Basic credentials — any username:token pair, for frictionless
     local testing. A missing or malformed header is a genuine 401."""
     headers = req.get("headers", {})
-    # `x.get(k, "") or x.get(k2, "")` yields None when BOTH are absent ("" is
-    # falsy), and None.startswith crashes the handler — hence the final `or ""`.
     auth = headers.get("Authorization") or headers.get("authorization") or ""
+    if auth == None:
+        auth = ""
     if not auth.startswith("Basic "):
-        return None, api_error(401, "unauthorized", "The credentials are missing or invalid.")
-    decoded = _b64_decode(auth[6:])
-    if ":" not in decoded or decoded == "":
-        return None, api_error(401, "unauthorized", "The credentials are missing or invalid.")
-    return decoded.split(":")[0], None
+        return None, api_error(401, "The credentials are missing or invalid.")
+    # crypto.base64_decode raises on non-alphabet input; validate first.
+    enc = auth[6:]
+    body_chars = enc.replace("=", "")
+    ok = len(body_chars) > 0 and len(enc) % 4 == 0 and "=" not in body_chars
+    if ok:
+        for i in range(len(body_chars)):
+            ch = body_chars[i]
+            if not (ch in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" or ch in "abcdefghijklmnopqrstuvwxyz" or ch in "0123456789" or ch == "+" or ch == "/"):
+                ok = False
+                break
+    if not ok:
+        return None, api_error(401, "The credentials are missing or invalid.")
+    decoded = crypto.base64_decode(enc)
+    if decoded == None or decoded == "":
+        return None, api_error(401, "The credentials are missing or invalid.")
+    # First colon separates user from token.
+    sep = -1
+    for i in range(len(decoded)):
+        if decoded[i] == ":":
+            sep = i
+            break
+    if sep <= 0:
+        return None, api_error(401, "The credentials are missing or invalid.")
+    return decoded[:sep], None
 
 def companies():
     return store_collection("sb_companies")
 
 def companies_of(_account):
-    rows = []
-    for c in companies().list():
-        rows.append(c)
-    return rows
+    return companies().list()
 
-def require_cif(req, account):
-    """The company row for the cif query parameter, or a 404 response.
-
-    A cif belonging to another account is also a 404: the real API never
-    tells you whether someone else's company exists.
-    """
-    cif = q1(req.get("query", {}), "cif", "")
+def require_cif(req, account, cif=None):
+    """The company row for the cif (query param or caller-supplied value),
+    or a 404 response. A cif belonging to another account is also a 404."""
+    if cif == None or cif == "":
+        cif = q1(req.get("query", {}), "cif", "")
     if cif == "":
-        return None, api_error(422, "validation", "cif is required")
+        return None, api_error(422, "cif is required")
     for c in companies_of(account):
-        if str(c.get("cif", "")) == cif:
+        if str(c.get("cif", "")) == str(cif):
             return c, None
-    return None, api_error(404, "not_found", "Company not found")
+    return None, api_error(404, "Company not found")
 
 def rows_of(resource, _account, cif):
-    # Scoped by cif (single-tenant simulator; the peekmrr-derived variant
-    # additionally scopes by credential account).
+    # Scoped by cif (single-tenant simulator).
     rows = []
     for d in store_collection(resource).list():
         if str(d.get("cif", "")) == str(cif):
             rows.append(d)
     return rows
 
-def next_id(resource):
-    return str(store_kv_incr("ids", "sb_" + resource))
-
-def _date_of(doc):
-    return str(doc.get("issueDate", doc.get("date", "")))
-
-def by_date(rows):
-    # Insertion sort by issue date — no list .sort, sorted() refuses kwargs.
-    out = []
-    for r in rows:
-        k = _date_of(r)
-        placed = False
-        for i in range(len(out)):
-            if k <= _date_of(out[i]):
-                out.insert(i, r)
-                placed = True
-                break
-        if not placed:
-            out.append(r)
-    return out
-
-def date_wanted(req):
-    query = req.get("query", {})
-    ds = q1(query, "startDate", "")
-    de = q1(query, "endDate", "")
-    def wanted(doc):
-        date = _date_of(doc)
-        if ds != "" and date != "" and date < ds:
-            return False
-        if de != "" and date != "" and date > de:
-            return False
-        return True
-    return wanted
-
-def page_slice(rows, req):
-    # Plain page/pageSize, one page per request. Returns (chunk, meta).
-    page_size = min(100, max(1, to_int(q1(req.get("query", {}), "pageSize", "25"), 25)))
-    page = max(1, to_int(q1(req.get("query", {}), "page", "1"), 1))
-    total = len(rows)
-    last = max(1, (total + page_size - 1) // page_size)
-    page = min(page, last)
-    start = (page - 1) * page_size
-    return rows[start:start + page_size], {
-        "page": page,
-        "pageSize": page_size,
-        "totalPages": last,
-        "totalRecords": total,
-    }
+def next_num(resource):
+    # Document numbers per series are sequential integers, like the real API.
+    return to_int(store_kv_incr("ids", "sb_" + resource + "_num"), 0)
 
 def strip_internal(doc):
+    # Drop internal bookkeeping: the credential account, the store's auto id,
+    # and any engine _-prefixed key (_batch et al). Real SmartBill documents
+    # have no id field.
     out = {}
     for k in doc:
-        if k == "sim_account":
+        if k == "sim_account" or k == "id" or k[:1] == "_":
             continue
         out[k] = doc[k]
     return out
+
+def _num_key(v):
+    # Document numbers are numeric; stored ints round-trip as floats, so
+    # str() comparison would see "1.0" != "1". Compare numerically, fall
+    # back to the raw string for non-numeric ids.
+    if type(v) == "float":
+        iv = int(v)
+        if v == iv * 1.0:
+            return str(iv)
+        return str(v)
+    if type(v) == "int":
+        return str(v)
+    n = to_int(v, -1)
+    if n >= 0:
+        return str(n)
+    return str(v)
+
+def find_doc(resource, account, cif, series_name, number):
+    want = _num_key(number)
+    for d in rows_of(resource, account, cif):
+        if str(d.get("seriesName", "")) == str(series_name) and _num_key(d.get("number", "")) == want:
+            return d
+    return None
+
+def line_totals(products):
+    # (net, vat) summed over lines: price*quantity and its taxPercentage.
+    net = 0.0
+    vat = 0.0
+    for p in products:
+        if type(p) != "dict":
+            continue
+        line = round2(to_num(p.get("price", 0)) * to_num(p.get("quantity", 0)))
+        net = net + line
+        vat = vat + round2(line * to_num(p.get("taxPercentage", 0)) / 100.0)
+    return round2(net), round2(vat)
