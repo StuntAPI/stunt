@@ -3,7 +3,14 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"encoding/pem"
 	"io"
 	"net/http"
 	"net/url"
@@ -1452,4 +1459,236 @@ func sfAuthDeleteWithQuery(t *testing.T, rawurl, token string) (string, int) {
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(resp.Body)
 	return string(b), resp.StatusCode
+}
+
+// sfPrivateKey parses the fixed mock keypair the JWT adapters share: the
+// private half lives here in tests (google_iam_style_test.go carries the
+// PEM), the Salesforce adapter verifies assertions against its public
+// half — the "connected-app certificate" a real client registers out of
+// band.
+func sfPrivateKey(t *testing.T) *rsa.PrivateKey {
+	t.Helper()
+	block, _ := pem.Decode([]byte(googleIAMPrivateKeyPEM))
+	if block == nil {
+		t.Fatal("bad test key PEM")
+	}
+	priv, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		t.Fatalf("parse test key: %v", err)
+	}
+	return priv
+}
+
+// sfSignRaw signs an arbitrary JOSE header + claims payload as RS256.
+func sfSignRaw(t *testing.T, key *rsa.PrivateKey, header, payload string) string {
+	t.Helper()
+	h := base64.RawURLEncoding.EncodeToString([]byte(header))
+	p := base64.RawURLEncoding.EncodeToString([]byte(payload))
+	digest := sha256.Sum256([]byte(h + "." + p))
+	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	return h + "." + p + "." + base64.RawURLEncoding.EncodeToString(sig)
+}
+
+// sfSignAssertion builds a real RS256 jwt-bearer assertion with
+// Salesforce's claim set: iss = the connected app's consumer key,
+// sub = the user the session is for, aud = a Salesforce login host.
+func sfSignAssertion(t *testing.T, key *rsa.PrivateKey, iss, sub, aud string, iat, exp int64) string {
+	t.Helper()
+	payload := `{"iss":"` + iss + `","sub":"` + sub + `","aud":"` + aud + `",` +
+		`"iat":` + strconv.FormatInt(iat, 10) + `,"exp":` + strconv.FormatInt(exp, 10) + `}`
+	return sfSignRaw(t, key, `{"alg":"RS256","typ":"JWT"}`, payload)
+}
+
+// TestSalesforceStyleJWTBearerGrant exercises the RFC 7523 flow: a valid
+// RS256 assertion mints a working session (no refresh token — the client
+// mints a fresh assertion instead), and forged, expired, wrong-audience,
+// and malformed assertions get the real invalid_grant 400.
+func TestSalesforceStyleJWTBearerGrant(t *testing.T) {
+	base := sfStart(t)
+	priv := sfPrivateKey(t)
+	now := time.Now().Unix()
+
+	postGrant := func(assertion string) (string, int) {
+		v := url.Values{
+			"grant_type": {"urn:ietf:params:oauth:grant-type:jwt-bearer"},
+		}
+		if assertion != "" {
+			v.Set("assertion", assertion)
+		}
+		return sfPostForm(t, base+"/services/oauth2/token", v)
+	}
+
+	// ===== Valid assertion → 200, access_token, no refresh_token =====
+
+	assertion := sfSignAssertion(t, priv,
+		"3MVG9mockConsumerKey", "jwt-user@example.com",
+		"https://login.salesforce.com", now, now+300)
+	body, status := postGrant(assertion)
+	if status != 200 {
+		t.Fatalf("jwt-bearer grant -> %d, want 200; body %s", status, body)
+	}
+	var tok map[string]any
+	if err := json.Unmarshal([]byte(body), &tok); err != nil {
+		t.Fatalf("unmarshal token resp: %v (body %s)", err, body)
+	}
+	accessToken, _ := tok["access_token"].(string)
+	if accessToken == "" {
+		t.Fatalf("access_token = %v, want non-empty", tok["access_token"])
+	}
+	if tok["token_type"] != "Bearer" {
+		t.Fatalf("token_type = %v, want Bearer", tok["token_type"])
+	}
+	if _, has := tok["refresh_token"]; has {
+		t.Fatalf("jwt-bearer response has refresh_token = %v, want absent", tok["refresh_token"])
+	}
+
+	// The minted token is a real session — it authorizes API calls.
+	res := sfQuery(t, base, accessToken, "query", "SELECT Id FROM Account LIMIT 1", nil)
+	if _, ok := res["totalSize"]; !ok {
+		t.Fatalf("query with jwt-bearer token = %v, want a result envelope", res)
+	}
+
+	// ===== Forged assertion (wrong signing key) → 400 invalid_grant =====
+
+	forgedKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	forged := sfSignAssertion(t, forgedKey,
+		"3MVG9mockConsumerKey", "jwt-user@example.com",
+		"https://login.salesforce.com", now, now+300)
+	body, status = postGrant(forged)
+	if status != 400 {
+		t.Fatalf("forged assertion -> %d, want 400; body %s", status, body)
+	}
+	if !strings.Contains(body, "invalid_grant") {
+		t.Fatalf("forged assertion -> body %q, want invalid_grant", body)
+	}
+
+	// ===== Properly signed but expired assertion → 400 invalid_grant =====
+
+	expired := sfSignAssertion(t, priv,
+		"3MVG9mockConsumerKey", "jwt-user@example.com",
+		"https://login.salesforce.com", now-600, now-300)
+	body, status = postGrant(expired)
+	if status != 400 {
+		t.Fatalf("expired assertion -> %d, want 400; body %s", status, body)
+	}
+	if !strings.Contains(body, "invalid_grant") {
+		t.Fatalf("expired assertion -> body %q, want invalid_grant", body)
+	}
+
+	// ===== Wrong audience → 400 invalid_grant =====
+
+	wrongAud := sfSignAssertion(t, priv,
+		"3MVG9mockConsumerKey", "jwt-user@example.com",
+		"https://evil.example.com/token", now, now+300)
+	body, status = postGrant(wrongAud)
+	if status != 400 {
+		t.Fatalf("wrong aud -> %d, want 400; body %s", status, body)
+	}
+	if !strings.Contains(body, "invalid_grant") {
+		t.Fatalf("wrong aud -> body %q, want invalid_grant", body)
+	}
+
+	// ===== Legacy prn claim (pre-sub JWTs) → 200 =====
+
+	prnOnly := sfSignRaw(t, priv, `{"alg":"RS256","typ":"JWT"}`,
+		`{"iss":"3MVG9mockConsumerKey","prn":"legacy-user@example.com",`+
+			`"aud":"https://login.salesforce.com","iat":`+strconv.FormatInt(now, 10)+
+			`,"exp":`+strconv.FormatInt(now+300, 10)+`}`)
+	body, status = postGrant(prnOnly)
+	if status != 200 {
+		t.Fatalf("prn-only assertion -> %d, want 200; body %s", status, body)
+	}
+
+	// ===== Sandbox audience → 200 =====
+
+	sandbox := sfSignAssertion(t, priv,
+		"3MVG9mockConsumerKey", "jwt-user@example.com",
+		"https://test.salesforce.com", now, now+300)
+	body, status = postGrant(sandbox)
+	if status != 200 {
+		t.Fatalf("sandbox aud -> %d, want 200; body %s", status, body)
+	}
+
+	// ===== alg != RS256 (properly signed, wrong header) → 400 =====
+
+	hsHeader := sfSignRaw(t, priv, `{"alg":"HS256","typ":"JWT"}`,
+		`{"iss":"3MVG9mockConsumerKey","sub":"jwt-user@example.com",`+
+			`"aud":"https://login.salesforce.com","iat":`+strconv.FormatInt(now, 10)+
+			`,"exp":`+strconv.FormatInt(now+300, 10)+`}`)
+	body, status = postGrant(hsHeader)
+	if status != 400 {
+		t.Fatalf("alg HS256 -> %d, want 400; body %s", status, body)
+	}
+
+	// ===== Non-string claims (null sub / null iss) → 400 =====
+	// JSON null decodes to Starlark None, and None == "" is False — a
+	// plain emptiness guard passes these. The verifier is type-strict.
+
+	nullSub := sfSignRaw(t, priv, `{"alg":"RS256","typ":"JWT"}`,
+		`{"iss":"3MVG9mockConsumerKey","sub":null,`+
+			`"aud":"https://login.salesforce.com","iat":`+strconv.FormatInt(now, 10)+
+			`,"exp":`+strconv.FormatInt(now+300, 10)+`}`)
+	body, status = postGrant(nullSub)
+	if status != 400 {
+		t.Fatalf("null sub -> %d, want 400; body %s", status, body)
+	}
+	nullIss := sfSignRaw(t, priv, `{"alg":"RS256","typ":"JWT"}`,
+		`{"iss":null,"sub":"jwt-user@example.com",`+
+			`"aud":"https://login.salesforce.com","iat":`+strconv.FormatInt(now, 10)+
+			`,"exp":`+strconv.FormatInt(now+300, 10)+`}`)
+	body, status = postGrant(nullIss)
+	if status != 400 {
+		t.Fatalf("null iss -> %d, want 400; body %s", status, body)
+	}
+
+	// ===== exp boundary and window =====
+	// exp == now is already expired (the check is >=). A float exp is
+	// not an int claim. And an assertion valid for an hour is outside
+	// the real endpoint's ~5-minute window.
+
+	expNow := sfSignAssertion(t, priv,
+		"3MVG9mockConsumerKey", "jwt-user@example.com",
+		"https://login.salesforce.com", now-10, now)
+	body, status = postGrant(expNow)
+	if status != 400 {
+		t.Fatalf("exp == now -> %d, want 400; body %s", status, body)
+	}
+	floatExp := sfSignRaw(t, priv, `{"alg":"RS256","typ":"JWT"}`,
+		`{"iss":"3MVG9mockConsumerKey","sub":"jwt-user@example.com",`+
+			`"aud":"https://login.salesforce.com","iat":`+strconv.FormatInt(now, 10)+
+			`,"exp":`+strconv.FormatFloat(float64(now+300), 'f', 1, 64)+`}`)
+	body, status = postGrant(floatExp)
+	if status != 400 {
+		t.Fatalf("float exp -> %d, want 400; body %s", status, body)
+	}
+	longLived := sfSignAssertion(t, priv,
+		"3MVG9mockConsumerKey", "jwt-user@example.com",
+		"https://login.salesforce.com", now, now+3600)
+	body, status = postGrant(longLived)
+	if status != 400 {
+		t.Fatalf("1h exp -> %d, want 400 (real window is ~5 min); body %s", status, body)
+	}
+
+	// ===== Garbage assertion (not a JWT) → 400 invalid_grant =====
+
+	body, status = postGrant("not-a-jwt-at-all")
+	if status != 400 {
+		t.Fatalf("garbage assertion -> %d, want 400; body %s", status, body)
+	}
+
+	// ===== Missing assertion → 400 invalid_request =====
+
+	body, status = postGrant("")
+	if status != 400 {
+		t.Fatalf("missing assertion -> %d, want 400; body %s", status, body)
+	}
+	if !strings.Contains(body, "invalid_request") {
+		t.Fatalf("missing assertion -> body %q, want invalid_request", body)
+	}
 }

@@ -222,6 +222,33 @@ func TestGoogleIAMStyleAdapter(t *testing.T) {
 		t.Fatalf("expired assertion -> body %q, want invalid_grant", body)
 	}
 
+	// ===== Properly signed but iss:null assertion → 400 invalid_grant =====
+	// JSON null decodes to Starlark None and None == "" is False, so a
+	// plain emptiness guard passes it; the check must be type-strict.
+
+	nullIssPayload := `{"iss":null,` +
+		`"scope":"openid https://www.googleapis.com/auth/cloud-platform",` +
+		`"aud":"https://oauth2.googleapis.com/token",` +
+		`"iat":` + strconv.FormatInt(now, 10) + `,"exp":` + strconv.FormatInt(now+3600, 10) + `}`
+	h := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256","typ":"JWT"}`))
+	p := base64.RawURLEncoding.EncodeToString([]byte(nullIssPayload))
+	digest := sha256.Sum256([]byte(h + "." + p))
+	sig, err := rsa.SignPKCS1v15(rand.Reader, privKey, crypto.SHA256, digest[:])
+	if err != nil {
+		t.Fatalf("sign null-iss: %v", err)
+	}
+	nullIss := h + "." + p + "." + base64.RawURLEncoding.EncodeToString(sig)
+	body, status = iamPostForm(t, base+"/oauth2/v4/token", url.Values{
+		"grant_type": {"urn:ietf:params:oauth:grant-type:jwt-bearer"},
+		"assertion":  {nullIss},
+	})
+	if status != 400 {
+		t.Fatalf("iss:null assertion -> status %d, want 400; body %s", status, body)
+	}
+	if !strings.Contains(body, "invalid_grant") {
+		t.Fatalf("iss:null assertion -> body %q, want invalid_grant", body)
+	}
+
 	// ===== List service accounts (seeded) =====
 
 	body, status = iamGetAuth(t, base+"/v1/projects/mock-project/serviceAccounts", token)

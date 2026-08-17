@@ -159,6 +159,16 @@ def _claim_int(v):
         return v
     return None
 
+# _claim_str coerces a claim value to string. JSON null decodes to None,
+# and None == "" is False in Starlark — so an `iss: null` would sail
+# past a plain `get(...) == ""` guard. Type-strict instead.
+def _claim_str(v):
+    if v == None:
+        return ""
+    if type(v) == "string":
+        return v
+    return ""
+
 # _verify_assertion fully verifies a service-account JWT-bearer assertion
 # the way Google's token endpoint does (modulo the fixed mock key):
 #   - 3 dot-separated, base64url-valid segments
@@ -179,7 +189,7 @@ def _verify_assertion(assertion):
     claims = _jwt_json(assertion, 1)
     if claims == None:
         return None
-    if claims.get("iss", "") == "":
+    if _claim_str(claims.get("iss", None)) == "":
         return None
     exp = _claim_int(claims.get("exp", None))
     if exp == None:
