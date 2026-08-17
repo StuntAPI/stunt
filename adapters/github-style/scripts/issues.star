@@ -38,6 +38,8 @@ def on_list_issues(req):
 
     result = _apply_issue_filters(req, result)
     page, next_link = _list_page(req, result)
+    if page == None:
+        return _gh_err(400, "Invalid cursor")
     return respond(200, page, _gh_link_headers(next_link))
 
 # on_create_issue creates a new issue.
@@ -242,6 +244,8 @@ def on_list_comments(req):
     for c in docs:
         views.append(_comment_view(c))
     page, next_link = _list_page(req, views)
+    if page == None:
+        return _gh_err(400, "Invalid cursor")
     return respond(200, page, _gh_link_headers(next_link))
 
 # on_add_label adds a label to an issue (or PR — same surface). Returns the
@@ -363,6 +367,8 @@ def on_list_issue_events(req):
     for e in docs:
         views.append(_issue_event_view(e))
     page, next_link = _list_page(req, views)
+    if page == None:
+        return _gh_err(400, "Invalid cursor")
     return respond(200, page, _gh_link_headers(next_link))
 
 # --- helpers ---

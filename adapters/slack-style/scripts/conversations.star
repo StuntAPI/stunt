@@ -87,6 +87,8 @@ def on_list_conversations(req):
         result.append(ch)
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return _err("invalid_cursor")
     body = {"channels": page}
     if next_cursor != None:
         body["response_metadata"] = {"next_cursor": next_cursor}
@@ -121,6 +123,8 @@ def on_conversation_history(req):
         })
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return _err("invalid_cursor")
     body = {"messages": page}
     if next_cursor != None:
         body["response_metadata"] = {"next_cursor": next_cursor}

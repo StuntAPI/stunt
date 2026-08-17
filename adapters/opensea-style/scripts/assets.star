@@ -38,6 +38,8 @@ def on_list_assets(req):
         })
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return respond(400, {"error": "Invalid cursor parameter."})
     body = {"assets": page}
     if next_cursor != None:
         body["next"] = next_cursor

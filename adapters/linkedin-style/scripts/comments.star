@@ -34,6 +34,8 @@ def on_list_comments(req):
         })
 
     page, next_cursor = _list_page(req, elements)
+    if page == None:
+        return respond(400, {"status": 400, "message": "Invalid start parameter."})
     start = _to_int(req["query"].get("start", ""))
     links = []
     if next_cursor != None:

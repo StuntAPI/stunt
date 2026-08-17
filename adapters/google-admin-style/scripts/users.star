@@ -30,6 +30,8 @@ def on_list_users(req):
 
     users = _apply_user_filters(req, users)
     page, next_token = _list_page(req, users)
+    if page == None:
+        return respond(400, {"error": {"code": 400, "message": "Invalid pageToken", "status": "INVALID_ARGUMENT"}})
     result = {
         "kind": "admin#directory#users",
         "users": page,
@@ -187,6 +189,8 @@ def on_list_tokens(req):
             })
 
     page, next_token = _list_page(req, tokens)
+    if page == None:
+        return respond(400, {"error": {"code": 400, "message": "Invalid pageToken", "status": "INVALID_ARGUMENT"}})
     result = {
         "kind": "admin#directory#tokenList",
         "items": page,

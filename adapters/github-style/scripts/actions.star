@@ -87,6 +87,8 @@ def on_list_runs(req):
 
     result = _apply_run_filters(req, result)
     page, next_link = _list_page(req, result)
+    if page == None:
+        return _gh_err(400, "Invalid cursor")
     return respond(200, {
         "total_count": len(result),
         "workflow_runs": page,

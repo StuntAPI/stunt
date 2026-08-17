@@ -66,6 +66,8 @@ def on_list_blueprints(req):
     if err != None:
         return err
     page, next_page = _list_page(req, _BLUEPRINTS)
+    if page == None:
+        return respond(400, {"error": {"message": "Invalid page parameter.", "code": 400}})
     return respond(200, {"data": page, "next_page": next_page})
 
 # on_list_variants returns the variants for a given blueprint_id.
@@ -79,4 +81,6 @@ def on_list_variants(req):
     if variants == None:
         return respond(404, {"status": 404, "message": "blueprint not found"})
     page, next_page = _list_page(req, variants)
+    if page == None:
+        return respond(400, {"error": {"message": "Invalid page parameter.", "code": 400}})
     return respond(200, {"data": page, "next_page": next_page})

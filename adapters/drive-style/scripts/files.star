@@ -154,6 +154,8 @@ def on_list(req):
         return _drive_err(400, "Invalid query filter: " + qerr, "INVALID_ARGUMENT")
     # Apply Drive-style paging (pageSize / pageToken) after filtering.
     page, next_token = _list_page(req, visible)
+    if page == None:
+        return _drive_err(400, "Invalid pageToken", "INVALID_ARGUMENT")
     result = {"files": page}
     if next_token != None:
         result["nextPageToken"] = next_token

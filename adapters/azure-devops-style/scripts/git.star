@@ -31,6 +31,8 @@ def on_list_repos(req):
 
     # Apply OData $top/$skip paging (after filtering by project).
     page, continuation = _list_page(req, items)
+    if page == None:
+        return respond(400, {"message": "Invalid continuation token."})
 
     resp = {"value": page, "count": len(page)}
     if continuation != None:
@@ -139,6 +141,8 @@ def on_list_commits(req):
         })
 
     page, continuation = _list_page(req, items)
+    if page == None:
+        return respond(400, {"message": "Invalid continuation token."})
     resp = {"value": page, "count": len(page)}
     if continuation != None:
         resp["continuationToken"] = continuation

@@ -94,6 +94,8 @@ def on_list_emails(req):
         docs.append(_email_view(_advance_email(d)))
 
     page, next_cursor = _list_page(req, docs)
+    if page == None:
+        return respond(400, {"message": "Invalid cursor."})
     body = {
         "object": "list",
         "has_more": next_cursor != None and next_cursor != "",

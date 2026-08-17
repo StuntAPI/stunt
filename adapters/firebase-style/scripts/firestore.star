@@ -55,6 +55,8 @@ def _list_path(req, project, path):
         if d.get("collection", "") == path and d.get("project", "") == project:
             result.append(_document_entity(d, project))
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return _err(400, "INVALID_ARGUMENT", "Invalid page token.")
     body = {"documents": page}
     if next_cursor != None:
         body["nextPageToken"] = next_cursor

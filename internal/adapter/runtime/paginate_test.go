@@ -161,6 +161,22 @@ func TestPaginateKwargsAndErrors(t *testing.T) {
 	if _, err := sk.Call(new(sk.Thread), fn, sk.Tuple{sk.MakeInt64(42), sk.MakeInt64(2), sk.None}, nil); err == nil {
 		t.Fatal("int items: want error, got nil")
 	}
+
+	// A huge limit (clamped to MaxInt64) with a VALID cursor must not
+	// overflow start+limit into a negative slice bound — found by review:
+	// this exact combination panicked.
+	big := sk.MakeInt64(9223372036854775807)
+	res, err = sk.Call(new(sk.Thread), fn, sk.Tuple{items, big, sk.String("1")}, nil)
+	if err != nil {
+		t.Fatalf("huge limit + valid cursor: %v", err)
+	}
+	tup, ok = res.(sk.Tuple)
+	if !ok || tup.Len() != 2 {
+		t.Fatalf("huge limit + valid cursor = %v, want tuple", res)
+	}
+	if got := listToInts(t, tup.Index(0)); !equal(got, []int{2, 3}) {
+		t.Fatalf("huge limit + valid cursor page = %v, want [2 3] (no effective limit)", got)
+	}
 }
 
 func equal(a, b []int) bool {

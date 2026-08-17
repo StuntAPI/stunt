@@ -67,6 +67,8 @@ def on_list(req):
     docs = c.list()
     tweets = _reverse(docs)
     page, next_cursor = _list_page(req, tweets)
+    if page == None:
+        return respond(400, {"title": "Invalid Request", "detail": "Invalid pagination_token.", "type": "about:blank"})
     meta = {"result_count": len(page)}
     if next_cursor != None:
         meta["next_token"] = next_cursor

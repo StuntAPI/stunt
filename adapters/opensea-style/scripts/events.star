@@ -36,6 +36,8 @@ def on_list_events(req):
         })
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return respond(400, {"error": "Invalid cursor parameter."})
     body = {"asset_events": page}
     if next_cursor != None:
         body["next"] = next_cursor

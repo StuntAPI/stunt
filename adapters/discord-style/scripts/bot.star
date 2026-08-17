@@ -76,6 +76,8 @@ def on_guild_channels(req):
     # limit disables paging (returns the whole list), matching the bare-array
     # behavior Discord exposes for this endpoint.
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return respond(400, {"message": "Invalid query parameter.", "code": 50034})
     headers = None
     link = _next_link(req, next_cursor)
     if link != None:

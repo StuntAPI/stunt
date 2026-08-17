@@ -35,6 +35,8 @@ def on_list_webhooks(req):
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, webhooks)
+    if paged == None:
+        return _zd_error(400, "InvalidQuery", "Invalid page cursor.")
 
     resp = {
         "webhooks": paged,

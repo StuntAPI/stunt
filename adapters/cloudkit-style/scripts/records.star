@@ -82,6 +82,8 @@ def on_query(req):
         result.append(_record_response(record))
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return _err(400, "INVALID_CURSOR", "Invalid continuation marker.")
     resp = {"records": page}
     if next_cursor != None:
         resp["continuationMarker"] = next_cursor

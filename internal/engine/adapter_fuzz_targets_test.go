@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -90,8 +91,23 @@ func fuzzServerFor(t *testing.T, name string) *fuzzServer {
 	if err != nil {
 		t.Fatalf("ServeForTest(%s): %v", name, err)
 	}
-	// Engine + listener live for the process; nothing to stop.
-	_ = stop
+	// Under `go test -fuzz` the workers are separate processes and each
+	// input is its own run — the engine must outlive t, so nothing is
+	// stopped and the dir stays. In plain `go test` (seed runs) it would
+	// just leak: close everything.
+	if fl := flag.Lookup("fuzz"); fl == nil || fl.Value.String() == "" {
+		t.Cleanup(func() {
+			stop()
+			e.Close()
+			_ = os.RemoveAll(stateDir)
+			fuzzSrvMu.Lock()
+			delete(fuzzSrvs, name)
+			fuzzSrvMu.Unlock()
+		})
+	} else {
+		// Engine + listener live for the process; nothing to stop.
+		_ = stop
+	}
 
 	srv := &fuzzServer{base: addrs["svc"], client: &http.Client{Timeout: 15 * time.Second}}
 	fuzzSrvs[name] = srv
@@ -102,12 +118,26 @@ func fuzzServerFor(t *testing.T, name string) *fuzzServer {
 // (keeping '/' structure) so every mutated path is still a valid request —
 // the fuzzer exercises the router and handlers, not the HTTP client.
 func fuzzSafePath(p string) string {
-	if p == "" || p[0] != '/' {
-		p = "/" + p
+	return fuzzSafeComponent(p, false)
+}
+
+// fuzzSafeQuery sanitizes a query string the same way, additionally
+// keeping the '?'-introducing '&'/'=' structure so mutations produce real
+// params (without this the query half of the URL — cursors, limits,
+// filters — is unreachable by the fuzzer).
+func fuzzSafeQuery(q string) string {
+	return fuzzSafeComponent(q, true)
+}
+
+func fuzzSafeComponent(s string, query bool) string {
+	if !query {
+		if s == "" || s[0] != '/' {
+			s = "/" + s
+		}
 	}
 	var b strings.Builder
-	for i := 0; i < len(p); i++ {
-		c := p[i]
+	for i := 0; i < len(s); i++ {
+		c := s[i]
 		if c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' ||
 			c == '/' || c == '-' || c == '.' || c == '_' || c == '~' ||
 			c == ':' || c == '@' || c == '!' || c == '$' || c == '&' || c == '\'' ||
@@ -130,30 +160,35 @@ func FuzzAdapterRequests(f *testing.F) {
 		idx    int
 		method string
 		path   string
+		query  string
 		body   string
 	}{
-		{0, "GET", "/v1/charges", ""},
-		{0, "POST", "/v1/charges", `{"amount": 1000, "currency": "usd"}`},
-		{0, "POST", "/v1/payment_intents", "amount=1000&currency=usd"},
-		{1, "GET", "/zones", ""},
-		{1, "POST", "/client/v4/accounts/acc/d1/database/db/query", `{"sql": "SELECT * FROM t"}`},
-		{2, "GET", "/services/data/v60.0/query", ""},
-		{2, "POST", "/services/oauth2/token", "grant_type=password&username=u&password=p"},
-		{3, "GET", "/accounts", ""},
-		{4, "GET", "/lists", ""},
-		{4, "POST", "/lists", `{"name": "x"}`},
-		{5, "POST", "/", `{"jsonrpc":"2.0","method":"eth_blockNumber","id":1}`},
-		{5, "POST", "/", `[{"jsonrpc":"2.0","method":"eth_blockNumber","id":1}]`},
-		{6, "POST", "/admin/api/2024-10/orders.json", `{"order":{"line_items":[{"title":"x"}]}}`},
-		{6, "GET", "/admin/api/2024-10/orders.json", ""},
+		{0, "GET", "/v1/charges", "", ""},
+		{0, "POST", "/v1/charges", "", `{"amount": 1000, "currency": "usd"}`},
+		{0, "POST", "/v1/payment_intents", "", "amount=1000&currency=usd"},
+		{1, "GET", "/zones", "cursor=!!!bogus", ""},
+		{1, "POST", "/client/v4/accounts/acc/d1/database/db/query", "", `{"sql": "SELECT * FROM t"}`},
+		{2, "GET", "/services/data/v60.0/query", "limit=99999999999999999999999&offset=25", ""},
+		{2, "POST", "/services/oauth2/token", "", "grant_type=password&username=u&password=p"},
+		{3, "GET", "/accounts", "%24skip=!!!bogus", ""},
+		{4, "GET", "/lists", "limit=-1", ""},
+		{4, "POST", "/lists", "", `{"name": "x"}`},
+		{5, "POST", "/", "", `{"jsonrpc":"2.0","method":"eth_blockNumber","id":1}`},
+		{5, "POST", "/", "", `[{"jsonrpc":"2.0","method":"eth_blockNumber","id":1}]`},
+		{6, "POST", "/admin/api/2024-10/orders.json", "page_info=!!!bogus&limit=250", `{"order":{"line_items":[{"title":"x"}]}}`},
+		{6, "GET", "/admin/api/2024-10/orders.json", "since_id=abc", ""},
 	} {
-		f.Add(s.idx, s.method, s.path, []byte(s.body))
+		f.Add(s.idx, s.method, s.path, s.query, []byte(s.body))
 	}
-	f.Fuzz(func(t *testing.T, adapterIdx int, method, path string, body []byte) {
+	f.Fuzz(func(t *testing.T, adapterIdx int, method, path, query string, body []byte) {
 		name := fuzzAdapters[abs(adapterIdx)%len(fuzzAdapters)]
 		srv := fuzzServerFor(t, name)
 
-		req, err := http.NewRequest(method, srv.base+fuzzSafePath(path), bytes.NewReader(body))
+		url := srv.base + fuzzSafePath(path)
+		if query != "" {
+			url += "?" + fuzzSafeQuery(query)
+		}
+		req, err := http.NewRequest(method, url, bytes.NewReader(body))
 		if err != nil {
 			return // unparseable method line — the HTTP client rejects it
 		}
@@ -171,8 +206,8 @@ func FuzzAdapterRequests(f *testing.F) {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<10))
 		resp.Body.Close()
 		if resp.StatusCode >= 500 {
-			t.Fatalf("%s %s %s (adapter %s) -> %d: client input must never 5xx; body: %.400s",
-				method, path, truncate(body, 200), name, resp.StatusCode, respBody)
+			t.Fatalf("%s %s?%s %s (adapter %s) -> %d: client input must never 5xx; body: %.400s",
+				method, path, query, truncate(body, 200), name, resp.StatusCode, respBody)
 		}
 	})
 }

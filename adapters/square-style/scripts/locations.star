@@ -57,6 +57,8 @@ def on_list_locations(req):
     ]
 
     page, next_cursor = _list_page(req, locations)
+    if page == None:
+        return _sq_err(400, "INVALID_REQUEST_ERROR", "INVALID_CURSOR", "The cursor is invalid.")
     return respond(200, {
         "locations": page,
         "cursor": _sq_cursor(next_cursor),

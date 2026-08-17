@@ -79,6 +79,8 @@ def on_list_installations(req):
         },
     ]
     page, next_link = _list_page(req, docs)
+    if page == None:
+        return _gh_err(400, "Invalid cursor")
     return respond(200, page, _gh_link_headers(next_link))
 
 # on_create_installation_token exchanges an app JWT for an installation

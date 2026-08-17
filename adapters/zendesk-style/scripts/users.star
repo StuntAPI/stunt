@@ -32,6 +32,8 @@ def on_list_users(req):
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, users)
+    if paged == None:
+        return _zd_error(400, "InvalidQuery", "Invalid page cursor.")
 
     resp = {
         "users": paged,
@@ -66,6 +68,8 @@ def on_list_organizations(req):
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, orgs)
+    if paged == None:
+        return _zd_error(400, "InvalidQuery", "Invalid page cursor.")
 
     resp = {
         "organizations": paged,
@@ -99,6 +103,8 @@ def on_list_groups(req):
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, groups)
+    if paged == None:
+        return _zd_error(400, "InvalidQuery", "Invalid page cursor.")
 
     resp = {
         "groups": paged,
@@ -123,6 +129,8 @@ def on_list_views(req):
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, views)
+    if paged == None:
+        return _zd_error(400, "InvalidQuery", "Invalid page cursor.")
 
     resp = {
         "views": paged,
@@ -151,6 +159,8 @@ def on_list_triggers(req):
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, triggers)
+    if paged == None:
+        return _zd_error(400, "InvalidQuery", "Invalid page cursor.")
 
     resp = {
         "triggers": paged,

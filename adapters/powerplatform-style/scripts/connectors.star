@@ -31,6 +31,8 @@ def on_list_connectors(req):
     ]
 
     page, next_link = _list_page(req, docs, "/v2/environments/" + req["params"]["env"] + "/connectors")
+    if page == None:
+        return respond(400, {"error": {"code": "BadRequest", "message": "Invalid skiptoken."}})
 
     resp = {"value": page}
     if next_link != None:

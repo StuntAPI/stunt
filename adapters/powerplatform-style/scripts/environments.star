@@ -8,6 +8,8 @@ def on_list_environments(req):
         return err
 
     page, next_link = _list_page(req, _ENVS, "/v2/environments")
+    if page == None:
+        return respond(400, {"error": {"code": "BadRequest", "message": "Invalid skiptoken."}})
 
     resp = {"value": page}
     if next_link != None:

@@ -91,6 +91,8 @@ def on_list_payments(req):
 
     payments = _apply_zuora_filters(req, payments)
     payments, next_cursor = _list_page(req, payments)
+    if payments == None:
+        return _zuora_err(400, "INVALID_CURSOR", "The cursor parameter is invalid.")
     payments = _apply_zuora_fields(req, payments)
 
     resp = {

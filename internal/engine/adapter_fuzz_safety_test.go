@@ -93,15 +93,22 @@ var garbageAuth = []string{
 }
 
 // garbageQuery poisons every plausible cursor/limit/query param name at
-// once (URL-encoded): adapters feed their own param name into paginate or
-// a decoder, and a tampered cursor must answer 4xx, never a builtin raise.
+// once (URL-encoded; case-sensitive names included): adapters feed their
+// own param name into paginate or a decoder, and a tampered cursor must
+// answer 4xx, never a builtin raise.
 const garbageQuery = "?cursor=%21%21%21bogus&pageToken=%21%21%21bogus" +
+	"&PageToken=%21%21%21bogus&nextPageToken=%21%21%21bogus" +
 	"&starting_after=%21%21%21bogus&after=%21%21%21bogus&next=%21%21%21bogus" +
-	"&offset=%21%21%21bogus&marker=%21%21%21bogus&position=%21%21%21bogus" +
-	"&continuation=%21%21%21bogus&bookmark=%21%21%21bogus" +
+	"&offset=%21%21%21bogus&marker=%21%21%21bogus&Marker=%21%21%21bogus" +
+	"&position=%21%21%21bogus&continuation=%21%21%21bogus&bookmark=%21%21%21bogus" +
+	"&pagination_token=%21%21%21bogus&page=%21%21%21bogus&page_info=%21%21%21bogus" +
+	"&sysparm_offset=%21%21%21bogus&%24skip=%21%21%21bogus&%24skipToken=%21%21%21bogus" +
+	"&continuation-token=%21%21%21bogus&start=%21%21%21bogus" +
 	"&limit=99999999999999999999999&maxResults=99999999999999999999999" +
 	"&maxresults=99999999999999999999999&per_page=99999999999999999999999" +
-	"&pageSize=99999999999999999999999&q=%F0%9F%A6%80"
+	"&pageSize=99999999999999999999999&max_results=99999999999999999999999" +
+	"&top=99999999999999999999999&%24top=99999999999999999999999" +
+	"&max-keys=99999999999999999999999&q=%F0%9F%A6%80"
 
 func runAdapterSafetySweep(t *testing.T, adapterDir string) {
 	t.Helper()

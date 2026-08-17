@@ -28,6 +28,8 @@ def on_list_templates(req):
         result.append(_template_view(t))
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return _wa_err(400, "Invalid cursor parameter.", "OAuthException", 100)
 
     resp = {"data": page}
     if next_cursor != None and next_cursor != "":

@@ -40,6 +40,8 @@ def on_list_users(req):
     uc = store_collection("users")
     docs = uc.list()
     page, next_link = _list_page(req, docs, "/v1.0/users")
+    if page == None:
+        return respond(400, {"error": {"code": "BadRequest", "message": "Invalid skiptoken.", "innerError": {}}})
     value = []
     for d in page:
         value.append(_user_entity(d))
@@ -138,6 +140,8 @@ def on_list_applications(req):
     ac = store_collection("applications")
     docs = ac.list()
     page, next_link = _list_page(req, docs, "/v1.0/applications")
+    if page == None:
+        return respond(400, {"error": {"code": "BadRequest", "message": "Invalid skiptoken.", "innerError": {}}})
     value = []
     for d in page:
         value.append({
@@ -172,6 +176,8 @@ def on_list_service_principals(req):
     spc = store_collection("service_principals")
     docs = spc.list()
     page, next_link = _list_page(req, docs, "/v1.0/servicePrincipals")
+    if page == None:
+        return respond(400, {"error": {"code": "BadRequest", "message": "Invalid skiptoken.", "innerError": {}}})
     value = []
     for d in page:
         value.append({

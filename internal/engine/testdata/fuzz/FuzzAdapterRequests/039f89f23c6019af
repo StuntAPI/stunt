@@ -2,4 +2,5 @@ go test fuzz v1
 int(96)
 string("POST")
 string("/")
+string("")
 []byte("[{\"0000000\":\"000\",\"method\":0}]")

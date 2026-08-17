@@ -8,6 +8,8 @@ def on_list_segments(req):
         return err
 
     page, next_cursor = _list_page(req, _SEGMENTS)
+    if page == None:
+        return respond(400, {"errors": [{"message": "Invalid cursor parameter."}]})
     body = {
         "message": "success",
         "segments": page,

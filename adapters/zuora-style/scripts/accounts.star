@@ -36,6 +36,8 @@ def on_list_accounts(req):
 
     accounts = _apply_zuora_filters(req, accounts)
     accounts, next_cursor = _list_page(req, accounts)
+    if accounts == None:
+        return _zuora_err(400, "INVALID_CURSOR", "The cursor parameter is invalid.")
     accounts = _apply_zuora_fields(req, accounts)
 
     resp = {

@@ -24,6 +24,8 @@ def on_list_sites(req):
 
     # Apply Search Console pagination (maxResults + pageToken) after listing.
     page, next_token = _list_page(req, items)
+    if page == None:
+        return _g_err(400, "Invalid pageToken", "INVALID_ARGUMENT")
     result = {"siteEntry": page}
     if next_token != None:
         result["nextPageToken"] = next_token
@@ -115,6 +117,8 @@ def on_list_sitemaps(req):
 
     # Apply Search Console pagination (maxResults + pageToken).
     page, next_token = _list_page(req, items)
+    if page == None:
+        return _g_err(400, "Invalid pageToken", "INVALID_ARGUMENT")
     result = {"sitemap": page}
     if next_token != None:
         result["nextPageToken"] = next_token

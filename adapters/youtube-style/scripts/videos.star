@@ -84,6 +84,8 @@ def on_list_videos(req):
     items = _apply_video_query(req, items)
 
     page, next_token = _list_page(req, items)
+    if page == None:
+        return respond(400, {"error": {"code": 400, "message": "Invalid pageToken", "status": "INVALID_ARGUMENT"}})
     result = {"items": page}
     if next_token != None:
         result["nextPageToken"] = next_token

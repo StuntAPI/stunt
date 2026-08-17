@@ -139,6 +139,8 @@ def on_list_messages(req):
         })
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return respond(400, {"errors": [{"message": "Invalid cursor parameter.", "field": None, "help": None}]})
     body = {"messages": page}
     if next_cursor != None and next_cursor != "":
         body["next_offset"] = next_cursor

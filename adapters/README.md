@@ -196,7 +196,8 @@ page, next_cursor = paginate(docs, limit, cursor)
 A **syntactically invalid cursor returns `(None, None)` instead of raising** — cursors
 are client input, handlers have no try/except, and a raise would be an unhandled 500.
 Guard the page and answer with the provider's own 400 (`Invalid pageToken`,
-`InvalidQueryParameterValue`, …):
+`invalid_cursor`, `InvalidQueryParameterValue`, …) — every cursor-exposing reference
+adapter does:
 
 ```python
 page, next_cursor = _list_page(req, docs)

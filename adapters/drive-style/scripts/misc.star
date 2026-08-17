@@ -70,6 +70,8 @@ def on_changes(req):
         seq = "0"
 
     page, next_token = _list_page(req, ordered)
+    if page == None:
+        return _drive_err(400, "Invalid pageToken", "INVALID_ARGUMENT")
     result = {
         "kind": "drive#changeList",
         "changes": [_change_token_view(e) for e in page],

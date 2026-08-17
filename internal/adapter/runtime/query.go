@@ -168,9 +168,11 @@ func buildQueryBuiltins() sk.StringDict {
 				if n < 0 {
 					n = 0
 				}
-				end = start + int(n)
-				if end > len(items) {
-					end = len(items)
+				// Clamp against remaining BEFORE adding — start+limit
+				// wraps negative when a huge limit saturated MaxInt64.
+				end = len(items)
+				if n <= int64(len(items)-start) {
+					end = start + int(n)
 				}
 			}
 			items = items[start:end]
