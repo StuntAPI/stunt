@@ -12,6 +12,7 @@ import (
 	"time"
 
 	stripe "github.com/stripe/stripe-go/v86"
+	"github.com/stripe/stripe-go/v86/charge"
 	"github.com/stripe/stripe-go/v86/customer"
 	"github.com/stripe/stripe-go/v86/paymentintent"
 	"github.com/stripe/stripe-go/v86/paymentmethod"
@@ -104,6 +105,21 @@ func TestStripeSDKConformance(t *testing.T) {
 	}
 	Record(t, "stripe-go/v86", "stripe-style", "paymentintent create+confirm -> succeeded")
 
+	// Charges are the legacy sibling entry point — this is where the
+	// amount-as-string bug originally survived the PI fix.
+	ch, err := charge.New(&stripe.ChargeParams{
+		Amount:   stripe.Int64(2000),
+		Currency: stripe.String("usd"),
+		Source:   &stripe.PaymentSourceSourceParams{Token: stripe.String("tok_visa")},
+	})
+	if err != nil {
+		t.Fatalf("charge.New: %v", err)
+	}
+	if ch.Amount != 2000 {
+		t.Fatalf("charge.Amount = %d, want 2000 (typed int64)", ch.Amount)
+	}
+	Record(t, "stripe-go/v86", "stripe-style", "charge.New (typed amount round-trip)")
+
 	// ===== SDK-iterator pagination walks has_more pages =====
 
 	for i := 0; i < 3; i++ {
@@ -133,6 +149,30 @@ func TestStripeSDKConformance(t *testing.T) {
 	}
 	Record(t, "stripe-go/v86", "stripe-style", "SDK iterator walks has_more pages (4+ over limit=2)")
 
+	// The iterator count alone cannot distinguish walked pages from one
+	// big page — pin the limit and has_more on a raw page too.
+	pageReq, err := http.NewRequest("GET", base+"/v1/customers?limit=2", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pageReq.Header.Set("Authorization", "Bearer "+stripe.Key)
+	pageResp, err := HTTPClient().Do(pageReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pageBody, _ := io.ReadAll(pageResp.Body)
+	pageResp.Body.Close()
+	var raw struct {
+		Data    []json.RawMessage `json:"data"`
+		HasMore bool              `json:"has_more"`
+	}
+	if err := json.Unmarshal(pageBody, &raw); err != nil {
+		t.Fatalf("raw page unmarshal: %v (%s)", err, pageBody)
+	}
+	if len(raw.Data) != 2 || !raw.HasMore {
+		t.Fatalf("raw page: len=%d has_more=%v, want 2/true (limit must be honored)", len(raw.Data), raw.HasMore)
+	}
+
 	// ===== Webhook delivery verified by the SDK's own HMAC validator =====
 
 	// Register the sink as a webhook endpoint via the real API (raw POST,
@@ -145,9 +185,6 @@ func TestStripeSDKConformance(t *testing.T) {
 	regReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	regReq.Header.Set("Authorization", "Bearer "+stripe.Key)
 	regResp, err := HTTPClient().Do(regReq)
-	if err != nil {
-		t.Fatalf("webhook_endpoint create: %v", err)
-	}
 	if err != nil {
 		t.Fatalf("webhook_endpoint create: %v", err)
 	}

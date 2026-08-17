@@ -36,7 +36,9 @@ func Boot(t *testing.T, adapter string, webhookURL ...string) string {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(dir); err != nil {
-		t.Skipf("adapter %s not present", adapter)
+		// Within this repo every reference adapter exists — absence is a
+		// layout/CWD bug, not a condition to skip green.
+		t.Fatalf("adapter %s not present (run via `just conformance` from the repo root): %v", adapter, err)
 	}
 
 	svcCfg := map[string]any{}

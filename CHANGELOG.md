@@ -39,10 +39,10 @@ All notable changes to **stunt** are documented here. The format is based on
 ### Engine
 
 - **Greedy route params (`{name+}`).** A route pattern whose last
-  segment is `{key+}` captures the rest of the path verbatim, slashes
-  included — the object-key shape S3- and Cloudflare-style providers
-  need. Whole-segment `{name}` and embedded `prefix{p}suffix` matching
-  are unchanged.
+  segment is `{key+}` captures the rest of the URL-decoded path, slashes
+  included (outer slashes trimmed, so `dir/` and `dir` address the same
+  key) — the object-key shape S3-style providers need. Whole-segment
+  `{name}` and embedded `prefix{p}suffix` matching are unchanged.
 
 ## [0.46.0] — 2026-08-17
 

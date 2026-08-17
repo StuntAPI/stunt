@@ -45,7 +45,9 @@ def on_create_charge(req):
         body = {}
 
     charge_id = _next_id("ch")
-    amount = body.get("amount", 0)
+    # Form bodies deliver amount as a STRING; money fields must render as
+    # JSON numbers for typed SDKs (stripe-go rejects "amount":"2000").
+    amount = _num(body.get("amount", 0))
     currency = body.get("currency", "usd")
     customer = body.get("customer", None)
     description = body.get("description", None)
