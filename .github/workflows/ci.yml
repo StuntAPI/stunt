@@ -39,10 +39,13 @@ jobs:
           go-version: "1.23.3"
           cache: true
 
-      - name: Set up Just
-        uses: extractions/setup-just@v2
-        with:
-          just-version: "latest"
+      - name: Set up Just (crates.io — casey/just's GitHub releases
+          are currently unresolvable by setup-just; revert to the
+          extractions/setup-just action when upstream heals)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Just
+        run: cargo install just --version 1.39.0 --locked
 
       - name: Run the canonical gate
         run: just ci
