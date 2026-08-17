@@ -13,14 +13,15 @@ data is synthetic — no real API data is included.
 A faithful behavioral mock of the Salesforce REST API surface, designed to unblock
 CRM integrations during local development:
 
-- **OAuth2:** `POST /services/oauth2/token` (password, authorization_code, or
-  refresh_token grants) → `{access_token:"00D...", instance_url, token_type:"Bearer",
-  id, issued_at, signature, refresh_token}`. Refresh tokens are long-lived and
-  **reusable**, exactly as in real Salesforce: redeeming one never invalidates
-  it, and the refresh grant response omits `refresh_token` (the caller keeps
-  the one it has). Access tokens rotate on every grant and expire with the
-  2-hour session TTL — an expired token 401s with `INVALID_SESSION_ID` until
-  the client refreshes again with the same refresh token.
+- **OAuth2:** `POST /services/oauth2/token` (password, authorization_code,
+  refresh_token, or JWT bearer grants) → `{access_token:"00D...", instance_url,
+  token_type:"Bearer", id, issued_at, signature, refresh_token}`. Refresh tokens
+  are long-lived and **reusable**, exactly as in real Salesforce: redeeming one
+  never invalidates it, and the refresh grant response omits `refresh_token`
+  (the caller keeps the one it has). Access tokens rotate on every grant and
+  expire with the 2-hour session TTL — an expired token 401s with
+  `INVALID_SESSION_ID` until the client refreshes again with the same refresh
+  token.
 - **sObjects describe global:** `GET /services/data/v60.0/sobjects` → list of
   available objects (Account, Contact, Opportunity, Lead, User).
 - **sObjects describe object:** `GET /services/data/v60.0/sobjects/Account` →
@@ -88,11 +89,34 @@ access tokens rotate on every grant and expire after the 2-hour session TTL,
 after which protected routes 401 with `INVALID_SESSION_ID` until the client
 refreshes again.
 
+## JWT bearer grant (server-to-server)
+
+The token endpoint also implements the RFC 7523 flow real connected apps use:
+
+```
+POST /services/oauth2/token
+grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer
+assertion=<RS256-signed JWT>
+```
+
+The assertion is verified the way the real endpoint does: three
+base64url segments, `alg: RS256`, the RSA-SHA256 signature checked
+against the adapter's fixed "connected-app certificate" (the public key
+in `scripts/oauth.star` — sign with its private half, the same throwaway
+repo material the other JWT adapters use), `iss` non-empty (the consumer
+key), `sub` (or legacy `prn`) non-empty, `aud` one of
+`https://login.salesforce.com` / `https://test.salesforce.com`, and `exp`
+in the future. A valid assertion mints a normal session token for the
+`sub` user; the response carries **no** `refresh_token` — a JWT-bearer
+client mints a fresh assertion instead of refreshing. Failures return
+`400 {"error": "invalid_grant", "error_description": "invalid assertion"}`
+(a missing `assertion` is `invalid_request`).
+
 ## Endpoints
 
 | Method | Route | Handler | Description |
 |--------|-------|---------|-------------|
-| POST | `/services/oauth2/token` | `oauth.star#on_token` | OAuth2 token (password/code/refresh) |
+| POST | `/services/oauth2/token` | `oauth.star#on_token` | OAuth2 token (password/code/refresh/JWT bearer) |
 | GET | `/services/data/v60.0/sobjects` | `sobjects.star#on_describe_global` | Describe global |
 | GET | `/services/data/v60.0/sobjects/Account` | `sobjects.star#on_describe_object` | Describe object |
 | POST | `/services/data/v60.0/sobjects/Account` | `sobjects.star#on_create` | Create record |
