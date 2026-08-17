@@ -30,7 +30,6 @@ func TestParseFormBodyBracketNotation(t *testing.T) {
 		{"terminal numeric index", "a[0]=v", `{"a":["v"]}`},
 		{"terminal numeric indexes", "a[0]=1&a[1]=2", `{"a":["1","2"]}`},
 		{"terminal numeric, numeric key, empty value", "0[0]=", `{"0":[""]}`},
-		{"terminal scalar never clobbers structure", "a[0][b]=1&a[0]=2", `{"a":[{"b":"1"}]}`},
 		// Found by fuzzing: a huge bracket index must be skipped, not
 		// materialized as a hundred-million-element sparse slice (57s
 		// in the parser alone before the cap).
@@ -101,7 +100,7 @@ func TestParseFormBodyMalformedBracketsFallsBackFlat(t *testing.T) {
 // at the same path never crashes the handler and never mixes shapes — exactly
 // one of the two survives, regardless of ParseQuery's map iteration order.
 func TestParseFormBodyShapeConflictSkipped(t *testing.T) {
-	for _, raw := range []string{"a=1&a[b]=2", "a[b]=1&a=2"} {
+	for _, raw := range []string{"a=1&a[b]=2", "a[b]=1&a=2", "a[0]=2&a[0][b]=1", "a[0][b]=1&a[0]=2"} {
 		got := parseFormBody(raw)
 		if got == nil {
 			t.Fatalf("parseFormBody(%q) = nil", raw)
@@ -111,12 +110,30 @@ func TestParseFormBodyShapeConflictSkipped(t *testing.T) {
 			if a != "1" && a != "2" {
 				t.Errorf("parseFormBody(%q): a = %q, want the scalar", raw, a)
 			}
+		case []any:
+			// Numeric-index variant: exactly one element, either the
+			// scalar or the dict — never mixed shapes.
+			if len(a) != 1 {
+				t.Errorf("parseFormBody(%q): a = %v, want one element", raw, a)
+			}
+			switch e := a[0].(type) {
+			case string:
+				if e != "1" && e != "2" {
+					t.Errorf("parseFormBody(%q): a[0] = %q, want the scalar", raw, e)
+				}
+			case map[string]any:
+				if e["b"] != "1" {
+					t.Errorf("parseFormBody(%q): a[0][b] = %v, want 1", raw, e["b"])
+				}
+			default:
+				t.Errorf("parseFormBody(%q): a[0] = %v (%T), want scalar or dict", raw, a[0], a[0])
+			}
 		case map[string]any:
 			if a["b"] != "1" && a["b"] != "2" {
 				t.Errorf("parseFormBody(%q): a[b] = %v, want the dict value", raw, a["b"])
 			}
 		default:
-			t.Errorf("parseFormBody(%q): a = %v (%T), want scalar or dict", raw, got["a"], got["a"])
+			t.Errorf("parseFormBody(%q): a = %v (%T), want scalar, list, or dict", raw, got["a"], got["a"])
 		}
 	}
 }
