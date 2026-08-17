@@ -304,6 +304,14 @@ def _uuid():
 def _contact_id(email):
     return crypto.sha256(email.lower())[:32]
 
+# _row_id is the contacts collection's storage key: list-scoped composite.
+# The real API keys contacts by email hash PER LIST (the same address is
+# routinely a contact of several lists), and the public id stays the bare
+# email hash — the composite keeps one row per (list, contact) without PK
+# collisions, and _present_contact renders the public form back.
+def _row_id(list_id, contact_id):
+    return list_id + "/" + contact_id
+
 # _iso_now returns the current time in EmailOctopus's ISO 8601 form
 # (RFC 3339 UTC, rendered with the +00:00 offset the API documents).
 def _iso_now():
@@ -409,11 +417,11 @@ def _present_list(doc):
         "double_opt_in": doc.get("double_opt_in", False),
         "fields": doc.get("fields", []),
         "tags": doc.get("tags", []),
-        "counts": [{
+        "counts": {
             "pending": pending,
             "subscribed": subscribed,
             "unsubscribed": unsubscribed,
-        }],
+        },
         "created_at": doc.get("created_at", ""),
         "last_updated_at": doc.get("last_updated_at", ""),
     }
@@ -422,7 +430,7 @@ def _present_list(doc):
 # response shape (drops the internal list_id key).
 def _present_contact(doc):
     return {
-        "id": doc.get("id", ""),
+        "id": doc.get("contact_id", ""),
         "email_address": doc.get("email_address", ""),
         "fields": doc.get("fields", {}),
         "tags": doc.get("tags", []),

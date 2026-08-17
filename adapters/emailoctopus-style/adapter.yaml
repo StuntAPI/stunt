@@ -45,22 +45,6 @@ endpoints:
     handler: scripts/lists.star#on_delete_list
     concurrency_key: list_id
 
-  # --- Tags (list-scoped; literal collection route before {tag}) ---
-  - route: /lists/{list_id}/tags
-    method: GET
-    handler: scripts/tags.star#on_list_tags
-  - route: /lists/{list_id}/tags
-    method: POST
-    handler: scripts/tags.star#on_create_tag
-    concurrency_key: list_id
-  - route: /lists/{list_id}/tags/{tag}
-    method: PUT
-    handler: scripts/tags.star#on_update_tag
-    concurrency_key: list_id
-  - route: /lists/{list_id}/tags/{tag}
-    method: DELETE
-    handler: scripts/tags.star#on_delete_tag
-    concurrency_key: list_id
 
   # --- Fields (list-scoped custom contact fields) ---
   - route: /lists/{list_id}/fields

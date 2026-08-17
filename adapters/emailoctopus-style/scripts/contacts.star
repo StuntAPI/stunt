@@ -102,6 +102,10 @@ def on_create_contact(req):
     if _is_str_list(tags) == False:
         errs.append(_verr("/tags", "This value should be of type array<string>."))
         tags = []
+    fields = body.get("fields", None)
+    if fields != None and type(fields) != "dict":
+        errs.append(_verr("/fields", "This value should be of type object."))
+        fields = None
 
     if len(errs) > 0:
         return _unprocessable(errs)
@@ -120,10 +124,11 @@ def on_create_contact(req):
             status = "subscribed"
 
     doc = {
-        "id": _contact_id(email),
+        "id": _row_id(list_id, _contact_id(email)),
+        "contact_id": _contact_id(email),
         "list_id": list_id,
         "email_address": email,
-        "fields": _clean_fields(body.get("fields", None)),
+        "fields": _clean_fields(fields),
         "tags": _dedupe_tags(tags),
         "status": status,
         "created_at": _iso_now(),
@@ -158,6 +163,14 @@ def on_upsert_contact(req):
     status = body.get("status", None)
     if status != None and _status_ok(status) == False:
         errs.append(_verr("/status", "The value you selected is not a valid choice."))
+    tags = body.get("tags", None)
+    if tags != None and type(tags) != "dict":
+        errs.append(_verr("/tags", "This value should be of type object."))
+        tags = None
+    fields = body.get("fields", None)
+    if fields != None and type(fields) != "dict":
+        errs.append(_verr("/fields", "This value should be of type object."))
+        fields = None
     if len(errs) > 0:
         return _unprocessable(errs)
 
@@ -171,11 +184,12 @@ def on_upsert_contact(req):
     if status == None:
         status = "subscribed"
     doc = {
-        "id": _contact_id(email),
+        "id": _row_id(list_id, _contact_id(email)),
+        "contact_id": _contact_id(email),
         "list_id": list_id,
         "email_address": email,
-        "fields": _clean_fields(body.get("fields", None)),
-        "tags": _dedupe_tags(_tags_from_map(body.get("tags", None), None)),
+        "fields": _clean_fields(fields),
+        "tags": _dedupe_tags(_tags_from_map(tags, None)),
         "status": status,
         "created_at": _iso_now(),
         "last_updated_at": _iso_now(),
@@ -218,7 +232,7 @@ def on_batch_update_contacts(req):
             errors.append(_batch_error("", "invalid_body", "Invalid body",
                                        "The contact id is missing.", 400))
             continue
-        doc = cc.get(cid)
+        doc = cc.get(_row_id(list_id, cid))
         if doc == None or doc.get("list_id", "") != list_id:
             errors.append(_batch_error(cid, "not_found", "Resource not found",
                                        "Resource not found.", 404))
@@ -246,7 +260,7 @@ def on_get_contact(req):
         return _not_found()
 
     contact_id = _param(req, "contact_id")
-    doc = store_collection("contacts").get(contact_id)
+    doc = store_collection("contacts").get(_row_id(list_id, contact_id))
     if doc == None or doc.get("list_id", "") != list_id:
         return _not_found()
     return respond(200, _present_contact(doc))
@@ -265,7 +279,7 @@ def on_update_contact(req):
 
     contact_id = _param(req, "contact_id")
     cc = store_collection("contacts")
-    doc = cc.get(contact_id)
+    doc = cc.get(_row_id(list_id, contact_id))
     if doc == None or doc.get("list_id", "") != list_id:
         return _not_found()
 
@@ -291,11 +305,11 @@ def on_delete_contact(req):
 
     contact_id = _param(req, "contact_id")
     cc = store_collection("contacts")
-    doc = cc.get(contact_id)
+    doc = cc.get(_row_id(list_id, contact_id))
     if doc == None or doc.get("list_id", "") != list_id:
         return _not_found()
 
-    cc.delete(contact_id)
+    cc.delete(_row_id(list_id, contact_id))
     _emit("contact.deleted", _present_contact(doc))
     return respond(204)
 
@@ -331,10 +345,16 @@ def _apply_contact_update(list_id, doc, body):
     changed = False
 
     if email != None and email != "" and email != doc.get("email_address", ""):
-        doc["email_address"] = email
         # The contact id IS the hash of the email address, so a changed
-        # address rekeys the row.
-        doc["id"] = _contact_id(email)
+        # address rekeys the row. The destination must be free on THIS list
+        # (409 otherwise) — checked BEFORE any mutation so the original row
+        # is never destroyed by a failed rekey.
+        new_row = _row_id(list_id, _contact_id(email))
+        if store_collection("contacts").get(new_row) != None:
+            return False, _conflict()
+        doc["email_address"] = email
+        doc["id"] = new_row
+        doc["contact_id"] = _contact_id(email)
         changed = True
 
     if fields != None:

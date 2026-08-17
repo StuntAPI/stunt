@@ -101,16 +101,17 @@ func TestEmailoctopusStyleAdapter(t *testing.T) {
 	if !ok || len(listData) < 3 { // 2 seeded + 1 created
 		t.Fatalf("list lists data = %v, want >= 3 entries", listResp["data"])
 	}
-	// The seeded double-opt-in list must be present with its derived counts.
+	// The seeded double-opt-in list must be present with its derived counts
+	// (a plain object per the v2 spec, not a wrapped array).
 	var doiCounts map[string]any
 	for _, it := range listData {
 		l := it.(map[string]any)
 		if l["id"] == "seed-list-doi-newsletter" {
-			counts, _ := l["counts"].([]any)
-			if len(counts) != 1 {
-				t.Fatalf("list counts = %v, want exactly one entry", l["counts"])
+			counts, ok := l["counts"].(map[string]any)
+			if !ok {
+				t.Fatalf("list counts = %v, want a plain object", l["counts"])
 			}
-			doiCounts, _ = counts[0].(map[string]any)
+			doiCounts = counts
 		}
 	}
 	if doiCounts == nil {
@@ -334,29 +335,13 @@ func TestEmailoctopusStyleAdapter(t *testing.T) {
 		t.Fatalf("batch error row status = %v, want 404", row["status"])
 	}
 
-	// ===== Tags: create → list → rename → delete =====
+	// ===== Contact tags (v2 surface: contact members + the tag filter) =====
+	// NOTE: v2 has NO tag CRUD endpoints (those are legacy 1.6 only) — the
+	// adapter deliberately does not serve /lists/{id}/tags.
 
-	body, status = postJSONAuth(t, base+"/lists/seed-list-single-optin/tags", token, map[string]any{"tag": "newsletter"})
-	if status != 201 {
-		t.Fatalf("create tag -> status %d, want 201; body %s", status, body)
-	}
-	if got := emailoctopusDecode(t, body)["tag"]; got != "newsletter" {
-		t.Fatalf("created tag = %v", got)
-	}
-	body, status = postJSONAuth(t, base+"/lists/seed-list-single-optin/tags", token, map[string]any{"tag": "newsletter"})
-	if status != 409 {
-		t.Fatalf("duplicate tag -> status %d, want 409; body %s", status, body)
-	}
 	body, status = getAuth(t, base+"/lists/seed-list-single-optin/tags", token)
-	if status != 200 {
-		t.Fatalf("list tags -> status %d, want 200; body %s", status, body)
-	}
-	tagNames := map[string]bool{}
-	for _, it := range emailoctopusDecode(t, body)["data"].([]any) {
-		tagNames[it.(map[string]any)["tag"].(string)] = true
-	}
-	if !tagNames["newsletter"] {
-		t.Fatalf("tags = %v, want newsletter present", tagNames)
+	if status != 404 {
+		t.Fatalf("GET /lists/{id}/tags -> status %d, want 404 (not v2 surface); body %s", status, body)
 	}
 
 	// Tag filter on contacts (tags is an array member, filtered by the adapter).
@@ -371,23 +356,6 @@ func TestEmailoctopusStyleAdapter(t *testing.T) {
 	}
 	if rows := emailoctopusDecode(t, body)["data"].([]any); len(rows) != 1 {
 		t.Fatalf("tag filter count = %d, want 1", len(rows))
-	}
-
-	body, status = emailoctopusPutJSON(t, base+"/lists/seed-list-single-optin/tags/newsletter", token, map[string]any{"tag": "weekly"})
-	if status != 200 {
-		t.Fatalf("rename tag -> status %d, want 200; body %s", status, body)
-	}
-	if got := emailoctopusDecode(t, body)["tag"]; got != "weekly" {
-		t.Fatalf("renamed tag = %v, want weekly", got)
-	}
-	// The rename cascaded to the contact.
-	body, status = getAuth(t, base+"/lists/seed-list-single-optin/contacts/"+graceID, token)
-	if tags := emailoctopusDecode(t, body)["tags"].([]any); !emailoctopusHas(tags, "weekly") || emailoctopusHas(tags, "newsletter") {
-		t.Fatalf("contact tags after rename = %v, want weekly present and newsletter gone", tags)
-	}
-	body, status = deleteAuth(t, base+"/lists/seed-list-single-optin/tags/weekly", token)
-	if status != 204 {
-		t.Fatalf("delete tag -> status %d, want 204; body %s", status, body)
 	}
 
 	// ===== Fields: create → duplicate → update → delete =====
@@ -587,8 +555,51 @@ func TestEmailoctopusStyleAdapter(t *testing.T) {
 		t.Fatalf("get deleted contact -> status %d, want 404; body %s", status, body)
 	}
 
+	// ===== Same email across lists (per-list contact identity) =====
+
+	// The contact id is the email hash, but identity is PER LIST: the same
+	// address may join a second list without a PK clash, and each list
+	// addresses its own row.
+	crossListID := "seed-list-doi-newsletter"
+	crossBody, status := postJSONAuth(t, base+"/lists/seed-list-single-optin/contacts", token, map[string]any{
+		"email_address": "shared@example.test",
+	})
+	if status != 201 {
+		t.Fatalf("create shared contact on list A -> status %d; body %s", status, crossBody)
+	}
+	sharedA := emailoctopusDecode(t, crossBody)["id"].(string)
+	crossBody, status = postJSONAuth(t, base+"/lists/"+crossListID+"/contacts", token, map[string]any{
+		"email_address": "shared@example.test",
+	})
+	if status != 201 {
+		t.Fatalf("same email on list B -> status %d (was a PK-clash 500), want 201; body %s", status, crossBody)
+	}
+	sharedB := emailoctopusDecode(t, crossBody)["id"].(string)
+	if sharedA != sharedB {
+		t.Fatalf("shared contact ids differ per list: %v vs %v (public id is the email hash)", sharedA, sharedB)
+	}
+	// Changing list B's copy to an email that exists on list A rekeys within
+	// list A's row space only — 409 on the SAME list, free across lists.
+	crossBody, status = emailoctopusPutJSON(t, base+"/lists/"+crossListID+"/contacts/"+sharedB, token,
+		map[string]any{"email_address": "moved@example.test"})
+	if status != 200 {
+		t.Fatalf("email change on other list -> status %d, want 200; body %s", status, crossBody)
+	}
+	body, status = getAuth(t, base+"/lists/seed-list-single-optin/contacts/"+sharedA, token)
+	if status != 200 {
+		t.Fatalf("list A contact after other list's rekey -> status %d, want 200 (must be untouched)", status)
+	}
+
 	// ===== List delete → 204, cascade removes its contacts =====
 
+	// Seed a contact on listID first so the cascade has something to remove.
+	body, status = postJSONAuth(t, base+"/lists/"+listID+"/contacts", token, map[string]any{
+		"email_address": "cascading@example.test",
+	})
+	if status != 201 {
+		t.Fatalf("create cascade contact -> status %d; body %s", status, body)
+	}
+	cascadeID := emailoctopusDecode(t, body)["id"].(string)
 	body, status = deleteAuth(t, base+"/lists/"+listID, token)
 	if status != 204 {
 		t.Fatalf("delete list -> status %d, want 204; body %s", status, body)
@@ -596,6 +607,10 @@ func TestEmailoctopusStyleAdapter(t *testing.T) {
 	body, status = getAuth(t, base+"/lists/"+listID, token)
 	if status != 404 {
 		t.Fatalf("get deleted list -> status %d, want 404; body %s", status, body)
+	}
+	body, status = getAuth(t, base+"/lists/"+listID+"/contacts/"+cascadeID, token)
+	if status != 404 {
+		t.Fatalf("contact after list delete -> status %d, want 404 (cascade); body %s", status, body)
 	}
 
 	// ===== Catch-all 404 in the EmailOctopus problem shape =====

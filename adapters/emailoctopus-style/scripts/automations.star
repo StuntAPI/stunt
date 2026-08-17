@@ -30,8 +30,15 @@ def on_queue_automation(req):
 
     # The documented contact_id is "the ID of the contact, or an MD5 hash of
     # the lowercase version of the contact's email address" — which is exactly
-    # how this adapter mints contact ids, so one lookup resolves both.
-    if store_collection("contacts").get(contact_id) == None:
+    # how this adapter mints contact ids, so one lookup resolves both. Rows
+    # are keyed per list (the same email hash can be a contact of several
+    # lists), so existence is "any list carries this contact".
+    found = False
+    for c in store_collection("contacts").list():
+        if c.get("contact_id", "") == contact_id:
+            found = True
+            break
+    if not found:
         return _not_found()
 
     # Persist BEFORE emitting. Queue entries are keyed (automation, contact)

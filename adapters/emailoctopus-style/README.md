@@ -65,10 +65,6 @@ two synthetic campaigns (one `sent`, one `draft`) with reports.
 | GET | `/lists/{list_id}` | `lists.star#on_get_list` | Get list |
 | PUT | `/lists/{list_id}` | `lists.star#on_update_list` | Update list |
 | DELETE | `/lists/{list_id}` | `lists.star#on_delete_list` | Delete list (204) |
-| GET | `/lists/{list_id}/tags` | `tags.star#on_list_tags` | Get all tags |
-| POST | `/lists/{list_id}/tags` | `tags.star#on_create_tag` | Create tag (201) |
-| PUT | `/lists/{list_id}/tags/{tag}` | `tags.star#on_update_tag` | Update tag |
-| DELETE | `/lists/{list_id}/tags/{tag}` | `tags.star#on_delete_tag` | Delete tag (204) |
 | POST | `/lists/{list_id}/fields` | `fields.star#on_create_field` | Create field (201) |
 | PUT | `/lists/{list_id}/fields/{tag}` | `fields.star#on_update_field` | Update field |
 | DELETE | `/lists/{list_id}/fields/{tag}` | `fields.star#on_delete_field` | Delete field (204) |
@@ -226,7 +222,6 @@ scripts/
   lib.star           shared auth / errors / paging / ids / presentation
   lists.star         /lists CRUD
   contacts.star      contact lifecycle (create, upsert, batch, update, delete)
-  tags.star          /lists/{list_id}/tags CRUD
   fields.star        /lists/{list_id}/fields CRUD
   campaigns.star     /campaigns + reports
   automations.star   /automations/{id}/queue
