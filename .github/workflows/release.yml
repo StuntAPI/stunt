@@ -39,13 +39,17 @@ jobs:
           go-version: "1.23.3"
           cache: true
 
-      - name: Run the CI gate (never release a broken build)
-        uses: extractions/setup-just@v2
-        with:
-          just-version: "latest"
+      # casey/just's GitHub releases are currently unresolvable by
+      # setup-just; crates.io install instead. Revert when upstream heals.
+      - name: Set up Rust (for just)
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: just ci
+      - name: Install Just
+        run: cargo install just --version 1.39.0 --locked
+
+      - name: Run the CI gate (never release a broken build)
         run: just ci
+
 
       - name: Install syft (SBOM tool — GoReleaser's `sboms` pipe shells out to it)
         run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
