@@ -22,7 +22,7 @@ def on_register_webhook(req):
 
     body = _get_body(req)
 
-    url = body.get("url", "")
+    url = body.get("url") or ""
     if url == None:
         url = ""
     if url == "":

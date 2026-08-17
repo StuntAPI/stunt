@@ -69,7 +69,7 @@ def on_get_institution_by_id(req):
     if body == None:
         body = {}
 
-    institution_id = body.get("institution_id", "")
+    institution_id = body.get("institution_id") or ""
     if institution_id == "":
         return respond(400, {
             "display_message": None,

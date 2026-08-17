@@ -195,7 +195,7 @@ def _create_folder(req, parent_id):
     body = req["body"]
     if body == None:
         body = {}
-    name = body.get("name", "")
+    name = body.get("name") or ""
     if name == "" or body.get("folder") == None:
         return _err("invalidRequest", 400, "A folder item requires 'name' and a 'folder' facet.")
 

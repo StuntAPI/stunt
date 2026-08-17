@@ -47,7 +47,7 @@ def on_create_zone(req):
     if body == None:
         return _cf_err(400, 1003, "Invalid or missing zone.")
 
-    name = body.get("name", "")
+    name = body.get("name") or ""
     if name == None:
         name = ""
     if name == "":

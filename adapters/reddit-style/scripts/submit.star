@@ -46,8 +46,8 @@ def on_submit(req):
     body = req["body"]
     if body == None:
         body = {}
-    sr = body.get("sr", "")
-    title = body.get("title", "")
+    sr = body.get("sr") or ""
+    title = body.get("title") or ""
 
     if sr == "":
         return respond(200, {"json": {"errors": [["SUBREDDIT_REQUIRED", "a subreddit is required", "sr"]], "data": {}}})

@@ -17,7 +17,7 @@ def on_suiteql(req):
         return err
 
     body = _get_body(req)
-    q = body.get("q", "")
+    q = body.get("q") or ""
     if q == "":
         return _netsuite_error(400, "Bad Request", "INVALID_REQUEST",
             "The 'q' field is required in the request body.")

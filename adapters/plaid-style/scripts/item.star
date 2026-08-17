@@ -17,7 +17,7 @@ def on_exchange_public_token(req):
     if body == None:
         body = {}
 
-    public_token = body.get("public_token", "")
+    public_token = body.get("public_token") or ""
     if public_token == "":
         return respond(400, {
             "display_message": None,
@@ -42,7 +42,7 @@ def on_exchange_public_token(req):
     # started the Link flow, the public_token must belong to that session.
     # Mismatched pairs are rejected the way Plaid rejects cross-session
     # artifacts (INVALID_PRODUCT / INVALID_FIELD).
-    link_token = body.get("link_token", "")
+    link_token = body.get("link_token") or ""
     if link_token != "":
         if pt_doc.get("link_token", "") != link_token:
             return respond(400, {

@@ -33,7 +33,7 @@ def on_query_grantable_roles(req):
     if body == None:
         body = {}
 
-    full_resource_name = body.get("fullResourceName", "")
+    full_resource_name = body.get("fullResourceName") or ""
     if full_resource_name == "":
         return respond(400, {
             "error": {

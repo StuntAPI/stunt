@@ -104,7 +104,7 @@ def on_subscribe(req):
 
     tokens = body.get("tokens", None)
     if tokens == None:
-        t = body.get("token", "")
+        t = body.get("token") or ""
         if t == "":
             return _err(400, 400, "token or tokens is required (MISSING_TOKEN).", "INVALID_ARGUMENT")
         tokens = [t]
@@ -130,7 +130,7 @@ def on_unsubscribe(req):
 
     tokens = body.get("tokens", None)
     if tokens == None:
-        t = body.get("token", "")
+        t = body.get("token") or ""
         if t == "":
             return _err(400, 400, "token or tokens is required (MISSING_TOKEN).", "INVALID_ARGUMENT")
         tokens = [t]

@@ -223,7 +223,7 @@ def _process_sub_request(sub_req, prior):
 
     if method == "POST":
         # Same required-field rule as the direct create endpoint.
-        if sub_body.get("Name", "") == "":
+        if (sub_body.get("Name") or "") == "":
             return _sub_response(ref_id, 400, [{
                 "message": "Required field missing: [Name]",
                 "errorCode": "REQUIRED_FIELD_MISSING",

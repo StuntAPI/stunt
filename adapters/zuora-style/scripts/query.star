@@ -15,7 +15,7 @@ def on_query(req):
         return err
 
     body = _get_body(req)
-    query = body.get("queryString", "")
+    query = body.get("queryString") or ""
     if query == None:
         query = ""
 

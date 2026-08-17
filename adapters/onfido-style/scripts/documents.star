@@ -15,7 +15,7 @@ def on_upload_document(req):
     if body == None:
         body = {}
 
-    applicant_id = body.get("applicant_id", "")
+    applicant_id = body.get("applicant_id") or ""
     if applicant_id == "":
         return respond(422, _err("validation_error", "applicant_id is required", {
             "applicant_id": ["can't be blank"],
@@ -61,7 +61,7 @@ def on_upload_live_photo(req):
     if body == None:
         body = {}
 
-    applicant_id = body.get("applicant_id", "")
+    applicant_id = body.get("applicant_id") or ""
     if applicant_id == "":
         return respond(422, _err("validation_error", "applicant_id is required", {
             "applicant_id": ["can't be blank"],

@@ -93,7 +93,7 @@ def on_token(req):
     grant_type = body.get("grant_type", "")
 
     if grant_type == "refresh_token":
-        rt = body.get("refresh_token", "")
+        rt = body.get("refresh_token") or ""
         if rt == "" or store_kv_get("xarticles", "refresh_" + rt) == None:
             return respond(400, {"error": "invalid_grant"})
         # Rotate: invalidate the presented refresh, issue a fresh pair.
@@ -127,7 +127,7 @@ def on_token(req):
         return respond(400, {"error": "invalid_grant", "detail": "redirect_uri mismatch"})
 
     # PKCE (relaxed — see module docstring): code_verifier must be present.
-    verifier = body.get("code_verifier", "")
+    verifier = body.get("code_verifier") or ""
     if verifier == "":
         return respond(400, {"error": "invalid_grant", "detail": "PKCE verifier mismatch"})
 

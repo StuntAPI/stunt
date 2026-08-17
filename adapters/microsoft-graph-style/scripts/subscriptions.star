@@ -33,9 +33,9 @@ def on_create_subscription(req):
     if body == None:
         body = {}
 
-    notification_url = body.get("notificationUrl", "")
-    resource = body.get("resource", "")
-    change_type = body.get("changeType", "")
+    notification_url = body.get("notificationUrl") or ""
+    resource = body.get("resource") or ""
+    change_type = body.get("changeType") or ""
     if notification_url == "" or resource == "" or change_type == "":
         return _err("ValidationError", 400, "notificationUrl, resource and changeType are required.")
 

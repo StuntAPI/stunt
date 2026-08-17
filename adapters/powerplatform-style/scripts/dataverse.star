@@ -204,7 +204,7 @@ def on_create_account(req):
     body = req["body"]
     if body == None:
         body = {}
-    if body.get("accountid", "") == "":
+    if (body.get("accountid") or "") == "":
         body["accountid"] = "acc-" + str(store_kv_incr("pp", "account_seq"))
     body["id"] = body["accountid"]
     _accounts().insert(body)

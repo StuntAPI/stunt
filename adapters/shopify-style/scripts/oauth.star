@@ -58,9 +58,9 @@ def on_access_token(req):
     body = req["body"]
     if body == None:
         body = {}
-    code = body.get("code", "")
-    client_id = body.get("client_id", "")
-    client_secret = body.get("client_secret", "")
+    code = body.get("code") or ""
+    client_id = body.get("client_id") or ""
+    client_secret = body.get("client_secret") or ""
 
     if code == "" or client_id == "" or client_secret == "":
         return respond(400, {"error": "invalid_request"})

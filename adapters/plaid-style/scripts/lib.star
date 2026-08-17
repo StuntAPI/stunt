@@ -14,8 +14,8 @@
 def _check_auth(req):
     body = req.get("body")
     if body != None:
-        cid = body.get("client_id", "")
-        secret = body.get("secret", "")
+        cid = body.get("client_id") or ""
+        secret = body.get("secret") or ""
         if cid != "" and secret != "":
             return None
 

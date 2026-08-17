@@ -126,8 +126,8 @@ def on_token(req):
 
     if grant_type == "refresh_token":
         presented = body.get("refresh_token", "")
-        client_id = body.get("client_id", "")
-        client_secret = body.get("client_secret", "")
+        client_id = body.get("client_id") or ""
+        client_secret = body.get("client_secret") or ""
 
         if client_id == "" or client_secret == "":
             return respond(400, {"error": "invalid_client", "error_description": "missing client creds"})

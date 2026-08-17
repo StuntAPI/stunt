@@ -14,7 +14,7 @@ def on_create_check(req):
     if body == None:
         body = {}
 
-    applicant_id = body.get("applicant_id", "")
+    applicant_id = body.get("applicant_id") or ""
     report_names = body.get("report_names", [])
 
     if applicant_id == "":

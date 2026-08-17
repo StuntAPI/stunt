@@ -284,7 +284,7 @@ def on_add_comment(req):
         return _not_found()
 
     body = _get_body(req)
-    comment_text = body.get("body", "")
+    comment_text = body.get("body") or ""
     if comment_text == "":
         return _jira_error(400, "Comment body is required", {"comment": "Comment body can not be empty!"})
 
@@ -340,7 +340,7 @@ def on_update_comment(req):
         return _not_found()
 
     body = _get_body(req)
-    comment_text = body.get("body", "")
+    comment_text = body.get("body") or ""
     if comment_text == "":
         return _jira_error(400, "Comment body is required", {"comment": "Comment body can not be empty!"})
 

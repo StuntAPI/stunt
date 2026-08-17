@@ -28,7 +28,7 @@ def on_set_events_url(req):
     if body == None:
         body = {}
 
-    url = body.get("url", "")
+    url = body.get("url") or ""
     if url == None:
         url = ""
     if url == "":

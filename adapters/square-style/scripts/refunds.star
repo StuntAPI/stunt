@@ -26,7 +26,7 @@ def on_create_refund(req):
     if body == None:
         body = {}
 
-    payment_id = body.get("payment_id", "")
+    payment_id = body.get("payment_id") or ""
     amount_money = body.get("amount_money", None)
     location_id = body.get("location_id", "")
     reason = body.get("reason", "")

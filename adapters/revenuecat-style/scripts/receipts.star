@@ -92,7 +92,7 @@ def on_post_receipt(req):
 # real API's mechanism, checked in common casings) or the body's platform
 # field. Returns "" when absent.
 def _platform(req, body):
-    p = body.get("platform", "")
+    p = body.get("platform") or ""
     if p == None:
         p = ""
     if p != "":

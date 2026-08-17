@@ -57,7 +57,7 @@ def on_create_database(req):
     if body == None:
         return _cf_err(400, _D1_ERR, "Invalid request body.")
 
-    name = body.get("name", "")
+    name = body.get("name") or ""
     if name == None:
         name = ""
     if name == "":
@@ -143,7 +143,7 @@ def on_query_database(req):
     if body == None:
         return _cf_err(400, _D1_ERR, "Missing request body.")
 
-    sql = body.get("sql", "")
+    sql = body.get("sql") or ""
     if sql == None:
         sql = ""
     if sql == "":

@@ -251,7 +251,7 @@ def on_played(req):
     t = body.get("type", "songs")
     if t == None:
         t = "songs"
-    ident = body.get("id", "")
+    ident = body.get("id") or ""
     if ident == None:
         ident = ""
     if ident == "":

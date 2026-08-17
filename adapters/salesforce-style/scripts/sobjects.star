@@ -139,7 +139,7 @@ def on_create(req):
         return _sf_error(404, "The requested resource does not exist", "NOT_FOUND")
 
     body = _get_body(req)
-    name = body.get("Name", "")
+    name = body.get("Name") or ""
     if name == "":
         return _sf_error(400, "Required field missing: [Name]", "REQUIRED_FIELD_MISSING")
 
@@ -313,7 +313,7 @@ def on_upsert(req):
         })
 
     # No match -> insert. Same required-field rule as plain create.
-    if body.get("Name", "") == "":
+    if (body.get("Name") or "") == "":
         return _sf_error(400, "Required field missing: [Name]", "REQUIRED_FIELD_MISSING")
 
     record_id = _next_id(obj_type)

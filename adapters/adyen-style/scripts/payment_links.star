@@ -35,7 +35,7 @@ def on_create_payment_link(req):
     if _amt_value(amount) <= 0:
         return _adyen_err(422, "710", "amount.value must be greater than zero", "validation")
 
-    reference = body.get("reference", "")
+    reference = body.get("reference") or ""
     if reference == None:
         reference = ""
     if reference == "":
@@ -46,7 +46,7 @@ def on_create_payment_link(req):
     if reusable == None:
         reusable = False
 
-    expires_at = body.get("expiresAt", "")
+    expires_at = body.get("expiresAt") or ""
     if expires_at == None:
         expires_at = ""
     if expires_at == "":

@@ -18,7 +18,7 @@ def on_add_reaction(req):
     channel = body.get("channel", "")
     if channel == None:
         channel = ""
-    timestamp = body.get("timestamp", "")
+    timestamp = body.get("timestamp") or ""
     if timestamp == None:
         timestamp = ""
     name = body.get("name", "")

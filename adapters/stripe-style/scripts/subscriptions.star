@@ -871,7 +871,7 @@ def on_update_subscription(req):
         doc["default_tax_rates"] = tax_rates
         changed = True
     if body.get("coupon", None) != None or body.get("promotion_code", None) != None:
-        if body.get("coupon", "") == "" and body.get("promotion_code", "") == "":
+        if (body.get("coupon") or "") == "" and (body.get("promotion_code") or "") == "":
             doc["discount"] = None
             changed = True
         else:
@@ -883,7 +883,7 @@ def on_update_subscription(req):
 
     pm_set = False
     if body.get("default_payment_method", None) != None:
-        pm = body.get("default_payment_method", "")
+        pm = body.get("default_payment_method") or ""
         if pm != "" and not _sub_pm_exists(pm):
             return _not_found("payment_method", pm)
         if pm == "":
