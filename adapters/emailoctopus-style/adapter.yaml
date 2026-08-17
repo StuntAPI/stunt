@@ -1,0 +1,166 @@
+# stunt adapter manifest — EmailOctopus-style API simulator (unofficial)
+# Docs: https://stuntapi.com/stunt
+#
+# This adapter mimics the *structure* of the EmailOctopus v2 API
+# (https://api.emailoctopus.com — bearer auth, no version path prefix) for
+# LOCAL TESTING ONLY. It does not call the real EmailOctopus API. All data
+# is synthetic. See DISCLAIMER.
+id: emailoctopus-style
+name: "EmailOctopus-style API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "EmailOctopus API"
+  version: "2.0.0"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order). The
+# load-bearing ordering here is /lists/{list_id}/contacts/batch (literal
+# "batch") before /lists/{list_id}/contacts/{contact_id}.
+#
+# concurrency_key serializes handlers that read-modify-write the same
+# document (list doc for list-scoped mutations, contact doc for the
+# id-scoped contact routes).
+endpoints:
+  # --- Lists (collection) ---
+  - route: /lists
+    method: GET
+    handler: scripts/lists.star#on_list_lists
+  - route: /lists
+    method: POST
+    handler: scripts/lists.star#on_create_list
+
+  # --- Lists (single) ---
+  - route: /lists/{list_id}
+    method: GET
+    handler: scripts/lists.star#on_get_list
+    concurrency_key: list_id
+  - route: /lists/{list_id}
+    method: PUT
+    handler: scripts/lists.star#on_update_list
+    concurrency_key: list_id
+  - route: /lists/{list_id}
+    method: DELETE
+    handler: scripts/lists.star#on_delete_list
+    concurrency_key: list_id
+
+  # --- Tags (list-scoped; literal collection route before {tag}) ---
+  - route: /lists/{list_id}/tags
+    method: GET
+    handler: scripts/tags.star#on_list_tags
+  - route: /lists/{list_id}/tags
+    method: POST
+    handler: scripts/tags.star#on_create_tag
+    concurrency_key: list_id
+  - route: /lists/{list_id}/tags/{tag}
+    method: PUT
+    handler: scripts/tags.star#on_update_tag
+    concurrency_key: list_id
+  - route: /lists/{list_id}/tags/{tag}
+    method: DELETE
+    handler: scripts/tags.star#on_delete_tag
+    concurrency_key: list_id
+
+  # --- Fields (list-scoped custom contact fields) ---
+  - route: /lists/{list_id}/fields
+    method: POST
+    handler: scripts/fields.star#on_create_field
+    concurrency_key: list_id
+  - route: /lists/{list_id}/fields/{tag}
+    method: PUT
+    handler: scripts/fields.star#on_update_field
+    concurrency_key: list_id
+  - route: /lists/{list_id}/fields/{tag}
+    method: DELETE
+    handler: scripts/fields.star#on_delete_field
+    concurrency_key: list_id
+
+  # --- Contacts (collection: list / create / upsert) ---
+  - route: /lists/{list_id}/contacts
+    method: GET
+    handler: scripts/contacts.star#on_list_contacts
+  - route: /lists/{list_id}/contacts
+    method: POST
+    handler: scripts/contacts.star#on_create_contact
+    concurrency_key: list_id
+  - route: /lists/{list_id}/contacts
+    method: PUT
+    handler: scripts/contacts.star#on_upsert_contact
+    concurrency_key: list_id
+
+  # --- Contacts batch (LITERAL: must precede /contacts/{contact_id}) ---
+  - route: /lists/{list_id}/contacts/batch
+    method: PUT
+    handler: scripts/contacts.star#on_batch_update_contacts
+    concurrency_key: list_id
+
+  # --- Contacts (single) ---
+  - route: /lists/{list_id}/contacts/{contact_id}
+    method: GET
+    handler: scripts/contacts.star#on_get_contact
+  - route: /lists/{list_id}/contacts/{contact_id}
+    method: PUT
+    handler: scripts/contacts.star#on_update_contact
+    concurrency_key: contact_id
+  - route: /lists/{list_id}/contacts/{contact_id}
+    method: DELETE
+    handler: scripts/contacts.star#on_delete_contact
+    concurrency_key: contact_id
+
+  # --- Campaigns (read-only in the real API; literal report tails first) ---
+  - route: /campaigns
+    method: GET
+    handler: scripts/campaigns.star#on_list_campaigns
+  - route: /campaigns/{campaign_id}
+    method: GET
+    handler: scripts/campaigns.star#on_get_campaign
+  - route: /campaigns/{campaign_id}/reports/summary
+    method: GET
+    handler: scripts/campaigns.star#on_campaign_summary
+  - route: /campaigns/{campaign_id}/reports/links
+    method: GET
+    handler: scripts/campaigns.star#on_campaign_links
+  - route: /campaigns/{campaign_id}/reports
+    method: GET
+    handler: scripts/campaigns.star#on_campaign_contact_report
+
+  # --- Automations (queue a contact into an automation) ---
+  - route: /automations/{automation_id}/queue
+    method: POST
+    handler: scripts/automations.star#on_queue_automation
+    concurrency_key: automation_id
+
+# Backing stores — collections for stateful data. The lists seed carries a
+# double-opt-in list (double opt-in is dashboard-configured in the real
+# product, not settable through the API), so the PENDING contact flow is
+# exercisable out of the box.
+resources:
+  - name: lists
+    kind: collection
+    seed: fixtures/lists.jsonl
+  - name: contacts
+    kind: collection
+  - name: campaigns
+    kind: collection
+  - name: automation_queue
+    kind: collection
+
+# Auth scheme metadata (mock: the real API uses HTTP bearer authentication —
+# "Authorization: Bearer {token}". Presence-validated, like a dev key).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404 in EmailOctopus's RFC 7807
+# problem+json error shape.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          type: https://emailoctopus.com/api-documentation/v2#not-found
+          title: An error occurred.
+          detail: Resource not found.
+          status: 404
