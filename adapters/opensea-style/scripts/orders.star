@@ -37,6 +37,8 @@ def on_list_listings(req):
         result.append(_strip_id(listing))
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return respond(400, {"error": "Invalid cursor parameter."})
     body = {"orders": page}
     if next_cursor != None:
         body["next"] = next_cursor
@@ -58,6 +60,8 @@ def on_list_offers(req):
         result.append(_strip_id(offer))
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return respond(400, {"error": "Invalid cursor parameter."})
     body = {"orders": page}
     if next_cursor != None:
         body["next"] = next_cursor

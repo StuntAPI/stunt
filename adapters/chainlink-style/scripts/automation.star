@@ -116,6 +116,8 @@ def on_list_upkeeps(req):
         upkeeps.append(_upkeep_view(doc))
 
     page, next_cursor = _list_page(req, upkeeps)
+    if page == None:
+        return _cl_err(400, "invalid_cursor", "Invalid cursor token")
     body = {"data": page}
     if next_cursor != None:
         body["nextCursor"] = next_cursor
@@ -323,6 +325,8 @@ def on_list_performs(req):
         rev.append(entries[i])
 
     page, next_cursor = _list_page(req, rev)
+    if page == None:
+        return _cl_err(400, "invalid_cursor", "Invalid cursor token")
     body = {"data": page, "count": len(rev)}
     if next_cursor != None:
         body["nextCursor"] = next_cursor

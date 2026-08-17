@@ -27,6 +27,8 @@ def on_list_buckets(req):
     # Pagination is via the per_page + cursor query params; the next cursor
     # is returned as a top-level "cursor" field alongside buckets.
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return _cf_err(400, 400, "Invalid cursor token")
     res = {"buckets": page}
     if next_cursor != None and next_cursor != "":
         res["cursor"] = next_cursor

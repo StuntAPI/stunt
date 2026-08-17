@@ -30,6 +30,8 @@ def on_list_contacts(req):
 
     contacts = _apply_contact_filters(req, contacts)
     contacts, next_page = _list_page(req, contacts)
+    if contacts == None:
+        return _xero_err(400, "ValidationException", 10, "Invalid page parameter.")
     return _envelope("Contacts", contacts, next_page)
 
 # _apply_contact_filters maps the real Xero GET /Contacts query params to

@@ -113,6 +113,8 @@ def on_list_transactions(req):
 
     # Apply OData $top/$skip paging after filtering.
     page, next_link = _list_page(req, value, "/v2/transactions")
+    if page == None:
+        return _avalara_err(400, "InvalidCursor", "The cursor parameter is invalid.")
 
     resp = {
         "@recordsetCount": len(value),

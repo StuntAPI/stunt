@@ -31,6 +31,8 @@ def on_list_products(req):
 
     total = len(shop_docs)
     page, next_page = _list_page(req, shop_docs)
+    if page == None:
+        return respond(400, {"error": {"message": "Invalid page parameter.", "code": 400}})
     offset = _page_offset(req)
     page_len = len(page)
     return respond(200, {

@@ -279,6 +279,8 @@ def on_list_payments(req):
 
     # Apply cursor pagination (pageSize + cursor) after building the list.
     page, next_cursor = _list_page(req, items)
+    if page == None:
+        return _adyen_err(400, "400", "Invalid cursor parameter.", "validation")
     body = {
         "paymentData": page,
     }

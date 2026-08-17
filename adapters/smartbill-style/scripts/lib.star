@@ -78,7 +78,9 @@ def require_auth(req):
         auth = ""
     if not auth.startswith("Basic "):
         return None, api_error(401, "The credentials are missing or invalid.")
-    # crypto.base64_decode raises on non-alphabet input; validate first.
+    # Shape-validate before decode (base64_decode is total and returns
+    # None on malformed input; the shape check keeps None out of the
+    # user:pass split).
     enc = auth[6:]
     body_chars = enc.replace("=", "")
     ok = len(body_chars) > 0 and len(enc) % 4 == 0 and "=" not in body_chars

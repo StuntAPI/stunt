@@ -30,4 +30,6 @@ def on_list_accounts(req):
 
     accounts = _apply_list_filters(req, accounts)
     accounts, next_page = _list_page(req, accounts)
+    if accounts == None:
+        return _xero_err(400, "ValidationException", 10, "Invalid page parameter.")
     return _envelope("Accounts", accounts, next_page)

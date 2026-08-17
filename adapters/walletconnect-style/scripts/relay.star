@@ -105,6 +105,8 @@ def on_list_sessions(req):
     for s in sc.list():
         result.append(_session_view(s))
     page, _next = _list_page(req, result)
+    if page == None:
+        return respond(400, {"error": "invalid_cursor", "message": "Invalid cursor token"})
     return respond(200, page)
 
 # on_approve_session acknowledges (approves) a session, simulating the

@@ -42,6 +42,8 @@ def on_list_databases(req):
             result.append(_db_result(d))
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return _cf_err(400, 400, "Invalid cursor token")
     return _cf_ok_with_info(page, len(result), next_cursor)
 
 # on_create_database creates a new D1 database.

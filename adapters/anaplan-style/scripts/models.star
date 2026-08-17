@@ -26,6 +26,8 @@ def on_list_models(req):
         models = []
 
     page, next_cursor = _list_page(req, models)
+    if page == None:
+        return respond(400, {"status": "FAILURE", "statusMessage": "Invalid offset parameter."})
     paging = {
         "currentPageSize": len(page),
         "offset": _to_int(req.get("query", {}).get("offset", "")),
@@ -75,6 +77,8 @@ def on_list_modules(req):
     ]
 
     page, next_cursor = _list_page(req, modules)
+    if page == None:
+        return respond(400, {"status": "FAILURE", "statusMessage": "Invalid offset parameter."})
     paging = {
         "currentPageSize": len(page),
         "offset": _to_int(req.get("query", {}).get("offset", "")),

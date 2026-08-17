@@ -34,6 +34,8 @@ def on_list_sites(req):
     base_url = "https://graph.microsoft.com/v1.0/groups/" + group_id + "/sites"
     top = _to_int(req["query"].get("$top", ""))
     page, next_cursor = _list_page(sites, req["query"])
+    if page == None:
+        return _err(400, "BadRequest", "Invalid skiptoken.")
 
     envelope = {
         "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#groups('" + group_id + "')/sites",

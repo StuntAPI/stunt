@@ -136,6 +136,8 @@ def on_list_payment_refunds(req):
     items = query_select(items, f if len(f) > 0 else None, "created_at", order_dir, None, None, None)
 
     page, next_cursor = _list_page(req, items)
+    if page == None:
+        return _sq_err(400, "INVALID_REQUEST_ERROR", "INVALID_CURSOR", "The cursor is invalid.")
     return respond(200, {
         "refunds": page,
         "cursor": _sq_cursor(next_cursor),

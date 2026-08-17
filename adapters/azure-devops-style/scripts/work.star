@@ -34,6 +34,8 @@ def on_iterations(req):
 
     # Apply OData $top/$skip paging.
     page, continuation = _list_page(req, items)
+    if page == None:
+        return respond(400, {"message": "Invalid continuation token."})
 
     resp = {"value": page, "count": len(page)}
     if continuation != None:

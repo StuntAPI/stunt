@@ -367,6 +367,8 @@ def _list_objects_v2(bucket, req):
 
     # Apply S3 ListObjectsV2 pagination (max-keys + continuation-token).
     page, next_cursor = _list_page(req, entries)
+    if page == None:
+        return _invalid_argument("continuation-token", "invalid", "The continuation token is not valid.")
     truncated = next_cursor != ""
 
     # Effective MaxKeys to echo (requested value, or S3 default).

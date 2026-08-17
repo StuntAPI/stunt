@@ -135,6 +135,8 @@ def on_list_messages(req):
     # Apply paging after filtering. Twilio lists are driven by PageSize
     # (page size) + PageToken (opaque cursor from a prior next_page_uri).
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return respond(400, {"code": 400, "message": "Invalid PageToken", "more_info": "", "status": 400})
 
     page_size = _to_int(req["query"].get("PageSize", ""))
     if page_size <= 0:

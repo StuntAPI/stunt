@@ -54,6 +54,8 @@ def on_list_calendars(req):
         items.append(entry)
 
     page, next_cursor = _list_page(req, items)
+    if page == None:
+        return _g_err(400, "Invalid pageToken", "INVALID_ARGUMENT")
 
     result = {
         "kind": "calendar#calendarList",

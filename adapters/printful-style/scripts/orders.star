@@ -87,6 +87,8 @@ def on_list_orders(req):
     docs = c.list()
     docs = _apply_order_filters(req, docs)
     page, next_cursor = _list_page(req, docs)
+    if page == None:
+        return respond(400, {"error": {"message": "Invalid offset parameter", "code": 400}})
     limit = _to_int(_get_query(req, "limit"))
     body = {"data": page}
     if limit > 0:

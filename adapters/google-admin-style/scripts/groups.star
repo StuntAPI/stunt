@@ -28,6 +28,8 @@ def on_list_groups(req):
 
     groups = _apply_group_filters(req, groups)
     page, next_token = _list_page(req, groups)
+    if page == None:
+        return respond(400, {"error": {"code": 400, "message": "Invalid pageToken", "status": "INVALID_ARGUMENT"}})
     result = {
         "kind": "admin#directory#groups",
         "groups": page,
@@ -153,6 +155,8 @@ def on_list_members(req):
 
     members = _apply_member_filters(req, members)
     page, next_token = _list_page(req, members)
+    if page == None:
+        return respond(400, {"error": {"code": 400, "message": "Invalid pageToken", "status": "INVALID_ARGUMENT"}})
     result = {
         "kind": "admin#directory#members",
         "members": page,

@@ -50,6 +50,8 @@ def on_list_dns_records(req):
     records = _apply_dns_record_filters(req, records)
 
     page, next_cursor = _list_page(req, records)
+    if page == None:
+        return _cf_err(400, 400, "Invalid cursor token")
     return _cf_ok_with_info(page, len(records), next_cursor)
 
 # on_create_dns_record creates a DNS record.

@@ -76,6 +76,8 @@ def on_list_usage(req):
     # same convention as the accounts and payments list endpoints.
     usage = _apply_zuora_filters(req, usage)
     usage, next_cursor = _list_page(req, usage)
+    if usage == None:
+        return _zuora_err(400, "INVALID_CURSOR", "The cursor parameter is invalid.")
     usage = _apply_zuora_fields(req, usage)
 
     resp = {

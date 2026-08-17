@@ -30,6 +30,8 @@ def on_list_flows(req):
         })
 
     page, next_link = _list_page(req, items, "/v2/environments/" + env + "/flows")
+    if page == None:
+        return respond(400, {"error": {"code": "BadRequest", "message": "Invalid skiptoken."}})
 
     resp = {"value": page}
     if next_link != None:

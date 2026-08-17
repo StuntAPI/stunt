@@ -75,6 +75,8 @@ def on_list_models(req):
         return err
 
     page, has_more = _list_page(req, _MODELS)
+    if page == None:
+        return respond(400, {"error": {"message": "Invalid cursor value.", "type": "invalid_request_error", "param": "after", "code": None}})
     return respond(200, {
         "object": "list",
         "data": page,

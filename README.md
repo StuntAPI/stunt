@@ -135,7 +135,10 @@ stunt catalog search stripe                   # browse the adapter registry
 
 **Reference adapters in this repo** — 95 of them (Stripe, Salesforce, Discord, Twilio,
 Square, Adyen, AWS S3, Google/Microsoft/Apple families, blockchain RPCs, …; all unofficial,
-synthetic-data-only, with a DISCLAIMER). Browse them with `stunt catalog search`. Highlights:
+synthetic-data-only, with a DISCLAIMER). Browse them with `stunt catalog search`. Every one
+passes an adversarial input-safety sweep (garbage params, null/malformed bodies, ~30 tampered
+cursor/limit param names — never a 5xx) plus coverage-guided fuzzing of the engine's parsers
+and dispatch (`just fuzz` for longer rounds). Highlights:
 
 | Adapter | Simulates | Backing |
 |---|---|---|

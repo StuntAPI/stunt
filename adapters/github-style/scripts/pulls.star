@@ -35,6 +35,8 @@ def on_list_pulls(req):
 
     result = _apply_pull_filters(req, result)
     page, next_link = _list_page(req, result)
+    if page == None:
+        return _gh_err(400, "Invalid cursor")
     return respond(200, page, _gh_link_headers(next_link))
 
 # on_create_pull creates a new PR.
@@ -246,6 +248,8 @@ def on_list_reviews(req):
     for r in docs:
         views.append(_review_view(r))
     page, next_link = _list_page(req, views)
+    if page == None:
+        return _gh_err(400, "Invalid cursor")
     return respond(200, page, _gh_link_headers(next_link))
 
 # on_create_review submits a review (POST): event APPROVE -> state APPROVED,

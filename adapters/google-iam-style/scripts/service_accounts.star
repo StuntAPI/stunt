@@ -30,6 +30,8 @@ def on_list_service_accounts(req):
             accounts.append(_sa_entity(d))
 
     page, next_token = _list_page(req, accounts)
+    if page == None:
+        return respond(400, {"error": {"code": 400, "message": "Invalid pageToken", "status": "INVALID_ARGUMENT"}})
     resp = {"accounts": page}
     if next_token != None:
         resp["nextPageToken"] = next_token
@@ -158,6 +160,8 @@ def on_list_keys(req):
             })
 
     page, next_token = _list_page(req, keys)
+    if page == None:
+        return respond(400, {"error": {"code": 400, "message": "Invalid pageToken", "status": "INVALID_ARGUMENT"}})
     resp = {"keys": page}
     if next_token != None:
         resp["nextPageToken"] = next_token

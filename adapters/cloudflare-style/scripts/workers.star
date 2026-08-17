@@ -32,6 +32,8 @@ def on_list_scripts(req):
             result.append(_worker_result(w))
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return _cf_err(400, 400, "Invalid cursor token")
     return _cf_ok_with_info(page, len(result), next_cursor)
 
 # on_deploy_script deploys (creates or updates) a Worker script.

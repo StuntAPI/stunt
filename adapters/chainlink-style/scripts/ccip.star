@@ -30,6 +30,8 @@ def on_list_messages(req):
     ]
 
     page, next_cursor = _list_page(req, messages)
+    if page == None:
+        return _cl_err(400, "invalid_cursor", "Invalid cursor token")
     body = {"data": page}
     if next_cursor != None:
         body["nextCursor"] = next_cursor

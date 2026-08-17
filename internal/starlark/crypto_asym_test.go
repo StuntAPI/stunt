@@ -301,7 +301,18 @@ func TestBase64URLDecodeRoundTrip(t *testing.T) {
 			t.Errorf("decode(%q) = %q, want %q", in, dec, claims)
 		}
 	}
-	if err := callAsymErr("base64url_decode", sk.Tuple{sk.String("!!!not-base64!!!")}); err == nil {
-		t.Error("garbage input: want error, got nil")
+	// Malformed input is TOTAL: None, no error — the argument is
+	// usually client input (JWT segments, cursors) and a raise would be
+	// an unhandled 500. (Note "garbage" is VALID unpadded base64url —
+	// 7 chars — so it is only garbage to the std alphabet.)
+	for _, in := range []string{"!!!not-base64!!!", "a", "!!!!"} {
+		if got := callAsym(t, "base64url_decode", sk.Tuple{sk.String(in)}); got != sk.None {
+			t.Errorf("base64url_decode(%q) = %v, want None", in, got)
+		}
+	}
+	for _, in := range []string{"!!!not-base64!!!", "a", "garbage", "=="} {
+		if got := callAsym(t, "base64_decode", sk.Tuple{sk.String(in)}); got != sk.None {
+			t.Errorf("base64_decode(%q) = %v, want None", in, got)
+		}
 	}
 }

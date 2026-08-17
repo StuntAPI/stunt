@@ -85,6 +85,27 @@ cross-build:
 test:
     go test -race ./...
 
+# Coverage-guided fuzzing — each target for the given time (default 30s;
+# pass just fuzz 2m for longer rounds). The fuzz seed corpora also run as
+# regular tests in `just test`, so discovered inputs stay pinned forever.
+# Found failures are written to testdata/fuzz/<Target>/ — commit them.
+fuzz t="30s":
+    #!/bin/sh
+    set -e
+    for spec in \
+        "internal/engine FuzzMatchRoute" \
+        "internal/engine FuzzParseFormBody" \
+        "internal/engine FuzzAdapterRequests" \
+        "internal/adapter/runtime FuzzParseMultipart" \
+        "internal/primitives/events FuzzValidateHeader"; do
+        set -- $spec
+        echo "== $1 $2"
+        go test "$1" -run "^$2\$" -fuzz "^$2\$" -fuzztime={{t}} || {
+            echo "FAIL: $2 — failing input in $1/testdata/fuzz/$2/"
+            exit 1
+        }
+    done
+
 # `go vet` across all packages.
 vet:
     go vet ./...

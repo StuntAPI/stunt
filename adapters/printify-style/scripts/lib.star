@@ -31,6 +31,11 @@ def _require_auth(req):
 
 # _to_int parses a decimal string to int. Returns 0 for None, empty string,
 # or any non-numeric input (never crashes on None).
+# _INT64_MAX bounds parsed ints: Starlark ints are arbitrary precision but
+# the response path converts to int64, and a client-sent 25-digit "id"
+# would overflow it.
+_INT64_MAX = (1 << 63) - 1
+
 def _to_int(s):
     if s == None or s == "":
         return 0
@@ -39,6 +44,8 @@ def _to_int(s):
         ch = s[i]
         if ch >= "0" and ch <= "9":
             n = n * 10 + (ord(ch) - ord("0"))
+            if n > _INT64_MAX:
+                return 0
         else:
             return 0
     return n

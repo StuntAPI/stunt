@@ -41,6 +41,8 @@ def on_list_companies(req):
 
     # Apply OData $top/$skip paging.
     page, next_link = _list_page(req, value, "/v2/companies")
+    if page == None:
+        return _avalara_err(400, "InvalidCursor", "The cursor parameter is invalid.")
 
     resp = {
         "@recordsetCount": len(value),

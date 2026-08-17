@@ -27,6 +27,8 @@ def on_list_tasks(req):
 
     # Apply Google Tasks pagination (maxResults + pageToken) after filtering.
     page, next_cursor = _list_page(req, items)
+    if page == None:
+        return _g_err(400, "Invalid pageToken", "INVALID_ARGUMENT")
 
     result = {"items": page}
     if next_cursor != None:

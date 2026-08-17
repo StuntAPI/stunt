@@ -29,6 +29,8 @@ def on_list_pipelines(req):
         items.append(_pipeline_resource(p))
 
     page, continuation = _list_page(req, items)
+    if page == None:
+        return respond(400, {"message": "Invalid continuation token."})
     resp = {"value": page, "count": len(page)}
     if continuation != None:
         resp["continuationToken"] = continuation
@@ -67,6 +69,8 @@ def on_list_runs(req):
         items.append(_run_resource(_advance_run(r)))
 
     page, continuation = _list_page(req, items)
+    if page == None:
+        return respond(400, {"message": "Invalid continuation token."})
     resp = {"value": page, "count": len(page)}
     if continuation != None:
         resp["continuationToken"] = continuation

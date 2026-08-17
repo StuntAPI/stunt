@@ -119,6 +119,8 @@ def on_list_media(req):
 
     user_media = _apply_media_fields(req, user_media)
     page, next_cursor = _list_page(req, user_media)
+    if page == None:
+        return respond(400, {"error": {"message": "Invalid after cursor", "type": "OAuthException", "code": 100, "fbtrace_id": ""}})
 
     result = {"data": page}
     if next_cursor != None and next_cursor != "":

@@ -27,6 +27,8 @@ def on_list(req):
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, docs)
+    if paged == None:
+        return _zd_error(400, "InvalidQuery", "Invalid page cursor.")
 
     tickets = []
     for d in paged:
@@ -258,6 +260,8 @@ def on_list_comments(req):
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, comments)
+    if paged == None:
+        return _zd_error(400, "InvalidQuery", "Invalid page cursor.")
 
     resp = {
         "comments": paged,
@@ -320,6 +324,8 @@ def on_search(req):
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, results)
+    if paged == None:
+        return _zd_error(400, "InvalidQuery", "Invalid page cursor.")
 
     resp = {
         "results": paged,
@@ -356,6 +362,8 @@ def on_list_requests(req):
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, requests)
+    if paged == None:
+        return _zd_error(400, "InvalidQuery", "Invalid page cursor.")
 
     resp = {
         "requests": paged,
@@ -374,6 +382,8 @@ def on_list_suspended(req):
 
     page_size = _to_int(_get_query(req, "per_page", "100"))
     paged, next_cursor = _list_page(req, [])
+    if paged == None:
+        return _zd_error(400, "InvalidQuery", "Invalid page cursor.")
 
     resp = {
         "suspended_tickets": paged,

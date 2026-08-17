@@ -28,6 +28,8 @@ def on_list_connections(req):
     ]
 
     docs, next_page = _list_page(req, docs)
+    if docs == None:
+        return _xero_err(400, "ValidationException", 10, "Invalid page parameter.")
     body = {"connections": docs}
     if next_page != None:
         body["nextPage"] = next_page

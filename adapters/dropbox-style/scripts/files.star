@@ -202,6 +202,8 @@ def on_list_folder(req):
                 entries.append(d)
 
     page, next_cursor = _list_page(req, entries)
+    if page == None:
+        return respond(400, {"error_summary": "invalid_cursor", "error": {".tag": "invalid_cursor"}})
     return respond(200, {
         "entries": page,
         "cursor": next_cursor if next_cursor != None else "",

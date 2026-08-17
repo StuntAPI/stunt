@@ -111,6 +111,8 @@ def on_list_messages(req):
     # the `after` cursor token round-trips via the Link header.
     result = _reverse(result)
     page, next_cursor = _list_page(req, result, 50)
+    if page == None:
+        return respond(400, {"message": "Invalid query parameter.", "code": 50034})
     headers = None
     link = _next_link(req, next_cursor)
     if link != None:

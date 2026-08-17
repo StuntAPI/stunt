@@ -33,6 +33,8 @@ def on_list_accounts(req):
         })
 
     page, next_cursor = _list_page(req, accounts)
+    if page == None:
+        return respond(400, {"error": {"code": 400, "message": "Invalid pageToken", "status": "INVALID_ARGUMENT"}})
     return respond(200, _page_body("accounts", page, next_cursor))
 
 # on_list_properties returns all GA4 properties.
@@ -74,6 +76,8 @@ def on_list_properties(req):
         })
 
     page, next_cursor = _list_page(req, properties)
+    if page == None:
+        return respond(400, {"error": {"code": 400, "message": "Invalid pageToken", "status": "INVALID_ARGUMENT"}})
     return respond(200, _page_body("properties", page, next_cursor))
 
 # on_list_datastreams returns all data streams for a property.
@@ -108,6 +112,8 @@ def on_list_datastreams(req):
         })
 
     page, next_cursor = _list_page(req, streams)
+    if page == None:
+        return respond(400, {"error": {"code": 400, "message": "Invalid pageToken", "status": "INVALID_ARGUMENT"}})
     return respond(200, _page_body("dataStreams", page, next_cursor))
 
 # --- seed hierarchy ---

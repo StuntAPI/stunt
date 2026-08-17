@@ -53,6 +53,8 @@ def on_list_accounts(req):
     if skip > 0:
         docs = docs[skip:]
     page, next_link = _list_page(req, docs, base_path)
+    if page == None:
+        return respond(400, {"error": {"code": "BadRequest", "message": "Invalid skiptoken."}})
 
     q = req.get("query")
     sel = ""

@@ -28,6 +28,8 @@ def on_list_invoices(req):
 
     invoices = _apply_invoice_filters(req, invoices)
     invoices, next_page = _list_page(req, invoices)
+    if invoices == None:
+        return _xero_err(400, "ValidationException", 10, "Invalid page parameter.")
     return _envelope("Invoices", invoices, next_page)
 
 # _apply_invoice_filters maps the real Xero GET /Invoices query params to
