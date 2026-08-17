@@ -6,6 +6,27 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.44.0] — 2026-08-17
+
+### Adapters
+
+- **salesforce-style: JWT bearer grant (RFC 7523)** — the server-to-server
+  OAuth flow real connected apps use. `POST /services/oauth2/token` accepts
+  `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer` with an RS256
+  `assertion`, verified the way the real endpoint does: base64url segment
+  shape, `alg: RS256`, RSA-SHA256 signature against the adapter's fixed
+  "connected-app certificate", `iss` (consumer key) and `sub` (or legacy
+  `prn`) as actual non-empty strings, `aud` a Salesforce login host, and
+  `exp` in the future and within the real ~5-minute window. A valid
+  assertion mints a normal session for the `sub` user — with no
+  `refresh_token` (JWT clients mint a fresh assertion instead of
+  refreshing); failures return the real `invalid_grant` 400. Closes the
+  salesforce sweep issue's last item (SOQL v0.22.0, SObject Collections
+  v0.37.0).
+- **google-iam-style**: the JWT `iss` claim check is now type-strict —
+  JSON `null` decodes to Starlark `None` and `None == ""` is `False`, so
+  a signed `{"iss":null}` assertion previously passed the emptiness guard.
+
 ## [0.43.0] — 2026-08-17
 
 ### Adapters
