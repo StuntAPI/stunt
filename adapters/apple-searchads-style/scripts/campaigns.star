@@ -47,7 +47,7 @@ def on_create_campaign(req):
     if body == None:
         body = {}
 
-    name = body.get("name", "")
+    name = body.get("name") or ""
     if name == "":
         return respond(400, _err("Campaign name is required"))
 

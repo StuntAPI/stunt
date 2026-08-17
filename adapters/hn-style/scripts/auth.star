@@ -13,7 +13,7 @@ def on_login(req):
     body = req["body"]
     if body == None:
         body = {}
-    acct = body.get("acct", "")
+    acct = body.get("acct") or ""
     pw = body.get("pw", "")
 
     if acct == "":

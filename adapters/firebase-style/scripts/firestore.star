@@ -101,7 +101,7 @@ def _create_path(req, project, path):
         if doc_id == None:
             doc_id = ""
     if doc_id == "":
-        doc_id = body.get("documentId", "")
+        doc_id = body.get("documentId") or ""
         if doc_id == None:
             doc_id = ""
 

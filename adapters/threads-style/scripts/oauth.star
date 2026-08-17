@@ -48,7 +48,7 @@ def on_access_token(req):
     grant_type = body.get("grant_type", "")
 
     if grant_type == "refresh_token":
-        rt = body.get("refresh_token", "")
+        rt = body.get("refresh_token") or ""
         uid = store_kv_get("threads", "refresh_" + rt)
         if rt == "" or uid == None:
             return respond(400, {"error": "invalid_grant", "error_description": "invalid refresh_token"})

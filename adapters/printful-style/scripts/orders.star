@@ -153,7 +153,7 @@ def on_update_order(req):
     if body == None:
         body = {}
 
-    new_status = body.get("status", "")
+    new_status = body.get("status") or ""
     if new_status != "":
         doc["status"] = new_status
 

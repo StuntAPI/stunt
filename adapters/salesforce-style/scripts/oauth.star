@@ -39,20 +39,20 @@ def on_token(req):
         return _issue_token(username, _claim_str(claims.get("iss", None)), None, False)
 
     if grant_type == "password":
-        username = body.get("username", "")
-        password = body.get("password", "")
+        username = body.get("username") or ""
+        password = body.get("password") or ""
         if username == "" or password == "" or client_id == "":
             return _oauth_error("invalid_request", "missing required parameters")
         return _issue_token(username, client_id)
 
     if grant_type == "authorization_code":
-        code = body.get("code", "")
+        code = body.get("code") or ""
         if code == "":
             return _oauth_error("invalid_grant", "invalid or expired code")
         return _issue_token("user@mock.org", client_id)
 
     if grant_type == "refresh_token":
-        refresh_token = body.get("refresh_token", "")
+        refresh_token = body.get("refresh_token") or ""
         username = store_kv_get("salesforce", "refresh_" + refresh_token)
         if refresh_token == "" or username == None:
             return _oauth_error("invalid_grant", "invalid refresh_token")

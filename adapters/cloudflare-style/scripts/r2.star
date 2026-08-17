@@ -45,7 +45,7 @@ def on_create_bucket(req):
     if body == None:
         return _cf_err(400, 10004, "Invalid request body.")
 
-    name = body.get("name", "")
+    name = body.get("name") or ""
     if name == None:
         name = ""
     if name == "":

@@ -27,7 +27,7 @@ def on_update_settings(req):
     enabled = body.get("enabled", False)
     if enabled == None:
         enabled = False
-    url = body.get("url", "")
+    url = body.get("url") or ""
     if url == None:
         url = ""
 

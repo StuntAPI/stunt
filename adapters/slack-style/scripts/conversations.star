@@ -22,7 +22,7 @@ def on_create_conversation(req):
     if body == None:
         body = {}
 
-    name = body.get("name", "")
+    name = body.get("name") or ""
     if name == None:
         name = ""
 

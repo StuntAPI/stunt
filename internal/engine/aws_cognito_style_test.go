@@ -260,6 +260,23 @@ func TestAWSCognitoStyleAdapter(t *testing.T) {
 		t.Fatalf("UserConfirmed = %v, want bool", signUpResp["UserConfirmed"])
 	}
 
+	// A JSON-null required field is a missing field: Starlark decodes
+	// null to None and None == "" is False, so a plain emptiness guard
+	// used to pass and store null. Real Cognito rejects it.
+	body, status = cognitoPostTarget(t, base+"/",
+		"AWSCognitoIdentityProviderService.SignUp",
+		map[string]any{
+			"ClientId": clientID,
+			"Username": nil,
+			"Password": signUpPassword,
+		})
+	if status != 400 {
+		t.Fatalf("SignUp with null Username -> status %d, want 400; body %s", status, body)
+	}
+	if !strings.Contains(body, "InvalidParameterException") {
+		t.Fatalf("SignUp with null Username -> body %s, want InvalidParameterException", body)
+	}
+
 	// ===== Service API: ConfirmSignUp =====
 
 	body, status = cognitoPostTarget(t, base+"/",

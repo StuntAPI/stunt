@@ -106,7 +106,7 @@ def _get_query(req):
     # POST: body field
     body = req.get("body")
     if body != None:
-        val = body.get("query", "")
+        val = body.get("query") or ""
         if val != "":
             return val
     return ""

@@ -128,7 +128,7 @@ def on_token(req):
     # --- refresh_token grant ---
     if grant_type == "refresh_token":
         presented = body.get("refresh_token", "")
-        client_id = body.get("client_id", "")
+        client_id = body.get("client_id") or ""
         client_secret = body.get("client_secret", "")
 
         if client_id == "":

@@ -22,8 +22,8 @@ def on_create_inquiry(req):
     if body == None:
         body = {}
 
-    template_id = body.get("template_id", "")
-    reference_id = body.get("reference_id", "")
+    template_id = body.get("template_id") or ""
+    reference_id = body.get("reference_id") or ""
     if template_id == "" or reference_id == "":
         return respond(400, _jsonapi_err(400, "invalid_request", "template_id and reference_id are required"))
 

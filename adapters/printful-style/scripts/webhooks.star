@@ -39,7 +39,7 @@ def on_set_webhooks(req):
     if body == None:
         body = {}
 
-    url = body.get("url", "")
+    url = body.get("url") or ""
     if url == "":
         return respond(400, {
             "error": {"message": "url is required", "code": 400},

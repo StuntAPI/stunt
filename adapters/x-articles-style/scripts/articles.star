@@ -32,7 +32,7 @@ def on_draft(req):
     if body == None:
         body = {}
 
-    title = body.get("title", "")
+    title = body.get("title") or ""
     if title == None:
         title = ""
     title = title.strip()

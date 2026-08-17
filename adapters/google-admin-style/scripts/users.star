@@ -54,7 +54,7 @@ def on_create_user(req):
     seq = store_kv_incr("gadmin", "user_seq")
     uid = "10" + _pad10(seq)
 
-    email = body.get("primaryEmail", "")
+    email = body.get("primaryEmail") or ""
     if email == "":
         email = "user" + str(seq) + "@mock-domain.com"
 

@@ -35,7 +35,7 @@ def on_create_record(req):
             "message": "repo must match the authenticated session",
         })
 
-    collection = body.get("collection", "")
+    collection = body.get("collection") or ""
     if collection == "":
         return respond(400, {
             "error": "InvalidRequest",

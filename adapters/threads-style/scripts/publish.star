@@ -33,7 +33,7 @@ def on_create(req):
     if body == None:
         body = {}
     media_type = body.get("media_type", "")
-    text = body.get("text", "")
+    text = body.get("text") or ""
 
     if media_type != "TEXT" or text == "":
         return respond(400, {"error": {"message": "media_type must be TEXT and text is required", "code": 100}})

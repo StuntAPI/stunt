@@ -75,7 +75,7 @@ def on_create_payment(req):
         headers = {}
     consent_id = headers.get("Consent-ID", "")
     if consent_id == None or consent_id == "":
-        consent_id = body.get("consentId", "")
+        consent_id = body.get("consentId") or ""
         if consent_id == None:
             consent_id = ""
 

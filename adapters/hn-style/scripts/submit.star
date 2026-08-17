@@ -26,7 +26,7 @@ def on_submit(req):
     body = req["body"]
     if body == None:
         body = {}
-    title = body.get("title", "")
+    title = body.get("title") or ""
     if title == "":
         title = "(no title)"
     url = body.get("url", "")

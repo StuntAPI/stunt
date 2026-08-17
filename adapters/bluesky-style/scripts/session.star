@@ -17,8 +17,8 @@ def on_create_session(req):
     body = req["body"]
     if body == None:
         body = {}
-    identifier = body.get("identifier", "")
-    password = body.get("password", "")
+    identifier = body.get("identifier") or ""
+    password = body.get("password") or ""
 
     if identifier == "" or password == "":
         return respond(400, {

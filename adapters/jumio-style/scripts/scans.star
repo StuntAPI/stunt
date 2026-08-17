@@ -31,7 +31,7 @@ def on_create_scan(req):
 
     # Failure injection: simulate_fail, or an explicit reject reason (which
     # implies failure — see README).
-    reject_reason = body.get("simulate_reject_reason", "")
+    reject_reason = body.get("simulate_reject_reason") or ""
     if reject_reason == None:
         reject_reason = ""
     fail = body.get("simulate_fail", False) == True or reject_reason != ""

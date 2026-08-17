@@ -35,8 +35,8 @@ def on_create(req):
     body = req["body"]
     if body == None:
         body = {}
-    image_url = body.get("image_url", "")
-    video_url = body.get("video_url", "")
+    image_url = body.get("image_url") or ""
+    video_url = body.get("video_url") or ""
     caption = body.get("caption", "")
 
     if image_url == "" and video_url == "":

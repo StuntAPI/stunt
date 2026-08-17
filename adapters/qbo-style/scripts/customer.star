@@ -28,7 +28,7 @@ def on_create_customer(req):
     c = store_collection("customers")
 
     # UPDATE path: POST with an Id addresses an existing customer.
-    upd_id = body.get("Id", "")
+    upd_id = body.get("Id") or ""
     if upd_id != "":
         doc = c.get(upd_id)
         if doc == None:
@@ -41,7 +41,7 @@ def on_create_customer(req):
         c.update(upd_id, doc)
         return respond(200, {"Customer": doc, "time": _now()})
 
-    display_name = body.get("DisplayName", "")
+    display_name = body.get("DisplayName") or ""
     if display_name == "":
         return _fault(400, "610", "Required parameter missing", "DisplayName is required")
 

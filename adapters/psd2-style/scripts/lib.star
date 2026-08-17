@@ -362,7 +362,7 @@ def _sca_update(req, kind):
     method_id = body.get("authenticationMethodId", "")
     if method_id == None:
         method_id = ""
-    otp = body.get("scaAuthenticationData", "")
+    otp = body.get("scaAuthenticationData") or ""
     if otp == None:
         otp = ""
 

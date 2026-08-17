@@ -72,7 +72,7 @@ def on_create_invoice(req):
 # API's void. An unknown Id is the usual 620 Object Not Found fault; a missing
 # Id is a 610 parameter fault.
 def _void_invoice(body):
-    inv_id = body.get("Id", "")
+    inv_id = body.get("Id") or ""
     if inv_id == "":
         return _fault(400, "610", "Required parameter missing", "Id is required to void an invoice")
 

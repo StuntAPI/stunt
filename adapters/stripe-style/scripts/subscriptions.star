@@ -883,7 +883,7 @@ def on_update_subscription(req):
 
     pm_set = False
     if body.get("default_payment_method", None) != None:
-        pm = body.get("default_payment_method", "")
+        pm = body.get("default_payment_method") or ""
         if pm != "" and not _sub_pm_exists(pm):
             return _not_found("payment_method", pm)
         if pm == "":

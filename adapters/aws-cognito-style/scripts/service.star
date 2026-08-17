@@ -72,8 +72,8 @@ def on_service_api(req):
 # {ClientId, Username, Password, UserAttributes: [{Name, Value}]}
 def _do_signup(req):
     body = _json_body(req)
-    username = body.get("Username", "")
-    password = body.get("Password", "")
+    username = body.get("Username") or ""
+    password = body.get("Password") or ""
 
     if username == "" or password == "":
         return _cognito_err("InvalidParameterException",
@@ -125,7 +125,7 @@ def _do_signup(req):
 # {ClientId, Username, ConfirmationCode}
 def _do_confirm_signup(req):
     body = _json_body(req)
-    username = body.get("Username", "")
+    username = body.get("Username") or ""
     if username == "":
         return _cognito_err("InvalidParameterException",
             "Username is required")
@@ -180,7 +180,7 @@ def _do_respond_to_challenge(req):
         return _cognito_err("InvalidParameterException",
             "ChallengeName " + challenge_name + " is not supported")
 
-    session_id = body.get("Session", "")
+    session_id = body.get("Session") or ""
     if session_id == "":
         return _cognito_err("InvalidParameterException",
             "Session is required")
@@ -216,7 +216,7 @@ def _do_respond_to_challenge(req):
     user["status"] = "CONFIRMED"
     uc.update(user["id"], user)
 
-    client_id = body.get("ClientId", "")
+    client_id = body.get("ClientId") or ""
     if client_id == "":
         client_id = "mock-client-id"
     return respond(200, _auth_result(user, client_id))
@@ -227,7 +227,7 @@ def _do_respond_to_challenge(req):
 # {ClientId, Username}
 def _do_forgot_password(req):
     body = _json_body(req)
-    username = body.get("Username", "")
+    username = body.get("Username") or ""
     if username == "":
         return _cognito_err("InvalidParameterException",
             "Username is required")
@@ -258,7 +258,7 @@ def _do_forgot_password(req):
 # {ClientId, Username, ConfirmationCode, Password}
 def _do_confirm_forgot_password(req):
     body = _json_body(req)
-    username = body.get("Username", "")
+    username = body.get("Username") or ""
     if username == "":
         return _cognito_err("InvalidParameterException",
             "Username is required")
@@ -305,7 +305,7 @@ def _do_confirm_forgot_password(req):
 # {AccessToken}
 def _do_global_sign_out(req):
     body = _json_body(req)
-    access_token = body.get("AccessToken", "")
+    access_token = body.get("AccessToken") or ""
 
     if access_token == "":
         return _cognito_err("NotAuthorizedException",
@@ -340,7 +340,7 @@ def _do_admin_user_global_sign_out(req):
 # GlobalSignOut (NotAuthorizedException).
 def _do_get_user(req):
     body = _json_body(req)
-    access_token = body.get("AccessToken", "")
+    access_token = body.get("AccessToken") or ""
 
     if access_token == "":
         return _cognito_err("NotAuthorizedException",
@@ -393,12 +393,12 @@ def _do_list_users(req):
 # {UserPoolId, Username, UserAttributes, [TemporaryPassword]}
 def _do_admin_create_user(req):
     body = _json_body(req)
-    username = body.get("Username", "")
+    username = body.get("Username") or ""
     if username == "":
         return _cognito_err("InvalidParameterException",
             "Username is required")
 
-    temp_password = body.get("TemporaryPassword", "")
+    temp_password = body.get("TemporaryPassword") or ""
     if temp_password == "":
         temp_password = "TempPass" + "1A!"
 
@@ -480,7 +480,7 @@ def _initiate_auth_flow(body, is_admin):
     auth_params = body.get("AuthParameters", {})
     if type(auth_params) != "dict":
         auth_params = {}
-    client_id = body.get("ClientId", "")
+    client_id = body.get("ClientId") or ""
     if client_id == "":
         client_id = "mock-client-id"
 

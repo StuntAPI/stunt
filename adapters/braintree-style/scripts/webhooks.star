@@ -67,8 +67,8 @@ def _register_webhook(req, body):
 # notification (the simulator accepts any non-empty bt_signature/bt_payload —
 # real verification is done with the merchant keypair, see lib.star).
 def _verify_inbound(body):
-    bt_sig = body.get("bt_signature", "")
-    bt_payload = body.get("bt_payload", "")
+    bt_sig = body.get("bt_signature") or ""
+    bt_payload = body.get("bt_payload") or ""
 
     if bt_sig == None:
         bt_sig = ""

@@ -80,7 +80,7 @@ def on_securetoken(req):
     if grant_type != "refresh_token":
         return _err(400, 400, "Only grant_type=refresh_token is supported (INVALID_GRANT_TYPE).", "INVALID_ARGUMENT")
 
-    presented = body.get("refresh_token", "")
+    presented = body.get("refresh_token") or ""
     if presented == "":
         return _err(400, 400, "refresh_token is required (MISSING_REFRESH_TOKEN).", "INVALID_ARGUMENT")
 
@@ -134,8 +134,8 @@ def on_relyingparty(req):
 
 # _do_sign_in validates email/password against stored users and issues tokens.
 def _do_sign_in(body, version):
-    email = body.get("email", "")
-    password = body.get("password", "")
+    email = body.get("email") or ""
+    password = body.get("password") or ""
     if email == "" or password == "":
         return _err(400, 400, "MISSING_EMAIL_OR_PASSWORD", "INVALID_ARGUMENT")
 
@@ -157,7 +157,7 @@ def _do_sign_in(body, version):
 
 # _do_sign_up creates a new user and issues tokens.
 def _do_sign_up(body, version):
-    email = body.get("email", "")
+    email = body.get("email") or ""
     password = body.get("password", "")
     display_name = body.get("displayName", "")
 

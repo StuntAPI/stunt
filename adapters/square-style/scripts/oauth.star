@@ -10,7 +10,7 @@ def on_token(req):
         body = {}
 
     # Square expects form-encoded body for OAuth.
-    grant_type = body.get("grant_type", "")
+    grant_type = body.get("grant_type") or ""
     if grant_type == None:
         grant_type = ""
 

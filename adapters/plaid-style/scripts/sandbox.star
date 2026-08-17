@@ -31,7 +31,7 @@ def on_create_public_token(req):
     if body == None:
         body = {}
 
-    institution_id = body.get("institution_id", "")
+    institution_id = body.get("institution_id") or ""
     ic = store_collection("institutions")
     inst = ic.get(institution_id)
     if institution_id == "" or inst == None:
@@ -49,7 +49,7 @@ def on_create_public_token(req):
 
     # When a link_token is supplied it must be a live Link session; the minted
     # public_token is then bound to that session for exchange verification.
-    link_token = body.get("link_token", "")
+    link_token = body.get("link_token") or ""
     if link_token != "":
         lc = store_collection("link_tokens")
         if lc.get(link_token) == None:

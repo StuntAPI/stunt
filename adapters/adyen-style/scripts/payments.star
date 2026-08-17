@@ -135,7 +135,7 @@ def on_payment_details(req):
     if body == None:
         body = {}
 
-    token = body.get("paymentData", "")
+    token = body.get("paymentData") or ""
     if token == None:
         token = ""
     if token == "":

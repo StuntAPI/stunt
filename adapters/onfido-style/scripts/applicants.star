@@ -13,8 +13,8 @@ def on_create_applicant(req):
     if body == None:
         body = {}
 
-    first_name = body.get("first_name", "")
-    last_name = body.get("last_name", "")
+    first_name = body.get("first_name") or ""
+    last_name = body.get("last_name") or ""
     dob = body.get("dob", "")
 
     if first_name == "" or last_name == "":

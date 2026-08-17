@@ -28,7 +28,7 @@ def on_jwt_exchange(req):
             "error_description": "Only jwt-bearer grant is supported.",
         })
 
-    assertion = body.get("assertion", "")
+    assertion = body.get("assertion") or ""
     if assertion == "":
         return respond(400, {
             "error": "invalid_grant",

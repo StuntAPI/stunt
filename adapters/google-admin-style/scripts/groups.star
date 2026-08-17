@@ -49,7 +49,7 @@ def on_create_group(req):
     if body == None:
         body = {}
 
-    email = body.get("email", "")
+    email = body.get("email") or ""
     if email == "":
         return respond(400, {
             "error": {
@@ -181,7 +181,7 @@ def on_add_member(req):
     if body == None:
         body = {}
 
-    email = body.get("email", "")
+    email = body.get("email") or ""
     if email == "":
         return respond(400, _invalid("email is required"))
 
