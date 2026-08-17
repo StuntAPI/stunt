@@ -17,8 +17,10 @@ analytics / engagement pipeline:
 - **OAuth2 (Meta):** authorize redirect, access-token exchange (single-use code),
   and `refresh_token` grant (single-use, rotating refresh tokens).
 - **Profile:** `GET /v1.0/me`.
-- **Publish (two-step):** create a media container, poll its processing
-  status until `finished`, then publish it.
+- **Publish (two-step):** create a media container, then publish it. Text
+  containers finish processing immediately (real Threads only needs a
+  status poll for video/image uploads), so create → publish back-to-back
+  works with no poll; the `simulate_fail` flag still drives the error path.
 - **Insights:** per-media metrics (views, likes, replies, reposts).
 - **Engagement:** inbox ingest with synthetic reply children.
 

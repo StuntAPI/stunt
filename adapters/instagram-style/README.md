@@ -39,6 +39,8 @@ request is visible when publishing in the next, within the same `stunt up` sessi
 | GET | `/oauth/authorize` | `oauth.star#on_authorize` | OAuth2 authorize → 302 redirect with single-use code |
 | POST | `/oauth/access_token` | `oauth.star#on_access_token` | Exchange code for access token |
 | GET | `/v21.0/me` | `profile.star#on_profile` | Authenticated user profile (Bearer) |
+| GET | `/v21.0/refresh_access_token` | `oauth.star#on_refresh_token` | Long-lived token refresh (`grant_type=ig_refresh_token`; fresh 60-day token, old one valid until its own expiry) |
+| GET | `/v21.0/{media_id}/comments` | `comments.star#on_comments` | Per-media comments (deterministic; `access_token` query param or Bearer; honors `since`) |
 | GET | `/v21.0/{media_id}/insights` | `insights.star#on_insights` | Per-media insights metrics (honors `metric=`) |
 | GET | `/v21.0/{container_id}` | `publish.star#on_container_status` | Container processing status: `status_code` = `IN_PROGRESS` → `FINISHED` (Bearer) |
 | POST | `/v21.0/{ig_user_id}/media_publish` | `publish.star#on_publish` | Publish a media container (Bearer; gated on `FINISHED`) |
