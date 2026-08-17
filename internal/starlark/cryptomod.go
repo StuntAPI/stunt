@@ -131,9 +131,13 @@ func base64Decode(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple)
 	if err := sk.UnpackArgs(b.Name(), args, kwargs, "data", &s); err != nil {
 		return nil, err
 	}
+	// Total on malformed input (None, not a raise): the argument is
+	// usually client input (auth material, cursors, ids), handlers have
+	// no try/except, and a raise is an unhandled 500. Same contract as
+	// json_safe_decode.
 	out, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
-		return nil, fmt.Errorf("crypto.base64_decode: %w", err)
+		return sk.None, nil
 	}
 	return sk.String(string(out)), nil
 }
@@ -153,9 +157,10 @@ func base64urlDecode(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tup
 	if err := sk.UnpackArgs(b.Name(), args, kwargs, "data", &s); err != nil {
 		return nil, err
 	}
+	// Total on malformed input — see base64Decode.
 	out, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(s, "="))
 	if err != nil {
-		return nil, fmt.Errorf("crypto.base64url_decode: %w", err)
+		return sk.None, nil
 	}
 	return sk.String(string(out)), nil
 }

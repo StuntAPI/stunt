@@ -29,6 +29,8 @@ def on_list_feeds(req):
             feeds.append(_feed_public(doc))
 
     page, next_cursor = _list_page(req, feeds)
+    if page == None:
+        return _cl_err(400, "invalid_cursor", "Invalid cursor token")
     body = {"data": page}
     if next_cursor != None:
         body["nextCursor"] = next_cursor
@@ -84,6 +86,8 @@ def on_list_rounds(req):
         rounds.append(_feed_round(doc, k))
 
     page, next_cursor = _list_page(req, rounds)
+    if page == None:
+        return _cl_err(400, "invalid_cursor", "Invalid cursor token")
     body = {"data": page, "count": len(rounds)}
     if next_cursor != None:
         body["nextCursor"] = next_cursor

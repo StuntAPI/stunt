@@ -18,6 +18,8 @@ def on_list_projects(req):
         items.append(_project_resource(p))
 
     page, next_token = _list_page(req, items)
+    if page == None:
+        return _g_err(400, "Invalid pageToken", "INVALID_ARGUMENT")
     result = {"projects": page}
     if next_token != None:
         result["nextPageToken"] = next_token

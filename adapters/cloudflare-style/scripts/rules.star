@@ -55,6 +55,8 @@ def on_list_firewall_rules(req):
             result.append(_fw_result(r))
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return _cf_err(400, 400, "Invalid cursor token")
     return _cf_ok_with_info(page, len(result), next_cursor)
 
 # on_create_firewall_rules creates one firewall rule (single object) or a
@@ -310,6 +312,8 @@ def on_list_page_rules(req):
     result = _apply_page_rule_filters(req, result)
 
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return _cf_err(400, 400, "Invalid cursor token")
     return _cf_ok_with_info(page, len(result), next_cursor)
 
 # on_create_page_rule creates a page rule.

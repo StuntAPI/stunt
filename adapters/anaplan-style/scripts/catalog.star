@@ -27,6 +27,8 @@ def _list_catalog(req, ws, mid, name):
         })
 
     page, next_cursor = _list_page(req, items)
+    if page == None:
+        return respond(400, {"status": "FAILURE", "statusMessage": "Invalid offset parameter."})
     paging = {
         "currentPageSize": len(page),
         "offset": _to_int(req.get("query", {}).get("offset", "")),

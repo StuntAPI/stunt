@@ -51,11 +51,14 @@ def on_jsonrpc(req):
 
 # _dispatch handles a single JSON-RPC request object and returns a response.
 def _dispatch(rpc):
-    if rpc == None:
+    if rpc == None or type(rpc) != "dict":
         return _rpc_err(None, -32600, "Invalid Request")
 
     method = rpc.get("method", "")
-    if method == None:
+    if method == None or type(method) != "string":
+        # JSON-RPC 2.0: method MUST be a String — anything else is an
+        # Invalid Request element, and string-concatenating a number in
+        # the not-found message would raise.
         method = ""
     params = rpc.get("params", [])
     if params == None:

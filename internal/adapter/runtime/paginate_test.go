@@ -147,9 +147,15 @@ func TestPaginateKwargsAndErrors(t *testing.T) {
 	if _, err := sk.Call(new(sk.Thread), fn, sk.Tuple{items, sk.Float(2.0), sk.None}, nil); err == nil {
 		t.Fatal("float limit: want error, got nil")
 	}
-	// Garbage cursor token errors.
-	if _, err := sk.Call(new(sk.Thread), fn, sk.Tuple{items, sk.MakeInt64(2), sk.String("abc")}, nil); err == nil {
-		t.Fatal("garbage cursor: want error, got nil")
+	// Garbage cursor token is TOTAL: (None, None) so the handler can
+	// answer its provider's 400 instead of an unhandled 500.
+	res, err := sk.Call(new(sk.Thread), fn, sk.Tuple{items, sk.MakeInt64(2), sk.String("abc")}, nil)
+	if err != nil {
+		t.Fatalf("garbage cursor: error %v, want (None, None)", err)
+	}
+	tup, ok := res.(sk.Tuple)
+	if !ok || tup.Len() != 2 || tup.Index(0) != sk.None || tup.Index(1) != sk.None {
+		t.Fatalf("garbage cursor = %v, want (None, None)", res.String())
 	}
 	// Non-iterable items errors.
 	if _, err := sk.Call(new(sk.Thread), fn, sk.Tuple{sk.MakeInt64(42), sk.MakeInt64(2), sk.None}, nil); err == nil {

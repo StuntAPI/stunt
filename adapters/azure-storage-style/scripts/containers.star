@@ -21,6 +21,8 @@ def on_list_containers(req):
 
     # Apply paging (maxresults + marker) after collecting the full list.
     containers, next_marker = _list_page(req, containers)
+    if containers == None:
+        return _az_error(400, "InvalidQueryParameterValue", "Value for one of the query parameters specified in the request URI is invalid.")
 
     xml = '<?xml version="1.0" encoding="utf-8"?>\n'
     xml = xml + '<EnumerationResults ServiceEndpoint="http://stunt.local/">\n'

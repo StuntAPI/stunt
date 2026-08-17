@@ -99,7 +99,7 @@ Builtins:
   c = store_collection("items"); c.insert(d); c.get(id); c.list(); c.update(id,d); c.delete(id)
   store_kv_set(ns,k,v); store_kv_get(ns,k); n=store_kv_incr(ns,k); store_kv_delete(ns,k)
   b = store_blob("up"); b.put(name,bytes,ctype); b.get(name); b.stat(name); b.list(); b.append(...); b.delete(name)
-  page, next = paginate(items, limit, cursor)  # cursor-based list paging; limit None/<=0 = all; next is None when done
+  page, next = paginate(items, limit, cursor)  # cursor-based list paging; limit None/<=0 = all; next is None when done; invalid cursor -> (None,None) (answer the provider's 400)
   parts, err = parse_multipart(content_type, raw_body)  # multipart/form-data; each part {name, filename, content_type, data}
   # filter/sort/slice/project a list in one call; filter = [[field, op, value], ...] (AND), ops:
   #   = != > >= < <= contains startswith endswith in like(% _); dotted field paths OK ("a.b")

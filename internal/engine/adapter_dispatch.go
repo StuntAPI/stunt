@@ -283,11 +283,16 @@ func matchRoute(pattern, path string) (map[string]string, bool) {
 }
 
 // matchSegment matches one path segment against a pattern segment, capturing
-// any param into params.
+// any param into params. An empty param name ("{}") never matches — a
+// manifest typo must not capture under "".
 func matchSegment(pat, pathSeg string, params map[string]string) bool {
 	// Whole-segment {name}: capture the entire segment.
 	if len(pat) >= 2 && pat[0] == '{' && pat[len(pat)-1] == '}' {
-		params[pat[1:len(pat)-1]] = pathSeg
+		name := pat[1 : len(pat)-1]
+		if name == "" {
+			return false
+		}
+		params[name] = pathSeg
 		return true
 	}
 	// No placeholder: literal match.
@@ -304,6 +309,9 @@ func matchSegment(pat, pathSeg string, params map[string]string) bool {
 	prefix := pat[:open]
 	name := pat[open+1 : closeIdx]
 	suffix := pat[closeIdx+1:]
+	if name == "" {
+		return false
+	}
 	if !strings.HasPrefix(pathSeg, prefix) || !strings.HasSuffix(pathSeg, suffix) || len(pathSeg) < len(prefix)+len(suffix) {
 		return false
 	}
@@ -430,11 +438,19 @@ func splitFormKey(k string) ([]string, bool) {
 	return segs, true
 }
 
+// maxFormIndex bounds a numeric bracket index: beyond it the pair is
+// skipped rather than materializing a huge sparse slice (found by
+// fuzzing — a[222222220][b]=v took 57s in the parser alone).
+const maxFormIndex = 10000
+
 // assignFormValue walks segs, materializing nested dicts and lists, and sets
 // the final segment to val. "" means "append to a list"; a numeric segment
 // indexes one (gaps become nil). Conflicting shapes at a path are skipped
 // (first writer wins) rather than crashing the handler.
 func assignFormValue(cur map[string]any, segs []string, val string) {
+	if len(segs) == 0 {
+		return // total: an empty path assigns nothing
+	}
 	head := segs[0]
 	if len(segs) == 1 {
 		// A terminal scalar never clobbers an existing structure at the same
@@ -455,11 +471,24 @@ func assignFormValue(cur map[string]any, segs []string, val string) {
 		cur[head] = l
 	case isNumericSegment(tail[0]):
 		idx, _ := strconv.Atoi(tail[0])
+		if idx < 0 || idx >= maxFormIndex {
+			return // pathological index (a[222222220]…): skipping beats
+			// materializing a hundred-million-element slice
+		}
 		l, _ := cur[head].([]any)
 		for len(l) <= idx {
 			l = append(l, nil)
 		}
-		if em, ok := l[idx].(map[string]any); ok {
+		if len(tail) == 1 {
+			// Terminal index (a[0]=v — the Rails array-literal form):
+			// write the scalar at the index, never clobbering a
+			// structure already there.
+			switch l[idx].(type) {
+			case map[string]any, []any:
+			default:
+				l[idx] = val
+			}
+		} else if em, ok := l[idx].(map[string]any); ok {
 			assignFormValue(em, tail[1:], val)
 		} else if l[idx] == nil {
 			sub := map[string]any{}

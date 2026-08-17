@@ -82,6 +82,8 @@ def _list_blobs(req):
 
     # Apply paging (maxresults + marker) after prefix filtering.
     matching, next_marker = _list_page(req, matching)
+    if matching == None:
+        return _az_error(400, "InvalidQueryParameterValue", "Value for one of the query parameters specified in the request URI is invalid.")
 
     xml = '<?xml version="1.0" encoding="utf-8"?>\n'
     xml = xml + '<EnumerationResults ServiceEndpoint="http://stunt.local/" ContainerName="' + _xml_escape(container) + '">\n'

@@ -54,6 +54,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"mime"
 	"mime/multipart"
 	"strconv"
@@ -168,7 +169,10 @@ func buildListBuiltins() sk.StringDict {
 			iter.Done()
 			total := len(all)
 
-			// limit: None or <= 0 disables paging.
+			// limit: None or <= 0 disables paging. An out-of-int64
+			// value (client-sent 25-digit limit) is clamped to the
+			// maximum — semantically "no limit", which is what a huge
+			// limit asks for — rather than raising.
 			limit := -1
 			if limitVal != sk.None {
 				li, ok := limitVal.(sk.Int)
@@ -177,12 +181,17 @@ func buildListBuiltins() sk.StringDict {
 				}
 				n, ok := li.Int64()
 				if !ok {
-					return nil, fmt.Errorf("paginate: limit out of int range")
+					n = math.MaxInt64
 				}
 				limit = int(n)
 			}
 
 			// cursor: opaque offset token (string) or None/"" for the start.
+			// A syntactically invalid token is TOTAL — (None, None) — the
+			// same contract as json_safe_decode: cursors are client
+			// input, handlers cannot try/except a raise, and the right
+			// answer is the adapter's own 400, not a 500. Type errors
+			// (programmer mistakes) still raise.
 			start := 0
 			if cursorVal != sk.None {
 				s, ok := cursorVal.(sk.String)
@@ -192,7 +201,7 @@ func buildListBuiltins() sk.StringDict {
 				if string(s) != "" {
 					off, err := strconv.ParseInt(string(s), 10, 64)
 					if err != nil || off < 0 {
-						return nil, fmt.Errorf("paginate: invalid cursor token %q", string(s))
+						return sk.Tuple{sk.None, sk.None}, nil
 					}
 					start = int(off)
 				}

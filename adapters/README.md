@@ -188,10 +188,21 @@ page, next_cursor = paginate(docs, limit, cursor)
 | Argument | Type | Default | Notes |
 |----------|------|---------|-------|
 | `items` | iterable | required | The full result list (typically `store_collection(...).list()`), filtered first |
-| `limit` | int | `None` | Page size. `None` or `<= 0` **disables paging** (returns the whole list, `next_cursor = None`) — so unmodified handlers keep their prior behavior |
+| `limit` | int | `None` | Page size. `None` or `<= 0` **disables paging** (returns the whole list, `next_cursor = None`) — so unmodified handlers keep their prior behavior. An out-of-int64 value is clamped (a client-sent huge limit means "no limit") |
 | `cursor` | str | `None` | Opaque offset token returned by a prior call; `None`/`""` for the first page |
 
 `next_cursor` is the opaque token for the next page, or `None` when no items remain.
+
+A **syntactically invalid cursor returns `(None, None)` instead of raising** — cursors
+are client input, handlers have no try/except, and a raise would be an unhandled 500.
+Guard the page and answer with the provider's own 400 (`Invalid pageToken`,
+`InvalidQueryParameterValue`, …):
+
+```python
+page, next_cursor = _list_page(req, docs)
+if page == None:
+    return _g_err(400, "Invalid pageToken", "INVALID_ARGUMENT")
+```
 
 The builtin does the universal slicing; **the adapter owns the provider envelope and cursor mapping**.
 Stripe, for example, has no cursor field — clients set `starting_after` to the last returned id — so a
@@ -282,7 +293,7 @@ A receiver that verifies a webhook signature (Stripe `Stripe-Signature`, GitHub 
 
 | Module | Functions | Notes |
 |--------|-----------|-------|
-| `crypto` | `hmac_sha256(key, data, encoding="hex")`, `hmac_sha1(...)`, `sha256(data, encoding="hex")`, `base64_encode(data)`, `base64_decode(s)`, `base64url_encode(data)`, `base64url_decode(s)`, `ecdsa_sign_p256(private_key_pem, data, encoding="hex")`, `ecdsa_verify_p256(public_key_pem, data, signature, encoding="hex")`, `rsa_sign(private_key_pem, data, encoding="hex")`, `rsa_verify(public_key_pem, data, signature, encoding="hex")`, `rsa_public_jwk(public_key_pem)→{kty,n,e}`, `ec_public_jwk(public_key_pem)→{kty,crv,x,y}`, `ed25519_sign(private_key_pem, data, encoding="hex")`, `ed25519_verify(public_key_pem, data, signature, encoding="hex")` | `encoding` is `"hex"` (default), `"base64"`, or `"base64url"`. MAC, hash, and asymmetric signature (ECDSA P-256 raw r‖s; RSA-SHA256 PKCS#1 v1.5; Ed25519 over the raw message). Keys arrive as PEM strings the adapter supplies (ship a fixed keypair for determinism). `rsa_public_jwk`/`ec_public_jwk` return the public key's JWK params (base64url) for serving JWKS — RS256 issuers (Entra ID, Cognito) and ES256 issuers (Sign in with Apple, APNs) respectively. `base64url_decode` accepts padded input (JWT segments are unpadded). No encryption/KDF/key-gen |
+| `crypto` | `hmac_sha256(key, data, encoding="hex")`, `hmac_sha1(...)`, `sha256(data, encoding="hex")`, `base64_encode(data)`, `base64_decode(s)`, `base64url_encode(data)`, `base64url_decode(s)`, `ecdsa_sign_p256(private_key_pem, data, encoding="hex")`, `ecdsa_verify_p256(public_key_pem, data, signature, encoding="hex")`, `rsa_sign(private_key_pem, data, encoding="hex")`, `rsa_verify(public_key_pem, data, signature, encoding="hex")`, `rsa_public_jwk(public_key_pem)→{kty,n,e}`, `ec_public_jwk(public_key_pem)→{kty,crv,x,y}`, `ed25519_sign(private_key_pem, data, encoding="hex")`, `ed25519_verify(public_key_pem, data, signature, encoding="hex")` | `encoding` is `"hex"` (default), `"base64"`, or `"base64url"`. MAC, hash, and asymmetric signature (ECDSA P-256 raw r‖s; RSA-SHA256 PKCS#1 v1.5; Ed25519 over the raw message). Keys arrive as PEM strings the adapter supplies (ship a fixed keypair for determinism). `rsa_public_jwk`/`ec_public_jwk` return the public key's JWK params (base64url) for serving JWKS — RS256 issuers (Entra ID, Cognito) and ES256 issuers (Sign in with Apple, APNs) respectively. `base64url_decode` accepts padded input (JWT segments are unpadded). `base64_decode`/`base64url_decode` are **total** — malformed input returns `None` instead of raising (the argument is usually client input: auth material, cursors, ids). No encryption/KDF/key-gen |
 | `clock` | `now_unix()`, `now_rfc3339()` | Wall clock from the engine's injectable `clock.Clock` — real today; the virtual mode is the seam for future record/replay |
 
 **Rule:** MAC the `events_body(...)` bytes verbatim — never a re-marshalled copy — so the signer and verifier agree on the exact bytes.

@@ -33,6 +33,8 @@ def on_list_zones(req):
 
     result = _apply_zone_filters(req, result)
     page, next_cursor = _list_page(req, result)
+    if page == None:
+        return _cf_err(400, 400, "Invalid cursor token")
     return _cf_ok_with_info(page, len(result), next_cursor)
 
 # on_create_zone creates a new zone.

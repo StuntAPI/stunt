@@ -195,6 +195,8 @@ def _trim(s):
     return s[start:end]
 
 # _to_int converts a string to an int (returns 0 on failure).
+_INT64_MAX = (1 << 63) - 1
+
 def _to_int(s):
     if s == "" or s == None:
         return 0
@@ -204,6 +206,8 @@ def _to_int(s):
         code = ord(ch)
         if code >= 48 and code <= 57:
             result = result * 10 + (code - 48)
+            if result > _INT64_MAX:
+                return 0
         else:
             return 0
     return result

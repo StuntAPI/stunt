@@ -232,3 +232,17 @@ def _seed():
         "active": True,
         "size": (2*1024*1024),
     })
+
+# _id_ok guards the blob-store name charset: path ids are client input and
+# the store rejects names outside [A-Za-z0-9][A-Za-z0-9._-]* (a raise there
+# is an unhandled 500). Real Anaplan ids are alphanumeric.
+def _id_ok(s):
+    if s == None or s == "":
+        return False
+    for i in range(len(s)):
+        c = s[i]
+        ok = (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or (c >= "0" and c <= "9") or c == "_" or c == "-" or c == "."
+        if not ok:
+            return False
+    f = s[0]
+    return (f >= "a" and f <= "z") or (f >= "A" and f <= "Z") or (f >= "0" and f <= "9")

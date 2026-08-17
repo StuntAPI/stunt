@@ -27,6 +27,8 @@ def on_list_drafts(req):
 
     # Apply Gmail pagination (maxResults + pageToken).
     page, next_cursor = _list_page(req, drafts)
+    if page == None:
+        return _g_err(400, "Invalid pageToken", "INVALID_ARGUMENT")
 
     result = {
         "drafts": page,

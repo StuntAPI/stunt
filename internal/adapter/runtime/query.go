@@ -2,6 +2,7 @@ package runtime
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"sort"
 	"strconv"
@@ -144,7 +145,7 @@ func buildQueryBuiltins() sk.StringDict {
 				}
 				n, ok := off.Int64()
 				if !ok {
-					return nil, fmt.Errorf("query_select: offset out of int range")
+					n = math.MaxInt64
 				}
 				start = int(n)
 				if start < 0 {
@@ -162,7 +163,7 @@ func buildQueryBuiltins() sk.StringDict {
 				}
 				n, ok := lim.Int64()
 				if !ok {
-					return nil, fmt.Errorf("query_select: limit out of int range")
+					n = math.MaxInt64
 				}
 				if n < 0 {
 					n = 0

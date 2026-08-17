@@ -65,6 +65,8 @@ def on_list_events(req):
 
     # Apply Google Calendar pagination (maxResults + pageToken).
     page, next_cursor = _list_page(req, items)
+    if page == None:
+        return _g_err(400, "Invalid pageToken", "INVALID_ARGUMENT")
 
     result = {
         "kind": "calendar#events",
@@ -266,6 +268,8 @@ def on_list_instances(req):
 
     # Apply Google Calendar pagination (maxResults + pageToken).
     page, next_cursor = _list_page(req, instances)
+    if page == None:
+        return _g_err(400, "Invalid pageToken", "INVALID_ARGUMENT")
 
     result = {
         "kind": "calendar#events",

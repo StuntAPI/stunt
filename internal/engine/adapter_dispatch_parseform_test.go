@@ -24,6 +24,17 @@ func TestParseFormBodyBracketNotation(t *testing.T) {
 		// map-iteration order is unspecified — asserted order-insensitively
 		// in TestParseFormBodyBareAppendDictsUnordered below.
 		{"numeric indexed merge", "a[0][b]=1&a[0][c]=2&a[1][b]=3", `{"a":[{"b":"1","c":"2"},{"b":"3"}]}`},
+		// Terminal numeric index — the Rails array-literal form. Found by
+		// fuzzing: an empty tail segs panicked the recursion (index out
+		// of range).
+		{"terminal numeric index", "a[0]=v", `{"a":["v"]}`},
+		{"terminal numeric indexes", "a[0]=1&a[1]=2", `{"a":["1","2"]}`},
+		{"terminal numeric, numeric key, empty value", "0[0]=", `{"0":[""]}`},
+		{"terminal scalar never clobbers structure", "a[0][b]=1&a[0]=2", `{"a":[{"b":"1"}]}`},
+		// Found by fuzzing: a huge bracket index must be skipped, not
+		// materialized as a hundred-million-element sparse slice (57s
+		// in the parser alone before the cap).
+		{"pathological index skipped", "a[222222220][b]=v&ok=1", `{"ok":"1"}`},
 		{"flat + brackets coexist", "mode=payment&line_items[0][qty]=2", `{"mode":"payment","line_items":[{"qty":"2"}]}`},
 		{"stripe-shaped", "line_items[0][price_data][currency]=usd&line_items[0][price_data][unit_amount]=1000&line_items[0][quantity]=1&success_url=https%3A%2F%2Fx.test%2Fs",
 			`{"line_items":[{"price_data":{"currency":"usd","unit_amount":"1000"},"quantity":"1"}],"success_url":"https://x.test/s"}`},

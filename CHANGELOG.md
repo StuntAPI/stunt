@@ -6,6 +6,43 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.45.0] — 2026-08-17
+
+### Testing
+
+- **Fuzz testing for the engine and every adapter.** Go-native fuzz
+  targets plus a deterministic all-adapter safety sweep now guard the one
+  invariant a mock must uphold: **client input never produces a 5xx**
+  (Starlark has no try/except, so any builtin raise on attacker-shaped
+  input is an unhandled 500; real APIs answer bad input with 4xx).
+  - `TestAdapterInputSafety` drives every reference adapter's routes
+    with adversarial-but-deterministic requests — garbage path params
+    (negative/huge/unicode), JSON-null and malformed bodies, batch
+    arrays, bracket-form bodies, garbage auth, and every plausible
+    cursor/limit query param poisoned at once.
+  - `FuzzMatchRoute` / `FuzzParseFormBody` (router + bracket-form
+    parser), `FuzzParseMultipart` (the multipart decoder's total-
+    contract), `FuzzValidateHeader` (webhook header injection), and
+    `FuzzAdapterRequests` (coverage-guided full-dispatch fuzzing over a
+    curated adapter set: stripe, cloudflare-D1, salesforce-SOQL,
+    powerplatform-OData, emailoctopus, eth-jsonrpc, shopify).
+  - Fuzz seed corpora run in plain `go test` forever; `just fuzz` runs
+    coverage-guided rounds locally (found inputs land in
+    `testdata/fuzz/` — commit them).
+  - **First-run findings, all fixed:** `paginate` raised on invalid
+    cursors (10 adapters 500'd on a tampered token — now returns
+    `(None, None)` and each adapter answers its provider's real 400);
+    `crypto.base64_decode`/`base64url_decode` raised on malformed input
+    (now total, returning `None`); `query_select`/`paginate` raised on
+    out-of-int64 limits (now clamped — a huge limit means "no limit");
+    JSON-RPC batch elements that weren't objects, or a non-string
+    `method`, crashed eth-jsonrpc/erc4337 (now per-element `-32600`
+    Invalid Request per the spec); anaplan built blob names from raw
+    path params (now validates identifiers, 400); printify/jira parsed
+    unbounded ints from client ids/params (now int64-bounded); the
+    router captured an empty param name for a `{}` manifest typo (now
+    never matches).
+
 ## [0.44.0] — 2026-08-17
 
 ### Adapters

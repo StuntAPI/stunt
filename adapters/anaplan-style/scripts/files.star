@@ -66,6 +66,11 @@ def on_upload_file(req):
     ws = req["params"]["workspaceId"]
     mid = req["params"]["modelId"]
     fid = req["params"]["fileId"]
+    if not _id_ok(ws) or not _id_ok(mid) or not _id_ok(fid):
+        return respond(400, {
+            "status": "FAILURE",
+            "statusMessage": "Invalid identifier.",
+        })
     key = _file_key(ws, mid, fid)
     bkey = _blob_key(ws, mid, fid)
 
@@ -145,6 +150,8 @@ def on_list_files(req):
         })
 
     page, next_cursor = _list_page(req, items)
+    if page == None:
+        return respond(400, {"status": "FAILURE", "statusMessage": "Invalid offset parameter."})
     paging = {
         "currentPageSize": len(page),
         "offset": _to_int(req.get("query", {}).get("offset", "")),
@@ -224,6 +231,8 @@ def on_list_chunks(req):
         })
 
     page, next_cursor = _list_page(req, items)
+    if page == None:
+        return respond(400, {"status": "FAILURE", "statusMessage": "Invalid offset parameter."})
     paging = {
         "currentPageSize": len(page),
         "offset": _to_int(req.get("query", {}).get("offset", "")),
