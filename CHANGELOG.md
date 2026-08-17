@@ -6,6 +6,28 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.46.0] — 2026-08-17
+
+### Adapters
+
+- **JSON-null required-field bypass closed — 114 sites across 65
+  adapters.** Starlark decodes JSON `null` to `None` and `None == ""` is
+  `False`, so `V = body.get(k, "")` + `if V == "": return 400` **passed**
+  a `{"username": null}` body: the null was stored and echoed where every
+  real API rejects the request. (The one class the v0.45.0 fuzz invariant
+  cannot see — it manifests as a wrong 200, not a 500.) Extractions are
+  now null-coercing (`V = body.get(k) or ""`) at every paired
+  extraction+guard site lacking its own None/type check, plus the
+  inline-guard shape (`body.get(k, "") == ""`) the pairing pass missed:
+  salesforce upsert/composite Name (create and upsert now agree),
+  powerplatform dataverse accountid (a null skipped id autogeneration
+  and then crashed the Location header), the stripe subscription
+  discount guard, and square refunds (a null payment_id crashed the 404
+  error path itself). Pinned by `TestAWSCognitoStyleAdapter`: SignUp
+  with `Username: null` → 400 `InvalidParameterException`.
+
+## [0.45.0] — 2026-08-17
+
 ### CI
 
 - **`just` is installed from crates.io in CI and Release workflows** —
@@ -15,8 +37,6 @@ All notable changes to **stunt** are documented here. The format is based on
   `dtolnay/rust-toolchain` + `cargo install just --version 1.39.0
   --locked` — the same version the pin named, sourced independently of
   GitHub releases. Revert to the setup action when upstream heals.
-
-## [0.45.0] — 2026-08-17
 
 ### Testing
 
