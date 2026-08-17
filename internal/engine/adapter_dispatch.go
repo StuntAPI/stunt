@@ -267,9 +267,34 @@ func (st *serviceState) getOrLoadVM(scriptPath string) (*starlark.VM, error) {
 //	/charges/{id}          matches /charges/abc123 (params={id:abc123})
 //	/charges/{id}/refund   matches /charges/abc123/refund
 //	/accounts({id})        matches /accounts(abc123) (params={id:abc123})
+//
+// matchRoute matches a route pattern against a request path, capturing
+// params. A pattern whose LAST segment is {name+} is greedy: it captures
+// the remaining path verbatim (slashes included) — the S3/Cloudflare
+// object-key shape, where keys like photos/2024/a.jpg are one path param.
 func matchRoute(pattern, path string) (map[string]string, bool) {
 	patSegs := splitPathSegments(pattern)
 	pathSegs := splitPathSegments(path)
+	if n := len(patSegs); n > 0 {
+		last := patSegs[n-1]
+		if len(last) >= 4 && last[0] == '{' && last[len(last)-1] == '}' && last[len(last)-2] == '+' {
+			name := last[1 : len(last)-2]
+			if name == "" {
+				return nil, false
+			}
+			if len(pathSegs) < n {
+				return nil, false
+			}
+			params := map[string]string{}
+			for i := 0; i < n-1; i++ {
+				if !matchSegment(patSegs[i], pathSegs[i], params) {
+					return nil, false
+				}
+			}
+			params[name] = strings.Join(pathSegs[n-1:], "/")
+			return params, true
+		}
+	}
 	if len(patSegs) != len(pathSegs) {
 		return nil, false
 	}

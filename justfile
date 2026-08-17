@@ -85,6 +85,13 @@ cross-build:
 test:
     go test -race ./...
 
+# SDK conformance: run REAL provider SDKs (stripe-go, aws-sdk-go-v2,
+# go-github) against booted adapters. Nested module under conformance/ so
+# the SDK deps never touch the stunt binary's graph. Set
+# RUN_CONFORMANCE_SCOREBOARD=<file> to dump a TSV of passed checks.
+conformance:
+    cd conformance && go test ./... -count=1 -v
+
 # Coverage-guided fuzzing — each target for the given time (default 30s;
 # pass just fuzz 2m for longer rounds). The fuzz seed corpora also run as
 # regular tests in `just test`, so discovered inputs stay pinned forever.

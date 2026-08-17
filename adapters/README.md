@@ -353,7 +353,7 @@ Every handler receives a `req` argument with:
 | `req.headers` | `dict[str, str]` | Request headers (case-insensitive lookups; `req.headers.get("authorization")` finds `Authorization`). `req` also supports dict access (`req["method"]`, `req.get("query")`) |
 | `req.body` | `dict` | Parsed JSON body (empty dict if no body) |
 | `req.raw_body` | `str` | The verbatim request body bytes (as a string). Use it for non-JSON / binary content (e.g. an S3 object upload) where the parsed `body` map is meaningless — store it via `store_blob` so it round-trips byte-exact |
-| `req.params` | `dict[str, str]` | Path parameters extracted from route (e.g. `{id}` → `{"id": "..."}`) |
+| `req.params` | `dict[str, str]` | Path parameters extracted from route. `{id}` matches one segment; a terminal `{key+}` is greedy and captures the remaining path verbatim, slashes included (the S3 object-key shape: `/{bucket}/{key+}` matches `photos/2024/a.jpg` as one key) |
 | `req.query` | `dict[str, str]` | Query parameters (first value of each key) |
 
 ## Serializing concurrent handler calls (`concurrency_key`)

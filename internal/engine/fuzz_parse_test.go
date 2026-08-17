@@ -86,3 +86,21 @@ func FuzzParseFormBody(f *testing.F) {
 		}
 	})
 }
+
+// The greedy {name+} terminal segment (S3 object keys) is pinned here and
+// in the router unit tests.
+func TestMatchRouteGreedy(t *testing.T) {
+	params, ok := matchRoute("/{bucket}/{key+}", "/my-bucket/photos/2024/a.jpg")
+	if !ok {
+		t.Fatal("greedy route did not match a slashed key")
+	}
+	if params["bucket"] != "my-bucket" || params["key"] != "photos/2024/a.jpg" {
+		t.Fatalf("params = %v", params)
+	}
+	if _, ok := matchRoute("/{bucket}/{key+}", "/only-bucket"); ok {
+		t.Fatal("greedy route matched without a key segment")
+	}
+	if params, ok := matchRoute("/{bucket}/{key+}", "/b/flat.txt"); !ok || params["key"] != "flat.txt" {
+		t.Fatalf("flat key: %v %v", params, ok)
+	}
+}

@@ -6,6 +6,44 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.47.0] — 2026-08-17
+
+### Testing
+
+- **SDK conformance harness — real provider SDKs against the adapters.**
+  A new nested Go module (`conformance/`, wired into CI via
+  `just conformance`) boots stunt adapters and drives them with the
+  official SDKs, asserting business outcomes rather than wire shapes:
+  - **stripe-go** (customer create with form+bracket bodies, PaymentIntent
+    create+confirm → succeeded, SDK-iterator pagination walking
+    `has_more`, and webhook verification through the SDK's own
+    `ConstructEvent` HMAC validator — signature verifies AND
+    `data.object` parses).
+  - **aws-sdk-go-v2** — STS `GetCallerIdentity`/`AssumeRole` with REAL
+    SigV4 signatures from the documented synthetic credentials, and the
+    full S3 lifecycle (CreateBucket, PutObject binary body, byte-exact
+    GetObject incl. non-UTF-8, HeadObject, the ListObjectsV2 paginator
+    following continuations, DeleteObject) over path-style addressing.
+  - **go-github** — issue CRUD on the seeded repo, `Link`-header
+    pagination through `resp.NextPage`, comments, and state transitions.
+  - First-run findings, all fixed: **stripe PaymentIntents returned
+    `amount` as a JSON string** (typed SDKs reject it — real Stripe
+    returns money fields as numbers; coerced at create and render); the
+    **router had no greedy path params**, so S3 keys containing slashes
+    (`photos/2024/a.jpg`) 404'd — a terminal `{key+}` segment now
+    captures the remaining path verbatim and the S3 object routes use
+    it; and **S3 XML `LastModified` rendered as `...T05Z.000Z`**
+    (millis appended after the zone), which the AWS SDK's time parser
+    rejects — now `...T05.000Z` like real S3.
+
+### Engine
+
+- **Greedy route params (`{name+}`).** A route pattern whose last
+  segment is `{key+}` captures the rest of the path verbatim, slashes
+  included — the object-key shape S3- and Cloudflare-style providers
+  need. Whole-segment `{name}` and embedded `prefix{p}suffix` matching
+  are unchanged.
+
 ## [0.46.0] — 2026-08-17
 
 ### Adapters
