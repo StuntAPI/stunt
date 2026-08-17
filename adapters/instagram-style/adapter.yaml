@@ -30,10 +30,20 @@ endpoints:
     method: GET
     handler: scripts/profile.star#on_profile
 
+  # --- Long-lived token refresh (LITERAL: must precede /v21.0/{container_id}) ---
+  - route: /v21.0/refresh_access_token
+    method: GET
+    handler: scripts/oauth.star#on_refresh_token
+
   # --- Container processing status (poll until FINISHED, then publish) ---
   - route: /v21.0/{container_id}
     method: GET
     handler: scripts/publish.star#on_container_status
+
+  # --- Comments (per-media) ---
+  - route: /v21.0/{media_id}/comments
+    method: GET
+    handler: scripts/comments.star#on_comments
 
   # --- Insights (per-media metrics) ---
   - route: /v21.0/{media_id}/insights

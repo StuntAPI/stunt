@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -272,6 +273,84 @@ func TestInstagramStyleAdapter(t *testing.T) {
 	body, status = instagramPostNoBodyAuth(t, base+"/v21.0/"+igUserID+"/media_publish?creation_id=c_nonexistent", accessToken)
 	if status != 404 {
 		t.Fatalf("bad container -> status %d, want 404; body %s", status, body)
+	}
+
+	// ===== Comments → query-param access_token, data shape, since filter =====
+
+	body, status = get2(t, base+"/v21.0/"+mediaID+"/comments?access_token="+accessToken)
+	if status != 200 {
+		t.Fatalf("comments (query-param token) -> status %d, want 200; body %s", status, body)
+	}
+	var commentsResp map[string]any
+	if err := json.Unmarshal([]byte(body), &commentsResp); err != nil {
+		t.Fatalf("unmarshal comments: %v (body %s)", err, body)
+	}
+	commentsArr, ok := commentsResp["data"].([]any)
+	if !ok || len(commentsArr) != 2 {
+		t.Fatalf("comments data = %v, want 2 deterministic comments", commentsResp["data"])
+	}
+	firstComment, ok := commentsArr[0].(map[string]any)
+	if !ok || firstComment["username"] == "" || firstComment["text"] == "" {
+		t.Fatalf("comment[0] = %v, want id/text/username/timestamp", commentsArr[0])
+	}
+	if _, ok := firstComment["timestamp"].(string); !ok {
+		t.Fatalf("comment timestamp = %v, want string", firstComment["timestamp"])
+	}
+	// Stable across reads (deterministic per media).
+	body2, _ := get2(t, base+"/v21.0/"+mediaID+"/comments?access_token="+accessToken)
+	if body2 != body {
+		t.Fatalf("comments not deterministic across reads:\n%s\n%s", body, body2)
+	}
+	// No token → 401; unknown media → 404; far-future since hides everything.
+	_, status = get2(t, base+"/v21.0/"+mediaID+"/comments")
+	if status != 401 {
+		t.Fatalf("comments without token -> status %d, want 401", status)
+	}
+	_, status = get2(t, base+"/v21.0/m_nope/comments?access_token="+accessToken)
+	if status != 404 {
+		t.Fatalf("comments unknown media -> status %d, want 404", status)
+	}
+	body, status = get2(t, base+"/v21.0/"+mediaID+"/comments?access_token="+accessToken+"&since="+fmt.Sprintf("%d", time.Now().Add(1*time.Hour).Unix()))
+	if status != 200 {
+		t.Fatalf("comments since -> status %d, want 200; body %s", status, body)
+	}
+	if err := json.Unmarshal([]byte(body), &commentsResp); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(commentsResp["data"].([]any)); n != 0 {
+		t.Fatalf("comments since far-future = %d, want 0", n)
+	}
+
+	// ===== Long-lived token refresh: fresh 60-day token, old one still valid =====
+
+	body, status = get2(t, base+"/v21.0/refresh_access_token?grant_type=ig_refresh_token&access_token="+accessToken)
+	if status != 200 {
+		t.Fatalf("refresh_access_token -> status %d, want 200; body %s", status, body)
+	}
+	var refreshResp map[string]any
+	if err := json.Unmarshal([]byte(body), &refreshResp); err != nil {
+		t.Fatal(err)
+	}
+	freshToken, ok := refreshResp["access_token"].(string)
+	if !ok || freshToken == "" || freshToken == accessToken {
+		t.Fatalf("refreshed token = %v, want a fresh token", refreshResp["access_token"])
+	}
+	if refreshResp["expires_in"] != float64(60*24*3600) {
+		t.Fatalf("refresh expires_in = %v, want 60 days", refreshResp["expires_in"])
+	}
+	// The fresh token authorizes like the original.
+	_, status = getAuth(t, base+"/v21.0/me", freshToken)
+	if status != 200 {
+		t.Fatalf("GET me with refreshed token -> status %d, want 200", status)
+	}
+	// Wrong grant / unknown token -> 400.
+	_, status = get2(t, base+"/v21.0/refresh_access_token?grant_type=nope&access_token="+accessToken)
+	if status != 400 {
+		t.Fatalf("refresh wrong grant -> status %d, want 400", status)
+	}
+	_, status = get2(t, base+"/v21.0/refresh_access_token?grant_type=ig_refresh_token&access_token=mock_token_nope")
+	if status != 400 {
+		t.Fatalf("refresh unknown token -> status %d, want 400", status)
 	}
 
 	// ===== Insights → all 4 metrics present, finite =====
