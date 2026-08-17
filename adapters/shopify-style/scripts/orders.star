@@ -306,9 +306,9 @@ def on_create_fulfillment(req):
     oc.update(oid, order)
 
     # Emit webhook event if subscribed.
-    _emit_if_subscribed("fulfillments/create", fulfillment)
+    _emit_if_subscribed("fulfillments/create", _fulfillment_view(fulfillment))
 
-    return respond(201, {"fulfillment": fulfillment})
+    return respond(201, {"fulfillment": _fulfillment_view(fulfillment)})
 
 # on_create_transaction records a transaction (capture/sale/refund/void)
 # against the order and re-derives the order's financial_status from ALL its
@@ -355,9 +355,32 @@ def on_create_transaction(req):
     order["updated_at"] = _now()
     oc.update(oid, order)
 
-    return respond(201, {"transaction": transaction})
+    return respond(201, {"transaction": _transaction_view(transaction)})
 
 # --- helpers ---
+
+# _fulfillment_view / _transaction_view render numeric ids (stored as
+# strings; typed SDKs unmarshal Shopify ids as ints).
+def _fulfillment_view(f):
+    out = dict(f)
+    out["id"] = _num_id(f["id"])
+    out["order_id"] = _num_id(f["order_id"])
+    if out.get("line_items", None) != None:
+        lines = []
+        for li in out["line_items"]:
+            w = dict(li)
+            if w.get("id", None) != None:
+                w["id"] = _num_id(w["id"])
+            lines.append(w)
+        out["line_items"] = lines
+    return out
+
+def _transaction_view(t):
+    out = dict(t)
+    out["id"] = _num_id(t["id"])
+    out["order_id"] = _num_id(t["order_id"])
+    return out
+
 
 # _order_view returns the public-facing order object. Internal keys (the
 # per-line _fulfilled counters) are projected away by _line_item_view.

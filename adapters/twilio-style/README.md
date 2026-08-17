@@ -49,7 +49,7 @@ AuthToken  = feed0000face1111beef2222cafe3333
 Base64 of `AC0123456789abcdef0123456789abcdef:feed0000face1111beef2222cafe3333`:
 
 ```
-QUMwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjp0d2lsaW9fYXV0aF90b2tlbg==
+QUMwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjpmZWVkMDAwMGZhY2UxMTExYmVlZjIyMjJjYWZlMzMzMw==
 ```
 
 ### Example
@@ -120,19 +120,22 @@ registered webhook sink. See the stunt docs for webhook configuration
 
 ### Signed deliveries — `X-Twilio-Signature`
 
-Webhook deliveries are signed exactly the way Twilio signs its webhook
-requests — the header carries a base64 HMAC-SHA1 over the delivery URL plus
-the raw request body:
+Webhook deliveries use Twilio's real status-callback shape: the message
+resource as **form parameters** (`AccountSid`, `ApiVersion`, `From`,
+`MessageSid`, `MessageStatus`, `To`), signed with a base64 HMAC-SHA1 over
+the delivery URL plus the parameters **sorted by key, each key immediately
+followed by its (decoded) value**:
 
 ```
 X-Twilio-Signature = base64(HMAC-SHA1(key=feed0000face1111beef2222cafe3333,
-                                      msg=events_target_url + raw_body))
+                                      msg=url + concat(sorted, key + value)))
 ```
 
 The URL is the webhook destination configured as this service's
-`events_target` (Twilio MACs the full request URL, so a receiver must validate
-against the same URL stunt delivered to), and the body is the exact JSON
-envelope on the wire. The signing key is the documented mock AuthToken:
+`events_target` — Twilio MACs the full request URL, so a receiver must
+validate against the same URL stunt delivered to. A receiver built from
+Twilio's validation documentation verifies every delivery as-is. The
+signing key is the documented mock AuthToken:
 
 ```
 feed0000face1111beef2222cafe3333

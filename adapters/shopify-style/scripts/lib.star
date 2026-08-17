@@ -144,16 +144,25 @@ def _next_id(kind):
     n = store_kv_incr("shopify", kind + "_seq")
     return str(_BASE_ID + n)
 
-# _num_id converts a stored string id back to an int for JSON responses
-# (Shopify returns numeric ids in REST/GraphQL responses).
-def _num_id(s):
-    return _to_int(s)
+# _num_id converts a stored or inbound id to an int for JSON responses
+# (Shopify returns numeric ids in REST/GraphQL responses). TOTAL over the
+# shapes an id can take: stored string, JSON int, JSON float (the engine
+# decodes numbers to float when a client sends an id as a number) — a
+# plain string parser raised on the latter two and 500'd the response.
+def _num_id(v):
+    if v == None:
+        return 0
+    if type(v) == "int":
+        return v
+    if type(v) == "float":
+        return int(v)
+    return _to_int(str(v))
 
 # _customer_id_numeric coerces an embedded customer object's id (typed SDKs
 # unmarshal order.customer.id as int64).
 def _customer_id_numeric(c):
     if c == None:
-        return {}
+        return None
     if c.get("id", None) == None:
         return c
     out = dict(c)
@@ -398,8 +407,21 @@ def _product_view(p):
         "tags": p.get("tags", ""),
         "created_at": p.get("created_at", _now()),
         "updated_at": p.get("updated_at", _now()),
-        "variants": p.get("variants", []),
+        "variants": _variants_numeric(p.get("variants", [])),
     }
+
+# _variants_numeric coerces variant id/product_id to numeric at render —
+# seeded variants store string ids and typed SDKs unmarshal them as ints.
+def _variants_numeric(vs):
+    out = []
+    for v in vs:
+        w = dict(v)
+        if w.get("id", None) != None:
+            w["id"] = _num_id(w["id"])
+        if w.get("product_id", None) != None:
+            w["product_id"] = _num_id(w["product_id"])
+        out.append(w)
+    return out
 
 
 def _customer_view(c):

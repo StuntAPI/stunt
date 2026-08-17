@@ -167,8 +167,24 @@ def _list_page(req, items):
 # base64(HMAC-SHA1(AUTH_TOKEN, url + params sorted by key, each key
 # immediately followed by its raw value)) — the formula real receivers
 # validate. events_emit_raw puts the exact pre-signed bytes on the wire.
-_FORM_SAFE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" + "-_.~"
+_FORM_SAFE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" + "0123" + "456789" + "-_.~"
 _HEX = "0123456789ABCDEF"
+# Callback params are sanitized to printable ASCII: Starlark ord() is
+# rune-based (a lone non-ASCII byte reads as U+FFFD), so a raw byte-exact
+# encoder is impossible — mapping non-ASCII to '?' deterministically keeps
+# the SIGNATURE string and the encoded BODY in agreement (both use the
+# sanitized value), so receivers still verify. Real From/To addresses and
+# alphanumeric sender IDs are ASCII.
+def _ascii_safe(s):
+    out = ""
+    for i in range(len(s)):
+        c = s[i]
+        v = ord(c)
+        if v >= 32 and v <= 126:
+            out = out + c
+        else:
+            out = out + "?"
+    return out
 
 def _form_encode(s):
     out = ""
@@ -178,6 +194,8 @@ def _form_encode(s):
             out = out + c
         else:
             v = ord(c)
+            if v > 255:
+                v = 63
             out = out + "%" + _HEX[v // 16] + _HEX[v % 16]
     return out
 
@@ -196,10 +214,10 @@ def _signed_emit(event_type, msg):
     params = {
         "AccountSid": ACCOUNT_SID,
         "ApiVersion": "2010-04-01",
-        "From": msg.get("from", ""),
+        "From": _ascii_safe(msg.get("from", "")),
         "MessageSid": msg.get("id", ""),
         "MessageStatus": msg.get("status", ""),
-        "To": msg.get("to", ""),
+        "To": _ascii_safe(msg.get("to", "")),
     }
     keys = []
     for k in params:

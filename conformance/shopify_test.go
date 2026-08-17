@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,16 +19,19 @@ import (
 // NextPageOptions, and webhook delivery verified by the SDK's own
 // VerifyWebhookRequest HMAC validator.
 func TestShopifySDKConformance(t *testing.T) {
+	var mu sync.Mutex
 	var deliveries []struct {
 		body    []byte
 		headers http.Header
 	}
 	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
+		mu.Lock()
 		deliveries = append(deliveries, struct {
 			body    []byte
 			headers http.Header
 		}{b, r.Header.Clone()})
+		mu.Unlock()
 		w.WriteHeader(200)
 	}))
 	defer sink.Close()
@@ -72,6 +76,25 @@ func TestShopifySDKConformance(t *testing.T) {
 	}
 	Record(t, "go-shopify/v3", "shopify-style", "Order.Create x4 (numeric ids)")
 
+	// The most common real pattern: an order carrying an embedded
+	// customer. The id round-trips numeric (regression: a float/int
+	// customer id used to crash the view and poison every later list).
+	withCustomer, err := client.Order.Create(goshopify.Order{
+		LineItems: []goshopify.LineItem{{Title: "For someone", Quantity: 1}},
+		Customer:  &goshopify.Customer{ID: 42, Email: "buyer@example.test"},
+	})
+	if err != nil {
+		t.Fatalf("Order.Create with customer: %v", err)
+	}
+	if withCustomer.Customer == nil || withCustomer.Customer.ID != 42 {
+		t.Fatalf("embedded customer id = %+v, want 42", withCustomer.Customer)
+	}
+	// And the list still renders every order afterwards.
+	if _, _, err := client.Order.ListWithPagination(nil); err != nil {
+		t.Fatalf("Order.List after embedded-customer create: %v", err)
+	}
+	Record(t, "go-shopify/v3", "shopify-style", "Order.Create with embedded customer (numeric id round-trip)")
+
 	// ===== Cursor pagination through the SDK's Link-header walking =====
 
 	options := &goshopify.ListOptions{Limit: 2}
@@ -101,9 +124,17 @@ func TestShopifySDKConformance(t *testing.T) {
 	// ===== Webhook deliveries verified by the SDK's own HMAC validator =====
 
 	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) && len(deliveries) < 4 {
+	for time.Now().Before(deadline) {
+		mu.Lock()
+		n := len(deliveries)
+		mu.Unlock()
+		if n >= 4 {
+			break
+		}
 		time.Sleep(200 * time.Millisecond)
 	}
+	mu.Lock()
+	defer mu.Unlock()
 	if len(deliveries) < 4 {
 		t.Fatalf("only %d orders/create deliveries arrived, want >= 4", len(deliveries))
 	}

@@ -150,7 +150,8 @@ func TestTwilioSDKConformance(t *testing.T) {
 		t.Fatalf("CreateMessage callback: %v", err)
 	}
 	// Callbacks fire per status TRANSITION and transitions are read-driven
-	// (derive-on-read) — poll this engine's message to drive them.
+	// (derive-on-read) — poll this engine's message to delivered so BOTH
+	// the sent and delivered callbacks fire.
 	cbSid := deref(cbMsg.Sid)
 	deadline = time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
@@ -158,7 +159,7 @@ func TestTwilioSDKConformance(t *testing.T) {
 		if err != nil {
 			t.Fatalf("FetchMessage cb: %v", err)
 		}
-		if st := deref(m.Status); st == "sent" || st == "delivered" {
+		if st := deref(m.Status); st == "delivered" || st == "failed" {
 			break
 		}
 		time.Sleep(300 * time.Millisecond)

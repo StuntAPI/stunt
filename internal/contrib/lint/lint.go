@@ -293,7 +293,7 @@ func splitGraphqlHandler(h string) (path, fn string) {
 //
 //	api:
 //	  name: "Twilio API"
-//	  version: "2010-06-01"
+//	  version: "2010-04-01"
 //
 // Missing or incomplete blocks are warnings (existing adapters without the
 // block are not broken), but every adapter SHOULD declare which real API
@@ -325,7 +325,7 @@ func lintAPIBlock(dir string) []Finding {
 	if apiNode == nil || apiNode.Kind != yaml.MappingNode {
 		return []Finding{{
 			File: "adapter.yaml", Severity: SeverityWarn,
-			Message: "missing `api:` block — declare the real upstream API + version this adapter simulates (e.g. api: { name: \"Twilio API\", version: \"2010-06-01\" })",
+			Message: "missing `api:` block — declare the real upstream API + version this adapter simulates (e.g. api: { name: \"Twilio API\", version: \"2010-04-01\" })",
 		}}
 	}
 	name, ver := "", ""

@@ -10,8 +10,8 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Testing
 
-- **SDK conformance wave 2 — three more official/standard SDKs, 15 new
-  checks (34 across six SDKs).**
+- **SDK conformance wave 2 — three more official/standard SDKs, 17 new
+  checks (36 across six SDK families).**
   - **twilio-go** — message create, the `queued → sent → delivered`
     lifecycle driven by SDK Fetch polling, the `+15005550001` magic
     invalid-number → `failed` trigger, list filters, and status-callback
@@ -44,9 +44,14 @@ All notable changes to **stunt** are documented here. The format is based on
     receivers — and Twilio's documented validation — verify out of the
     box. The lifecycle engine test now verifies every callback's
     signature.
-  - **shopify-style rendered webhook ids and embedded customer ids as
-    JSON strings** — Shopify ids are numeric; typed SDKs (`go-shopify`)
-    reject the response outright.
+  - **shopify-style rendered webhook ids, embedded customer ids,
+    fulfillment/transaction ids, and variant ids as JSON strings** —
+    Shopify ids are numeric; typed SDKs (`go-shopify`) reject the
+    response outright. The id coercion is total over the shapes an id
+    can take (stored string, JSON int, JSON float) — the first cut
+    crashed on numeric customer ids, 500ing the most common Shopify
+    create pattern and poisoning later order lists (caught in review,
+    pinned by the embedded-customer conformance check).
   - **google-style's token endpoint rejected HTTP Basic client
     credentials** (RFC 6749 §2.3.1) — the default style of
     `golang.org/x/oauth2` and the Google SDKs. The first attempt also

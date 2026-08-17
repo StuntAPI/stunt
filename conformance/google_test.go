@@ -98,6 +98,13 @@ func TestGoogleOAuthConformance(t *testing.T) {
 	}
 	Record(t, "google-api-go-client/idtoken", "google-style", "idtoken.Validate verifies the adapter's RS256 id_token via its JWKS")
 
+	// A tampered id_token must FAIL the same verifier.
+	tampered := idTok[:len(idTok)-6] + "AAAAAA"
+	if _, err := validator.Validate(ctx, tampered, "conformance-client"); err == nil {
+		t.Fatal("tampered id_token passed idtoken.Validate")
+	}
+	Record(t, "google-api-go-client/idtoken", "google-style", "tampered id_token rejected by idtoken.Validate")
+
 	// ===== Refresh with rotation (the old token dies) =====
 
 	// Expire the cached token so TokenSource performs a real refresh
