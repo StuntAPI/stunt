@@ -106,7 +106,9 @@ in `scripts/oauth.star` — sign with its private half, the same throwaway
 repo material the other JWT adapters use), `iss` non-empty (the consumer
 key), `sub` (or legacy `prn`) non-empty, `aud` one of
 `https://login.salesforce.com` / `https://test.salesforce.com`, and `exp`
-in the future. A valid assertion mints a normal session token for the
+in the future and no more than ~5 minutes out (the real endpoint's
+window, plus its documented clock-skew allowance — long-lived assertions
+are an `invalid_grant`). A valid assertion mints a normal session token for the
 `sub` user; the response carries **no** `refresh_token` — a JWT-bearer
 client mints a fresh assertion instead of refreshing. Failures return
 `400 {"error": "invalid_grant", "error_description": "invalid assertion"}`

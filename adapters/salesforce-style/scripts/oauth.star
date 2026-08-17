@@ -33,10 +33,10 @@ def on_token(req):
         claims = _verify_assertion(assertion)
         if claims == None:
             return _oauth_error("invalid_grant", "invalid assertion")
-        username = claims.get("sub", "")
+        username = _claim_str(claims.get("sub", None))
         if username == "":
-            username = claims.get("prn", "")  # legacy claim name
-        return _issue_token(username, claims.get("iss", ""), None, False)
+            username = _claim_str(claims.get("prn", None))  # legacy claim
+        return _issue_token(username, _claim_str(claims.get("iss", None)), None, False)
 
     if grant_type == "password":
         username = body.get("username", "")
@@ -197,6 +197,16 @@ def _claim_int(v):
         return v
     return None
 
+# _claim_str coerces a claim value to string. JSON null decodes to None,
+# and None == "" is False in Starlark — so a `sub: null` would sail past
+# a plain `get(...) == ""` guard. Type-strict instead.
+def _claim_str(v):
+    if v == None:
+        return ""
+    if type(v) == "string":
+        return v
+    return ""
+
 # _verify_assertion fully verifies a jwt-bearer assertion the way the real
 # token endpoint does (modulo the fixed mock certificate):
 #   - 3 dot-separated, base64url-valid segments
@@ -205,7 +215,8 @@ def _claim_int(v):
 #     connected-app certificate
 #   - iss non-empty (the consumer key), sub or legacy prn non-empty (the
 #     user the token is for), aud a Salesforce login host, exp in the
-#     future
+#     future and no more than ~5 minutes out (the real window, plus the
+#     documented clock-skew allowance)
 # Returns the claims dict, or None when the assertion fails any check.
 def _verify_assertion(assertion):
     header = _jwt_json(assertion, 0)
@@ -219,14 +230,19 @@ def _verify_assertion(assertion):
     claims = _jwt_json(assertion, 1)
     if claims == None:
         return None
-    if claims.get("iss", "") == "":
+    if _claim_str(claims.get("iss", None)) == "":
         return None
-    if claims.get("sub", "") == "" and claims.get("prn", "") == "":
+    if _claim_str(claims.get("sub", None)) == "" and _claim_str(claims.get("prn", None)) == "":
         return None
     exp = _claim_int(claims.get("exp", None))
     if exp == None:
         return None
     if clock.now_unix() >= exp:
+        return None
+    # Real Salesforce rejects assertions whose exp is more than ~5
+    # minutes out (plus the documented clock-skew allowance) — clients
+    # can't mint long-lived JWTs.
+    if exp > clock.now_unix() + 480:
         return None
     if claims.get("aud", "") not in _JWT_AUDS:
         return None
