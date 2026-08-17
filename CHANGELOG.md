@@ -6,6 +6,21 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.42.0] — 2026-08-17
+
+### Adapters
+
+- **instagram-style**: the Graph comment-reader + token-refresh surfaces a
+  real client integration needs beyond publish/insights.
+  - `GET /v21.0/{media_id}/comments` — authorizes via the `access_token`
+    query param (how SDK clients call this endpoint family) or the bearer
+    header; two deterministic per-media comments
+    (`id/text/username/timestamp/like_count`), Graph `since` filter, 404 on
+    unknown media.
+  - `GET /v21.0/refresh_access_token` — `grant_type=ig_refresh_token` mints
+    a fresh 60-day token for the same user; the old token stays valid until
+    its own expiry. Literal route ordered before `/v21.0/{container_id}`.
+
 ## [0.41.0] — 2026-08-16
 
 ### Engine
