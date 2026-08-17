@@ -871,7 +871,7 @@ def on_update_subscription(req):
         doc["default_tax_rates"] = tax_rates
         changed = True
     if body.get("coupon", None) != None or body.get("promotion_code", None) != None:
-        if body.get("coupon", "") == "" and body.get("promotion_code", "") == "":
+        if (body.get("coupon") or "") == "" and (body.get("promotion_code") or "") == "":
             doc["discount"] = None
             changed = True
         else:

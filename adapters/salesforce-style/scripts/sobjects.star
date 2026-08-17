@@ -313,7 +313,7 @@ def on_upsert(req):
         })
 
     # No match -> insert. Same required-field rule as plain create.
-    if body.get("Name", "") == "":
+    if (body.get("Name") or "") == "":
         return _sf_error(400, "Required field missing: [Name]", "REQUIRED_FIELD_MISSING")
 
     record_id = _next_id(obj_type)
