@@ -17,9 +17,9 @@ def _pi_public(doc):
     return {
         "id": doc["id"],
         "object": "payment_intent",
-        "amount": doc.get("amount", 0),
-        "amount_capturable": doc.get("amount_capturable", 0),
-        "amount_received": doc.get("amount_received", 0),
+        "amount": _num(doc.get("amount", 0)),
+        "amount_capturable": _num(doc.get("amount_capturable", 0)),
+        "amount_received": _num(doc.get("amount_received", 0)),
         "currency": doc.get("currency", "usd"),
         "status": doc.get("status", "requires_payment_method"),
         "capture_method": doc.get("capture_method", "automatic"),
@@ -155,7 +155,10 @@ def on_create_payment_intent(req):
     if body == None:
         body = {}
 
-    amount = body.get("amount", 0)
+    # Form-encoded creates deliver amount as a STRING ("4200"); the real
+    # API returns money fields as JSON numbers, and typed SDKs (stripe-go)
+    # reject a string amount — coerce at the door.
+    amount = _num(body.get("amount", 0))
     currency = body.get("currency", "usd")
     capture_method = body.get("capture_method", "automatic")
     if capture_method not in ["automatic", "manual"]:

@@ -411,9 +411,14 @@ def _as_int(v):
     return int(v)
 
 # _unix_to_iso8601 renders Unix seconds in S3 XML millis form
-# ("2026-01-20T00:00:00.000Z").
+# ("2026-01-20T00:00:00.000Z"). unix_to_rfc3339 already ends in "Z", so
+# the millis are spliced in BEFORE it — appending ".000Z" produced
+# "...:05Z.000Z", which the AWS SDK's time parser rejects.
 def _unix_to_iso8601(u):
-    return clock.unix_to_rfc3339(_as_int(u)) + ".000Z"
+    s = clock.unix_to_rfc3339(_as_int(u))
+    if s != "" and s[len(s)-1] == "Z":
+        s = s[:len(s)-1]
+    return s + ".000Z"
 
 # _unix_to_rfc1123 renders Unix seconds as an RFC 1123 Last-Modified
 # value ("Mon, 02 Jan 2006 15:04:05 GMT"), like real S3 headers.

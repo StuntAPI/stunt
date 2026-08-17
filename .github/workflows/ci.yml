@@ -49,3 +49,6 @@ jobs:
 
       - name: Run the canonical gate
         run: just ci
+
+      - name: SDK conformance (real provider SDKs vs adapters)
+        run: just conformance
