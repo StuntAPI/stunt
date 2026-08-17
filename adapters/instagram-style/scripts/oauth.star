@@ -95,3 +95,29 @@ def _mint_token(user):
         "expires_at": clock.now_unix() + 60 * 24 * 3600,
     })
     return token
+
+# on_refresh_token handles GET /v21.0/refresh_access_token (long-lived token
+# refresh). Real endpoint authorizes via the access_token QUERY param with
+# grant_type=ig_refresh_token, and returns a FRESH 60-day token; the old one
+# keeps working until its own expiry (no rotation invalidation).
+def on_refresh_token(req):
+    token = _get_query(req, "access_token", "")
+    if token == "":
+        token = _bearer(req)
+    if token == "":
+        return respond(400, {"error": {"message": "An access token is required", "type": "OAuthException", "code": 190}})
+
+    grant = _get_query(req, "grant_type", "")
+    if grant != "ig_refresh_token":
+        return respond(400, {"error": {"message": "grant_type must be ig_refresh_token", "type": "OAuthException", "code": 1}})
+
+    tc = store_collection("tokens")
+    doc = tc.get(token)
+    if doc == None:
+        return respond(400, {"error": {"message": "Invalid OAuth access token", "type": "OAuthException", "code": 190}})
+    exp = doc.get("expires_at", 0)
+    if exp != 0 and clock.now_unix() > exp:
+        return respond(400, {"error": {"message": "The access token has expired", "type": "OAuthException", "code": 190}})
+
+    fresh = _mint_token({"ig_user_id": doc.get("ig_user_id", ""), "username": doc.get("username", "")})
+    return respond(200, {"access_token": fresh, "token_type": "bearer", "expires_in": 60 * 24 * 3600})
