@@ -6,6 +6,16 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+### CI
+
+- **`just` is installed from crates.io in CI and Release workflows** —
+  casey/just's GitHub releases became unresolvable by
+  `extractions/setup-just` mid-release (even `latest` failed), which
+  broke every CI run regardless of the code. The workflows now use
+  `dtolnay/rust-toolchain` + `cargo install just --version 1.39.0
+  --locked` — the same version the pin named, sourced independently of
+  GitHub releases. Revert to the setup action when upstream heals.
+
 ## [0.45.0] — 2026-08-17
 
 ### Testing
