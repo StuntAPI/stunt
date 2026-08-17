@@ -140,7 +140,7 @@ synthetic-data-only, with a DISCLAIMER). Browse them with `stunt catalog search`
 | Adapter | Simulates | Backing |
 |---|---|---|
 | `stripe-style` | payments — full API surface (158 endpoints): **PaymentIntents, disputes, refunds, the Billing suite (subscriptions/invoices/credit notes), Checkout Sessions, SetupIntents, balance transactions**, Connect (persons/capabilities/application fees), **Test Clocks** (deterministic billing), **Idempotency-Key**, cursor-paginated lists, **signed webhooks + registration-gated delivery** | Collection + Starlark |
-| `salesforce-style` | CRM — sObjects CRUD, **general SOQL** (WHERE/IN/LIKE/AND/OR, ORDER BY, LIMIT/OFFSET), OAuth (password/auth-code/**refresh**) | Collection + Starlark |
+| `salesforce-style` | CRM — sObjects CRUD, **general SOQL** (WHERE/IN/LIKE/AND/OR, ORDER BY, LIMIT/OFFSET), OAuth (password/auth-code/refresh/**JWT bearer**) | Collection + Starlark |
 | `discord-style` | bot API — REST + **WebSocket Gateway (HELLO→IDENTIFY→READY→dispatch)** + **Ed25519-signed interactions** | Collection + Starlark |
 | `emailoctopus-style` | email — **lists + contact lifecycle (double/single opt-in, unsubscribe/resubscribe)**, fields/tags CRUD, campaigns reports, **RFC 7807 errors** + cursor paging | Collection + Starlark |
 | `drive-style` | files API — upload/get/download/list/patch/delete, folders, about/quota, resumable uploads | Blob + Collection |
