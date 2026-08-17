@@ -95,7 +95,7 @@ def on_delete_webhook(req):
 # _webhook_view returns the public-facing webhook subscription object.
 def _webhook_view(w):
     return {
-        "id": w["id"],
+        "id": _num_id(w["id"]),
         "topic": w.get("topic", ""),
         "address": w.get("address", ""),
         "format": w.get("format", "json"),

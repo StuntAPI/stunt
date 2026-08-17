@@ -104,6 +104,11 @@ def on_create_order(req):
     customer = input_ord.get("customer", {})
     if customer == None:
         customer = {}
+    else:
+        # Shopify embeds numeric customer ids on orders.
+        if customer.get("id", None) != None:
+            customer = dict(customer)
+            customer["id"] = _num_id(customer["id"])
     email = input_ord.get("email", "")
     if email == None:
         email = ""

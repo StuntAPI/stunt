@@ -107,11 +107,18 @@ def on_token(req):
         body = {}
     grant_type = body.get("grant_type", "")
 
+    # OAuth2 (RFC 6749 §2.3.1) client credentials may arrive as HTTP Basic
+    # — the DEFAULT style of golang.org/x/oauth2 and most Google SDKs.
+    basic_cid, basic_secret = _basic_client(req)
+
     if grant_type == "refresh_token":
         presented = body.get("refresh_token", "")
         client_id = body.get("client_id") or ""
         client_secret = body.get("client_secret") or ""
 
+        if client_id == "" or client_secret == "":
+            client_id = basic_cid
+            client_secret = basic_secret
         if client_id == "" or client_secret == "":
             return respond(400, {"error": "invalid_client", "error_description": "missing client creds"})
 
@@ -135,6 +142,9 @@ def on_token(req):
     client_id = body.get("client_id", "")
     client_secret = body.get("client_secret", "")
     redirect_uri = body.get("redirect_uri", "")
+    if client_id == "" or client_secret == "":
+        client_id = basic_cid
+        client_secret = basic_secret
 
     cc = store_collection("codes")
     code_doc = cc.get(code)
@@ -150,6 +160,19 @@ def on_token(req):
 
     scope = code_doc.get("scope", "openid email profile")
     return respond(200, _issue_tokens(_mint_user(), scope, client_id))
+
+# _basic_client extracts RFC 6749 §2.3.1 HTTP Basic client credentials.
+def _basic_client(req):
+    h = req["headers"].get("Authorization", "")
+    if h == None or h[:6] != "Basic ":
+        return "", ""
+    dec = crypto.base64_decode(h[6:])
+    if dec == None:
+        return "", ""
+    i = dec.find(":")
+    if i < 0:
+        return "", ""
+    return dec[:i], dec[i + 1:]
 
 # on_certs serves the JWKS at Google's real discovery path
 # (/oauth2/v3/certs). The key is REAL: derived from the fixed synthetic

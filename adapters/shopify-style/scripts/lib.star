@@ -149,6 +149,17 @@ def _next_id(kind):
 def _num_id(s):
     return _to_int(s)
 
+# _customer_id_numeric coerces an embedded customer object's id (typed SDKs
+# unmarshal order.customer.id as int64).
+def _customer_id_numeric(c):
+    if c == None:
+        return {}
+    if c.get("id", None) == None:
+        return c
+    out = dict(c)
+    out["id"] = _num_id(c["id"])
+    return out
+
 # _seed populates default products, orders, and customers on first access so
 # that list endpoints return realistic data without prior setup.
 def _seed():
@@ -365,7 +376,7 @@ def _order_view(o):
         "total_price": o.get("total_price", "0.00"),
         "currency": o.get("currency", "USD"),
         "line_items": line_views,
-        "customer": o.get("customer", {}),
+        "customer": _customer_id_numeric(o.get("customer", {})),
         "order_number": o.get("order_number", 0),
         "name": o.get("name", ""),
         "closed_at": o.get("closed_at", None),
