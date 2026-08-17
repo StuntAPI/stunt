@@ -1,0 +1,2 @@
+{"id": "seed-list-doi-newsletter", "name": "Seeded double opt-in newsletter", "double_opt_in": true, "fields": [{"label": "Hometown", "tag": "Hometown", "type": "text", "fallback": "Unknown"}], "tags": ["seeded"], "created_at": "2024-01-15T10:00:00+00:00", "last_updated_at": "2024-01-15T10:00:00+00:00"}
+{"id": "seed-list-single-optin", "name": "Seeded single opt-in list", "double_opt_in": false, "fields": [], "tags": [], "created_at": "2024-01-15T10:30:00+00:00", "last_updated_at": "2024-01-15T10:30:00+00:00"}

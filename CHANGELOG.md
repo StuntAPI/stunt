@@ -6,6 +6,23 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.43.0] — 2026-08-17
+
+### Adapters
+
+- **New: `emailoctopus-style`** — the 95th adapter, researched from the
+  official v2 OpenAPI spec. Bearer API-key auth; lists CRUD with derived
+  counts; full contact lifecycle (double-opt-in lists default to `pending`,
+  single-opt-in to `subscribed`; unsubscribe/resubscribe; upsert + batch
+  with per-row 404s; status filters; 32-hex ids derived from the lowercased
+  email); fields + tags CRUD with merge-tag rename cascades; read-only
+  campaigns with summary/links/contact reports (v2 has no campaign-create
+  API — campaigns are dashboard-authored); automation queue. RFC 7807
+  problem+json errors with the provider's exact detail strings and
+  `errors[{detail,pointer|parameter}]` on 422; `data` /
+  `paging.next.{url,starting_after}` envelope with base64 cursors. v2 has
+  no webhook API, so none is simulated.
+
 ## [0.42.0] — 2026-08-17
 
 ### Adapters
