@@ -42,7 +42,7 @@ jobs:
       - name: Set up Just
         uses: extractions/setup-just@v2
         with:
-          just-version: "1.39.0"
+          just-version: "latest"
 
       - name: Run the canonical gate
         run: just ci

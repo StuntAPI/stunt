@@ -42,7 +42,7 @@ jobs:
       - name: Run the CI gate (never release a broken build)
         uses: extractions/setup-just@v2
         with:
-          just-version: "1.39.0"
+          just-version: "latest"
 
       - name: just ci
         run: just ci
