@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -313,3 +314,39 @@ func getJSON(t *testing.T, url, authToken string) (string, int) {
 
 // Ensure fmt import is used in the test file (referenced by helpers).
 var _ = fmt.Sprintf
+
+// reserveFreePort asks the OS for a free port and releases it, so the caller
+// can bind it immediately after (the classic listen-close-relisten race is
+// acceptable in tests).
+func reserveFreePort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+	return ln.Addr().(*net.TCPAddr).Port
+}
+
+// TestDemoHonorsPortFlag pins the --port contract: a requested port is served
+// exactly, not silently replaced by an OS-assigned one (ServeForTest used to
+// ignore BasePort, so --port never worked).
+func TestDemoHonorsPortFlag(t *testing.T) {
+	port := reserveFreePort(t)
+	var mu sync.Mutex
+	var out bytes.Buffer
+	safeOut := &lockingWriter{mu: &mu, buf: &out}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- runDemoServe(ctx, safeOut, port, true) }()
+
+	baseURL := waitForDemoBaseURL(t, &mu, &out, done)
+	if want := fmt.Sprintf("http://127.0.0.1:%d", port); baseURL != want {
+		t.Fatalf("baseURL = %q, want %q (--port ignored)", baseURL, want)
+	}
+	if _, status := getJSON(t, baseURL+"/v1/charges", "Bearer sk_test_demo"); status != 200 {
+		t.Fatalf("list charges at fixed port: status %d", status)
+	}
+}

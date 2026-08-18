@@ -18,6 +18,14 @@ func (e *Engine) ServeForTest(ctx context.Context) (map[string]string, func(), e
 	return e.serve(ctx, true)
 }
 
+// ServeAtBasePorts starts one server per service at sequential ports from
+// base_port (network.base_port in the manifest), returning a map of service
+// name -> http://host:port. Unlike ServeForTest the ports are honored, so a
+// busy port is an error rather than a silent rebind.
+func (e *Engine) ServeAtBasePorts(ctx context.Context) (map[string]string, func(), error) {
+	return e.serve(ctx, false)
+}
+
 // Serve starts one server per service at sequential ports from base_port,
 // blocking until ctx is canceled.
 func (e *Engine) Serve(ctx context.Context) error {

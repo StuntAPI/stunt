@@ -110,7 +110,14 @@ func runDemoServe(ctx context.Context, out io.Writer, port int, noWebhookSink bo
 	}
 	defer e.Close()
 
-	addrs, cancelServe, err := e.ServeForTest(ctx)
+	// --port is a promise: serve there exactly, or fail loudly.
+	var addrs map[string]string
+	var cancelServe func()
+	if port != 0 {
+		addrs, cancelServe, err = e.ServeAtBasePorts(ctx)
+	} else {
+		addrs, cancelServe, err = e.ServeForTest(ctx)
+	}
 	if err != nil {
 		return fmt.Errorf("demo: start engine: %w", err)
 	}
