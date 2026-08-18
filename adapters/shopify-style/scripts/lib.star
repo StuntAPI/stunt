@@ -328,7 +328,13 @@ def _list_page(req, docs):
 def _next_link(req, next_cursor, limit):
     if next_cursor == None:
         return None
-    scheme = "https"
+    # The proxy sets X-Forwarded-Proto; port mode is plain http on
+    # loopback. Clients that FOLLOW the page_info URL (not just parse the
+    # token) need the real scheme.
+    scheme = req.get("headers", {}).get("x-forwarded-proto", "")
+    if scheme == None or scheme == "":
+        host0 = req.get("host", "") or ""
+        scheme = "http" if host0.startswith("127.0.0.1") or host0.startswith("localhost") else "https"
     host = req.get("host", "")
     if host == None:
         host = ""

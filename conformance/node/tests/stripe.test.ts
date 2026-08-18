@@ -58,12 +58,22 @@ describe("stripe-node against stripe-style", () => {
         for (let i = 0; i < 3; i++) {
           await stripe.customers.create({ name: `paging ${i}` });
         }
-        let seen = 0;
-        await stripe.customers.list({ limit: 2 }).autoPagingEach(() => {
-          seen++;
-          if (seen > 10) return false; // safety valve
+        // Distinct ids pin BOTH failure modes: has_more always false
+        // (stops early) and starting_after ignored (duplicates forever).
+        const ids: string[] = [];
+        let valved = false;
+        await stripe.customers.list({ limit: 2 }).autoPagingEach((c: { id: string }) => {
+          ids.push(c.id);
+          if (ids.length > 10) {
+            valved = true;
+            return false;
+          }
         });
-        expect(seen).toBeGreaterThanOrEqual(4);
+        // The engine seeds a couple of customers, so the exact count is
+        // not fixed — no-duplicates + no-valve pins both failure modes.
+        expect(valved).toBe(false);
+        expect(ids.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(ids).size).toBe(ids.length);
 
         // ===== Webhook registration, delivery verified by the SDK's own
         // constructEvent =====
@@ -89,6 +99,7 @@ describe("stripe-node against stripe-style", () => {
           registeredViaSDK = false;
         }
         if (!registeredViaSDK) {
+          console.warn("webhookEndpoints.create fell back to raw POST (bun/stripe-node url-param quirk?)");
         const regStatus = await rawPost(
           h.base + "/v1/webhook_endpoints",
           new URLSearchParams({
@@ -134,6 +145,6 @@ describe("stripe-node against stripe-style", () => {
         await h.stop();
       }
     },
-    { timeout: 60_000 },
+    { timeout: 120_000 },
   );
 });

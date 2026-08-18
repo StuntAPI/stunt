@@ -59,6 +59,6 @@ describe("octokit against github-style", () => {
         await h.stop();
       }
     },
-    { timeout: 60_000 },
+    { timeout: 120_000 },
   );
 });

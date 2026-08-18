@@ -42,10 +42,10 @@ export async function bootAdapter(adapter: string): Promise<Harness> {
   const dir = mkdtempSync(join(tmpdir(), "stunt-node-conf-"));
   // Port mode requires a concrete base_port (0 is rejected by manifest
   // validation — the Go suites use the engine directly and bypass it).
-  // Probe-bind a free one to avoid collisions.
+  // Probe-bind a free one; the socket stays open until just before the
+  // spawn to keep the race window small.
   const probe = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data() {} } });
   const basePort = probe.port;
-  probe.stop(true);
   writeFileSync(
     join(dir, "stunt.yaml"),
     `version: 1
@@ -60,10 +60,24 @@ services:
 `,
   );
 
+  const errBuf: string[] = [];
   const proc = Bun.spawn([STUNT_BIN, "up", "--manifest", join(dir, "stunt.yaml")], {
     stdout: "ignore",
-    stderr: "ignore",
+    stderr: "pipe",
   });
+  (async () => {
+    const t = await new Response(proc.stderr).text();
+    errBuf.push(t);
+  })();
+  probe.stop(true);
+
+  const cleanupFail = (msg: string): never => {
+    proc.kill();
+    sink.stop(true);
+    rmSync(dir, { recursive: true, force: true });
+    const tail = errBuf.join("").trim().split("\n").slice(-6).join("\n");
+    throw new Error(tail ? `${msg}\nstunt up stderr tail:\n${tail}` : msg);
+  };
 
   // Poll the runtime file for the assigned address.
   const runtimePath = join(dir, ".stunt", "runtime", "up.json");
@@ -82,16 +96,17 @@ services:
     await Bun.sleep(100);
   }
   if (!base) {
-    proc.kill();
-    throw new Error(`stunt up did not write ${runtimePath} within 20s`);
+    cleanupFail(`stunt up did not write ${runtimePath} within 20s`);
   }
 
-  // Readiness: any HTTP answer means the listener is live.
+  // Readiness: any HTTP answer means the listener is live. Bounded per
+  // attempt; a boot that never answers is a failure, not silence.
   for (let i = 0; i < 100; i++) {
     try {
-      await fetch(base + "/");
+      await fetch(base + "/", { signal: AbortSignal.timeout(500) });
       break;
     } catch {
+      if (i === 99) cleanupFail(`adapter never answered on ${base}`);
       await Bun.sleep(100);
     }
   }

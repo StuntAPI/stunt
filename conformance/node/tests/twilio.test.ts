@@ -86,15 +86,17 @@ describe("twilio-node against twilio-style", () => {
         // transitions, which fire the callbacks).
         const deadline = Date.now() + 10_000;
         let status = "";
+        // Drive to DELIVERED (not just sent): the delivered callback only
+        // fires on the read that derives the second transition.
         while (Date.now() < deadline) {
           const m = await client.api.v2010.accounts(SID).messages(msg.sid).fetch();
-          if (["delivered", "sent", "failed"].includes(m.status)) {
+          if (["delivered", "failed"].includes(m.status)) {
             status = m.status;
             break;
           }
           await Bun.sleep(300);
         }
-        expect(["sent", "delivered"]).toContain(status);
+        expect(status).toBe("delivered");
 
         // ===== Callbacks verified by twilio-node's own validateRequest =====
         const first = await h.waitFor((d) => d.headers["x-twilio-signature"] != null);
@@ -103,10 +105,10 @@ describe("twilio-node against twilio-style", () => {
         const ok = twilio.validateRequest(AUTH_TOKEN, first.headers["x-twilio-signature"], url, params);
         expect(ok).toBe(true);
 
-        // Every callback that arrives must verify.
-        await h.waitFor((d) => d !== first && d.headers["x-twilio-signature"] != null, 8_000).catch(
-          () => null,
-        );
+        // The terminal (delivered) callback MUST arrive — the loop only
+        // verifies what's present, so a dropped unsigned second callback
+        // must fail here, not slip through.
+        await h.waitFor((d) => d !== first && d.headers["x-twilio-signature"] != null, 8_000);
         for (const d of h.deliveries()) {
           if (!d.headers["x-twilio-signature"]) continue;
           const p = Object.fromEntries(new URLSearchParams(d.body));
@@ -127,6 +129,6 @@ describe("twilio-node against twilio-style", () => {
         await h.stop();
       }
     },
-    { timeout: 90_000 },
+    { timeout: 120_000 },
   );
 });

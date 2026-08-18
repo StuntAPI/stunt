@@ -102,7 +102,7 @@ conformance-node:
     # Build fresh — `just build` produces no binary, and /tmp/stunt-ci may
     # hold a stale artifact from an old lint run.
     go build -ldflags "{{ldflags}}" -o /tmp/stunt-ci ./cmd/stunt
-    cd conformance/node && bun install --frozen-lockfile 2>/dev/null || bun install
+    cd conformance/node && bun install --frozen-lockfile
     STUNT_BIN=/tmp/stunt-ci bun test
 
 # Coverage-guided fuzzing — each target for the given time (default 30s;
