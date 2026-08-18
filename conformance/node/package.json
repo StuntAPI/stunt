@@ -1,0 +1,13 @@
+{
+  "name": "stunt-node-conformance",
+  "private": true,
+  "description": "SDK conformance suites driving official Node SDKs against booted stunt adapters (run via `just conformance-node`).",
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "stripe": "^19.0.0",
+    "octokit": "^5.0.0",
+    "twilio": "^5.0.0"
+  }
+}

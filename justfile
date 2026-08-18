@@ -92,6 +92,19 @@ test:
 conformance:
     cd conformance && go test ./... -count=1 -race -v
 
+# Node SDK conformance: stripe-node, octokit, twilio-node via bun,
+# booting the REAL stunt binary (also end-to-end tests the CLI). Requires
+# bun on PATH; builds the binary to /tmp first.
+conformance-node:
+    #!/bin/sh
+    set -e
+    command -v bun >/dev/null || { echo "bun not found on PATH"; exit 1; }
+    # Build fresh — `just build` produces no binary, and /tmp/stunt-ci may
+    # hold a stale artifact from an old lint run.
+    go build -ldflags "{{ldflags}}" -o /tmp/stunt-ci ./cmd/stunt
+    cd conformance/node && bun install --frozen-lockfile
+    STUNT_BIN=/tmp/stunt-ci bun test
+
 # Coverage-guided fuzzing — each target for the given time (default 30s;
 # pass just fuzz 2m for longer rounds). The fuzz seed corpora also run as
 # regular tests in `just test`, so discovered inputs stay pinned forever.

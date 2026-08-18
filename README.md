@@ -140,7 +140,8 @@ passes an adversarial input-safety sweep (garbage params, null/malformed bodies,
 cursor/limit param names — never a 5xx), coverage-guided fuzzing of the engine's parsers and
 dispatch (`just fuzz`), and conformance suites that drive **real provider SDKs** — stripe-go,
 aws-sdk-go-v2, go-github, twilio-go, go-shopify, google-api-go-client — end-to-end against
-the adapters (`just conformance`). Highlights:
+the adapters (`just conformance`), plus Node suites driving **stripe-node, octokit, and
+twilio-node** through the real `stunt` binary (`just conformance-node`). Highlights:
 
 | Adapter | Simulates | Backing |
 |---|---|---|

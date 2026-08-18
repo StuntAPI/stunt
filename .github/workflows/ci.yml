@@ -52,3 +52,9 @@ jobs:
 
       - name: SDK conformance (real provider SDKs vs adapters)
         run: just conformance
+
+      - name: Set up bun (Node SDK conformance)
+        uses: oven-sh/setup-bun@v2
+
+      - name: Node SDK conformance (stripe-node, octokit, twilio-node)
+        run: just conformance-node

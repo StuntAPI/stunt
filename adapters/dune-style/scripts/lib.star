@@ -288,7 +288,10 @@ def _next_uri(req, exec_id, offset, limit):
     host = req.get("host", "")
     if host == None:
         host = ""
-    return ("http://" + host + "/api/v1/execution/" + exec_id
+    scheme = req.get("headers", {}).get("x-forwarded-proto", "")
+    if scheme == None or scheme == "":
+        scheme = "http" if host.startswith("127.0.0.1") or host.startswith("localhost") else "http"
+    return (scheme + "://" + host + "/api/v1/execution/" + exec_id
             + "/results?offset=" + str(offset) + "&limit=" + str(limit))
 
 # _pad2 zero-pads to 2 digits.
