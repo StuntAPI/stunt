@@ -10,26 +10,26 @@ version: "0.1.0"
 
 api:
   name: "Twilio API"
-  version: "2010-06-01"
+  version: "2010-04-01"
 
 # Endpoints — each maps a route + method to a Starlark handler.
 # NOTE: literal routes must come BEFORE parameterized routes so they are
 # matched first (the dispatch engine checks in declaration order).
 endpoints:
   # --- Messages (stateful) ---
-  - route: /2010-06-01/Accounts/{account_sid}/Messages.json
+  - route: /2010-04-01/Accounts/{account_sid}/Messages.json
     method: POST
     handler: scripts/messages.star#on_send_message
-  - route: /2010-06-01/Accounts/{account_sid}/Messages.json
+  - route: /2010-04-01/Accounts/{account_sid}/Messages.json
     method: GET
     handler: scripts/messages.star#on_list_messages
-  - route: /2010-06-01/Accounts/{account_sid}/Messages/{sid}
+  - route: /2010-04-01/Accounts/{account_sid}/Messages/{sid}
     method: GET
     handler: scripts/messages.star#on_get_message
     concurrency_key: sid
 
   # --- Calls ---
-  - route: /2010-06-01/Accounts/{account_sid}/Calls.json
+  - route: /2010-04-01/Accounts/{account_sid}/Calls.json
     method: POST
     handler: scripts/calls.star#on_create_call
 

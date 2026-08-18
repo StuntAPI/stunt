@@ -1,6 +1,6 @@
 # Calls handler — create a call.
 #
-# POST /2010-06-01/Accounts/{account_sid}/Calls.json
+# POST /2010-04-01/Accounts/{account_sid}/Calls.json
 #   JSON { To, From, Url } -> { sid:"CA...", status:"queued", ... }
 
 # Shared helpers (_require_auth, _next_sid) are preloaded from
@@ -37,11 +37,11 @@ def on_create_call(req):
         "from": frm,
         "status": "queued",
         "direction": "outbound-api",
-        "api_version": "2010-06-01",
+        "api_version": "2010-04-01",
         "price": "-0.01500",
         "price_unit": "USD",
         "duration": "0",
-        "uri": "/2010-06-01/Accounts/" + account_sid + "/Calls/" + sid + ".json",
+        "uri": "/2010-04-01/Accounts/" + account_sid + "/Calls/" + sid + ".json",
         "date_created": "Mon, 01 Jan 2024 00:00:00 +0000",
         "date_updated": "Mon, 01 Jan 2024 00:00:00 +0000",
         "parent_call_sid": None,

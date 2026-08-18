@@ -118,3 +118,35 @@ func TestMain(m *testing.M) {
 func parseURL(s string) (*url.URL, error) {
 	return url.Parse(s)
 }
+
+// RewriteClient returns an *http.Client that rewrites every request to
+// the stunt base (scheme+host), preserving path and query — the seam for
+// SDKs that hardcode their provider's host but accept a custom HTTP
+// client (twilio-go ClientParams.HTTPClient, go-shopify WithHTTPClient).
+// Only safe for SDKs that do NOT sign the request URL.
+func RewriteClient(t *testing.T, base string) *http.Client {
+	t.Helper()
+	u, err := url.Parse(base)
+	if err != nil {
+		t.Fatalf("parse %s: %v", base, err)
+	}
+	return &http.Client{
+		Timeout:   30 * time.Second,
+		Transport: &rewriteTransport{to: u, base: http.DefaultTransport},
+	}
+}
+
+type rewriteTransport struct {
+	to   *url.URL
+	base http.RoundTripper
+}
+
+func (rt *rewriteTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	u := *r.URL
+	u.Scheme = rt.to.Scheme
+	u.Host = rt.to.Host
+	r2 := r.Clone(r.Context())
+	r2.URL = &u
+	r2.Host = rt.to.Host
+	return rt.base.RoundTrip(r2)
+}

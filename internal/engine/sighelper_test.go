@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -137,14 +139,38 @@ func verifyWhatsAppSig(t *testing.T, raw []byte, hdr http.Header, secret string)
 // verifyTwilioSig re-derives base64(HMAC-SHA1(authToken, url+rawBody)) and
 // compares it to the X-Twilio-Signature header. Twilio MACs the request URL
 // concatenated with the raw body; url is the delivery URL stunt POSTed to.
-func verifyTwilioSig(t *testing.T, raw []byte, hdr http.Header, authToken, url string) {
+func verifyTwilioSig(t *testing.T, raw []byte, hdr http.Header, authToken, callbackURL string) {
 	t.Helper()
+	// The receiver reconstructs the signed URL from r.Host + the request
+	// URI, which always carries at least "/" — normalize a pathless
+	// target the same way the adapter does.
+	if i := strings.Index(callbackURL, "://"); i >= 0 && !strings.Contains(callbackURL[i+3:], "/") {
+		callbackURL += "/"
+	}
+	// Twilio's real formula: url + the form params sorted by key, each
+	// key immediately followed by its (decoded) value.
+	vals, err := neturl.ParseQuery(string(raw))
+	if err != nil {
+		t.Fatalf("callback body is not a form: %v (%s)", err, raw)
+	}
+	keys := make([]string, 0, len(vals))
+	for k := range vals {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var sb strings.Builder
+	sb.WriteString(callbackURL)
+	for _, k := range keys {
+		sb.WriteString(k + vals.Get(k))
+	}
 	mac := hmac.New(sha1.New, []byte(authToken))
-	mac.Write([]byte(url))
-	mac.Write(raw)
+	mac.Write([]byte(sb.String()))
 	want := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 	if got := hdr.Get("X-Twilio-Signature"); got != want {
-		t.Fatalf("X-Twilio-Signature = %q, want %q (url=%s)", got, want, url)
+		t.Fatalf("X-Twilio-Signature = %q, want %q (url=%s)", got, want, callbackURL)
+	}
+	if vals.Get("MessageStatus") == "" || vals.Get("MessageSid") == "" {
+		t.Fatalf("callback params missing MessageStatus/MessageSid: %v", vals)
 	}
 }
 

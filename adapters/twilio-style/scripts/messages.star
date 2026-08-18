@@ -1,10 +1,10 @@
 # Messages handlers — stateful send, list, and retrieve.
 #
-# POST /2010-06-01/Accounts/{account_sid}/Messages.json
+# POST /2010-04-01/Accounts/{account_sid}/Messages.json
 #   JSON { To, From, Body } -> { sid:"SM...", body, status:"queued", ... }
-# GET  /2010-06-01/Accounts/{account_sid}/Messages.json
+# GET  /2010-04-01/Accounts/{account_sid}/Messages.json
 #   -> { first_page_uri, next_page_uri, messages: [...] }
-# GET  /2010-06-01/Accounts/{account_sid}/Messages/{sid}.json
+# GET  /2010-04-01/Accounts/{account_sid}/Messages/{sid}.json
 #   -> { sid, body, status, ... }
 #
 # Messages are STATEFUL: a message POSTed appears in the GET list.
@@ -62,10 +62,10 @@ def on_send_message(req):
         "body": msg_body,
         "status": "queued",
         "direction": "outbound-api",
-        "api_version": "2010-06-01",
+        "api_version": "2010-04-01",
         "price": "-0.00750",
         "price_unit": "USD",
-        "uri": "/2010-06-01/Accounts/" + account_sid + "/Messages/" + sid + ".json",
+        "uri": "/2010-04-01/Accounts/" + account_sid + "/Messages/" + sid + ".json",
         "date_created": "Mon, 01 Jan 2024 00:00:00 +0000",
         "date_sent": None,
         "date_updated": "Mon, 01 Jan 2024 00:00:00 +0000",
@@ -144,15 +144,15 @@ def on_list_messages(req):
 
     next_page_uri = None
     if next_cursor != None:
-        next_page_uri = "/2010-06-01/Accounts/" + account_sid + "/Messages.json?Page=0&PageSize=" + str(page_size) + "&PageToken=" + next_cursor
+        next_page_uri = "/2010-04-01/Accounts/" + account_sid + "/Messages.json?Page=0&PageSize=" + str(page_size) + "&PageToken=" + next_cursor
 
     return respond(200, {
-        "first_page_uri": "/2010-06-01/Accounts/" + account_sid + "/Messages.json?Page=0&PageSize=" + str(page_size),
+        "first_page_uri": "/2010-04-01/Accounts/" + account_sid + "/Messages.json?Page=0&PageSize=" + str(page_size),
         "next_page_uri": next_page_uri,
         "page": 0,
         "page_size": page_size,
         "previous_page_uri": None,
-        "uri": "/2010-06-01/Accounts/" + account_sid + "/Messages.json",
+        "uri": "/2010-04-01/Accounts/" + account_sid + "/Messages.json",
         "messages": page,
     })
 
@@ -227,5 +227,7 @@ def _advance_message(msg):
             msg["date_updated"] = _SENT_AT
         msg["_stage"] = stage
         c.update(msg["sid"], msg)
-        _signed_emit("message." + msg["status"], _public_view(msg))
+        # Raw doc, not the public view — _signed_emit reads the internal
+        # id/from/status/to fields to build the callback params.
+        _signed_emit("message." + msg["status"], msg)
     return msg

@@ -9,7 +9,7 @@
 # as the password. These are well-known synthetic test credentials for the
 # local simulator.
 ACCOUNT_SID = "AC" + "0123456789abcdef0123456789abcdef"
-AUTH_TOKEN = "twilio_auth_token"
+AUTH_TOKEN = "feed0000face1111beef2222cafe3333"
 
 # _basic_auth extracts and validates HTTP Basic credentials.
 #
@@ -162,17 +162,88 @@ def _list_page(req, items):
         cursor = ""
     return paginate(items, limit, cursor)
 
-# _signed_emit MACs the exact on-wire body and delivers with X-Twilio-Signature
-# (Twilio's scheme): base64(HMAC-SHA1(AUTH_TOKEN, url + body)). The URL is the
-# webhook destination (events_target) — Twilio MACs the request URL + raw body,
-# so the receiver must validate against the same URL stunt delivered to.
-def _signed_emit(event_type, payload):
-    body = events_body(event_type, payload)
+# _signed_emit delivers Twilio's REAL status-callback shape: the message
+# resource as form parameters, signed with
+# base64(HMAC-SHA1(AUTH_TOKEN, url + params sorted by key, each key
+# immediately followed by its raw value)) — the formula real receivers
+# validate. events_emit_raw puts the exact pre-signed bytes on the wire.
+_FORM_SAFE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" + "0123" + "456789" + "-_.~"
+_HEX = "0123456789ABCDEF"
+# Callback params are sanitized to printable ASCII: Starlark ord() is
+# rune-based (a lone non-ASCII byte reads as U+FFFD), so a raw byte-exact
+# encoder is impossible — mapping non-ASCII to '?' deterministically keeps
+# the SIGNATURE string and the encoded BODY in agreement (both use the
+# sanitized value), so receivers still verify. Real From/To addresses and
+# alphanumeric sender IDs are ASCII.
+def _ascii_safe(s):
+    out = ""
+    for i in range(len(s)):
+        c = s[i]
+        v = ord(c)
+        if v >= 32 and v <= 126:
+            out = out + c
+        else:
+            out = out + "?"
+    return out
+
+def _form_encode(s):
+    out = ""
+    for i in range(len(s)):
+        c = s[i]
+        if _FORM_SAFE.find(c) >= 0:
+            out = out + c
+        else:
+            v = ord(c)
+            if v > 255:
+                v = 63
+            out = out + "%" + _HEX[v // 16] + _HEX[v % 16]
+    return out
+
+def _signed_emit(event_type, msg):
     url = events_target()
     if url == None:
         url = ""
-    sig = crypto.hmac_sha1(AUTH_TOKEN, url + body, encoding="base64")
-    events_emit(event_type, payload, {"X-Twilio-Signature": sig})
+    else:
+        # The receiver reconstructs the signed URL from r.Host + the
+        # request URI, which always carries at least "/" — a pathless
+        # target would sign differently than the receiver sees.
+        scheme_end = url.find("://")
+        rest = url[scheme_end + 3:] if scheme_end >= 0 else url
+        if rest.find("/") < 0:
+            url = url + "/"
+    params = {
+        "AccountSid": ACCOUNT_SID,
+        "ApiVersion": "2010-04-01",
+        "From": _ascii_safe(msg.get("from", "")),
+        "MessageSid": msg.get("id", ""),
+        "MessageStatus": msg.get("status", ""),
+        "To": _ascii_safe(msg.get("to", "")),
+    }
+    keys = []
+    for k in params:
+        keys.append(k)
+    # insertion sort (Starlark has no list.sort)
+    for i in range(1, len(keys)):
+        k = keys[i]
+        j = i - 1
+        while j >= 0 and keys[j] > k:
+            keys[j + 1] = keys[j]
+            j = j - 1
+        keys[j + 1] = k
+    signing = url
+    pairs = []
+    for i in range(len(keys)):
+        k = keys[i]
+        signing = signing + k + params[k]
+        pairs.append(_form_encode(k) + "=" + _form_encode(params[k]))
+    body = ""
+    for i in range(len(pairs)):
+        if i > 0:
+            body = body + "&"
+        body = body + pairs[i]
+    sig = crypto.hmac_sha1(AUTH_TOKEN, signing, encoding="base64")
+    events_emit_raw(event_type, body, {"X-Twilio-Signature": sig,
+                                       "Content-Type": "application/x-www-form-urlencoded"})
 
 # ============================================================================
 # ASYNC MESSAGE LIFECYCLE (derive-on-read state machine)

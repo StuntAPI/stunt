@@ -63,7 +63,7 @@ func TestWhatsAppStyleSignatureVerifies(t *testing.T) {
 // X-Twilio-Signature the real Twilio formula accepts: base64(HMAC-SHA1(auth
 // token, url+body)). The delivery URL is the configured webhook target.
 func TestTwilioStyleSignatureVerifies(t *testing.T) {
-	const authToken = "twilio_auth_token"
+	const authToken = "feed0000face1111beef2222cafe3333"
 	sink := newCaptureSink()
 	defer sink.close()
 
@@ -92,7 +92,7 @@ func TestTwilioStyleSignatureVerifies(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	base := addrs["twilio"]
 
-	msgPath := base + "/2010-06-01/Accounts/" + twilioAccountSID + "/Messages.json"
+	msgPath := base + "/2010-04-01/Accounts/" + twilioAccountSID + "/Messages.json"
 	body, status := twilioPostJSON(t, msgPath, map[string]any{
 		"To":   "+15551234567",
 		"From": "+15557654321",
@@ -110,7 +110,7 @@ func TestTwilioStyleSignatureVerifies(t *testing.T) {
 	// The message.sent status callback now fires when a read first derives
 	// the sent stage (derive-on-read lifecycle, +1s after the POST).
 	time.Sleep(1200 * time.Millisecond)
-	if _, status := twilioGet(t, base+"/2010-06-01/Accounts/"+twilioAccountSID+"/Messages/"+sid+".json"); status != 200 {
+	if _, status := twilioGet(t, base+"/2010-04-01/Accounts/"+twilioAccountSID+"/Messages/"+sid+".json"); status != 200 {
 		t.Fatalf("GET Messages/%s.json -> %d, want 200", sid, status)
 	}
 

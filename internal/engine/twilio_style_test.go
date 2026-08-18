@@ -3,6 +3,8 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
 	"encoding/base64"
 	"encoding/json"
 	"io"
@@ -10,6 +12,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -21,7 +24,7 @@ import (
 // Twilio synthetic test credentials (must match scripts/lib.star).
 const (
 	twilioAccountSID = "AC0123456789abcdef0123456789abcdef"
-	twilioAuthToken  = "twilio_auth_token"
+	twilioAuthToken  = "feed0000face1111beef2222cafe3333"
 )
 
 // twilioBasicAuth returns the value for an HTTP Basic Authorization header.
@@ -122,7 +125,7 @@ func TestTwilioStyleAdapter(t *testing.T) {
 
 	base := addrs["twilio"]
 	const accountSID = twilioAccountSID
-	msgPath := base + "/2010-06-01/Accounts/" + accountSID + "/Messages.json"
+	msgPath := base + "/2010-04-01/Accounts/" + accountSID + "/Messages.json"
 
 	// ===== POST message → 201, sid SM..., status queued =====
 
@@ -151,8 +154,8 @@ func TestTwilioStyleAdapter(t *testing.T) {
 	if msg["direction"] != "outbound-api" {
 		t.Fatalf("message direction = %v, want outbound-api", msg["direction"])
 	}
-	if msg["api_version"] != "2010-06-01" {
-		t.Fatalf("message api_version = %v, want 2010-06-01", msg["api_version"])
+	if msg["api_version"] != "2010-04-01" {
+		t.Fatalf("message api_version = %v, want 2010-04-01", msg["api_version"])
 	}
 
 	// ===== GET message list → shows the sent message (STATEFUL) =====
@@ -185,7 +188,7 @@ func TestTwilioStyleAdapter(t *testing.T) {
 
 	// ===== GET message by SID → persisted message =====
 
-	body, status = twilioGet(t, base+"/2010-06-01/Accounts/"+accountSID+"/Messages/"+msgSID+".json")
+	body, status = twilioGet(t, base+"/2010-04-01/Accounts/"+accountSID+"/Messages/"+msgSID+".json")
 	if status != 200 {
 		t.Fatalf("GET message by sid -> status %d, want 200; body %s", status, body)
 	}
@@ -202,7 +205,7 @@ func TestTwilioStyleAdapter(t *testing.T) {
 
 	// ===== GET nonexistent message → 404 =====
 
-	_, status = twilioGet(t, base+"/2010-06-01/Accounts/"+accountSID+"/Messages/SMnotfound.json")
+	_, status = twilioGet(t, base+"/2010-04-01/Accounts/"+accountSID+"/Messages/SMnotfound.json")
 	if status != 404 {
 		t.Fatalf("GET nonexistent message -> status %d, want 404", status)
 	}
@@ -232,7 +235,7 @@ func TestTwilioStyleAdapter(t *testing.T) {
 	time.Sleep(3500 * time.Millisecond)
 
 	// Normal message -> delivered, with date_sent now set.
-	body, status = twilioGet(t, base+"/2010-06-01/Accounts/"+accountSID+"/Messages/"+msgSID+".json")
+	body, status = twilioGet(t, base+"/2010-04-01/Accounts/"+accountSID+"/Messages/"+msgSID+".json")
 	if status != 200 {
 		t.Fatalf("GET delivered message -> status %d, want 200; body %s", status, body)
 	}
@@ -248,7 +251,7 @@ func TestTwilioStyleAdapter(t *testing.T) {
 	}
 
 	// Failure-injected message -> undelivered with an error code.
-	body, status = twilioGet(t, base+"/2010-06-01/Accounts/"+accountSID+"/Messages/"+failSID+".json")
+	body, status = twilioGet(t, base+"/2010-04-01/Accounts/"+accountSID+"/Messages/"+failSID+".json")
 	if status != 200 {
 		t.Fatalf("GET undelivered message -> status %d, want 200; body %s", status, body)
 	}
@@ -265,7 +268,7 @@ func TestTwilioStyleAdapter(t *testing.T) {
 
 	// ===== POST call → 201, sid CA..., status queued =====
 
-	callPath := base + "/2010-06-01/Accounts/" + accountSID + "/Calls.json"
+	callPath := base + "/2010-04-01/Accounts/" + accountSID + "/Calls.json"
 	body, status = twilioPostJSON(t, callPath, map[string]any{
 		"To":   "+15551234567",
 		"From": "+15557654321",
@@ -430,7 +433,7 @@ func TestTwilioStyleMessageFilters(t *testing.T) {
 
 	base := addrs["twilio"]
 	const accountSID = twilioAccountSID
-	msgPath := base + "/2010-06-01/Accounts/" + accountSID + "/Messages.json"
+	msgPath := base + "/2010-04-01/Accounts/" + accountSID + "/Messages.json"
 
 	for _, to := range []string{"+15551110001", "+15551110001", "+15551110002"} {
 		body, status := twilioPostJSON(t, msgPath, map[string]any{
@@ -487,15 +490,38 @@ func TestTwilioStyleMessageFilters(t *testing.T) {
 func TestTwilioStyleLifecycleEmitsOnce(t *testing.T) {
 	var mu sync.Mutex
 	var statuses []string
+	var sigOK int
+	var sigChecked int
 	sink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
-		var ev map[string]any
-		if err := json.Unmarshal(b, &ev); err == nil {
-			if ty, ok := ev["type"].(string); ok {
+		// Real-callback contract: form params (MessageStatus=...) signed
+		// per Twilio's formula: base64(HMAC-SHA1(token, url + sorted
+		// key+value pairs)).
+		if vals, err := url.ParseQuery(string(b)); err == nil {
+			if st := vals.Get("MessageStatus"); st != "" {
 				mu.Lock()
-				statuses = append(statuses, ty)
+				statuses = append(statuses, "message."+st)
 				mu.Unlock()
 			}
+			keys := make([]string, 0, len(vals))
+			for k := range vals {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			var sb strings.Builder
+			sb.WriteString("http://" + r.Host + r.URL.RequestURI())
+			for _, k := range keys {
+				sb.WriteString(k + vals.Get(k))
+			}
+			mac := hmac.New(sha1.New, []byte(twilioAuthToken))
+			mac.Write([]byte(sb.String()))
+			want := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+			mu.Lock()
+			sigChecked++
+			if r.Header.Get("X-Twilio-Signature") == want {
+				sigOK++
+			}
+			mu.Unlock()
 		}
 		w.WriteHeader(200)
 	}))
@@ -529,7 +555,7 @@ func TestTwilioStyleLifecycleEmitsOnce(t *testing.T) {
 
 	base := addrs["twilio"]
 	const accountSID = twilioAccountSID
-	msgPath := base + "/2010-06-01/Accounts/" + accountSID + "/Messages.json"
+	msgPath := base + "/2010-04-01/Accounts/" + accountSID + "/Messages.json"
 
 	body, status := twilioPostJSON(t, msgPath, map[string]any{
 		"To":   "+15551234567",
@@ -542,7 +568,7 @@ func TestTwilioStyleLifecycleEmitsOnce(t *testing.T) {
 	var msg map[string]any
 	_ = json.Unmarshal([]byte(body), &msg)
 	sid := msg["sid"].(string)
-	single := base + "/2010-06-01/Accounts/" + accountSID + "/Messages/" + sid + ".json"
+	single := base + "/2010-04-01/Accounts/" + accountSID + "/Messages/" + sid + ".json"
 
 	time.Sleep(3500 * time.Millisecond)
 
@@ -568,5 +594,8 @@ func TestTwilioStyleLifecycleEmitsOnce(t *testing.T) {
 	}
 	if counts["message.sent"] != 1 {
 		t.Errorf("sent emitted %d times, want exactly 1 (statuses: %v)", counts["sent"], counts)
+	}
+	if sigChecked == 0 || sigOK != sigChecked {
+		t.Errorf("signature verification: %d/%d callbacks carried a valid X-Twilio-Signature", sigOK, sigChecked)
 	}
 }

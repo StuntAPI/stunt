@@ -6,6 +6,58 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.48.0] — 2026-08-17
+
+### Testing
+
+- **SDK conformance wave 2 — three more official/standard SDKs, 17 new
+  checks (36 across six SDK families).**
+  - **twilio-go** — message create, the `queued → sent → delivered`
+    lifecycle driven by SDK Fetch polling, the `+15005550001` magic
+    invalid-number → `failed` trigger, list filters, and status-callback
+    webhooks verified against Twilio's documented HMAC-SHA1 formula.
+  - **go-shopify** (bold-commerce, the standard Go client) — webhook
+    registration, order creates, `page_info` cursor pagination through
+    the SDK's `NextPageOptions` Link-header walking, and deliveries
+    verified by the SDK's own `VerifyWebhookRequest` HMAC validator.
+  - **google-api-go-client / x/oauth2** — the full authorization-code
+    exchange, refresh with rotation, userinfo, and the marquee:
+    **`idtoken.Validate` — Google's own RS256+JWKS verifier — accepting
+    the adapter-minted id_token against the adapter-served
+    `/oauth2/v3/certs`.**
+
+### Adapters
+
+- Wave-2 findings, all fixed:
+  - **twilio-style's mock auth token contained underscores** — real
+    Twilio tokens are 32-char alphanumeric, and official SDKs validate
+    that client-side, rejecting the credentials before any request. The
+    documented token is now `feed0000face1111beef2222cafe3333` (update
+    any hardcoded credential).
+  - **twilio-style versioned its API `/2010-06-01/`** — the real API
+    (and every SDK) uses `/2010-04-01/`. All routes renamed.
+  - **twilio-style status callbacks delivered the stunt envelope, not
+    Twilio's callback shape.** Real Twilio POSTs the message resource as
+    form parameters signed with
+    `base64(HMAC-SHA1(token, url + sorted key/value pairs))`; the
+    adapter now delivers exactly that (via `events_emit_raw`), so real
+    receivers — and Twilio's documented validation — verify out of the
+    box. The lifecycle engine test now verifies every callback's
+    signature.
+  - **shopify-style rendered webhook ids, embedded customer ids,
+    fulfillment/transaction ids, and variant ids as JSON strings** —
+    Shopify ids are numeric; typed SDKs (`go-shopify`) reject the
+    response outright. The id coercion is total over the shapes an id
+    can take (stored string, JSON int, JSON float) — the first cut
+    crashed on numeric customer ids, 500ing the most common Shopify
+    create pattern and poisoning later order lists (caught in review,
+    pinned by the embedded-customer conformance check).
+  - **google-style's token endpoint rejected HTTP Basic client
+    credentials** (RFC 6749 §2.3.1) — the default style of
+    `golang.org/x/oauth2` and the Google SDKs. The first attempt also
+    burned the single-use code, so the library's retry could never
+    succeed. Both grant types now accept Basic or form credentials.
+
 ## [0.47.0] — 2026-08-17
 
 ### Testing

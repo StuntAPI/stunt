@@ -137,8 +137,10 @@ stunt catalog search stripe                   # browse the adapter registry
 Square, Adyen, AWS S3, Google/Microsoft/Apple families, blockchain RPCs, …; all unofficial,
 synthetic-data-only, with a DISCLAIMER). Browse them with `stunt catalog search`. Every one
 passes an adversarial input-safety sweep (garbage params, null/malformed bodies, ~30 tampered
-cursor/limit param names — never a 5xx) plus coverage-guided fuzzing of the engine's parsers
-and dispatch (`just fuzz` for longer rounds). Highlights:
+cursor/limit param names — never a 5xx), coverage-guided fuzzing of the engine's parsers and
+dispatch (`just fuzz`), and conformance suites that drive **real provider SDKs** — stripe-go,
+aws-sdk-go-v2, go-github, twilio-go, go-shopify, google-api-go-client — end-to-end against
+the adapters (`just conformance`). Highlights:
 
 | Adapter | Simulates | Backing |
 |---|---|---|

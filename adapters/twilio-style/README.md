@@ -1,6 +1,6 @@
 # Twilio-style adapter
 
-A stunt adapter for simulating a **Twilio REST API (2010-06-01)** locally.
+A stunt adapter for simulating a **Twilio REST API (2010-04-01)** locally.
 All data is synthetic — no real API data is included.
 
 > **Unofficial / not affiliated.** This adapter is not affiliated with, endorsed
@@ -14,14 +14,14 @@ A faithful behavioral mock of Twilio's Programmable Messaging, Voice, and
 Verify surfaces, designed for local integration testing without a real Twilio
 account:
 
-- **Send SMS/MMS:** `POST /2010-06-01/Accounts/{Sid}/Messages.json` (`{To, From, Body}`).
-- **List messages:** `GET /2010-06-01/Accounts/{Sid}/Messages.json` (cursor-paginated
+- **Send SMS/MMS:** `POST /2010-04-01/Accounts/{Sid}/Messages.json` (`{To, From, Body}`).
+- **List messages:** `GET /2010-04-01/Accounts/{Sid}/Messages.json` (cursor-paginated
   via `PageSize` + `PageToken`, with a Twilio-style `next_page_uri`; filters
   `To`, `From`, `DateSent` (also `DateSent>`/`DateSent<` windows — queued
   messages with a null `date_sent` are excluded by date filters, like the
   real API)).
 - **Retrieve message:** `GET .../Messages/{Sid}.json`.
-- **Create call:** `POST /2010-06-01/Accounts/{Sid}/Calls.json` (`{To, From, Url}`).
+- **Create call:** `POST /2010-04-01/Accounts/{Sid}/Calls.json` (`{To, From, Url}`).
 - **Verify:** `POST /v2/Services/{ServiceSid}/Verification` → `{status:"pending"}`.
 - **Verify check:** `POST /v2/Services/{ServiceSid}/VerificationCheck` (`{To, Code}`) → `{status:"approved"}` on correct code.
 
@@ -43,20 +43,20 @@ header:
 
 ```
 AccountSid = AC0123456789abcdef0123456789abcdef
-AuthToken  = twilio_auth_token
+AuthToken  = feed0000face1111beef2222cafe3333
 ```
 
-Base64 of `AC0123456789abcdef0123456789abcdef:twilio_auth_token`:
+Base64 of `AC0123456789abcdef0123456789abcdef:feed0000face1111beef2222cafe3333`:
 
 ```
-QUMwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjp0d2lsaW9fYXV0aF90b2tlbg==
+QUMwMTIzNDU2Nzg5YWJjZGVmMDEyMzQ1Njc4OWFiY2RlZjpmZWVkMDAwMGZhY2UxMTExYmVlZjIyMjJjYWZlMzMzMw==
 ```
 
 ### Example
 
 ```bash
-curl -u "AC0123456789abcdef0123456789abcdef:twilio_auth_token" \
-  http://localhost:PORT/2010-06-01/Accounts/AC0123456789abcdef0123456789abcdef/Messages.json \
+curl -u "AC0123456789abcdef0123456789abcdef:feed0000face1111beef2222cafe3333" \
+  http://localhost:PORT/2010-04-01/Accounts/AC0123456789abcdef0123456789abcdef/Messages.json \
   -d 'To=+15551234567' \
   -d 'From=+15557654321' \
   -d 'Body=Hello from stunt'
@@ -65,7 +65,7 @@ curl -u "AC0123456789abcdef0123456789abcdef:twilio_auth_token" \
 ### 401 without auth
 
 ```bash
-curl http://localhost:PORT/2010-06-01/Accounts/AC.../Messages.json
+curl http://localhost:PORT/2010-04-01/Accounts/AC.../Messages.json
 # → 401 {"code":20003,"message":"Missing or invalid Basic Auth credentials",...}
 ```
 
@@ -120,22 +120,25 @@ registered webhook sink. See the stunt docs for webhook configuration
 
 ### Signed deliveries — `X-Twilio-Signature`
 
-Webhook deliveries are signed exactly the way Twilio signs its webhook
-requests — the header carries a base64 HMAC-SHA1 over the delivery URL plus
-the raw request body:
+Webhook deliveries use Twilio's real status-callback shape: the message
+resource as **form parameters** (`AccountSid`, `ApiVersion`, `From`,
+`MessageSid`, `MessageStatus`, `To`), signed with a base64 HMAC-SHA1 over
+the delivery URL plus the parameters **sorted by key, each key immediately
+followed by its (decoded) value**:
 
 ```
-X-Twilio-Signature = base64(HMAC-SHA1(key=twilio_auth_token,
-                                      msg=events_target_url + raw_body))
+X-Twilio-Signature = base64(HMAC-SHA1(key=feed0000face1111beef2222cafe3333,
+                                      msg=url + concat(sorted, key + value)))
 ```
 
 The URL is the webhook destination configured as this service's
-`events_target` (Twilio MACs the full request URL, so a receiver must validate
-against the same URL stunt delivered to), and the body is the exact JSON
-envelope on the wire. The signing key is the documented mock AuthToken:
+`events_target` — Twilio MACs the full request URL, so a receiver must
+validate against the same URL stunt delivered to. A receiver built from
+Twilio's validation documentation verifies every delivery as-is. The
+signing key is the documented mock AuthToken:
 
 ```
-twilio_auth_token
+feed0000face1111beef2222cafe3333
 ```
 
 A receiver can therefore exercise real signature-verification code paths
@@ -148,10 +151,10 @@ their deliveries and their mock secrets.
 
 | Method | Route | Handler | Description |
 |--------|-------|---------|-------------|
-| POST | `/2010-06-01/Accounts/{account_sid}/Messages.json` | `messages.star#on_send_message` | Send a message (→ `queued`) |
-| GET | `/2010-06-01/Accounts/{account_sid}/Messages.json` | `messages.star#on_list_messages` | List messages (stateful, cursor-paginated) |
-| GET | `/2010-06-01/Accounts/{account_sid}/Messages/{sid}.json` | `messages.star#on_get_message` | Retrieve a message |
-| POST | `/2010-06-01/Accounts/{account_sid}/Calls.json` | `calls.star#on_create_call` | Create a call (→ `queued`) |
+| POST | `/2010-04-01/Accounts/{account_sid}/Messages.json` | `messages.star#on_send_message` | Send a message (→ `queued`) |
+| GET | `/2010-04-01/Accounts/{account_sid}/Messages.json` | `messages.star#on_list_messages` | List messages (stateful, cursor-paginated) |
+| GET | `/2010-04-01/Accounts/{account_sid}/Messages/{sid}.json` | `messages.star#on_get_message` | Retrieve a message |
+| POST | `/2010-04-01/Accounts/{account_sid}/Calls.json` | `calls.star#on_create_call` | Create a call (→ `queued`) |
 | POST | `/v2/Services/{service_sid}/Verification` | `verify.star#on_create_verification` | Start a verification |
 | POST | `/v2/Services/{service_sid}/VerificationCheck` | `verify.star#on_check_verification` | Check a verification code |
 
