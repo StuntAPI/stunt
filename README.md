@@ -60,19 +60,11 @@ brew install --cask stuntapi/tap/stunt
 **Windows (winget):**
 
 ```powershell
-# clone the manifest repo, then install from the local manifest dir
-git clone --depth 1 https://github.com/stuntapi/winget
-winget install --manifest winget/manifests/s/StuntAPI/Stunt/0.31.0
+irm https://raw.githubusercontent.com/stuntapi/winget/main/install.ps1 | iex
 ```
-
-> Once stunt is submitted to the default winget source, this becomes simply
-> `winget install StuntAPI.Stunt` (no clone).
 
 Pre-built binaries for every platform are also on the
 [Releases page](https://github.com/stuntapi/stunt/releases).
-
-> Dev-machine note: if `go` commands fail with a stdlib-version mismatch, prefix them
-> with `env -u GOROOT` (a local toolchain quirk; not needed in CI/for end users).
 
 ## Quickstart
 
