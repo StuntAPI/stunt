@@ -6,6 +6,14 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+
+- **`stunt demo --port` was silently ignored** — the demo served on an
+  OS-assigned port regardless of the flag (it used the test-serving path,
+  which always binds free ports). A requested port is now served exactly or
+  the command fails loudly, via the new `engine.ServeAtBasePorts`. Found
+  while scripting the README demo GIF, which needs a deterministic port.
+
 ## [0.49.0] — 2026-08-18
 
 ### Testing
@@ -414,11 +422,6 @@ All notable changes to **stunt** are documented here. The format is based on
 - Review fixed: producthunt Int-variable coercion + numeric NEWEST ordering,
   shopify webhook payload parity, keyed upload sessions (chunk-retry
   corruption), ms-graph frozen timestamps.
-
-## [Unreleased]
-
-### Added
-
 - **`smartbill-style` adapter** — a SmartBill-style Romanian invoicing
   API simulator on the real version-free surface: invoices
   (create/get/cancel/restore/paymentstatus with per-line VAT totals),
@@ -427,6 +430,36 @@ All notable changes to **stunt** are documented here. The format is based on
   document/send, tax/series metadata; Basic auth, JSON-numeric money,
   `errorText` errors, documents read by `cif`+`seriesname`+`number`.
   Includes a conformance test. Adapter count is now **94**.
+
+## [0.35.0] — 2026-08-15
+
+### Added
+
+- **`fattureincloud-style` adapter** — a Fatture in Cloud-style bookkeeping API
+  v2 simulator: entities (companies), received and issued documents (full CRUD
+  + metodata categories), suppliers, clients, products (full CRUD), taxes,
+  cashbook, webhooks, archive. Models the v2 conventions client code gets
+  wrong against thinner sims: Laravel pagination envelopes (`last_page` must
+  be followed), `{data}` wrappers, company-id scoping where a foreign id is an
+  indistinguishable 404, genuine 401s for missing bearers, and amounts as
+  decimal strings (`"9800.00"`). Conformance test included.
+- **`escrow-style` adapter** — an Escrow.com-style transaction API simulator
+  (public 2017-09-01 surface): create with parties/items/schedules and a
+  caller-controlled or defaulted fee split, per-party agreement via PATCH
+  action, secured-state transitions, lookup by id or caller reference, webhook
+  registration, and a clearly-namespaced `/sim/transaction/{id}/fund`
+  affordance standing in for the hosted payment page no API can drive.
+  Conformance test included.
+
+### Adapters
+
+- **Real inbound signature verification + clock adoption.** AWS SigV4 (from
+  the documented synthetic credentials), Azure SharedKey and SAS (including
+  the `RootManageSharedAccessKey` connection string), inbound HMACs for the
+  KYC providers, and cryptographic webhook receivers (xero, cloudkit ECDSA,
+  github) now verify on the way in instead of accepting any token. Sixteen
+  adapters derive time from the injectable clock rather than wall time, so
+  TTL/expiry behavior is deterministic under test.
 
 ## [0.34.0] — 2026-08-15
 
@@ -451,30 +484,14 @@ All notable changes to **stunt** are documented here. The format is based on
   + sandbox endpoints), square (autocomplete semantics, ListPayments/
   ListPaymentRefunds, refund ceilings + currency match, orders/calculate).
 
-### Added
+## [0.33.0] — 2026-08-15
 
-- **`fattureincloud-style` adapter** — a Fatture in Cloud-style bookkeeping API
-  v2 simulator: entities (companies), received and issued documents (full CRUD
-  + metodata categories), suppliers, clients, products (full CRUD), taxes,
-  cashbook, webhooks, archive. Models the v2 conventions client code gets
-  wrong against thinner sims: Laravel pagination envelopes (`last_page` must
-  be followed), `{data}` wrappers, company-id scoping where a foreign id is an
-  indistinguishable 404, genuine 401s for missing bearers, and amounts as
-  decimal strings (`"9800.00"`). Conformance test included.
-- **`escrow-style` adapter** — an Escrow.com-style transaction API simulator
-  (public 2017-09-01 surface): create with parties/items/schedules and a
-  caller-controlled or defaulted fee split, per-party agreement via PATCH
-  action, secured-state transitions, lookup by id or caller reference, webhook
-  registration, and a clearly-namespaced `/sim/transaction/{id}/fund`
-  affordance standing in for the hosted payment page no API can drive.
-  Conformance test included.
+### Added
 
 - **`json_safe_decode(s)` builtin** — total JSON decode for handlers
   validating untrusted JSON (JWT claims, multipart metadata): returns the
   value or `None` instead of raising. Numbers decode as ints when integral,
   matching the stdlib `json.decode`.
-
-## [0.33.0] — 2026-08-15
 
 ### Adapters
 

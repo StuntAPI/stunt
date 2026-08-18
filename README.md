@@ -9,6 +9,8 @@ or depending on the network. One static Go binary. Everything deterministic.
 
 > See the **magic in 30 seconds**:
 
+![stunt demo — a stateful charge lifecycle, live webhooks, all local](docs/img/demo.gif)
+
 ```bash
 stunt demo        # boots a stateful Stripe-style sim; prints copy-paste curl that creates a charge,
                   # lists it back (stateful!), captures it, and fires a webhook — all locally
