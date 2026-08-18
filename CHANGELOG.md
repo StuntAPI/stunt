@@ -6,6 +6,38 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.49.0] — 2026-08-18
+
+### Testing
+
+- **SDK conformance wave 3 — the Node SDKs, via bun.** New suites under
+  `conformance/node/` (`just conformance-node`; bun added to CI) that
+  boot the **real `stunt` binary** — `stunt up`, runtime file, ports —
+  so they double as end-to-end tests of the CLI itself:
+  - **stripe-node** — typed creates, `autoPagingEach` walking
+    `has_more`, PaymentIntent confirm, and webhook verification through
+    the SDK's `constructEventAsync` HMAC validator (signature verifies,
+    `data.object` parses, tampered payloads rejected).
+  - **octokit** — issue CRUD and `octokit.paginate` following the
+    adapter's `Link` headers page by page.
+  - **twilio-node** — the message lifecycle driven by SDK fetches
+    (`queued → sent/delivered`), the `+15005550001` magic number →
+    `failed`, and status callbacks verified by twilio-node's own
+    `validateRequest`.
+
+### Adapters
+
+- **github-style's `Link` pagination headers pointed at the real
+  `api.github.com`** — hardcoded absolute URLs. Clients that follow the
+  header (`octokit.paginate`) were sent to the real GitHub and 401'd;
+  go-github survived only because it parses the page params without
+  following the URL. Link targets are now built from the serving host
+  (`req["host"]`), which is also what a real GitHub Enterprise does.
+- Known-environment note (documented in the suite): under bun,
+  stripe-node's fetch layer intermittently drops the `url` form param
+  when it names a live same-process listener — the webhook registration
+  in the Node suite goes via a raw POST; everything else is SDK-driven.
+
 ## [0.48.0] — 2026-08-17
 
 ### Testing

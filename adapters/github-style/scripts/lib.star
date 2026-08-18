@@ -425,7 +425,14 @@ def _list_page(req, docs):
     next_link = None
     if next_cursor != None:
         next_page = _to_int(next_cursor) // per_page + 1
-        base = "https://api.github.com" + req.get("path", "")
+        # The Link target must point at THIS server: clients that follow
+        # the header (octokit.paginate) would be sent to the real
+        # api.github.com otherwise. req["host"] is the serving host.
+        host = req.get("host", "")
+        if host == None or host == "":
+            host = "api.github.com"
+        scheme = "http" if host.startswith("127.0.0.1") or host.startswith("localhost") else "https"
+        base = scheme + "://" + host + req.get("path", "")
         next_link = "<" + base + "?per_page=" + str(per_page) + "&page=" + str(next_page) + '>; rel="next"'
     return page_docs, next_link
 
