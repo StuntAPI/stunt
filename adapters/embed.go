@@ -43,7 +43,7 @@ func Has(name string) bool {
 	return err == nil && !info.IsDir()
 }
 
-// Names returns the sorted list of embedded adapter names (the 91 reference
+// Names returns the sorted list of embedded adapter names (the 98 reference
 // adapters). Directories without an adapter.yaml (package files) are excluded.
 func Names() []string {
 	entries, err := fs.ReadDir(allFS, ".")

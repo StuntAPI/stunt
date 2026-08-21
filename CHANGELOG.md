@@ -6,6 +6,38 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ## [Unreleased]
 
+### Adapters
+
+- **Three new adapters for the local-prototyping surface — auth, queues,
+  and a datastore over HTTP: `auth0-style`, `sqs-style`, `dynamodb-style`
+  (95 → 98 reference adapters).**
+  - **`auth0-style`** — the OIDC authentication domain (discovery, JWKS,
+    `authorize` code flow, `token` code/refresh/client-credentials grants,
+    `userinfo`, `revoke`, `dbconnections/signup`) plus Management API v2
+    users + roles CRUD. Tokens are real RS256 over a fixed synthetic
+    keypair embedded in the adapter (the JWKS endpoint serves the public
+    half); inbound Bearers are verified for real (`crypto.rsa_verify`,
+    exp/iss checked, clock-aware).
+  - **`sqs-style`** — the SQS JSON protocol (`X-Amz-Target: AmazonSQS.*`):
+    all 14 operations over both transports (endpoint-addressed `POST /`
+    and queue-URL-addressed `POST /<queue>`), per-queue visibility
+    timeout driven by the engine clock (receive → in-flight → timeout →
+    redelivery with `ApproximateReceiveCount`), batches with partial
+    failure, and the real one-per-60s purge window. SigV4 is verified
+    for real (service `sqs`, same documented synthetic credentials as
+    aws-s3-style).
+  - **`dynamodb-style`** — the DynamoDB JSON protocol (all 12 operations):
+    table CRUD, typed item CRUD, `Query`/`Scan` with sort-key ordering and
+    keyset pagination, batches, and a documented expression subset —
+    KeyCondition/Filter/Condition comparisons, `begins_with`, `BETWEEN`,
+    `attribute_exists`, Update `SET`/`REMOVE`/`ADD` with exact decimal
+    arithmetic; `OR`/`NOT`/nested paths answer a named `ValidationException`.
+    SigV4 verified for real (service `dynamodb`).
+  - Each ships a Go test suite driving the scripts directly over a shared
+    store (`adapters/{auth0,sqs,dynamodb}_style_test.go`); auth0 and sqs
+    use the virtual clock to test expiry/visibility semantics without
+    sleeping.
+
 ### Fixed
 
 - **`stunt demo --port` was silently ignored** — the demo served on an
