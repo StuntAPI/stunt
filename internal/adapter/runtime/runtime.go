@@ -85,6 +85,10 @@ type BuiltinOptions struct {
 	Emitter     *events.Emitter
 	Clock       *clock.Clock
 	ServiceName string
+	// ActiveProfile reports THIS service's active profile name ("" when
+	// none). Handlers branch on it to codify adapter-authored behavior
+	// modes. Nil registers a builtin that always returns None.
+	ActiveProfile func() string
 }
 
 // eventsEmitTimeout is the maximum time allowed for a single events_emit
@@ -116,7 +120,27 @@ func BuildAllBuiltins(opts BuiltinOptions) sk.StringDict {
 	for k, v := range buildSafeDecodeBuiltins() {
 		dict[k] = v
 	}
+	for k, v := range buildProfileBuiltins(opts.ActiveProfile) {
+		dict[k] = v
+	}
 	return dict
+}
+
+// buildProfileBuiltins exposes profile_active(): the name of THIS service's
+// active profile, or None when none is active. Total — never errors, so a
+// handler can branch on it unconditionally.
+func buildProfileBuiltins(active func() string) sk.StringDict {
+	return sk.StringDict{
+		"profile_active": sk.NewBuiltin("profile_active", func(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+			if active == nil {
+				return sk.None, nil
+			}
+			if name := active(); name != "" {
+				return sk.String(name), nil
+			}
+			return sk.None, nil
+		}),
+	}
 }
 
 // BuildBuiltins returns a Starlark StringDict exposing the given stores as

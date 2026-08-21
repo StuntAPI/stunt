@@ -166,6 +166,12 @@ signed webhook delivery (HMAC/ECDSA/Ed25519 schemes), derive-on-read async state
   Clock+scheduler (deterministic), Generator, Validator (JSON-Schema). State persists in `.stunt/state/`.
 - **Networking**: optional portless.dev-style TLS proxy on `*.localhost` (HTTP/2, local CA). The privileged
   listener forwards to an **unprivileged** engine, so adapter code never runs as root. WSS passthrough verified.
+- **Profiles**: runtime-activatable behavior modes, all declarative. Declare rule bundles per service in
+  `stunt.yaml` (`profiles:`), ship modes in an adapter's `adapter.yaml` (handlers read `profile_active()`),
+  compose global presets that assign several services at once. `stunt profile activate <name>` (or the
+  dashboard panel) flips the world — "launch-day latency", "degraded dependency" — without touching YAML or
+  restarting; active profile rules run as a pre-dispatch override, so they reach handler-backed routes base
+  rules can't. Runtime-only by design: a restart resets the world; `stunt up --profile <name>` boots with one.
 
 ## Observability dashboard
 

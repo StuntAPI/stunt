@@ -43,6 +43,10 @@ func TestValidateErrors(t *testing.T) {
 		{"bad service name (space)", &Manifest{Version: 1, Network: Network{Mode: "port", BasePort: 9000}, Services: map[string]Service{"ev il": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}}},
 		{"bad TLD (newline)", &Manifest{Version: 1, Network: Network{Mode: "subdomain", TLD: "ev\nil"}, Services: map[string]Service{"x": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}}},
 		{"bad TLD (space)", &Manifest{Version: 1, Network: Network{Mode: "subdomain", TLD: "ev il"}, Services: map[string]Service{"x": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}}},
+		{"service profile rule without respond", &Manifest{Version: 1, Network: Network{Mode: "port", BasePort: 9000}, Services: map[string]Service{"x": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}, Profiles: map[string]ServiceProfile{"p": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}}}}}}}}},
+		{"bad service profile name", &Manifest{Version: 1, Network: Network{Mode: "port", BasePort: 9000}, Services: map[string]Service{"x": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}, Profiles: map[string]ServiceProfile{"ev il": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}}}}},
+		{"bad global profile name", &Manifest{Version: 1, Network: Network{Mode: "port", BasePort: 9000}, Services: map[string]Service{"x": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}, Profiles: map[string]GlobalProfile{"ev\nil": {}}}},
+		{"global profile references unknown service", &Manifest{Version: 1, Network: Network{Mode: "port", BasePort: 9000}, Services: map[string]Service{"x": {Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}}, Profiles: map[string]GlobalProfile{"launch": {Set: map[string]string{"ghost": "p"}}}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

@@ -803,3 +803,54 @@ graphql:
 		t.Errorf("error should mention directory escape, got: %v", err)
 	}
 }
+
+func TestLoadProfilesValidation(t *testing.T) {
+	cases := []struct {
+		name string
+		yaml string
+		err  string
+	}{
+		{
+			name: "uppercase name",
+			yaml: `id: p
+name: P
+profiles:
+  Throttled: "no"
+`,
+			err: "invalid characters",
+		},
+		{
+			name: "name too long",
+			yaml: "id: p\nname: P\nprofiles:\n  " + strings.Repeat("a", 33) + ": \"no\"\n",
+			err:  "1-32 characters",
+		},
+		{
+			name: "valid names pass",
+			yaml: `id: p
+name: P
+profiles:
+  throttled: "empty receives"
+  breach-2: "refresh 403s"
+`,
+			err: "",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.WriteFile(filepath.Join(dir, "adapter.yaml"), []byte(c.yaml), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			_, err := Load(dir)
+			if c.err == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), c.err) {
+				t.Fatalf("err = %v, want containing %q", err, c.err)
+			}
+		})
+	}
+}

@@ -175,6 +175,7 @@ handler. Webhooks are delivered as HTTP POST with a JSON body `{type, payload}`.
 | Builtin | Signature | Returns | Notes |
 |---------|-----------|---------|-------|
 | `events_register(url)` | `(url: str)` | `None` | Registers a webhook URL for the current service |
+| `profile_active()` | `()` | `str` or `None` | The name of THIS service's active behavior profile (or `None`). Branch on it to codify adapter-authored modes (`profiles:` in adapter.yaml); activation is runtime-only via `stunt profile` / the dashboard |
 | `events_target()` | `()` | `str` or `None` | The currently-registered webhook URL for this service (or `None`). Use it when a provider's signature MACs the destination URL (Twilio, Square) |
 | `events_emit(event_type, payload?, headers?)` | `(event_type: str, payload: dict = {}, headers: dict = {})` | `None` | Emits an event to registered webhook(s). `headers` are set on the POST on top of `Content-Type: application/json` (a caller `Content-Type` overrides it); `Host`/`Content-Length` and any CR/LF are rejected |
 | `events_body(event_type, payload?)` | `(event_type: str, payload: dict = {})` | `str` | The exact JSON body `events_emit(event_type, payload)` will POST. Use it to compute a signature over the real wire bytes (see Signing webhooks below) |

@@ -52,6 +52,10 @@ adapters written in a **sandboxed Starlark** scripting layer.
 | `stunt trust` | Install stunt's CA into the system trust store (needs privilege). |
 | `stunt service install\|status\|uninstall` | Manage the system service unit. |
 | `stunt version` \| `stunt --version` | Print the version. |
+| `stunt profile list` | Every activatable profile (presets + per-service, active marked) on a running server. |
+| `stunt profile show <name>` | Describe one profile and where it is active. |
+| `stunt profile activate <name>` | Activate a global preset, or a name one service defines (`--service` disambiguates). |
+| `stunt profile deactivate` | Deactivate (`--service` for one; default all). Runtime-only — resets on restart; `stunt up --profile <name>` sets a boot default. |
 | `stunt llm` | Print the in-binary reference (this doc, compact). |
 
 **Global flag:** `--manifest <path>` (default `stunt.yaml`). Adapter cache: `--cache-dir` /
@@ -84,6 +88,29 @@ services:
     config:                         # optional per-service config passed to adapter scripts
       webhook_url: http://127.0.0.1:9999/hooks
     max_body_bytes: 8388608         # optional request-body cap (default 1 MiB); oversize → 413
+    # profiles: named rule bundles activatable at runtime on THIS service.
+    # An active profile's rules run as a PRE-DISPATCH override layer — they
+    # can intercept routes that handlers or base rules would otherwise take.
+    # Adapters may also author profiles (adapter.yaml `profiles:`), readable
+    # from handlers via profile_active(); activation treats both sets as one
+    # namespace per service.
+    # profiles:
+    #   degraded:
+    #     description: slow + occasional 429
+    #     rules:
+    #       - match: { path: /v1/** }
+    #         when: { chance: 30 }
+    #         respond: { status: 429, body: { inline: { error: rate_limited } } }
+
+# Global profile presets: one activation assigns profiles across services.
+# Profile names are validated at activation time (adapters may author names
+# the manifest cannot see). Nothing predefined ships — examples like
+# "launch-day" are yours to declare.
+profiles:
+  launch-day:                       # `stunt profile activate launch-day`
+    description: both dependencies degraded
+    set:
+      myapi: degraded               # a service profile (declared above or adapter-authored)
 ```
 
 ### Rule fields (inline declarative responses)
@@ -129,6 +156,12 @@ resources:                         # backing stores (stateful)
   - name: items
     kind: collection               # "collection" (documents) or "kv" (key-value)
     seed: fixtures/items.jsonl     # optional JSONL seed (one JSON object per line)
+
+# Adapter-authored behavior modes: name → one-line description. Handlers
+# branch on the active one via the profile_active() builtin; users activate
+# at runtime (`stunt profile` / dashboard). Names: [a-z0-9][a-z0-9-]*, ≤32.
+profiles:
+  degraded: "lists return empty; single-item reads still work"
 
 identity:                          # auth primitive metadata
   token_scheme: bearer             # informational; enforcement is up to your handlers

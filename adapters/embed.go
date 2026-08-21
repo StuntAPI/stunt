@@ -13,8 +13,11 @@
 package adapters
 
 import (
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -71,6 +74,40 @@ func Extract(name, dstDir string) error {
 		return fmt.Errorf("adapters: %q is not an embedded adapter", name)
 	}
 	return copyEmbedDir(allFS, name, dstDir)
+}
+
+// Fingerprint returns a stable content hash of the embedded adapter's
+// files. The adapter cache stamps each extraction with it: a binary whose
+// embedded copy changed (every release) must refresh the extraction — a
+// stale cached copy would otherwise shadow the current adapter forever.
+func Fingerprint(name string) (string, error) {
+	if !Has(name) {
+		return "", fmt.Errorf("adapters: %q is not an embedded adapter", name)
+	}
+	var files []string
+	err := fs.WalkDir(allFS, name, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("adapters: walk %s: %w", name, err)
+	}
+	sort.Strings(files)
+	h := sha256.New()
+	for _, p := range files {
+		io.WriteString(h, p)
+		data, err := fs.ReadFile(allFS, p)
+		if err != nil {
+			return "", fmt.Errorf("adapters: read %s: %w", p, err)
+		}
+		h.Write(data)
+	}
+	return hex.EncodeToString(h.Sum(nil))[:16], nil
 }
 
 // AdapterMeta is the per-adapter metadata exposed by Index. It is kept in

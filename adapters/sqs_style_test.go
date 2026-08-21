@@ -48,6 +48,12 @@ type sqsFixture struct {
 }
 
 func newSQSFixture(t *testing.T, start time.Time) *sqsFixture {
+	return newSQSFixtureProfile(t, start, nil)
+}
+
+// newSQSFixtureProfile is newSQSFixture with a fake active profile backing
+// profile_active() (nil = no profile active).
+func newSQSFixtureProfile(t *testing.T, start time.Time, active func() string) *sqsFixture {
 	t.Helper()
 	dir := repoAdaptersDir(t)
 	root := filepath.Join(dir, "sqs-style")
@@ -75,11 +81,12 @@ func newSQSFixture(t *testing.T, start time.Time) *sqsFixture {
 
 	vc := clock.NewVirtualClock(start)
 	builtins := runtime.BuildAllBuiltins(runtime.BuiltinOptions{
-		Store:       store,
-		KV:          kvStore,
-		Blob:        blobStore,
-		Clock:       vc,
-		ServiceName: "test",
+		Store:         store,
+		KV:            kvStore,
+		Blob:          blobStore,
+		Clock:         vc,
+		ServiceName:   "test",
+		ActiveProfile: active,
 	})
 
 	load := func(script string) *starlark.VM {
@@ -719,5 +726,58 @@ func TestSQSQueueLifecycle(t *testing.T) {
 	resp = f.qCall("alphabet", "SendMessage", map[string]any{"MessageBody": "gone"})
 	if resp.Status != 400 || sqsErrType(t, resp) != "QueueDoesNotExist" {
 		t.Fatalf("send after delete -> %d %q, want 400 QueueDoesNotExist", resp.Status, sqsErrType(t, resp))
+	}
+}
+
+func TestSQSThrottledProfile(t *testing.T) {
+	// The adapter-authored 'throttled' mode: alternate receives return
+	// empty (parity of a per-queue counter — deterministic, not chance).
+	// VisibilityTimeout 0 keeps the message visible between receives so
+	// only the throttling decides emptiness.
+	start := time.Date(2026, 1, 20, 12, 0, 0, 0, time.UTC)
+	throttled := false
+	f := newSQSFixtureProfile(t, start, func() string {
+		if throttled {
+			return "throttled"
+		}
+		return ""
+	})
+
+	if resp := f.svcCall("CreateQueue", map[string]any{"QueueName": "jobs"}); resp.Status != 200 {
+		t.Fatalf("CreateQueue -> %d: %v", resp.Status, resp.Body)
+	}
+	if resp := f.svcCall("SendMessage", map[string]any{
+		"QueueUrl": "http://" + f.host + "/jobs", "MessageBody": "tick",
+	}); resp.Status != 200 {
+		t.Fatalf("SendMessage -> %d: %v", resp.Status, resp.Body)
+	}
+	recv := func() []any {
+		resp := f.svcCall("ReceiveMessage", map[string]any{
+			"QueueUrl": "http://" + f.host + "/jobs", "VisibilityTimeout": 0,
+		})
+		if resp.Status != 200 {
+			t.Fatalf("ReceiveMessage -> %d: %v", resp.Status, resp.Body)
+		}
+		msgs, _ := resp.Body["Messages"].([]any)
+		return msgs
+	}
+
+	// Baseline: without the profile every receive sees the message.
+	if m := recv(); len(m) != 1 {
+		t.Fatalf("baseline receive = %v, want the message", m)
+	}
+	throttled = true
+	if m := recv(); len(m) != 1 { // counter 1: odd → served
+		t.Fatalf("first throttled receive = %v, want the message", m)
+	}
+	if m := recv(); len(m) != 0 { // counter 2: even → empty
+		t.Fatalf("second throttled receive = %v, want empty (throttled)", m)
+	}
+	if m := recv(); len(m) != 1 { // counter 3: odd → served again
+		t.Fatalf("third throttled receive = %v, want the message", m)
+	}
+	throttled = false
+	if m := recv(); len(m) != 1 {
+		t.Fatalf("receive after deactivation = %v, want the message", m)
 	}
 }
