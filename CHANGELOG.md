@@ -4,6 +4,52 @@ All notable changes to **stunt** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.51.0] — 2026-08-21
+
+### Engine
+
+- **Profiles — runtime-activatable behavior bundles.** Named behavior
+  modes, all declarative, activatable while the server runs (runtime-only:
+  a restart resets the world). Three layers sharing one activation name:
+  rule bundles declared per service in stunt.yaml (`profiles:`) whose
+  active rules run as a **pre-dispatch override** (they intercept
+  handler-backed routes — "make this dependency flake" finally reaches
+  `/v1/charges`; base rules remain fallback-only), modes authored by
+  adapters in adapter.yaml (handlers branch on `profile_active()`; sqs-style
+  ships `throttled`: alternate ReceiveMessage calls return empty,
+  deterministic by counter parity), and global presets
+  (`profiles: {launch-day: {set: {service: profile}}}`) assigning profiles
+  across services in one activation. Bare-name activation resolves a
+  preset first, else a name exactly one service defines; ambiguity and
+  unknown names error descriptively, listing everything available.
+
+### CLI
+
+- **`stunt profile list|show|activate|deactivate` + `stunt up --profile`.**
+  The profile commands talk to the running server's dashboard (same
+  --url/--token resolution as `stunt requests`); `--profile` sets a
+  boot-time default that fails loudly before binding ports on a typo.
+
+### Dashboard
+
+- **Profiles panel + `GET/POST /api/profile`.** Preset buttons and
+  per-service selects (token-guarded like every dashboard endpoint; the
+  token never appears in payloads).
+
+### Starlark handler API
+
+- **`profile_active()` builtin.** Returns this service's active profile
+  name (or `None`) so handlers codify adapter-authored behavior modes.
+
+### Fixed
+
+- **Stale embedded-adapter extractions shadowed every upgrade.** The
+  adapter cache treated an extracted embedded adapter as immutable, so a
+  user who had run an older binary kept its adapters forever. Each
+  extraction is now stamped with a content fingerprint of the binary's
+  embedded copy and refreshed on mismatch (caches from older binaries
+  refresh once on first use). Found live while verifying this release.
+
 ## [0.50.0] — 2026-08-21
 
 ### Adapters
