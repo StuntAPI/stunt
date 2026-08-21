@@ -1,6 +1,7 @@
 package adapterdist
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"os/exec"
@@ -714,5 +715,53 @@ func TestEnsureEmbedded(t *testing.T) {
 	// PathFor must agree.
 	if got := c.PathFor(s); got != wantDir {
 		t.Errorf("PathFor = %q, want %q", got, wantDir)
+	}
+}
+
+func TestEnsureEmbeddedRefreshesStaleExtraction(t *testing.T) {
+	cache, err := OpenCache(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := &Source{Kind: "embedded", URL: "stripe-style"}
+
+	dir, _, err := cache.Ensure(context.Background(), src)
+	if err != nil {
+		t.Fatalf("first ensure: %v", err)
+	}
+	manifest := filepath.Join(dir, "adapter.yaml")
+	orig, err := os.ReadFile(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stamp := filepath.Join(dir, ".embedded-stamp")
+	if _, err := os.Stat(stamp); err != nil {
+		t.Fatalf("extraction not stamped: %v", err)
+	}
+
+	// Simulate a pre-stamp extraction from an OLDER binary: drop the stamp
+	// and leave an outdated manifest in place.
+	os.Remove(stamp)
+	stale := []byte("id: stripe-style\nname: stale-from-an-old-binary\n")
+	if err := os.WriteFile(manifest, stale, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	dir2, _, err := cache.Ensure(context.Background(), src)
+	if err != nil {
+		t.Fatalf("second ensure: %v", err)
+	}
+	if dir2 != dir {
+		t.Fatalf("dir moved: %q -> %q", dir, dir2)
+	}
+	now, err := os.ReadFile(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(now, orig) {
+		t.Fatalf("stale extraction not refreshed (%d bytes vs %d)", len(now), len(orig))
+	}
+	if _, err := os.Stat(stamp); err != nil {
+		t.Fatalf("refresh did not re-stamp: %v", err)
 	}
 }

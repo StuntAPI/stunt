@@ -86,27 +86,40 @@ func refToDirName(ref string) string {
 }
 
 // ensureEmbedded extracts an embedded (binary-baked) adapter into the cache
-// on first use and returns its path. Embedded adapters never need a fetch:
-// they are immutable and shipped with the binary, so once extracted the path
-// is returned as-is on subsequent calls. The extraction is serialized by
-// the cache mutex for safety, and a partial extraction is cleaned up on
-// error so a failed run does not leave a half-written directory that looks
-// complete on the next attempt.
+// on first use and returns its path. Embedded adapters never need a network
+// fetch, but they are NOT immutable across binaries: every release may
+// change the embedded tree, so each extraction is stamped with the
+// binary's content fingerprint and refreshed when it no longer matches —
+// otherwise a stale cached copy would shadow the current adapter forever.
+// The extraction is serialized by the cache mutex for safety, and a partial
+// extraction is cleaned up on error so a failed run does not leave a
+// half-written directory that looks complete on the next attempt.
 func (c *Cache) ensureEmbedded(s *Source) (localDir, resolvedRef string, err error) {
 	name := s.URL
 	if !adapters.Has(name) {
 		return "", "", fmt.Errorf("adapterdist: %q is not an embedded adapter", name)
 	}
+	fp, err := adapters.Fingerprint(name)
+	if err != nil {
+		return "", "", fmt.Errorf("adapterdist: fingerprint embedded %s: %w", name, err)
+	}
 	dir := filepath.Join(c.root, "embedded", name)
-	// A complete extraction is marked by an adapter.yaml at its root.
+	stamp := filepath.Join(dir, ".embedded-stamp")
+	// A complete extraction is marked by an adapter.yaml at its root AND a
+	// stamp matching this binary's fingerprint.
 	if _, err := os.Stat(filepath.Join(dir, "adapter.yaml")); err == nil {
-		return dir, "", nil
+		if cur, _ := os.ReadFile(stamp); string(cur) == fp {
+			return dir, "", nil
+		}
+		os.RemoveAll(dir) // stale extraction from an older binary
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	// Re-check under the lock (another goroutine may have extracted it).
-	if _, err := os.Stat(filepath.Join(dir, "adapter.yaml")); err == nil {
-		return dir, "", nil
+	if cur, _ := os.ReadFile(stamp); string(cur) == fp {
+		if _, err := os.Stat(filepath.Join(dir, "adapter.yaml")); err == nil {
+			return dir, "", nil
+		}
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", "", fmt.Errorf("adapterdist: mkdir embedded %s: %w", name, err)
@@ -114,6 +127,9 @@ func (c *Cache) ensureEmbedded(s *Source) (localDir, resolvedRef string, err err
 	if err := adapters.Extract(name, dir); err != nil {
 		os.RemoveAll(dir)
 		return "", "", fmt.Errorf("adapterdist: extract embedded %s: %w", name, err)
+	}
+	if err := os.WriteFile(stamp, []byte(fp), 0o644); err != nil {
+		return "", "", fmt.Errorf("adapterdist: stamp embedded %s: %w", name, err)
 	}
 	return dir, "", nil
 }
