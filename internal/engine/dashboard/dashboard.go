@@ -57,6 +57,8 @@ type Dashboard struct {
 	stopInstance  StopInstanceFunc
 	shutdown      context.CancelFunc // cancels the server's graceful-shutdown ctx (POST /api/shutdown)
 	services      []string           // manifest service names (set by up.go) for the picker
+	profileView   func() any         // profile state+catalog payload (nil = endpoint 503)
+	profileApply  func(name, service string) error
 }
 
 // ServiceState is a serializable snapshot of one service's stores, returned by
@@ -145,6 +147,16 @@ func (d *Dashboard) SetInstances(list InstancesProvider, stop StopInstanceFunc) 
 // no cross-process SIGTERM). Optional: when unset the endpoint reports 503.
 func (d *Dashboard) SetShutdown(cancel context.CancelFunc) { d.shutdown = cancel }
 
+// SetProfile wires the profile activation surface: view renders the current
+// state+catalog (GET /api/profile), apply activates by bare name — resolving
+// a global preset, else a unique per-service match — or, with a non-empty
+// service, targets that service directly (POST /api/profile). Apply errors
+// are returned verbatim as 400s so their descriptive text (available
+// profiles, ambiguity candidates) reaches the caller.
+func (d *Dashboard) SetProfile(view func() any, apply func(name, service string) error) {
+	d.profileView, d.profileApply = view, apply
+}
+
 // SetServices records the manifest's service names (for the browser picker).
 func (d *Dashboard) SetServices(names []string) { d.services = names }
 
@@ -197,6 +209,7 @@ func (d *Dashboard) Handler() http.Handler {
 	mux.HandleFunc("/api/instances", d.handleInstances)
 	mux.HandleFunc("/api/instances/{pid}/stop", d.handleInstanceStop)
 	mux.HandleFunc("/api/shutdown", d.handleShutdown)
+	mux.HandleFunc("/api/profile", d.handleProfile)
 	mux.HandleFunc("/api/state/{service}/reset", d.handleStateReset)
 	mux.HandleFunc("/api/state/{service}/collections/{name}", d.handleStateCollection)
 	mux.HandleFunc("/api/state/{service}/collections", d.handleStateCollections)
@@ -716,6 +729,46 @@ func (d *Dashboard) handleShutdown(w http.ResponseWriter, r *http.Request) {
 	}
 	d.shutdown()
 	writeJSON(w, map[string]any{"shutting_down": true})
+}
+
+// handleProfile serves the profile activation surface. GET returns the
+// current state plus the full catalog; POST body {"name": "...",
+// "service": "..."(optional)} activates (name "" deactivates). The engine's
+// descriptive resolution errors — unknown name, ambiguity, per-service
+// availability — are surfaced as 400 {"error": ...} verbatim.
+func (d *Dashboard) handleProfile(w http.ResponseWriter, r *http.Request) {
+	if d.profileView == nil || d.profileApply == nil {
+		http.Error(w, "profiles not available", http.StatusServiceUnavailable)
+		return
+	}
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, d.profileView())
+		return
+	case http.MethodPost:
+		var body struct {
+			Name    string `json:"name"`
+			Service string `json:"service"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid JSON body: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := d.profileApply(body.Name, body.Service); err != nil {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, d.profileView())
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// writeJSONStatus is writeJSON with an explicit status code (error payloads).
+func writeJSONStatus(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 func newToken() string {

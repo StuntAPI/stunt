@@ -44,6 +44,7 @@ without starting servers.`,
 	}
 	cmd.Flags().Int("proxy-port", 0, "proxy listen port (subdomain mode only; 0 = OS-assigned high port; use stunt setup/service for :443)")
 	cmd.Flags().Bool("no-tls", false, "disable TLS in subdomain mode")
+	cmd.Flags().String("profile", "", "activate this profile at boot (a global preset, or a name one service defines); unknown names fail before serving")
 	return cmd
 }
 
@@ -72,8 +73,25 @@ func runUp(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		defer e.Close()
+		if err := applyBootProfile(cmd, e); err != nil {
+			return err
+		}
 		return runUpPort(ctx, stop, e, m, out)
 	}
+}
+
+// applyBootProfile activates the --profile flag's profile before serving.
+// Failing here (rather than after binding ports) keeps `stunt up --profile
+// typo` loud and port-clean.
+func applyBootProfile(cmd *cobra.Command, e *engine.Engine) error {
+	name, _ := cmd.Flags().GetString("profile")
+	if name == "" {
+		return nil
+	}
+	if err := e.SetProfile(name); err != nil {
+		return fmt.Errorf("--profile: %w", err)
+	}
+	return nil
 }
 
 // runUpPort serves each service on its own port. The engine must already be
@@ -181,6 +199,12 @@ func startDashboard(ctx context.Context, cancel context.CancelFunc, e *engine.En
 	}
 	d := dashboard.New(rl)
 	d.SetShutdown(cancel) // POST /api/shutdown cancels the server's graceful-shutdown ctx.
+	d.SetProfile(func() any { return e.ProfileSnapshot() }, func(name, service string) error {
+		if service == "" {
+			return e.SetProfile(name)
+		}
+		return e.SetServiceProfile(service, name)
+	})
 	d.SetSeq(e.Seq())
 	d.SetReplayFunc(func(ent requestlog.Entry) (int, string) {
 		rw := httptest.NewRecorder()
@@ -372,6 +396,9 @@ func runUpSubdomain(ctx context.Context, signalCancel context.CancelFunc, cmd *c
 		return err
 	}
 	defer e.Close()
+	if err := applyBootProfile(cmd, e); err != nil {
+		return err
+	}
 
 	engineAddr, engineShutdown, err := e.ServeSingle(ctx, "127.0.0.1:0", tld)
 	if err != nil {

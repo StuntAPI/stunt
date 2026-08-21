@@ -139,7 +139,7 @@
     <h1>stunt</h1>
     <span class="tag">request inspector</span>
     <span class="live" id="liveBadge"><span class="dot"></span><span id="liveText">connecting</span></span>
-    <nav class="tabs"><button class="tab active" data-view="requests">requests</button><button class="tab" data-view="state">state</button><button class="tab" data-view="instances">instances</button></nav>
+    <nav class="tabs"><button class="tab active" data-view="requests">requests</button><button class="tab" data-view="state">state</button><button class="tab" data-view="instances">instances</button><button class="tab" data-view="profiles">profiles</button></nav>
   </div>
   <div class="stripe"></div>
 </header>
@@ -233,6 +233,12 @@
 <main id="viewInstances" hidden>
   <div class="hint">running stunt servers across all manifests — stop, or open a dashboard</div>
   <table class="inst-table"><thead><tr><th>pid</th><th>mode</th><th>age</th><th>manifest</th><th>services</th><th>dashboard</th><th></th></tr></thead><tbody id="instBody"></tbody></table>
+</main>
+
+<main id="viewProfiles" hidden>
+  <div class="hint">behavior profiles — activate a preset across services, or one service's mode; runtime-only, resets on restart</div>
+  <div id="profPresets"></div>
+  <table class="inst-table"><thead><tr><th>service</th><th>active profile</th><th>available</th></tr></thead><tbody id="profBody"></tbody></table>
 </main>
 
 <footer><div class="ftr">
@@ -602,8 +608,10 @@ document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', () =>
   document.getElementById('viewRequests').hidden = (view !== 'requests')
   document.getElementById('viewState').hidden = (view !== 'state')
   document.getElementById('viewInstances').hidden = (view !== 'instances')
+  document.getElementById('viewProfiles').hidden = (view !== 'profiles')
   if (view === 'state') loadServices()
   if (view === 'instances') loadInstances()
+  if (view === 'profiles') loadProfiles()
 }))
 
 // ── state browser (read-only) ──
@@ -733,6 +741,47 @@ async function loadInstances(){
   }catch(e){ body.innerHTML = '<tr><td colspan="7" class="muted">instances unavailable ('+esc(e.message)+')</td></tr>' }
 }
 function ageOf(s){ if(!s) return '?'; const t = new Date(s); const d = Math.round((Date.now()-t)/1000); if(isNaN(d)) return '?'; return d<60?d+'s':Math.round(d/60)+'m' }
+
+// ── profiles panel ──
+async function loadProfiles(){
+  const body = document.getElementById('profBody')
+  const presets = document.getElementById('profPresets')
+  body.innerHTML = '<tr><td colspan="3"><span class="muted">loading…</span></td></tr>'
+  try{
+    const v = await api('/api/profile')
+    presets.innerHTML = (v.catalog && v.catalog.presets && v.catalog.presets.length)
+      ? '<div class="hint">presets: ' + v.catalog.presets.map(p =>
+          '<button class="profbtn" data-name="'+esc(p.name)+'">'+esc(p.name)+(v.active_global===p.name?' ●':'')+'</button>'
+        ).join(' ') + '</div>'
+      : ''
+    presets.querySelectorAll('.profbtn').forEach(b => b.addEventListener('click', () => applyProfile(b.dataset.name, '')))
+    const svcs = v.catalog && v.catalog.services ? Object.keys(v.catalog.services).sort() : []
+    if(!svcs.length){
+      body.innerHTML = '<tr><td colspan="3"><span class="muted">no service profiles defined — declare them in stunt.yaml or an adapter.yaml</span></td></tr>'
+      return
+    }
+    body.innerHTML = svcs.map(s => {
+      const opts = ['<option value="">(none)</option>'].concat(v.catalog.services[s].map(p =>
+        '<option value="'+esc(p.name)+'"'+(v.active && v.active[s]===p.name?' selected':'')+'>'+esc(p.name)+'</option>')).join('')
+      const descs = v.catalog.services[s].map(p => esc(p.name)+' ('+esc(p.source)+')').join(', ')
+      return '<tr><td>'+esc(s)+'</td><td><select data-svc="'+esc(s)+'">'+opts+'</select></td><td class="muted">'+descs+'</td></tr>'
+    }).join('')
+    body.querySelectorAll('select').forEach(sel => sel.addEventListener('change', () => applyProfile(sel.value, sel.dataset.svc, sel)))
+  }catch(e){ body.innerHTML = '<tr><td colspan="3" class="muted">profiles unavailable ('+esc(e.message)+')</td></tr>' }
+}
+async function applyProfile(name, service, sel){
+  try{
+    const res = await fetch('/api/profile', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, service})})
+    if(!res.ok){
+      const e = await res.json().catch(() => ({}))
+      throw new Error(e.error || res.status)
+    }
+    loadProfiles()
+  }catch(e){
+    alert('profile: '+e.message)
+    if(sel) loadProfiles()
+  }
+}
 function shortMan(p){ if(!p) return '-'; const i = p.lastIndexOf('/'); return i>0?p.slice(i+1):p }
 </script>
 </body>

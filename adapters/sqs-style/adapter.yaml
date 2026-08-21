@@ -42,6 +42,12 @@ resources:
   - name: messages
     kind: collection
 
+# Adapter-authored behavior modes. Handlers read the active one via the
+# profile_active() builtin; activation is runtime-only (see the stunt
+# profile command / dashboard profiles panel).
+profiles:
+  throttled: "alternate ReceiveMessage calls return empty — exercise consumer retry/backoff paths"
+
 # Auth scheme: SigV4 (AWS4-HMAC-SHA256), verified for real (canonical
 # request rebuilt + HMAC chain recomputed with the documented synthetic
 # credentials; see README).

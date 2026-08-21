@@ -55,19 +55,43 @@ type Service struct {
 	Rules   []rules.Rule   `yaml:"rules,omitempty"`
 	Config  map[string]any `yaml:"config,omitempty"` // optional per-service config (e.g. webhook_url)
 
+	// Profiles are named rule bundles the user declares for THIS service.
+	// Activating one makes its rules a pre-dispatch override layer (they
+	// can intercept handler-backed routes, unlike base rules). Adapters
+	// may also author profiles of their own (adapter.yaml) — activation
+	// treats both sets as one namespace per service.
+	Profiles map[string]ServiceProfile `yaml:"profiles,omitempty"`
+
 	// MaxBodyBytes caps the request body size for this service. Bodies over
 	// the cap are rejected with HTTP 413 (never silently truncated). Zero
 	// means the engine default (1 MiB).
 	MaxBodyBytes int64 `yaml:"max_body_bytes,omitempty"`
 }
 
+// ServiceProfile is one named, activatable rule bundle on a service.
+type ServiceProfile struct {
+	Description string       `yaml:"description,omitempty"`
+	Rules       []rules.Rule `yaml:"rules,omitempty"`
+}
+
+// GlobalProfile is a named preset assigning a profile to each listed
+// service (authored-by-adapter or declared in stunt.yaml). Activating it
+// resets every service's profile to none, then applies these assignments —
+// no hidden carryover. Service profile names are validated at activation
+// time, not here: adapter-authored names only exist once adapters load.
+type GlobalProfile struct {
+	Description string            `yaml:"description,omitempty"`
+	Set         map[string]string `yaml:"set,omitempty"` // service name -> profile name
+}
+
 type Manifest struct {
-	Path          string             `yaml:"-"`
-	Version       int                `yaml:"version"`
-	RNGSeed       int64              `yaml:"rng_seed,omitempty"`
-	Network       Network            `yaml:"network"`
-	Services      map[string]Service `yaml:"services,omitempty"`
-	UnknownFields []string           `yaml:"-"` // top-level keys not in the known set (for warnings)
+	Path          string                   `yaml:"-"`
+	Version       int                      `yaml:"version"`
+	RNGSeed       int64                    `yaml:"rng_seed,omitempty"`
+	Network       Network                  `yaml:"network"`
+	Services      map[string]Service       `yaml:"services,omitempty"`
+	Profiles      map[string]GlobalProfile `yaml:"profiles,omitempty"` // global presets
+	UnknownFields []string                 `yaml:"-"`                  // top-level keys not in the known set (for warnings)
 }
 
 // knownManifestFields is the set of recognised top-level manifest keys.
@@ -77,6 +101,7 @@ var knownManifestFields = map[string]bool{
 	"rng_seed": true,
 	"network":  true,
 	"services": true,
+	"profiles": true,
 }
 
 // detectUnknownFields parses data as a YAML node and returns any top-level

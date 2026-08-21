@@ -1093,6 +1093,12 @@ def _op_receive_message(req, body, path_queue):
         mattr_names = []
     now = clock.now_unix()
     mc = store_collection("messages")
+    # Adapter-authored 'throttled' profile: alternate receives come back
+    # empty (real-service throttling feels like empty polls). Parity of a
+    # monotonic counter keeps it deterministic, unlike a chance roll.
+    if profile_active() == "throttled":
+        if store_kv_incr("sqs", "recv_seq." + name) % 2 == 0:
+            return _sqs_ok({})
     picked = []
     for m in _queue_messages_sorted(name):
         if now >= _to_int(m.get("visible_at_unix", "0")):

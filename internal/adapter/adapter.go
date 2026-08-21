@@ -7,6 +7,8 @@ package adapter
 import (
 	"fmt"
 	"os"
+	"regexp"
+	"sort"
 	"strings"
 
 	"stuntapi.com/stunt/internal/pathutil"
@@ -30,6 +32,11 @@ type Adapter struct {
 	Grpc       *GrpcSpec           `yaml:"grpc"`
 	Graphql    *GraphqlSpec        `yaml:"graphql"`
 	Websockets []WebsocketEndpoint `yaml:"ws"`
+
+	// Profiles are behavior modes the adapter itself authors: name ->
+	// one-line description. Handlers read the active one via the
+	// profile_active() builtin; the activation state lives in the engine.
+	Profiles map[string]string `yaml:"profiles,omitempty"`
 }
 
 // APISpec records which real upstream API (and which version of it) an adapter
@@ -209,8 +216,27 @@ func (a *Adapter) validate() error {
 		}
 		wsRoutes[ws.Route] = true
 	}
+	// Adapter-authored profiles are pure metadata (name -> description);
+	// keep the names activation-friendly: stable charset, short.
+	pnames := make([]string, 0, len(a.Profiles))
+	for p := range a.Profiles {
+		pnames = append(pnames, p)
+	}
+	sort.Strings(pnames)
+	for _, p := range pnames {
+		if p == "" || len(p) > 32 {
+			return fmt.Errorf("adapter: profile name %q must be 1-32 characters", p)
+		}
+		if !profileNameRe.MatchString(p) {
+			return fmt.Errorf("adapter: profile name %q contains invalid characters (allowed: lowercase letters, digits, hyphens)", p)
+		}
+	}
 	return nil
 }
+
+// profileNameRe constrains adapter-authored profile names (activation is a
+// CLI/dashboard action; keep the names shell- and URL-safe).
+var profileNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 // resolveHandlerPaths converts any endpoint handler script path from relative
 // (to the adapter dir) to absolute, preserving the "#function" fragment. It

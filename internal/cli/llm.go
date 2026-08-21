@@ -29,6 +29,18 @@ services in stunt.yaml; ` + "`stunt up`" + ` serves them on local ports.
   stunt doctor        # health check (run when something fails)
   stunt catalog search <q>   # find adapters (--json for machine output)
 
+## Profiles (runtime behavior modes, all declarative)
+Declare per service in stunt.yaml (profiles: rule bundles), author in adapter.yaml
+(profiles: modes, read via profile_active()), compose as global presets (top-level
+profiles: name -> set: service -> profile). Activate at runtime — resets on restart;
+stunt up --profile <name> for a boot default. Bare-name activation resolves a preset,
+else a name exactly one service defines; errors list everything available.
+  profile list [--json]         everything activatable + what is active
+  profile show <name>           one profile, where it is defined/active
+  profile activate <name> [--service svc]
+  profile deactivate [--service svc|all]
+Dashboard: profiles panel (presets + per-service selects). API: GET/POST /api/profile.
+
 ## Dashboard (every ` + "`stunt up`" + `)
 Each running server serves its OWN localhost dashboard (loopback + token auth): a live
 request inspector (HTTP/gRPC/WS, bodies, copy-as-curl, replay), a STATE browser
@@ -107,6 +119,7 @@ Builtins:
   tok = identity_mint(subject, scopes=[...]); sub = identity_validate(token); identity_has_scope(token,scope)
   events_register(url); events_emit(event_type, payload?, headers?)   # headers: optional dict set on the webhook POST
   events_target()                            # the service's registered webhook URL (for URL-in-MAC schemes: Twilio, Square)
+  profile_active()                           # THIS service's active behavior profile name (None if none) — branch to codify adapter-authored modes
   events_body(type, payload?)               # EXACT on-wire JSON body events_emit will POST — MAC this for signing
   crypto.hmac_sha256/sha1(key, data, encoding?)  # MAC → hex (default) or "base64"; also sha256, base64_encode/decode, base64url_encode/decode
   crypto.ecdsa_sign_p256/verify(priv/pub_pem, data, sig, encoding="hex")  # ES256 raw r‖s

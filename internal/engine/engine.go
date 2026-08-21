@@ -74,6 +74,14 @@ type Engine struct {
 	// recorders, so captured entries have globally-unique, ascending Seq values
 	// (unique row labels + gap-free ordering for the live feed).
 	seq *atomic.Int64
+
+	// Active profile state: per-service active profile name (declared in
+	// stunt.yaml or authored by the adapter) plus the global preset name
+	// that produced the current assignment ("" when set per-service).
+	// Runtime-only: resets on restart. profileMu guards both.
+	profileMu     sync.RWMutex
+	activeProfile map[string]string
+	activeGlobal  string
 }
 
 // serviceState holds the per-service runtime for an adapter-backed service:
@@ -115,14 +123,15 @@ func New(m *manifest.Manifest, opts ...Option) (*Engine, error) {
 // newEngine is the testable constructor that accepts an explicit cache root.
 func newEngine(m *manifest.Manifest, cacheRoot string, opts ...Option) (*Engine, error) {
 	e := &Engine{
-		manifest:   m,
-		states:     make(map[string]*serviceState),
-		cacheRoot:  cacheRoot,
-		wsSem:      make(chan struct{}, wsMaxConcurrentConns),
-		shutdownCh: make(chan struct{}),
-		logger:     log.New(os.Stderr, "", 0),
-		loadErrors: make(map[string]error),
-		clock:      clock.NewClock(),
+		manifest:      m,
+		states:        make(map[string]*serviceState),
+		cacheRoot:     cacheRoot,
+		wsSem:         make(chan struct{}, wsMaxConcurrentConns),
+		shutdownCh:    make(chan struct{}),
+		logger:        log.New(os.Stderr, "", 0),
+		loadErrors:    make(map[string]error),
+		clock:         clock.NewClock(),
+		activeProfile: make(map[string]string),
 	}
 	// Apply options before any service is built: the clock is baked into each
 	// service's handler builtins during buildServiceState, so it must be final.
@@ -152,7 +161,7 @@ func newEngine(m *manifest.Manifest, cacheRoot string, opts ...Option) (*Engine,
 		if svc.Adapter == "" {
 			continue // rules-only service — no state needed
 		}
-		st, err := buildServiceState(name, svc, stateDir, manifestDir, cacheRoot, m.RNGSeed, e.clock)
+		st, err := buildServiceState(name, svc, stateDir, manifestDir, cacheRoot, m.RNGSeed, e.clock, e.profileGetter(name))
 		if err != nil {
 			// Best-effort: log the error and continue serving the rest.
 			// A single broken service must not prevent the good ones from
@@ -238,7 +247,7 @@ func resolveAdapterDir(spec, cacheRoot, manifestDir string) (string, error) {
 // The per-service issuer secret is derived deterministically from
 // sha256(rngSeed:serviceName) so that restarting the engine with the same
 // seed produces a compatible issuer (tokens survive restarts).
-func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir, cacheRoot string, rngSeed int64, clk *clock.Clock) (*serviceState, error) {
+func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir, cacheRoot string, rngSeed int64, clk *clock.Clock, profileOf func() string) (*serviceState, error) {
 	dir, err := resolveAdapterDir(svc.Adapter, cacheRoot, manifestDir)
 	if err != nil {
 		return nil, err
@@ -328,13 +337,14 @@ func buildServiceState(name string, svc manifest.Service, stateDir, manifestDir,
 		issuer:    issuer,
 		emitter:   emitter,
 		builtins: runtime.BuildAllBuiltins(runtime.BuiltinOptions{
-			Store:       store,
-			KV:          kvStore,
-			Blob:        blobStore,
-			Issuer:      issuer,
-			Emitter:     emitter,
-			Clock:       clk,
-			ServiceName: name,
+			Store:         store,
+			KV:            kvStore,
+			Blob:          blobStore,
+			Issuer:        issuer,
+			Emitter:       emitter,
+			Clock:         clk,
+			ServiceName:   name,
+			ActiveProfile: profileOf,
 		}),
 		vms:          make(map[string]*starlark.VM),
 		handlerLocks: newKeyedMutex(),
@@ -489,6 +499,28 @@ func (e *Engine) serviceHandler(name string, svc manifest.Service) http.Handler 
 				writeStatus(w, http.StatusBadRequest, `{"error":"failed to read request body"}`)
 				return
 			}
+		}
+
+		// --- Active profile override layer ---
+		// Unlike base rules (which only fire when no handler endpoint
+		// matched), an active profile's rules are evaluated BEFORE adapter
+		// dispatch — a profile must be able to intercept handler-backed
+		// routes, or "make this service flake" would be a no-op. WS
+		// upgrades and GraphQL keep their earlier precedence: they are
+		// transport dispatches that never reach the body read above.
+		if pname := e.Profile(name); pname != "" {
+			if pset, ok := svc.Profiles[pname]; ok && len(pset.Rules) > 0 {
+				req := rules.Request{Method: r.Method, Path: r.URL.Path, Headers: headerMap(r.Header), Body: body}
+				rulesMu.Lock()
+				d := rules.Evaluate(req, pset.Rules, rng, fk, baseDir)
+				rulesMu.Unlock()
+				if d.Matched {
+					applyDecision(w, r, d)
+					return
+				}
+			}
+			// Adapter-authored profiles carry no rules here — their
+			// handlers read profile_active() directly. Fall through.
 		}
 
 		// --- adapter-backed dispatch ---
