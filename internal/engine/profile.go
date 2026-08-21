@@ -99,6 +99,11 @@ func (e *Engine) SetProfile(name string) error {
 // SetServiceProfile activates (or, with "", clears) one service's profile.
 func (e *Engine) SetServiceProfile(service, name string) error {
 	if name == "" {
+		// Deactivate is also a probe: a typo'd service should error, not
+		// report a silent success.
+		if _, _, err := e.serviceExists(service); err != nil {
+			return err
+		}
 		e.profileMu.Lock()
 		delete(e.activeProfile, service)
 		// A per-service change no longer matches the global assignment, if any.
@@ -122,6 +127,11 @@ func (e *Engine) checkServiceProfile(service, name string) (profileDef, error) {
 	if len(defs) == 0 {
 		if _, _, err := e.serviceExists(service); err != nil {
 			return profileDef{}, err
+		}
+		// A failed adapter load hides its authored profiles — say so rather
+		// than a bare "defines no profiles".
+		if _, broken := e.loadErrors[service]; broken {
+			return profileDef{}, fmt.Errorf("service %s defines no profiles (its adapter failed to load, so adapter-authored profiles are unavailable). %s", service, e.describeAvailable())
 		}
 		return profileDef{}, fmt.Errorf("service %s defines no profiles. %s", service, e.describeAvailable())
 	}

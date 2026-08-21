@@ -175,6 +175,11 @@ func TestProfileResolutionErrors(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "unknown service") {
 		t.Fatalf("unknown-service error = %v", err)
 	}
+	// Deactivating a typo'd service errors too, not a silent success.
+	err = e.SetServiceProfile("ghost", "")
+	if err == nil || !strings.Contains(err.Error(), "unknown service") {
+		t.Fatalf("deactivate unknown service = %v, want error", err)
+	}
 }
 
 // The catalog exposes presets and per-service profiles with their source.
