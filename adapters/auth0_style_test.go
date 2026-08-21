@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -367,6 +368,196 @@ func TestAuth0CodeFlowEndToEnd(t *testing.T) {
 	if replay.Status != 400 || replay.Body["error"] != "invalid_grant" {
 		t.Fatalf("code replay -> %d %v, want 400 invalid_grant", replay.Status, replay.Body)
 	}
+
+	// Exchanging against a different redirect_uri than the authorize request
+	// is rejected (OAuth2 code-interchange binding) — even one the client
+	// has registered.
+	mismatchAuth := f.oidcCall("on_authorize", "GET", "/authorize", map[string]any{
+		"client_id":     auth0ClientID,
+		"redirect_uri":  auth0RedirectURI,
+		"response_type": "code",
+		"state":         "s9",
+	}, nil, nil)
+	if mismatchAuth.Status != 302 {
+		t.Fatalf("authorize for redirect_uri mismatch -> %d", mismatchAuth.Status)
+	}
+	mismatchCode := locationQueryValue(mismatchAuth.Headers["Location"], "code")
+	mismatch := f.oidcCall("on_token", "POST", "/oauth/token", nil, map[string]any{
+		"grant_type":    "authorization_code",
+		"code":          mismatchCode,
+		"client_id":     auth0ClientID,
+		"client_secret": auth0ClientSecret,
+		"redirect_uri":  "https://demo.example.test/cb",
+	}, nil)
+	if mismatch.Status != 400 || mismatch.Body["error"] != "invalid_grant" {
+		t.Fatalf("redirect_uri mismatch exchange -> %d %v, want 400 invalid_grant", mismatch.Status, mismatch.Body)
+	}
+}
+
+// TestAuth0AuthCodeExpiry: authorization codes live 5 minutes; past that
+// window the exchange answers invalid_grant (virtual clock, no waiting).
+func TestAuth0AuthCodeExpiry(t *testing.T) {
+	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
+
+	authResp := f.oidcCall("on_authorize", "GET", "/authorize", map[string]any{
+		"client_id":     auth0ClientID,
+		"redirect_uri":  auth0RedirectURI,
+		"response_type": "code",
+		"state":         "s0",
+	}, nil, nil)
+	if authResp.Status != 302 {
+		t.Fatalf("authorize -> %d: %v", authResp.Status, authResp.Body)
+	}
+	code := locationQueryValue(authResp.Headers["Location"], "code")
+	if code == "" {
+		t.Fatalf("authorize Location %q carries no code", authResp.Headers["Location"])
+	}
+
+	f.vc.Advance(6 * time.Minute)
+
+	resp := f.oidcCall("on_token", "POST", "/oauth/token", nil, map[string]any{
+		"grant_type":    "authorization_code",
+		"code":          code,
+		"client_id":     auth0ClientID,
+		"client_secret": auth0ClientSecret,
+		"redirect_uri":  auth0RedirectURI,
+	}, nil)
+	if resp.Status != 400 || resp.Body["error"] != "invalid_grant" {
+		t.Fatalf("expired code exchange -> %d %v, want 400 invalid_grant", resp.Status, resp.Body)
+	}
+}
+
+// TestAuth0PaginationZeroBasedPages: page is ZERO-based (Auth0 semantics) —
+// walking pages 0..2 with per_page=2 over the 3 seeded users returns every
+// user exactly once (no duplicated first page), an empty third page, and
+// the include_totals summary matches Auth0's documented field meanings
+// (start = first index of the page, limit = per_page, length = rows on
+// this page, total = whole filtered count).
+func TestAuth0PaginationZeroBasedPages(t *testing.T) {
+	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
+	token := f.mgmtToken()
+
+	type summary struct {
+		start, limit, length, total int64
+	}
+	want := []summary{{0, 2, 2, 3}, {2, 2, 1, 3}, {4, 2, 0, 3}}
+	seen := map[string]int{}
+	for page := 0; page < len(want); page++ {
+		resp := f.mgmtCall("on_users_list", "GET", "/api/v2/users", "", token, nil,
+			map[string]string{"page": strconv.Itoa(page), "per_page": "2", "include_totals": "true"})
+		if resp.Status != 200 {
+			t.Fatalf("page %d -> %d: %v", page, resp.Status, resp.Body)
+		}
+		w := want[page]
+		for field, val := range map[string]int64{
+			"start": w.start, "limit": w.limit, "length": w.length, "total": w.total,
+		} {
+			if resp.Body[field] != val {
+				t.Fatalf("page %d summary[%q] = %v, want %d (envelope %v)", page, field, resp.Body[field], val, resp.Body)
+			}
+		}
+		users, _ := resp.Body["users"].([]any)
+		if int64(len(users)) != w.length {
+			t.Fatalf("page %d returned %d users, want %d", page, len(users), w.length)
+		}
+		for _, u := range users {
+			seen[u.(map[string]any)["user_id"].(string)]++
+		}
+	}
+	if len(seen) != 3 {
+		t.Fatalf("walk covered %d distinct users, want all 3 seeded", len(seen))
+	}
+	for uid, n := range seen {
+		if n != 1 {
+			t.Fatalf("user %s appeared %d times across pages, want exactly once (1-based-page regression)", uid, n)
+		}
+	}
+}
+
+// TestAuth0ControlCharClaims: claim values are client input, so control
+// characters must be \u00XX-escaped in the hand-built JWT payloads — the
+// id_token must decode with a standards-compliant JSON parser, and a
+// machine-to-machine token with a control-char audience must survive this
+// adapter's own payload verification instead of 401-ing forever.
+func TestAuth0ControlCharClaims(t *testing.T) {
+	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
+
+	signup := f.oidcCall("on_signup", "POST", "/dbconnections/signup", nil, map[string]any{
+		"client_id": auth0ClientID,
+		"email":     "ctrl@example.test",
+		"password":  "CtrlPass123!",
+		"nickname":  "a\x01b",
+	}, nil)
+	if signup.Status != 200 {
+		t.Fatalf("signup with control-char nickname -> %d: %v", signup.Status, signup.Body)
+	}
+
+	issued := f.codeFlow("ctrl@example.test")
+	idToken := issued["id_token"].(string)
+	segs := strings.Split(idToken, ".")
+	payload, err := base64.RawURLEncoding.DecodeString(segs[1])
+	if err != nil {
+		t.Fatalf("id_token payload base64url: %v", err)
+	}
+	var claims map[string]any
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		t.Fatalf("id_token payload is not valid JSON (raw control char?): %v\npayload: %q", err, string(payload))
+	}
+	if claims["nickname"] != "a\x01b" {
+		t.Fatalf("nickname claim = %q, want the control character round-tripped", claims["nickname"])
+	}
+
+	cc := f.oidcCall("on_token", "POST", "/oauth/token", nil, map[string]any{
+		"grant_type":    "client_credentials",
+		"client_id":     auth0ClientID,
+		"client_secret": auth0ClientSecret,
+		"audience":      "https://ctrl.test/api\x07",
+	}, nil)
+	if cc.Status != 200 {
+		t.Fatalf("client_credentials with control-char audience -> %d: %v", cc.Status, cc.Body)
+	}
+	list := f.mgmtCall("on_users_list", "GET", "/api/v2/users", "", cc.Body["access_token"].(string), nil, nil)
+	if list.Status != 200 {
+		t.Fatalf("management with control-char-audience token -> %d: %v (must round-trip, not 401)", list.Status, list.Body)
+	}
+}
+
+// TestAuth0PatchDuplicateEmail: email stays tenant-unique across PATCH —
+// patching onto another user's address is a 409 in the management envelope,
+// while a fresh address and re-asserting your own both succeed.
+func TestAuth0PatchDuplicateEmail(t *testing.T) {
+	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
+	token := f.mgmtToken()
+
+	created := f.mgmtCall("on_user_create", "POST", "/api/v2/users", "", token, map[string]any{
+		"email":    "bob@example.test",
+		"password": "BobPass123!",
+	}, nil)
+	if created.Status != 201 {
+		t.Fatalf("create user -> %d: %v", created.Status, created.Body)
+	}
+	uid := created.Body["user_id"].(string)
+
+	conflict := f.mgmtCall("on_user_patch", "PATCH", "/api/v2/users/"+uid, uid, token,
+		map[string]any{"email": "ada@example.test"}, nil)
+	if conflict.Status != 409 || conflict.Body["error"] != "Conflict" {
+		t.Fatalf("patch onto ada's email -> %d %v, want 409 Conflict envelope", conflict.Status, conflict.Body)
+	}
+	if conflict.Body["message"] != "The user already exists." {
+		t.Fatalf("409 message = %v", conflict.Body["message"])
+	}
+
+	moved := f.mgmtCall("on_user_patch", "PATCH", "/api/v2/users/"+uid, uid, token,
+		map[string]any{"email": "carol@example.test"}, nil)
+	if moved.Status != 200 || moved.Body["email"] != "carol@example.test" {
+		t.Fatalf("patch to a fresh email -> %d %v, want 200", moved.Status, moved.Body)
+	}
+
+	self := f.mgmtCall("on_user_patch", "PATCH", "/api/v2/users/auth0|a1b2c3", "auth0|a1b2c3", token,
+		map[string]any{"email": "ada@example.test"}, nil)
+	if self.Status != 200 {
+		t.Fatalf("patch re-asserting own email -> %d %v, want 200 (self-identity must not 409)", self.Status, self.Body)
+	}
 }
 
 // TestAuth0AuthorizeValidation: unknown client, unregistered redirect_uri,
@@ -629,16 +820,17 @@ func TestAuth0ManagementUsersCRUD(t *testing.T) {
 	}
 
 	paged := f.mgmtCall("on_users_list", "GET", "/api/v2/users", "", token, nil,
-		map[string]string{"page": "2", "per_page": "2", "include_totals": "true"})
+		map[string]string{"page": "1", "per_page": "2", "include_totals": "true"})
 	if paged.Status != 200 {
 		t.Fatalf("paged users -> %d: %v", paged.Status, paged.Body)
 	}
-	if paged.Body["length"] != int64(3) || paged.Body["limit"] != int64(2) || paged.Body["start"] != int64(2) {
+	if paged.Body["start"] != int64(2) || paged.Body["limit"] != int64(2) ||
+		paged.Body["length"] != int64(1) || paged.Body["total"] != int64(3) {
 		t.Fatalf("include_totals envelope = %v", paged.Body)
 	}
 	users2, _ := paged.Body["users"].([]any)
 	if len(users2) != 1 {
-		t.Fatalf("page 2 of per_page=2 has %d users, want 1", len(users2))
+		t.Fatalf("zero-based page 1 of per_page=2 has %d users, want 1", len(users2))
 	}
 	badPage := f.mgmtCall("on_users_list", "GET", "/api/v2/users", "", token, nil,
 		map[string]string{"per_page": "101"})

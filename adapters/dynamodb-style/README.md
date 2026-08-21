@@ -240,6 +240,9 @@ documented divergence; real DynamoDB serializes item writes per key.
    caps** are not modeled; the per-table 25-key cap is enforced.
 10. **UpdateItem always re-adds the key attributes** (REMOVE on a key
     attribute silently no-ops instead of erroring).
+11. **Non-canonical number strings** (".5", "5.", "01") are accepted where
+    real DynamoDB rejects them; numbers are compared/stored after
+    normalization, so they behave as their canonical value.
 
 ## API version
 

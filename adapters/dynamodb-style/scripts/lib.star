@@ -545,7 +545,8 @@ def _strip_zeros_right(s):
 
 # _dec_parts splits a decimal string into [neg(0/1), intDigits, fracDigits]
 # normalized (no sign/dot, no leading zeros on the int part, no trailing
-# zeros on the fraction). Returns None when malformed.
+# zeros on the fraction; negative zero collapses to positive zero so "-0"
+# and "0" are one number, like real DynamoDB). Returns None when malformed.
 def _dec_parts(s):
     if not _dec_ok(s):
         return None
@@ -565,6 +566,8 @@ def _dec_parts(s):
     fp = _strip_zeros_right(fp)
     if ip == "":
         ip = "0"
+    if neg == 1 and ip == "0" and fp == "":
+        neg = 0
     return [neg, ip, fp]
 
 # _unsigned_dec_cmp compares two unsigned decimals given their normalized
@@ -731,6 +734,33 @@ def _attr_scalar(v):
         return "1"
     return str(v[t])
 
+# _ns_member reports whether a number-set member list already contains val
+# (numeric equality after normalization — "1" == "1.0" == "01").
+def _ns_member(members, val):
+    p = _dec_parts(val)
+    if p == None:
+        return False
+    for m in members:
+        q = _dec_parts(m)
+        if q != None and p[0] == q[0] and p[1] == q[1] and p[2] == q[2]:
+            return True
+    return False
+
+# _set_has_dup reports duplicate set members: exact string equality for
+# SS/BS, numeric equality for NS (real DynamoDB rejects both forms).
+def _set_has_dup(members, t):
+    if t == "NS":
+        for i in range(len(members)):
+            for j in range(i + 1, len(members)):
+                if _ns_member([members[i]], members[j]):
+                    return True
+        return False
+    for i in range(len(members)):
+        for j in range(i + 1, len(members)):
+            if members[i] == members[j]:
+                return True
+    return False
+
 # _validate_attr_value returns "" when v is a well-formed typed attribute
 # value, else a ValidationException message fragment. Iterative (work
 # stack): this Starlark dialect rejects recursive function calls, and L/M
@@ -763,6 +793,8 @@ def _validate_attr_value(v):
                     return "One or more parameter values were invalid: set members must be strings"
                 if t == "NS" and not _dec_ok(e):
                     return "One or more parameter values were invalid: NS members must be numeric"
+            if _set_has_dup(cur[t], t):
+                return "One or more parameter values were invalid: Input collection contains duplicates"
         elif t == "L":
             if type(cur[t]) != "list":
                 return "Supplied AttributeValue is empty; it must contain exactly one supported type"
@@ -827,6 +859,19 @@ def _stable_encode(v):
         out = out + t + ":" + _attr_scalar(cur) + ";"
     return out
 
+# _esc_key escapes the doc-id join separator (and the escape char itself)
+# inside an encoded key value so encoding is injective: pk "a" + sk "b|S:c"
+# can no longer collide with pk "a|S:b" + sk "c".
+def _esc_key(s):
+    out = ""
+    for i in range(len(s)):
+        ch = s[i]
+        if ch == "\\" or ch == "|":
+            out = out + "\\" + ch
+        else:
+            out = out + ch
+    return out
+
 # _encode_typed renders a typed value for the item-collection doc id
 # ("S:abc", "N:12", ...). Key attributes are always S/N/B, so the encoding
 # is self-contained and matches the seed fixtures exactly; N is normalized
@@ -838,7 +883,7 @@ def _encode_typed(v):
         if p != None:
             return "N:" + str(p[0]) + "-" + p[1] + "." + p[2]
     if t == "S" or t == "B":
-        return t + ":" + _attr_scalar(v)
+        return t + ":" + _esc_key(_attr_scalar(v))
     return _stable_encode(v)
 
 # _typed_cmp totally orders two typed values: N numerically, S/B/BOOL
@@ -985,6 +1030,10 @@ def _key_id(table_doc, key):
         m = _validate_attr_value(kv[name])
         if m != "":
             return ["", m]
+        # Real DynamoDB rejects empty primary-key values (non-key S attrs
+        # may stay empty — see _validate_attr_value).
+        if (want == "S" or want == "B") and _attr_scalar(kv[name]) == "":
+            return ["", "One or more parameter values were invalid: Empty attribute value for key " + name]
     id = table_doc.get("name", "") + "|" + _encode_typed(kv[h])
     if r != "":
         id = id + "|" + _encode_typed(kv[r])
@@ -1022,7 +1071,9 @@ def _upsert_item(key_id, table_name, key, attrs):
 # The documented subset: identifiers, #name / :value placeholders, the
 # comparators (= <> < <= > >=), commas, parens, and bare keywords. A "."
 # inside an identifier is captured so document paths can be REJECTED with
-# a clear message. Returns None on an unsupported character.
+# a clear message. Returns None on an unsupported character OR a
+# token-initial "." (a zero-length token would otherwise loop forever
+# without advancing i and burn the VM step budget -> 500).
 def _tok(s):
     toks = []
     i = 0
@@ -1058,6 +1109,8 @@ def _tok(s):
                     j = j + 1
                 else:
                     break
+            if j == i:
+                return None  # lone/dangling "." — not a token
             toks.append(s[i:j])
             i = j
             continue
@@ -1154,9 +1207,15 @@ def _parse_condition(expr, kind, names, values):
     toks = _tok(expr)
     if toks == None:
         return [None, _validation_err("Invalid " + kind + " syntax: " + expr)]
+    if len(toks) == 0:
+        return [None, _validation_err("Invalid " + kind + ": the expression is empty")]
     pos = [0]
     terms = []
-    while pos[0] < len(toks):
+    while True:
+        # A term is required at this position (start, or right after AND) —
+        # a dangling AND must not be silently accepted.
+        if pos[0] >= len(toks):
+            return [None, _validation_err("Invalid " + kind + ": the expression ended unexpectedly")]
         term = _parse_cond_term(toks, pos, names, values)
         if type(term) == "dict":
             return [None, term]
@@ -1175,8 +1234,6 @@ def _parse_condition(expr, kind, names, values):
         if nxt == "(" or nxt == ")":
             return [None, _validation_err("Parenthesized groups are not supported by this simulator's expression subset")]
         return [None, _validation_err("Invalid " + kind + " syntax near: " + nxt)]
-    if len(terms) == 0:
-        return [None, _validation_err("Invalid " + kind + ": the expression is empty")]
     return [terms, None]
 
 _CMP_OPS = ["=", "<>", "<", "<=", ">", ">="]
@@ -1470,6 +1527,8 @@ def _parse_update(expr, names, values):
                 nxt = _peek(toks, pos)
                 if nxt == ",":
                     pos[0] = pos[0] + 1
+                    if pos[0] >= len(toks):
+                        return [None, _validation_err("Invalid UpdateExpression: trailing comma")]
                     continue
                 break
         elif up == "REMOVE":
@@ -1482,6 +1541,8 @@ def _parse_update(expr, names, values):
                 nxt = _peek(toks, pos)
                 if nxt == ",":
                     pos[0] = pos[0] + 1
+                    if pos[0] >= len(toks):
+                        return [None, _validation_err("Invalid UpdateExpression: trailing comma")]
                     continue
                 break
         elif up == "ADD":
@@ -1498,6 +1559,8 @@ def _parse_update(expr, names, values):
                 nxt = _peek(toks, pos)
                 if nxt == ",":
                     pos[0] = pos[0] + 1
+                    if pos[0] >= len(toks):
+                        return [None, _validation_err("Invalid UpdateExpression: trailing comma")]
                     continue
                 break
         elif up == "DELETE":
@@ -1547,7 +1610,12 @@ def _apply_update(attrs, actions):
                     merged.append(str(e))
                 for e in a[2][ot]:
                     s = str(e)
-                    if s not in merged:
+                    # NS members dedupe numerically ("1" vs "1.0" is one
+                    # element), consistent with set validation.
+                    if ot == "NS":
+                        if not _ns_member(merged, s):
+                            merged.append(s)
+                    elif s not in merged:
                         merged.append(s)
                 out[name] = {ot: merged}
                 touched[name] = True
@@ -1559,11 +1627,14 @@ def _apply_update(attrs, actions):
 # ProjectionExpression (top-level names only)
 # ====================================================================
 
-# _project returns [projectedItem, None] or [None, errorResponse].
-def _project(item, body):
+# _projection_fields parses + validates ProjectionExpression into a field
+# list. Returns [fields, None] or [None, errorResponse]; fields == [] means
+# "no projection". Callers validate BEFORE any existence/emptiness
+# early-return so a bad projection always 400s, even on a miss.
+def _projection_fields(body):
     proj = body.get("ProjectionExpression", None)
     if proj == None or proj == "":
-        return [item, None]
+        return [[], None]
     names = _expr_names(body)
     toks = _tok(proj)
     if toks == None:
@@ -1578,11 +1649,17 @@ def _project(item, body):
         fields.append(rp[0])
     if len(fields) == 0:
         return [None, _validation_err("Invalid ProjectionExpression: no attributes found")]
+    return [fields, None]
+
+# _project applies parsed fields to an item (fields == [] -> item verbatim).
+def _project(item, fields):
+    if len(fields) == 0:
+        return item
     out = {}
     for f in fields:
         if f in item:
             out[f] = item[f]
-    return [out, None]
+    return out
 
 # ====================================================================
 # Response helpers

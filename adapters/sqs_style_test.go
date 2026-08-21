@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -338,7 +339,8 @@ func TestSQSSigV4Verification(t *testing.T) {
 // extends the window, DeleteMessage removes the message for good, and stale
 // handles fail with ReceiptHandleIsInvalid.
 func TestSQSVisibilityTimeoutLifecycle(t *testing.T) {
-	f := newSQSFixture(t, time.Date(2026, 1, 20, 12, 0, 0, 0, time.UTC))
+	start := time.Date(2026, 1, 20, 12, 0, 0, 0, time.UTC)
+	f := newSQSFixture(t, start)
 
 	if resp := f.svcCall("CreateQueue", map[string]any{"QueueName": "jobs"}); resp.Status != 200 {
 		t.Fatalf("CreateQueue -> %d: %v", resp.Status, resp.Body)
@@ -401,8 +403,13 @@ func TestSQSVisibilityTimeoutLifecycle(t *testing.T) {
 	if attrs1["ApproximateReceiveCount"] != "1" {
 		t.Fatalf("ApproximateReceiveCount = %v, want 1", attrs1["ApproximateReceiveCount"])
 	}
-	if attrs1["SentTimestamp"] == "" {
-		t.Fatalf("SentTimestamp missing: %v", attrs1)
+	// Message system attributes are epoch milliseconds on the SQS wire
+	// (queue attributes stay seconds) — see _message_attribute_map.
+	if attrs1["SentTimestamp"] != fmt.Sprintf("%d", start.Unix()*1000) {
+		t.Fatalf("SentTimestamp = %v, want sent-at epoch ms %d", attrs1["SentTimestamp"], start.Unix()*1000)
+	}
+	if attrs1["ApproximateFirstReceiveTimestamp"] != fmt.Sprintf("%d", start.Add(10*time.Second).Unix()*1000) {
+		t.Fatalf("ApproximateFirstReceiveTimestamp = %v, want first-receive epoch ms", attrs1["ApproximateFirstReceiveTimestamp"])
 	}
 
 	// While in flight (before the 5s override lapses) nothing is receivable

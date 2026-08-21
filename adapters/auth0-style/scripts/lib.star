@@ -76,7 +76,17 @@ def _contains(s, substr):
     return s.find(substr) >= 0
 
 # _jstr renders s as a JSON string literal (quotes included, minimal
-# escaping) for the hand-built JWT claim payloads.
+# escaping) for the hand-built JWT claim payloads. Every control character
+# (and DEL) is \u00XX-escaped: a raw control byte inside a JSON string is
+# invalid RFC 8259, and claim values come from client input (signup
+# nickname, token audience) — an unparseable payload would strand the token
+# at 401 in this adapter's own _jwt_json and in every standards-compliant
+# JWT library.
+_HEX = "0123" + "4567" + "89" + "abcdef"
+
+def _hex2(code):
+    return _HEX[(code // 16) % 16] + _HEX[code % 16]
+
 def _jstr(s):
     if s == None:
         return '""'
@@ -91,6 +101,8 @@ def _jstr(s):
             out = out + "\\r"
         elif ch == "\t":
             out = out + "\\t"
+        elif ord(ch) < 0x20 or ord(ch) == 0x7f:
+            out = out + "\\u00" + _hex2(ord(ch))
         else:
             out = out + ch
     return '"' + out + '"'
@@ -395,8 +407,6 @@ def _find_user_by_email(email):
 
 # _seq_tag renders the KV sequence as a 6-char hex-ish tag so generated
 # user ids keep the auth0|<token> shape.
-_HEX = "0123" + "4567" + "89" + "abcdef"
-
 def _seq_tag(seq):
     digits = ""
     n = seq
@@ -517,36 +527,36 @@ def _rotate_user_tokens(req, user, client_id):
 # List paging (page/per_page — the Auth0 v2 convention)
 # ====================================================================
 
-# Auth0 lists page by per_page/page (no cursor), so the paginate builtin's
-# cursor is fed the computed offset of the requested page.
+# Auth0 lists page by per_page/page (page is ZERO-based; page 0 is the
+# first page), so the paginate builtin's cursor is fed the computed offset
+# of the requested page: offset = page * per_page.
 _PER_PAGE_DEFAULT = 50
 _PER_PAGE_MAX = 100
 
-# _page_window validates per_page/page. Returns [per_page, page, err_resp].
+# _page_window validates per_page and resolves the zero-based page index.
+# Returns [per_page, page, err_resp]. A missing or unparsable page is page
+# 0 (the Auth0 default); a page past the end simply yields an empty window.
 def _page_window(req):
     q = req["query"]
     per_page = _to_int(q.get("per_page", ""))
     page = _to_int(q.get("page", ""))
     if per_page == 0:
         per_page = _PER_PAGE_DEFAULT
-    if page == 0:
-        page = 1
     if per_page < 1 or per_page > _PER_PAGE_MAX:
         return [0, 0, _mgmt_err(400, "Bad Request",
             "per_page must be 1 to " + str(_PER_PAGE_MAX), "invalid_query_string")]
-    if page < 1:
-        return [0, 0, _mgmt_err(400, "Bad Request",
-            "page must be greater than or equal to 1", "invalid_query_string")]
     return [per_page, page, None]
 
 # _paged_view slices the (already filtered + sorted) view and answers with
 # the bare-array or include_totals envelope under list_key ("users" /
-# "roles").
+# "roles"). Per the real summary: start/limit describe the page's slice of
+# the result set, length is how many rows this page carries, total is the
+# whole filtered count.
 def _paged_view(view, req, list_key):
     per_page, page, err = _page_window(req)
     if err != None:
         return err
-    offset = (page - 1) * per_page
+    offset = page * per_page
     window, _nxt = paginate(view, per_page, str(offset))
     if window == None:
         return _mgmt_err(400, "Bad Request", "Invalid page", "invalid_query_string")
@@ -554,7 +564,8 @@ def _paged_view(view, req, list_key):
         return respond(200, {
             "start": offset,
             "limit": per_page,
-            "length": len(view),
+            "length": len(window),
+            "total": len(view),
             list_key: window,
         })
     return respond(200, window)

@@ -758,10 +758,13 @@ def _attr_value(q, counts, name):
     return str(attrs.get(name, ""))
 
 def _message_attribute_map(m):
+    # Message system attributes are epoch milliseconds on the SQS wire;
+    # internally the queue keeps seconds, so convert at this boundary
+    # (queue attributes like CreatedTimestamp stay seconds — as real SQS).
     return {
-        "SentTimestamp": m.get("sent_at_unix", "0"),
+        "SentTimestamp": str(_to_int(m.get("sent_at_unix", "0")) * 1000),
         "ApproximateReceiveCount": str(_as_num(m.get("receive_count", 0))),
-        "ApproximateFirstReceiveTimestamp": m.get("first_receive_unix", "0"),
+        "ApproximateFirstReceiveTimestamp": str(_to_int(m.get("first_receive_unix", "0")) * 1000),
         "SenderId": _SENDER_ID,
     }
 

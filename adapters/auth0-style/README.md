@@ -29,9 +29,11 @@ no real API data is included.
 - **Revocation:** `POST /oauth/revoke` — idempotent 200 (RFC 7009).
 - **Signup:** `POST /dbconnections/signup` — email/password user creation; new
   users start unverified.
-- **Management API v2** (Bearer): user CRUD with `q` search and `page`/`per_page`
-  paging (`include_totals=true` switches to the `{start, limit, length, users}`
-  envelope), and roles list/create/assign/unassign per user.
+- **Management API v2** (Bearer): user CRUD with `q` search and zero-based
+  `page`/`per_page` paging (`include_totals=true` adds the Auth0 summary
+  `{start, limit, length, total, users}` — `length` is this page's rows,
+  `total` the whole filtered count), and roles list/create/assign/unassign
+  per user.
 
 Tokens are **real, decodable RS256 JWTs** signed with a fixed synthetic RSA-2048
 keypair (kid `mock-auth0-key-1`). The JWKS endpoint serves the public half (via
@@ -159,7 +161,9 @@ Deliberate simplifications — none of them call the network:
 - **`q` search is reduced** to `field:"value"` exact matches on
   email/name/nickname/user_id (via `query_select`) or a bare substring term over
   the same fields — not Lucene. Checkpoint pagination (`from`/`take`) is not
-  implemented; only `page`/`per_page` (max 100).
+  implemented; only `page` (zero-based)/`per_page` (max 100). An out-of-range
+  page answers an empty `users` array with the echoed `start`; a non-numeric
+  `page`/`per_page` coerces to the defaults instead of a 400.
 - **No scope enforcement on the Management API**: any valid RS256 access token
   (user or machine-to-machine) may call `/api/v2/*`; `scope`/permission claims are
   minted but not checked.

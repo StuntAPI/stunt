@@ -333,13 +333,15 @@ def _op_get_item(body):
     kid, kiderr = _key_id(tdoc, body.get("Key", None))
     if kiderr != "":
         return _validation_err(kiderr)
+    # Projection validated before the miss early-return: a bad
+    # ProjectionExpression must 400 even when the item does not exist.
+    fields, ferr = _projection_fields(body)
+    if ferr != None:
+        return ferr
     out = {}
     doc = _items().get(kid)
     if doc != None:
-        proj, perr = _project(doc.get("attrs", {}), body)
-        if perr != None:
-            return perr
-        out["Item"] = proj
+        out["Item"] = _project(doc.get("attrs", {}), fields)
     cap = _capacity(body, tdoc.get("name", ""))
     if cap != None:
         out["ConsumedCapacity"] = cap
@@ -509,6 +511,8 @@ def _op_query(body):
     tdoc, err = _require_table(body, "Cannot do operations on a non-existent table")
     if err != None:
         return err
+    if "IndexName" in body:
+        return _validation_err("Secondary indexes are not supported by this simulator")
     name = tdoc.get("name", "")
     h = tdoc.get("hashAttr", "")
     r = tdoc.get("rangeAttr", "")
@@ -539,6 +543,11 @@ def _op_query(body):
         return _validation_err("Invalid Select: " + str(select))
     if select == "SPECIFIC_ATTRIBUTES" and (body.get("ProjectionExpression", None) == None or body.get("ProjectionExpression", "") == ""):
         return _validation_err("Select type SPECIFIC_ATTRIBUTES requires ProjectionExpression")
+    # Projection validated up front so an empty result page still 400s on
+    # a bad expression.
+    fields, pferr = _projection_fields(body)
+    if pferr != None:
+        return pferr
 
     keyed = []
     for d in _table_items(name):
@@ -572,6 +581,12 @@ def _op_query(body):
 
     start = body.get("ExclusiveStartKey", None)
     if start != None and type(start) == "dict":
+        # The starting key must be a full, schema-valid key — real DynamoDB
+        # rejects a start key missing the sort attribute instead of
+        # quietly returning an empty page.
+        sid, siderr = _key_id(tdoc, start)
+        if siderr != "":
+            return _validation_err("The provided starting key is invalid: " + siderr)
         sh = start.get(h, None)
         if sh == None or _typed_cmp(sh, parsed["pkv"]) != 0:
             return _validation_err("The provided starting key is invalid: Invalid hash key provided")
@@ -585,10 +600,7 @@ def _op_query(body):
     if select != "COUNT":
         items = []
         for d in page:
-            proj, prerr = _project(d.get("attrs", {}), body)
-            if prerr != None:
-                return prerr
-            items.append(proj)
+            items.append(_project(d.get("attrs", {}), fields))
         out["Items"] = items
     if nxt != None and len(page) > 0:
         out["LastEvaluatedKey"] = page[len(page) - 1].get("k", {})
@@ -601,6 +613,8 @@ def _op_scan(body):
     tdoc, err = _require_table(body, "Cannot do operations on a non-existent table")
     if err != None:
         return err
+    if "IndexName" in body:
+        return _validation_err("Secondary indexes are not supported by this simulator")
     name = tdoc.get("name", "")
     names = _expr_names(body)
     values = _expr_values(body)
@@ -613,6 +627,11 @@ def _op_scan(body):
     select = body.get("Select", "")
     if select != "" and select != "ALL_ATTRIBUTES" and select != "ALL_PROJECTED_ATTRIBUTES" and select != "SPECIFIC_ATTRIBUTES" and select != "COUNT":
         return _validation_err("Invalid Select: " + str(select))
+    # Projection validated up front so an empty result page still 400s on
+    # a bad expression.
+    fields, pferr = _projection_fields(body)
+    if pferr != None:
+        return pferr
 
     docs = _table_items(name)
     scanned = len(docs)
@@ -643,10 +662,7 @@ def _op_scan(body):
     if select != "COUNT":
         items = []
         for d in page:
-            proj, prerr = _project(d.get("attrs", {}), body)
-            if prerr != None:
-                return prerr
-            items.append(proj)
+            items.append(_project(d.get("attrs", {}), fields))
         out["Items"] = items
     if nxt != None and len(page) > 0:
         out["LastEvaluatedKey"] = page[len(page) - 1].get("k", {})
@@ -677,6 +693,11 @@ def _op_batch_get_item(body):
             return _validation_err("RequestItems[" + str(tname) + "].Keys must be a list")
         if len(keys) > _MAX_BATCH:
             return _validation_err("Too many items requested for the BatchGetItemList call")
+        # Per-table projection validated before any key lookups (a bad
+        # expression must 400 even when nothing is found).
+        fields, pferr = _projection_fields(spec)
+        if pferr != None:
+            return pferr
         seen = {}
         got = []
         for k in keys:
@@ -689,10 +710,7 @@ def _op_batch_get_item(body):
             doc = _items().get(kid)
             if doc == None:
                 continue
-            proj, perr = _project(doc.get("attrs", {}), spec)
-            if perr != None:
-                return perr
-            got.append(proj)
+            got.append(_project(doc.get("attrs", {}), fields))
         responses[tname] = got
         cap = _capacity(body, tname)
         if cap != None:
@@ -707,7 +725,10 @@ def _op_batch_write_item(body):
     if ri == None or type(ri) != "dict" or len(ri) == 0:
         return _validation_err("RequestItems must not be empty")
     caps = []
-    ic = _items()
+    plan = []
+    # Pass 1 validates EVERY request (all tables, both kinds) before
+    # anything is applied — real DynamoDB validates the whole batch, so a
+    # later 400 must not leave earlier writes committed.
     for tname in ri:
         reqs = ri[tname]
         if reqs == None or type(reqs) != "list":
@@ -731,7 +752,7 @@ def _op_batch_write_item(body):
                 kid, kiderr = _key_id(tdoc, key)
                 if kiderr != "":
                     return _validation_err(kiderr)
-                _upsert_item(kid, tname, key, item)
+                plan.append(["put", kid, tname, key, item])
             elif "DeleteRequest" in wr:
                 dr = wr["DeleteRequest"]
                 if dr == None or type(dr) != "dict":
@@ -739,13 +760,19 @@ def _op_batch_write_item(body):
                 kid, kerr = _key_id(tdoc, dr.get("Key", None))
                 if kerr != "":
                     return _validation_err(kerr)
-                if ic.get(kid) != None:
-                    ic.delete(kid)
+                plan.append(["del", kid])
             else:
                 return _validation_err("One or more parameter values were invalid: each write request must be exactly one of PutRequest/DeleteRequest")
         cap = _capacity(body, tname)
         if cap != None:
             caps.append(cap)
+    # Pass 2: apply the validated plan.
+    ic = _items()
+    for op in plan:
+        if op[0] == "put":
+            _upsert_item(op[1], op[2], op[3], op[4])
+        elif ic.get(op[1]) != None:
+            ic.delete(op[1])
     out = {"UnprocessedItems": {}}
     if len(caps) > 0:
         out["ConsumedCapacity"] = caps

@@ -89,6 +89,15 @@ def on_user_patch(req):
         return _mgmt_user_404()
 
     body = _json_body(req)
+
+    # Email is tenant-unique: patching onto another user's address is a 409
+    # (the real PATCH answer); re-asserting your own address is a no-op.
+    new_email = body.get("email", None)
+    if new_email != None and new_email != "":
+        other = _find_user_by_email(new_email)
+        if other != None and other.get("user_id", "") != user.get("user_id", ""):
+            return _mgmt_err(409, "Conflict", "The user already exists.", "auth0_idp_error")
+
     for key in ["email", "name", "nickname", "picture", "email_verified",
                 "blocked", "user_metadata", "app_metadata"]:
         if body.get(key, None) != None:

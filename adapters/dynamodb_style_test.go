@@ -467,6 +467,18 @@ func TestDynamoDBItemRoundTrip(t *testing.T) {
 		"TableName": "demo-table",
 		"Key":       map[string]any{},
 	}), 400, "ValidationException")
+
+	// Empty primary-key values are rejected on both write and read paths
+	// (real DynamoDB rejects empty key values; non-key S attrs may stay
+	// empty).
+	ddbWantErr(t, f.call(ddbTarget+"PutItem", map[string]any{
+		"TableName": "demo-table",
+		"Item":      map[string]any{"pk": map[string]any{"S": ""}, "label": map[string]any{"S": "empty key"}},
+	}), 400, "ValidationException")
+	ddbWantErr(t, f.call(ddbTarget+"GetItem", map[string]any{
+		"TableName": "demo-table",
+		"Key":       map[string]any{"pk": map[string]any{"S": ""}},
+	}), 400, "ValidationException")
 }
 
 // TestDynamoDBUpdateItem: SET / REMOVE / ADD (numeric, exact decimal) with
@@ -685,6 +697,23 @@ func TestDynamoDBQuerySortKey(t *testing.T) {
 		"ExpressionAttributeValues": map[string]any{":p": map[string]any{"N": "1"}},
 	}), 400, "ValidationException")
 
+	// ExclusiveStartKey missing the sort attribute → ValidationException
+	// (real DynamoDB rejects the start key instead of returning Count: 0).
+	ddbWantErr(t, f.call(ddbTarget+"Query", map[string]any{
+		"TableName":                 "range-table",
+		"KeyConditionExpression":    "pk = :p",
+		"ExpressionAttributeValues": map[string]any{":p": map[string]any{"S": "u1"}},
+		"ExclusiveStartKey":         map[string]any{"pk": map[string]any{"S": "u1"}},
+	}), 400, "ValidationException")
+
+	// IndexName is rejected: no secondary indexes exist in this simulator.
+	ddbWantErr(t, f.call(ddbTarget+"Query", map[string]any{
+		"TableName":                 "range-table",
+		"IndexName":                 "gsi-1",
+		"KeyConditionExpression":    "pk = :p",
+		"ExpressionAttributeValues": map[string]any{":p": map[string]any{"S": "u1"}},
+	}), 400, "ValidationException")
+
 	// begins_with needs a string sort key: second table.
 	if r := f.call(ddbTarget+"CreateTable", map[string]any{
 		"TableName": "str-table",
@@ -793,6 +822,12 @@ func TestDynamoDBScanFilter(t *testing.T) {
 	}
 
 	ddbWantErr(t, f.call(ddbTarget+"Scan", map[string]any{"TableName": "missing-table"}), 400, "ResourceNotFoundException")
+
+	// IndexName is rejected: no secondary indexes exist in this simulator.
+	ddbWantErr(t, f.call(ddbTarget+"Scan", map[string]any{
+		"TableName": "demo-table",
+		"IndexName": "gsi-1",
+	}), 400, "ValidationException")
 }
 
 // TestDynamoDBConditionalWrites: attribute_not_exists guards, the
@@ -967,6 +1002,33 @@ func TestDynamoDBBatchOperations(t *testing.T) {
 			"missing-table": map[string]any{"Keys": []any{map[string]any{"pk": map[string]any{"S": "x"}}}},
 		},
 	}), 400, "ResourceNotFoundException")
+
+	// The whole batch is validated before anything is applied: a valid
+	// delete followed by an invalid put must 400 AND delete nothing.
+	if p := f.call(ddbTarget+"PutItem", map[string]any{
+		"TableName": "batch-table",
+		"Item":      map[string]any{"pk": map[string]any{"S": "b-x"}, "label": map[string]any{"S": "atomic"}},
+	}); p.Status != 200 {
+		t.Fatalf("PutItem b-x -> %d: %v", p.Status, p.Body)
+	}
+	atomicErr := f.call(ddbTarget+"BatchWriteItem", map[string]any{
+		"RequestItems": map[string]any{"batch-table": []any{
+			map[string]any{"DeleteRequest": map[string]any{
+				"Key": map[string]any{"pk": map[string]any{"S": "b-x"}},
+			}},
+			map[string]any{"PutRequest": map[string]any{
+				"Item": map[string]any{"label": map[string]any{"S": "no key attr"}},
+			}},
+		}},
+	})
+	ddbWantErr(t, atomicErr, 400, "ValidationException")
+	still := f.call(ddbTarget+"GetItem", map[string]any{
+		"TableName": "batch-table",
+		"Key":       map[string]any{"pk": map[string]any{"S": "b-x"}},
+	})
+	if item, _ := still.Body["Item"].(map[string]any); item == nil {
+		t.Fatalf("failed batch was partially applied: b-x got deleted (body %v)", still.Body)
+	}
 }
 
 // TestDynamoDBExpressionSubset: the unsupported constructs fail with clear
@@ -1003,6 +1065,69 @@ func TestDynamoDBExpressionSubset(t *testing.T) {
 	})
 	ddbWantErr(t, projErr, 400, "ValidationException")
 
+	// Projection is validated even when nothing matches: a GetItem miss or
+	// an empty Query page must still reject a bad expression.
+	missProj := f.call(ddbTarget+"GetItem", map[string]any{
+		"TableName":            "demo-table",
+		"Key":                  map[string]any{"pk": map[string]any{"S": "no-such"}},
+		"ProjectionExpression": "meta.src",
+	})
+	ddbWantErr(t, missProj, 400, "ValidationException")
+	emptyQ := f.call(ddbTarget+"Query", map[string]any{
+		"TableName":                 "demo-table",
+		"KeyConditionExpression":    "pk = :p",
+		"ExpressionAttributeValues": map[string]any{":p": map[string]any{"S": "no-such"}},
+		"ProjectionExpression":      "meta.src",
+	})
+	ddbWantErr(t, emptyQ, 400, "ValidationException")
+
+	// A token-initial "." must answer ValidationException, not loop the
+	// tokenizer until the VM step budget dies (500): one case per flavor.
+	dotProj := f.call(ddbTarget+"GetItem", map[string]any{
+		"TableName":            "demo-table",
+		"Key":                  key,
+		"ProjectionExpression": ".label",
+	})
+	ddbWantErr(t, dotProj, 400, "ValidationException")
+	dotFilter := f.call(ddbTarget+"Scan", map[string]any{
+		"TableName":        "demo-table",
+		"FilterExpression": "qty > :v AND .flag = :w",
+		"ExpressionAttributeValues": map[string]any{
+			":v": map[string]any{"N": "1"},
+			":w": map[string]any{"S": "x"},
+		},
+	})
+	ddbWantErr(t, dotFilter, 400, "ValidationException")
+	dotSet := f.call(ddbTarget+"UpdateItem", map[string]any{
+		"TableName":                 "demo-table",
+		"Key":                       key,
+		"UpdateExpression":          "SET .a = :v",
+		"ExpressionAttributeValues": map[string]any{":v": map[string]any{"S": "x"}},
+	})
+	ddbWantErr(t, dotSet, 400, "ValidationException")
+
+	// Dangling AND (filter + condition) and a trailing UpdateExpression
+	// comma must not be silently accepted.
+	dangle := f.call(ddbTarget+"Scan", map[string]any{
+		"TableName":                 "demo-table",
+		"FilterExpression":          "qty > :v AND",
+		"ExpressionAttributeValues": map[string]any{":v": map[string]any{"N": "1"}},
+	})
+	ddbWantErr(t, dangle, 400, "ValidationException")
+	dangleCond := f.call(ddbTarget+"PutItem", map[string]any{
+		"TableName":           "demo-table",
+		"Item":                map[string]any{"pk": map[string]any{"S": "dangle"}, "label": map[string]any{"S": "v"}},
+		"ConditionExpression": "attribute_exists(label) AND",
+	})
+	ddbWantErr(t, dangleCond, 400, "ValidationException")
+	trailingComma := f.call(ddbTarget+"UpdateItem", map[string]any{
+		"TableName":                 "demo-table",
+		"Key":                       key,
+		"UpdateExpression":          "SET label = :l,",
+		"ExpressionAttributeValues": map[string]any{":l": map[string]any{"S": "x"}},
+	})
+	ddbWantErr(t, trailingComma, 400, "ValidationException")
+
 	// DELETE (the set-remove UpdateExpression clause) is unsupported.
 	delErr := f.call(ddbTarget+"UpdateItem", map[string]any{
 		"TableName":        "demo-table",
@@ -1033,4 +1158,170 @@ func TestDynamoDBExpressionSubset(t *testing.T) {
 	// Unknown operation → 400 UnknownOperationException envelope.
 	unk := f.call(ddbTarget+"TimeTravel", map[string]any{})
 	ddbWantErr(t, unk, 400, "UnknownOperationException")
+}
+
+// ddbCreateRangeTable creates a pk+sk table with the given name and string
+// key types (shared by the encoding/collision tests).
+func ddbCreateRangeTable(t *testing.T, f *dynamoFixture, name string) {
+	t.Helper()
+	resp := f.call(ddbTarget+"CreateTable", map[string]any{
+		"TableName": name,
+		"AttributeDefinitions": []any{
+			map[string]any{"AttributeName": "pk", "AttributeType": "S"},
+			map[string]any{"AttributeName": "sk", "AttributeType": "S"},
+		},
+		"KeySchema": []any{
+			map[string]any{"AttributeName": "pk", "KeyType": "HASH"},
+			map[string]any{"AttributeName": "sk", "KeyType": "RANGE"},
+		},
+		"BillingMode": "PAY_PER_REQUEST",
+	})
+	if resp.Status != 200 {
+		t.Fatalf("CreateTable %s -> %d: %v", name, resp.Status, resp.Body)
+	}
+}
+
+// TestDynamoDBKeyEncodingNoCollision: the doc-id encoding escapes the "|"
+// join separator inside key values, so pk "a" + sk "b|S:c" and pk "a|S:b" +
+// sk "c" are two distinct items (an unescaped join silently overwrote one
+// with the other).
+func TestDynamoDBKeyEncodingNoCollision(t *testing.T) {
+	f := newDynamoFixture(t, time.Unix(1_750_000_000, 0).UTC())
+	ddbCreateRangeTable(t, f, "coll-table")
+
+	first := map[string]any{"pk": map[string]any{"S": "a"}, "sk": map[string]any{"S": "b|S:c"}, "label": map[string]any{"S": "first"}}
+	second := map[string]any{"pk": map[string]any{"S": "a|S:b"}, "sk": map[string]any{"S": "c"}, "label": map[string]any{"S": "second"}}
+	for _, item := range []map[string]any{first, second} {
+		if p := f.call(ddbTarget+"PutItem", map[string]any{"TableName": "coll-table", "Item": item}); p.Status != 200 {
+			t.Fatalf("PutItem -> %d: %v", p.Status, p.Body)
+		}
+	}
+
+	for _, item := range []map[string]any{first, second} {
+		got := f.call(ddbTarget+"GetItem", map[string]any{
+			"TableName": "coll-table",
+			"Key":       map[string]any{"pk": item["pk"], "sk": item["sk"]},
+		})
+		back, _ := got.Body["Item"].(map[string]any)
+		if back == nil {
+			t.Fatalf("GetItem for %v returned no Item: %v", item, got.Body)
+		}
+		want := ddbAttr(t, item, "label")["S"]
+		if ddbAttr(t, back, "label")["S"] != want {
+			t.Fatalf("item %v came back as %v (id collision / overwrite)", item, back)
+		}
+	}
+
+	scan := f.call(ddbTarget+"Scan", map[string]any{"TableName": "coll-table"})
+	if ddbInt(scan.Body["Count"]) != 2 {
+		t.Fatalf("Scan Count = %v, want 2 distinct items (body %v)", scan.Body["Count"], scan.Body)
+	}
+}
+
+// TestDynamoDBSetDuplicates: SS/BS members dedupe by string, NS members by
+// numeric value ("1" vs "1.0" is a duplicate); the ADD set-union keeps the
+// same numeric rule.
+func TestDynamoDBSetDuplicates(t *testing.T) {
+	f := newDynamoFixture(t, time.Unix(1_750_000_000, 0).UTC())
+
+	ddbWantErr(t, f.call(ddbTarget+"PutItem", map[string]any{
+		"TableName": "demo-table",
+		"Item": map[string]any{
+			"pk":   map[string]any{"S": "dup-1"},
+			"tags": map[string]any{"SS": []any{"alpha", "alpha"}},
+		},
+	}), 400, "ValidationException")
+
+	// NS duplicates are detected numerically, not lexically.
+	ddbWantErr(t, f.call(ddbTarget+"PutItem", map[string]any{
+		"TableName": "demo-table",
+		"Item": map[string]any{
+			"pk":   map[string]any{"S": "dup-2"},
+			"nums": map[string]any{"NS": []any{"1", "1.0"}},
+		},
+	}), 400, "ValidationException")
+
+	// "-0" and "0" normalize to the same number, so they collide too.
+	ddbWantErr(t, f.call(ddbTarget+"PutItem", map[string]any{
+		"TableName": "demo-table",
+		"Item": map[string]any{
+			"pk":   map[string]any{"S": "dup-3"},
+			"nums": map[string]any{"NS": []any{"0", "-0"}},
+		},
+	}), 400, "ValidationException")
+
+	// Distinct members stay fine.
+	if p := f.call(ddbTarget+"PutItem", map[string]any{
+		"TableName": "demo-table",
+		"Item": map[string]any{
+			"pk":   map[string]any{"S": "dup-ok"},
+			"nums": map[string]any{"NS": []any{"1", "2"}},
+		},
+	}); p.Status != 200 {
+		t.Fatalf("PutItem NS [1 2] -> %d: %v", p.Status, p.Body)
+	}
+
+	// ADD to an NS set unions numerically: adding "1.0" to {"1","2"} is a
+	// no-op, not a third member.
+	add := f.call(ddbTarget+"UpdateItem", map[string]any{
+		"TableName":        "demo-table",
+		"Key":              map[string]any{"pk": map[string]any{"S": "dup-ok"}},
+		"UpdateExpression": "ADD nums :more",
+		"ExpressionAttributeValues": map[string]any{
+			":more": map[string]any{"NS": []any{"1.0"}},
+		},
+		"ReturnValues": "ALL_NEW",
+	})
+	if add.Status != 200 {
+		t.Fatalf("ADD nums -> %d: %v", add.Status, add.Body)
+	}
+	attrs, _ := add.Body["Attributes"].(map[string]any)
+	nums, _ := ddbAttr(t, attrs, "nums")["NS"].([]any)
+	if len(nums) != 2 {
+		t.Fatalf("NS after ADD = %v, want the same 2 members (numeric dedupe)", ddbAttr(t, attrs, "nums"))
+	}
+	for _, m := range nums {
+		if m == "1.0" {
+			t.Fatalf("NS after ADD = %v, want no \"1.0\" member (numeric dedupe)", ddbAttr(t, attrs, "nums"))
+		}
+	}
+}
+
+// TestDynamoDBNumericZeroKey: "-0" and "0" are one number — a put with one
+// spelling is found under the other, and both share a single stored item.
+func TestDynamoDBNumericZeroKey(t *testing.T) {
+	f := newDynamoFixture(t, time.Unix(1_750_000_000, 0).UTC())
+	resp := f.call(ddbTarget+"CreateTable", map[string]any{
+		"TableName":            "nkey-table",
+		"AttributeDefinitions": []any{map[string]any{"AttributeName": "pk", "AttributeType": "N"}},
+		"KeySchema":            []any{map[string]any{"AttributeName": "pk", "KeyType": "HASH"}},
+		"BillingMode":          "PAY_PER_REQUEST",
+	})
+	if resp.Status != 200 {
+		t.Fatalf("CreateTable nkey-table -> %d: %v", resp.Status, resp.Body)
+	}
+
+	if p := f.call(ddbTarget+"PutItem", map[string]any{
+		"TableName": "nkey-table",
+		"Item": map[string]any{
+			"pk":    map[string]any{"N": "-0"},
+			"label": map[string]any{"S": "neg zero"},
+		},
+	}); p.Status != 200 {
+		t.Fatalf("PutItem pk -0 -> %d: %v", p.Status, p.Body)
+	}
+
+	got := f.call(ddbTarget+"GetItem", map[string]any{
+		"TableName": "nkey-table",
+		"Key":       map[string]any{"pk": map[string]any{"N": "0"}},
+	})
+	item, _ := got.Body["Item"].(map[string]any)
+	if item == nil || ddbAttr(t, item, "label")["S"] != "neg zero" {
+		t.Fatalf("GetItem pk 0 after PutItem pk -0 = %v, want the same item", got.Body)
+	}
+
+	scan := f.call(ddbTarget+"Scan", map[string]any{"TableName": "nkey-table"})
+	if ddbInt(scan.Body["Count"]) != 1 {
+		t.Fatalf("Scan Count = %v, want 1 (\"-0\" and \"0\" are one number)", scan.Body["Count"])
+	}
 }
