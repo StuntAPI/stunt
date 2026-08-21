@@ -1,0 +1,4 @@
+{"id":"demo-table|S:demo-1","table":"demo-table","k":{"pk":{"S":"demo-1"}},"attrs":{"pk":{"S":"demo-1"},"label":{"S":"Alpha demo widget"},"qty":{"N":"12"},"price":{"N":"980"},"active":{"BOOL":true},"tags":{"SS":["alpha","demo"]}}}
+{"id":"demo-table|S:demo-2","table":"demo-table","k":{"pk":{"S":"demo-2"}},"attrs":{"pk":{"S":"demo-2"},"label":{"S":"Beta demo widget"},"qty":{"N":"34"},"price":{"N":"1250"},"active":{"BOOL":false},"tags":{"SS":["beta","demo"]}}}
+{"id":"demo-table|S:demo-3","table":"demo-table","k":{"pk":{"S":"demo-3"}},"attrs":{"pk":{"S":"demo-3"},"label":{"S":"Gamma demo widget"},"qty":{"N":"7"},"price":{"N":"555"},"active":{"BOOL":true},"meta":{"M":{"src":{"S":"seed"},"rank":{"N":"3"}}}}}
+{"id":"demo-table|S:demo-4","table":"demo-table","k":{"pk":{"S":"demo-4"}},"attrs":{"pk":{"S":"demo-4"},"label":{"S":"Delta demo widget"},"qty":{"N":"0"},"price":{"N":"199"},"active":{"BOOL":true},"flags":{"L":[{"BOOL":true},{"BOOL":false}]},"note":{"NULL":true}}}

@@ -1,0 +1,70 @@
+# stunt adapter manifest — Amazon SQS-style API simulator (unofficial)
+# Docs: https://stuntapi.com/stunt
+#
+# This adapter mimics the *structure* of the Amazon SQS JSON API for
+# LOCAL TESTING ONLY. It does not call the real Amazon SQS API. All data is
+# synthetic. See DISCLAIMER.
+id: sqs-style
+name: "Amazon SQS-style API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Amazon SQS API"
+  version: "2012-11-05"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# SQS is a POST-only JSON protocol dispatching on X-Amz-Target:
+#   AmazonSQS.<Operation>.
+#
+# NOTE: the literal route "/" must come BEFORE the parameterized
+# /{queueName} so it is matched first (the dispatch engine checks in
+# declaration order).
+endpoints:
+  # Endpoint-addressed transport: POST / with X-Amz-Target, queue from the
+  # QueueUrl body field.
+  - route: /
+    method: POST
+    handler: scripts/service.star#on_service_api
+  # Queue-URL-addressed transport: SDKs resolve the queue URL
+  # (http://<host>/<queueName>) and re-send operations to POST /<queueName>.
+  # concurrency_key serializes send/receive/delete (read-modify-write on the
+  # queue's message list) per queue.
+  - route: /{queueName}
+    method: POST
+    handler: scripts/queues.star#on_queue_url_api
+    concurrency_key: queueName
+
+# Backing stores — collections for stateful data (no seeds: an empty
+# simulator is the correct starting state for a queue service).
+resources:
+  - name: queues
+    kind: collection
+  - name: messages
+    kind: collection
+
+# Auth scheme: SigV4 (AWS4-HMAC-SHA256), verified for real (canonical
+# request rebuilt + HMAC chain recomputed with the documented synthetic
+# credentials; see README).
+identity:
+  token_scheme: sigv4
+
+# Catch-all: any unmatched route returns a 404 in the SQS error shape (every
+# real SQS route IS a queue URL, so an unmatched path is a nonexistent queue).
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          __type: com.amazonaws.sqs#QueueDoesNotExist
+          message: "The specified queue does not exist."
+
+# Resources notes:
+# - queues collection: {name, attributes (string map), created_unix,
+#                       last_modified_unix, purged_at_unix} — epochs as
+#                       strings (collection docs round-trip through JSON)
+# - messages collection: {queue, message_id, body, message_attrs, in_flight,
+#                         receipt_handle, visible_at_unix, sent_at_unix,
+#                         receive_count, first_receive_unix, seq,
+#                         body_digest, attrs_digest}

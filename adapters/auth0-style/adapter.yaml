@@ -1,0 +1,115 @@
+# stunt adapter manifest — Auth0 Authentication & Management API simulator (unofficial)
+# Docs: https://stuntapi.com/stunt
+#
+# This adapter mimics the *structure* of Auth0 for LOCAL TESTING ONLY.
+# It does not call the real Auth0 API. All data is synthetic. See DISCLAIMER.
+#
+# Auth0 has two halves: the OIDC/OAuth2 authentication domain
+# (/.well-known, /authorize, /oauth/token, /userinfo, /dbconnections) and
+# the Management API v2 (/api/v2) over RS256 Bearer tokens.
+id: auth0-style
+name: "Auth0-style Authentication API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Auth0 Authentication & Management API"
+  version: "v2"
+
+# Endpoints — each maps a route + method to a Starlark handler.
+# NOTE: literal routes must come BEFORE parameterized routes so they are
+# matched first (the dispatch engine checks in declaration order).
+endpoints:
+  # --- OIDC / OAuth2 authentication domain ---
+  - route: /.well-known/openid-configuration
+    method: GET
+    handler: scripts/oidc.star#on_discovery
+  - route: /.well-known/jwks.json
+    method: GET
+    handler: scripts/oidc.star#on_jwks
+  - route: /authorize
+    method: GET
+    handler: scripts/oidc.star#on_authorize
+  - route: /oauth/token
+    method: POST
+    handler: scripts/oidc.star#on_token
+  - route: /userinfo
+    method: GET
+    handler: scripts/oidc.star#on_userinfo
+  - route: /oauth/revoke
+    method: POST
+    handler: scripts/oidc.star#on_revoke
+  - route: /dbconnections/signup
+    method: POST
+    handler: scripts/oidc.star#on_signup
+
+  # --- Management API v2 (literal routes first) ---
+  - route: /api/v2/users
+    method: GET
+    handler: scripts/management.star#on_users_list
+  - route: /api/v2/users
+    method: POST
+    handler: scripts/management.star#on_user_create
+  - route: /api/v2/roles
+    method: GET
+    handler: scripts/management.star#on_roles_list
+  - route: /api/v2/roles
+    method: POST
+    handler: scripts/management.star#on_role_create
+
+  # --- Management API v2 (parameterized routes) ---
+  - route: /api/v2/users/{id}
+    method: GET
+    handler: scripts/management.star#on_user_get
+  - route: /api/v2/users/{id}
+    method: PATCH
+    handler: scripts/management.star#on_user_patch
+    concurrency_key: id
+  - route: /api/v2/users/{id}
+    method: DELETE
+    handler: scripts/management.star#on_user_delete
+    concurrency_key: id
+  - route: /api/v2/users/{id}/roles
+    method: GET
+    handler: scripts/management.star#on_user_roles_list
+  - route: /api/v2/users/{id}/roles
+    method: POST
+    handler: scripts/management.star#on_user_roles_assign
+    concurrency_key: id
+  - route: /api/v2/users/{id}/roles
+    method: DELETE
+    handler: scripts/management.star#on_user_roles_delete
+    concurrency_key: id
+
+# Backing stores — collections for stateful data. Seeded fixtures ship the
+# demo tenant's users, roles, and the one application client (README).
+resources:
+  - name: users
+    kind: collection
+    seed: fixtures/users.jsonl
+  - name: roles
+    kind: collection
+    seed: fixtures/roles.jsonl
+  - name: clients
+    kind: collection
+    seed: fixtures/clients.jsonl
+  - name: oauth_codes
+    kind: collection
+  - name: refresh_tokens
+    kind: collection
+
+# Auth scheme metadata (mock: RS256 JWT Bearer tokens minted by this adapter
+# over a fixed synthetic keypair; no upstream Auth0 API is contacted).
+identity:
+  token_scheme: custom
+
+# Catch-all: any unmatched route returns a 404 in the Management API shape.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          statusCode: 404
+          error: "Not Found"
+          message: "Route not found"
