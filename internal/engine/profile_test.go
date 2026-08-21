@@ -47,7 +47,10 @@ func profileManifest(t *testing.T) *manifest.Manifest {
 // The core property base rules cannot offer: an active profile's rules
 // intercept a route that is otherwise handled (here by a base rule).
 func TestProfileOverridesDispatch(t *testing.T) {
-	e, err := New(profileManifest(t))
+	// HTTPServerForTest serves the first map-ordered service; pin one.
+	m := profileManifest(t)
+	delete(m.Services, "other")
+	e, err := New(m)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,8 +80,8 @@ func TestProfileOverridesDispatch(t *testing.T) {
 
 // An active profile with no matching rule falls through to normal dispatch.
 func TestProfileFallsThroughWhenNoRuleMatches(t *testing.T) {
+	// HTTPServerForTest serves the first map-ordered service; pin one.
 	m := profileManifest(t)
-	// HandlerForTest serves the first map-ordered service; pin one.
 	delete(m.Services, "other")
 	e, err := New(m)
 	if err != nil {
@@ -102,6 +105,8 @@ func TestProfileFallsThroughWhenNoRuleMatches(t *testing.T) {
 
 // Global presets assign profiles across services and report themselves.
 func TestProfileGlobalPreset(t *testing.T) {
+	// Both services stay: the preset references both, and its 503/200
+	// assertions are identical on either, so map order does not matter.
 	e, err := New(profileManifest(t))
 	if err != nil {
 		t.Fatal(err)
@@ -205,8 +210,10 @@ func TestProfileCatalog(t *testing.T) {
 // A profile name defined on a service that declares no rules for it (the
 // adapter-authored shape) must pass through untouched.
 func TestProfileActiveWithoutRulesPassesThrough(t *testing.T) {
-	m := profileManifest(t)
+	// HTTPServerForTest serves the first map-ordered service; pin one.
 	// Declare a mode with no rules: rules-less, like adapter-authored ones.
+	m := profileManifest(t)
+	delete(m.Services, "other")
 	m.Services["hello"].Profiles["breach"] = manifest.ServiceProfile{}
 	e, err := New(m)
 	if err != nil {
