@@ -110,7 +110,7 @@ conformance-node:
 # CI regenerates and fails on drift — rerun after touching adapters,
 # Record(...) calls, node test sections, or matrix.yaml.
 conformance-matrix:
-    cd conformance && go run ./cmd/genmatrix
+    cd conformance && go run ./cmd/genmatrix -json matrix.json
 
 # Coverage-guided fuzzing — each target for the given time (default 30s;
 # pass just fuzz 2m for longer rounds). The fuzz seed corpora also run as

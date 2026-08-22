@@ -62,7 +62,7 @@ jobs:
       - name: Conformance matrix freshness (CONFORMANCE.md)
         run: |
           just conformance-matrix
-          if ! git diff --exit-code CONFORMANCE.md; then
-            echo "::error::CONFORMANCE.md is stale — run 'just conformance-matrix' and commit"
+          if ! git diff --exit-code CONFORMANCE.md conformance/matrix.json; then
+            echo "::error::CONFORMANCE.md or conformance/matrix.json is stale — run 'just conformance-matrix' and commit"
             exit 1
           fi
