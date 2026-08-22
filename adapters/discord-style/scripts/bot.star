@@ -1,6 +1,7 @@
 # Bot REST handlers — user resolution, guild, and channels.
 #
 # GET /users/@me                -> { id, username, bot:true, ... }
+# GET /users/@me/guilds         -> [ { id, name, icon, owner, ... } ]
 # GET /guilds/{guild_id}        -> { id, name, icon, owner_id, ... }
 # GET /guilds/{guild_id}/channels -> [ { id, name, type, guild_id, ... } ]
 #
@@ -17,6 +18,26 @@ def on_bot_user(req):
         return respond(401, {"code": 0, "message": "401: Unauthorized"})
 
     return respond(200, _bot_user())
+
+# on_user_guilds lists the guilds the bot is in — the discovery endpoint
+# every bot client calls first (real shape: partial guild objects).
+def on_user_guilds(req):
+    if _require_bot(req) == None:
+        return respond(401, {"code": 0, "message": "401: Unauthorized"})
+
+    _seed()
+    out = []
+    for g in store_collection("guilds").list():
+        out.append({
+            "id": g.get("id"),
+            "name": g.get("name"),
+            "icon": g.get("icon"),
+            "banner": None,
+            "owner": False,
+            "permissions": "140737488355327",
+            "features": [],
+        })
+    return respond(200, out)
 
 # on_guild returns the guild object for the given guild_id.
 def on_guild(req):

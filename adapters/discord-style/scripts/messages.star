@@ -75,6 +75,24 @@ def on_send_message(req):
 
 # on_list_messages returns recent messages for the given channel as a bare
 # JSON array (newest first, matching Discord's default order).
+# on_get_message returns a single message by id (the real API's
+# GET /channels/{cid}/messages/{mid}).
+def on_get_message(req):
+    if _require_bot(req) == None:
+        return respond(401, {"code": 0, "message": "401: Unauthorized"})
+
+    mc = store_collection("messages")
+    msg = mc.get(req["params"]["message_id"])
+    if msg == None or msg.get("channel_id", "") != req["params"]["channel_id"]:
+        # 10008 is the real Discord Unknown Message error code.
+        return respond(404, {"code": 10008, "message": "Unknown Message"})
+
+    out = {}
+    for k in msg:
+        if k[:1] != "_":
+            out[k] = msg[k]
+    return respond(200, out)
+
 def on_list_messages(req):
     if _require_bot(req) == None:
         return respond(401, {"code": 0, "message": "401: Unauthorized"})
