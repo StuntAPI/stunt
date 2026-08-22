@@ -155,10 +155,11 @@ fresh sequence with the mode still active.
 - **No long polling**: `WaitTimeSeconds` is accepted (and range-checked) but
   never honored — stunt handlers cannot block, so `ReceiveMessage` returns
   immediately with whatever is visible. Set your SDK's receive-wait to 0.
-- **MD5 → SHA-256**: the crypto module has no MD5, so `MD5OfMessageBody` and
-  `MD5OfMessageAttributes` carry deterministic **SHA-256** digests instead
-  (same field names, different algorithm). `MD5OfMessageAttributes` hashes a
-  canonical `name\ndatatype\nvalue\n` rendering of the sorted attribute map.
+- **`MD5OfMessageBody` is the real MD5 of the body** — provider SDKs validate
+  it client-side and hard-fail on mismatch (aws-sdk-go-v2 does; found by the
+  conformance suite). `MD5OfMessageAttributes` is **omitted**: the compound
+  length-prefixed attribute encoding is not reproduced, and SDKs skip
+  validation when the field is absent.
 - **Purge is immediate** (real SQS purges asynchronously within about a
   minute) but the one-purge-per-60-seconds rule IS enforced with the clock.
 - **Message ids / receipt handles are synthetic deterministic strings**

@@ -2,6 +2,7 @@ package starlark
 
 import (
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base64"
@@ -30,9 +31,13 @@ import (
 var cryptoModule = &starlarkstruct.Module{
 	Name: "crypto",
 	Members: sk.StringDict{
-		"hmac_sha256":       sk.NewBuiltin("crypto.hmac_sha256", hmacSHA256),
-		"hmac_sha1":         sk.NewBuiltin("crypto.hmac_sha1", hmacSHA1),
-		"sha256":            sk.NewBuiltin("crypto.sha256", sha256Hash),
+		"hmac_sha256": sk.NewBuiltin("crypto.hmac_sha256", hmacSHA256),
+		"hmac_sha1":   sk.NewBuiltin("crypto.hmac_sha1", hmacSHA1),
+		"sha256":      sk.NewBuiltin("crypto.sha256", sha256Hash),
+		// md5 exists for PROTOCOL CHECKSUMS only (SQS MD5OfMessage etc.) —
+		// providers validate it client-side; it is not a security primitive
+		// and adapters must not use it for signatures.
+		"md5":               sk.NewBuiltin("crypto.md5", md5Hash),
 		"base64_encode":     sk.NewBuiltin("crypto.base64_encode", base64Encode),
 		"base64_decode":     sk.NewBuiltin("crypto.base64_decode", base64Decode),
 		"base64url_encode":  sk.NewBuiltin("crypto.base64url_encode", base64urlEncode),
@@ -99,6 +104,19 @@ func hmacSHA1(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk
 	mac := hmac.New(sha1.New, []byte(key))
 	mac.Write([]byte(data))
 	out, err := encodeDigest(mac.Sum(nil), encoding)
+	if err != nil {
+		return nil, err
+	}
+	return sk.String(out), nil
+}
+
+func md5Hash(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	var data, encoding string
+	if err := sk.UnpackArgs(b.Name(), args, kwargs, "data", &data, "encoding?", &encoding); err != nil {
+		return nil, err
+	}
+	sum := md5.Sum([]byte(data))
+	out, err := encodeDigest(sum[:], encoding)
 	if err != nil {
 		return nil, err
 	}

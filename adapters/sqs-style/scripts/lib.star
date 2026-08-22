@@ -636,7 +636,7 @@ def _sorted_queues():
 # ====================================================================
 # A message doc is {queue, message_id, body, message_attrs, in_flight,
 # receipt_handle, visible_at_unix, sent_at_unix, receive_count,
-# first_receive_unix, seq, body_digest, attrs_digest}. Epochs are stored as
+# first_receive_unix, seq, body_digest}. Epochs are stored as
 # strings (collection docs round-trip through JSON where ints come back as
 # floats). A message is receivable iff now >= visible_at_unix — the same
 # field covers DelaySeconds on send and the in-flight timeout after a receive.
@@ -654,9 +654,12 @@ def _receipt_handle(seq, now):
 # MD5* digests are SHA-256 based (the crypto module has no MD5) — a
 # documented divergence; the field names stay the real ones.
 def _body_digest(msg_body):
+    # Real SQS returns the MD5 of the body and SDKs VALIDATE it client-side
+    # (aws-sdk-go-v2 hard-fails on mismatch — found by conformance). md5 is
+    # a checksum primitive here, never a signature.
     if msg_body == None:
         msg_body = ""
-    return crypto.sha256(msg_body)
+    return crypto.md5(msg_body)
 
 def _attr_value_text(v):
     for k in ["StringValue", "BinaryValue", "NumberValue", "StringListValues"]:
@@ -664,20 +667,6 @@ def _attr_value_text(v):
         if got != None:
             return str(got)
     return ""
-
-# _attrs_digest hashes a canonical name/type/value rendering of the message
-# attribute map (sorted names) — deterministic, same divergence as above.
-def _attrs_digest(mattrs):
-    if mattrs == None or type(mattrs) != "dict" or len(mattrs) == 0:
-        return ""
-    names = _sig_sort_strings([k for k in mattrs])
-    out = ""
-    for n in names:
-        v = mattrs.get(n, {})
-        if type(v) != "dict":
-            v = {}
-        out = out + n + "\n" + str(v.get("DataType", "")) + "\n" + _attr_value_text(v) + "\n"
-    return crypto.sha256(out)
 
 def _new_message(queue, msg_body, mattrs, now, delay):
     seq = store_kv_incr("sqs", "msg_seq")
@@ -694,7 +683,6 @@ def _new_message(queue, msg_body, mattrs, now, delay):
         "first_receive_unix": "0",
         "seq": seq,
         "body_digest": _body_digest(msg_body),
-        "attrs_digest": _attrs_digest(mattrs),
     }
 
 # _msg_key orders receives FIFO-ish (send time, then insertion sequence);
@@ -975,8 +963,6 @@ def _op_send_message(req, body, path_queue):
         "MessageId": doc["message_id"],
         "MD5OfMessageBody": doc["body_digest"],
     }
-    if len(mattrs) > 0:
-        out["MD5OfMessageAttributes"] = doc["attrs_digest"]
     return _sqs_ok(out)
 
 # _send_entry_fault returns a Failed-entry dict when a batch entry is invalid
@@ -1049,8 +1035,6 @@ def _op_send_message_batch(req, body, path_queue):
             "MessageId": doc["message_id"],
             "MD5OfMessageBody": doc["body_digest"],
         }
-        if len(mattrs) > 0:
-            ok_entry["MD5OfMessageAttributes"] = doc["attrs_digest"]
         successful.append(ok_entry)
     out = {}
     if len(successful) > 0:
@@ -1132,7 +1116,6 @@ def _op_receive_message(req, body, path_queue):
         mattrs = _pick_message_attrs(m, mattr_names)
         if len(mattrs) > 0:
             out_msg["MessageAttributes"] = mattrs
-            out_msg["MD5OfMessageAttributes"] = m["attrs_digest"]
         messages.append(out_msg)
     return _sqs_ok({"Messages": messages})
 
