@@ -1,12 +1,12 @@
 {
   "summary": {
     "adapters": 98,
-    "checks": 166,
+    "checks": 184,
     "tiers": {
       "sdk_and_vm": 2,
-      "sdk_only": 25,
+      "sdk_only": 27,
       "vm_only": 4,
-      "boot": 67
+      "boot": 65
     }
   },
   "adapters": [
@@ -2131,9 +2131,23 @@
       "api_name": "Microsoft Graph / Entra ID",
       "api_version": "v1.0",
       "routes": 9,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "microsoft-graph-client",
+          "version": "3.0.7 (floor)"
+        }
+      ],
+      "behaviors": [
+        "authorize redirects with code + state",
+        "token exchange mints a JWKS-verifiable RS256 bearer",
+        "authProvider feeds the SDK; /v1.0/me resolves the token's user",
+        "users create + get round-trip (by id and by UPN)",
+        "users list pages via $top + $skipToken + PageIterator",
+        "applications + servicePrincipals reads",
+        "refresh grant rotates the token the SDK presents",
+        "error decoding: 404 and 401 surface as GraphError"
+      ],
       "missing": [
         "No $filter, $search, $orderby, $select, or $expand on Graph queries",
         "No user PATCH or DELETE (/v1.0/users/{id})",
@@ -2145,7 +2159,9 @@
         "No signInLogs, audit logs, or user activities"
       ],
       "deviations": [
-        "Authorize auto-approves with an instant 302; no consent screen"
+        "Authorize auto-approves with an instant 302; no consent screen",
+        "nextLink cursor param is $skipToken (camelCase); real Graph emits $skiptoken",
+        "users create ignores mailNickname; mail defaults to the UPN"
       ],
       "covered": [
         {
@@ -4218,9 +4234,25 @@
       "api_name": "Microsoft Graph API",
       "api_version": "v1.0",
       "routes": 55,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "microsoft-graph-client",
+          "version": "3.0.7 (floor)"
+        }
+      ],
+      "behaviors": [
+        "/me resolves the signed-in profile",
+        "users directory pages via $top and the @odata.nextLink cursor",
+        "$filter and $select are applied server-side",
+        "draft lifecycle: create, PATCH, send, land in Sent Items",
+        "sendMail posts straight to Sent Items (no draft)",
+        "subscription lifecycle with clientState-echoed notifications",
+        "calendar: create, calendarView window, accept records the response",
+        "teams chat: create chat, send message, list, delete",
+        "drive: quota, simple upload round-trip, path resolution",
+        "error envelope: unknown user 404, unknown token 401"
+      ],
       "missing": [
         "No Excel workbook sessions (createSession, refreshSession, closeSession)",
         "No mail reply/forward, attachments, or message move/copy endpoints",
@@ -4235,7 +4267,9 @@
         "Webhook validationToken handshake not enforced; subscription accepted immediately",
         "Upload session ids are deterministic counters, not unguessable tokens",
         "OData $filter limited to the equality pattern (field eq value)",
-        "Static seeded mock-bearer-token bypasses the entra-id token flow"
+        "Static seeded mock-bearer-token bypasses the entra-id token flow",
+        "@odata.nextLink/@odata.context point at graph.microsoft.com, not the serving host (prod-faithful; a local SDK harness must rebase)",
+        "Resumable upload session URLs are absolute http:// — the JS SDK's OneDriveLargeFileUploadTask urlJoins them into a broken path"
       ],
       "covered": [
         {

@@ -169,19 +169,21 @@ func parseGoRecords(dir string) ([]check, error) {
 // nodeSuiteSDK maps a node test file to the SDK label its sections are
 // attributed to.
 var nodeSuiteSDK = map[string]string{
-	"discord.test.ts":    "discord-node",
-	"github.test.ts":     "octokit",
-	"hubspot.test.ts":    "hubspot-node",
-	"jira.test.ts":       "jira-js",
-	"llm.test.ts":        "openai-node",
-	"plaid.test.ts":      "plaid-node",
-	"resend.test.ts":     "resend-node",
-	"salesforce.test.ts": "jsforce",
-	"slack.test.ts":      "slack-node",
-	"square.test.ts":     "square-node",
-	"stripe.test.ts":     "stripe-node",
-	"twilio.test.ts":     "twilio-node",
-	"zendesk.test.ts":    "node-zendesk",
+	"discord.test.ts":        "discord-node",
+	"entraid.test.ts":        "microsoft-graph-client",
+	"github.test.ts":         "octokit",
+	"hubspot.test.ts":        "hubspot-node",
+	"jira.test.ts":           "jira-js",
+	"llm.test.ts":            "openai-node",
+	"microsoftgraph.test.ts": "microsoft-graph-client",
+	"plaid.test.ts":          "plaid-node",
+	"resend.test.ts":         "resend-node",
+	"salesforce.test.ts":     "jsforce",
+	"slack.test.ts":          "slack-node",
+	"square.test.ts":         "square-node",
+	"stripe.test.ts":         "stripe-node",
+	"twilio.test.ts":         "twilio-node",
+	"zendesk.test.ts":        "node-zendesk",
 }
 
 var (
@@ -353,19 +355,20 @@ var goModuleBases = map[string]string{
 }
 
 var nodePackages = map[string]string{
-	"discord-node": "@discordjs/rest",
-	"hubspot-node": "@hubspot/api-client",
-	"jira-js":      "jira.js",
-	"jsforce":      "jsforce",
-	"octokit":      "octokit",
-	"openai-node":  "openai",
-	"plaid-node":   "plaid",
-	"resend-node":  "resend",
-	"slack-node":   "@slack/web-api",
-	"node-zendesk": "node-zendesk",
-	"square-node":  "square",
-	"stripe-node":  "stripe",
-	"twilio-node":  "twilio",
+	"discord-node":           "@discordjs/rest",
+	"hubspot-node":           "@hubspot/api-client",
+	"jira-js":                "jira.js",
+	"jsforce":                "jsforce",
+	"octokit":                "octokit",
+	"openai-node":            "openai",
+	"plaid-node":             "plaid",
+	"resend-node":            "resend",
+	"slack-node":             "@slack/web-api",
+	"microsoft-graph-client": "@microsoft/microsoft-graph-client",
+	"node-zendesk":           "node-zendesk",
+	"square-node":            "square",
+	"stripe-node":            "stripe",
+	"twilio-node":            "twilio",
 }
 
 // resolveVersions resolves the display version for every SDK label in the
