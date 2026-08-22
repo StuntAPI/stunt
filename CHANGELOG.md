@@ -51,6 +51,12 @@ All notable changes to **stunt** are documented here. The format is based on
   refresh once on first use). Found live while verifying this release.
 
 
+## [0.51.1] — 2026-08-22
+
+### Fixed (audit hardening round — the v0.51.0 build predates it)
+
+The published v0.51.0 artifacts were built from a tree without the
+hardening merge despite its tag; this release ships them for real.
 ### Fixed (audit hardening round)
 
 - **`behavior: timeout` now actually drops the connection.** The request-log
