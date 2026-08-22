@@ -21,6 +21,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -36,14 +37,15 @@ import (
 
 func main() {
 	root := flag.String("root", "..", "repo root (default: run from conformance/)")
+	jsonOut := flag.String("json", "", "also write the matrix as JSON to this path (stuntapi.com consumes it)")
 	flag.Parse()
-	if err := run(*root); err != nil {
+	if err := run(*root, *jsonOut); err != nil {
 		fmt.Fprintln(os.Stderr, "genmatrix:", err)
 		os.Exit(1)
 	}
 }
 
-func run(root string) error {
+func run(root, jsonOut string) error {
 	adapters, err := loadAdapters(filepath.Join(root, "adapters"))
 	if err != nil {
 		return err
@@ -82,6 +84,16 @@ func run(root string) error {
 	out := filepath.Join(root, "CONFORMANCE.md")
 	if err := os.WriteFile(out, []byte(doc), 0o644); err != nil {
 		return err
+	}
+	if jsonOut != "" {
+		data, err := renderJSON(adapters, checks, sdkVer, gaps, root)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(jsonOut, data, 0o644); err != nil {
+			return err
+		}
+		fmt.Printf("genmatrix: wrote %s\n", jsonOut)
 	}
 	fmt.Printf("genmatrix: wrote %s (%d adapters, %d checks)\n", out, len(adapters), len(checks))
 	return nil
@@ -617,4 +629,113 @@ func collapse(s string) string {
 		}
 	}
 	return strings.Join(parts, " ")
+}
+
+// matrixJSON is the JSON shape stuntapi.com renders (src/data/
+// conformance.json). It mirrors the markdown matrix one-to-one; versions
+// are resolved from the same sources so they cannot drift.
+type matrixJSON struct {
+	Generated struct {
+		Adapters int `json:"adapters"`
+		Checks   int `json:"checks"`
+		Tiers    struct {
+			SDKAndVM int `json:"sdk_and_vm"`
+			SDKOnly  int `json:"sdk_only"`
+			VMOnly   int `json:"vm_only"`
+			Boot     int `json:"boot"`
+		} `json:"tiers"`
+	} `json:"summary"`
+	Adapters []adapterJSON `json:"adapters"`
+}
+
+type adapterJSON struct {
+	ID           string    `json:"id"`
+	APIName      string    `json:"api_name"`
+	APIVersion   string    `json:"api_version"`
+	Routes       int       `json:"routes"`
+	WSRoutes     int       `json:"ws_routes,omitempty"`
+	GraphQL      bool      `json:"graphql,omitempty"`
+	GRPCService  string    `json:"grpc_service,omitempty"`
+	Verification string    `json:"verification"`
+	SDKs         []sdkJSON `json:"sdks"`
+	Behaviors    []string  `json:"behaviors"`
+	Missing      []string  `json:"missing"`
+	Deviations   []string  `json:"deviations"`
+}
+
+type sdkJSON struct {
+	Label   string `json:"label"`
+	Version string `json:"version"`
+}
+
+func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, root string) ([]byte, error) {
+	byAdapterChecks := map[string][]check{}
+	for _, c := range checks {
+		byAdapterChecks[c.Adapter] = append(byAdapterChecks[c.Adapter], c)
+	}
+	vm := map[string]bool{}
+	for _, a := range adapters {
+		name := strings.ReplaceAll(a.ID, "-", "_") + "_test.go"
+		if _, err := os.Stat(filepath.Join(root, "adapters", name)); err == nil {
+			vm[a.ID] = true
+		}
+	}
+	var m matrixJSON
+	m.Generated.Adapters = len(adapters)
+	m.Generated.Checks = len(checks)
+	for _, a := range adapters {
+		tier := "boot"
+		isSDK := len(byAdapterChecks[a.ID]) > 0
+		switch {
+		case isSDK && vm[a.ID]:
+			tier = "SDK + VM"
+			m.Generated.Tiers.SDKAndVM++
+		case isSDK:
+			tier = "SDK"
+			m.Generated.Tiers.SDKOnly++
+		case vm[a.ID]:
+			tier = "VM"
+			m.Generated.Tiers.VMOnly++
+		default:
+			m.Generated.Tiers.Boot++
+		}
+		row := adapterJSON{
+			ID:           a.ID,
+			Routes:       len(a.Endpoints),
+			WSRoutes:     len(a.Websockets),
+			Verification: tier,
+			Behaviors:    []string{},
+			Missing:      gaps[a.ID].Missing,
+			Deviations:   gaps[a.ID].Deviations,
+		}
+		if row.Missing == nil {
+			row.Missing = []string{}
+		}
+		if row.Deviations == nil {
+			row.Deviations = []string{}
+		}
+		if a.API != nil {
+			row.APIName = a.API.Name
+			row.APIVersion = a.API.Version
+		}
+		if a.Graphql != nil {
+			row.GraphQL = true
+		}
+		if a.Grpc != nil {
+			row.GRPCService = a.Grpc.Service
+		}
+		seen := map[string]bool{}
+		for _, c := range byAdapterChecks[a.ID] {
+			row.Behaviors = append(row.Behaviors, c.Name)
+			if !seen[c.SDK] {
+				seen[c.SDK] = true
+				row.SDKs = append(row.SDKs, sdkJSON{Label: c.SDK, Version: sdkVer[c.SDK]})
+			}
+		}
+		if row.SDKs == nil {
+			row.SDKs = []sdkJSON{}
+		}
+		m.Adapters = append(m.Adapters, row)
+	}
+	return json.MarshalIndent(m, "", "  ")
 }
