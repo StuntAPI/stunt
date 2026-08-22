@@ -14,30 +14,15 @@ describe("jsforce against salesforce-style", () => {
     async () => {
       const h = await bootAdapter("salesforce-style");
       try {
-        // ===== password grant mints a session; the adapter echoes our host
-        // as instance_url (like real Salesforce), which becomes jsforce's
-        // API base for every call below =====
-        const form = new URLSearchParams({
-          grant_type: "password",
-          client_id: "sdk-conformance",
-          username: "sdk@example.test",
-          password: "local-test-password",
-        });
-        const tok = await (await fetch(h.base + "/services/oauth2/token", {
-          method: "POST",
-          headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: form.toString(),
-        })).json();
-        expect(tok.access_token).toBeTruthy();
-        expect(tok.instance_url).toBe(h.base);
-
-        // conn.login would ride jsforce's SOAP login; the OAuth2 grant above
-        // is the documented token-endpoint flow.
+        // ===== SDK-driven login: with clientId+clientSecret configured,
+        // jsforce's conn.login rides the OAuth2 password grant itself, and
+        // adopts the adapter's echoed instance_url as its API base =====
         const conn = new jsforce.Connection({
-          instanceUrl: tok.instance_url,
-          accessToken: tok.access_token,
+          oauth2: { loginUrl: h.base, clientId: "sdk-conformance", clientSecret: "local-secret" },
           version: "60.0",
         });
+        await conn.login("sdk@example.test", "local-test-password");
+        expect(conn.accessToken).toBeTruthy();
 
         // ===== sobject create assigns an id =====
         const created = await conn.sobject("Account").create({ Name: "SDK Co" });

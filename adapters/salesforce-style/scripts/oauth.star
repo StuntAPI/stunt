@@ -49,7 +49,7 @@ def on_token(req):
         code = body.get("code") or ""
         if code == "":
             return _oauth_error("invalid_grant", "invalid or expired code")
-        return _issue_token("user@mock.org", client_id)
+        return _issue_token("user@mock.org", client_id, req=req)
 
     if grant_type == "refresh_token":
         refresh_token = body.get("refresh_token") or ""
@@ -58,7 +58,7 @@ def on_token(req):
             return _oauth_error("invalid_grant", "invalid refresh_token")
         # Reuse-safe: the refresh token stays valid for the next redemption;
         # only the access token rotates.
-        return _issue_token(username, client_id, refresh_token)
+        return _issue_token(username, client_id, refresh_token, req=req)
 
     return _oauth_error("unsupported_grant_type", "grant_type not supported")
 

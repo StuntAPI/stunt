@@ -183,6 +183,12 @@ auth on the target, or fetch-back verification via the REST API. stunt mirrors
 that: deliveries carry the real envelope and no signature headers. Do not
 invent a signature check client-side; use a secret path segment instead.
 
+## Versioned and v2 routes
+
+The full issue + comment surface (create/read/update/delete, transitions,
+comments) is **also served under `/rest/api/2`** — the version jira.js and
+several clients actually use — alongside the v3 paths above.
+
 ## Usage
 
 ```yaml

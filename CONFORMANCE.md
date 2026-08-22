@@ -76,7 +76,7 @@ Verification tiers:
 | [hn-style](adapters/hn-style/) | Hacker News Firebase API `v0` | 11 | boot | — | — | [3](#hn-style) | [2](#hn-style) |
 | [hubspot-style](adapters/hubspot-style/) | HubSpot CRM API `v3` | 33 | SDK | hubspot-node @ 14.0.1 (floor) | 5 | [4](#hubspot-style) | — |
 | [instagram-style](adapters/instagram-style/) | Instagram Graph API `v21.0` | 10 | boot | — | — | [4](#instagram-style) | [2](#instagram-style) |
-| [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 34 | SDK | jira-js @ 6.1.0 (floor) | 7 | [5](#jira-style) | [5](#jira-style) |
+| [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 32 | SDK | jira-js @ 6.1.0 (floor) | 7 | [5](#jira-style) | [6](#jira-style) |
 | [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | boot | — | — | [3](#jumio-style) | [4](#jumio-style) |
 | [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | boot | — | — | [4](#linkedin-style) | [1](#linkedin-style) |
 | [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | SDK | openai-node @ 7.5.0 (floor) | 2 | [4](#llm-style) | [3](#llm-style) |
@@ -100,7 +100,7 @@ Verification tiers:
 | [reddit-style](adapters/reddit-style/) | Reddit API `1.0` | 2 | boot | — | — | [5](#reddit-style) | [1](#reddit-style) |
 | [resend-style](adapters/resend-style/) | Resend API `1.0.0` | 6 | SDK | resend-node @ 6.22.0 (floor) | 4 | [6](#resend-style) | [3](#resend-style) |
 | [revenuecat-style](adapters/revenuecat-style/) | RevenueCat API `v1` | 7 | boot | — | — | [5](#revenuecat-style) | [4](#revenuecat-style) |
-| [salesforce-style](adapters/salesforce-style/) | Salesforce REST API `v60.0` | 29 | SDK | jsforce @ 3.10.22 (floor) | 6 | [7](#salesforce-style) | [3](#salesforce-style) |
+| [salesforce-style](adapters/salesforce-style/) | Salesforce REST API `v60.0` | 29 | SDK | jsforce @ 3.10.22 (floor) | 6 | [7](#salesforce-style) | [4](#salesforce-style) |
 | [sendgrid-style](adapters/sendgrid-style/) | Twilio SendGrid v3 API `v3` | 5 | boot | — | — | [7](#sendgrid-style) | [5](#sendgrid-style) |
 | [servicenow-style](adapters/servicenow-style/) | ServiceNow Table API `2` | 44 | boot | — | — | [5](#servicenow-style) | [1](#servicenow-style) |
 | [shopify-style](adapters/shopify-style/) | Shopify Admin REST + GraphQL API `2024-10` | 21 +GQL | SDK | go-shopify/v4 @ v4.7.0 | 5 | [7](#shopify-style) | [4](#shopify-style) |
@@ -240,7 +240,7 @@ sections in `conformance/node/tests/*.test.ts`).
 
 **salesforce-style**
 
-- password grant mints a session; the adapter echoes our host as instance_url (like real Salesforce), which becomes jsforce's API base for every call below
+- SDK-driven login: with clientId+clientSecret configured, jsforce's conn.login rides the OAuth2 password grant itself, and adopts the adapter's echoed instance_url as its API base
 - sobject create assigns an id
 - retrieve round-trips the fields
 - update patches and persists
@@ -2194,7 +2194,7 @@ behavior notes live in each adapter's README.
 
 ### jira-style
 
-**Covered** — 34 routes
+**Covered** — 32 routes
 
 <details><summary>Routes</summary>
 
@@ -2224,8 +2224,6 @@ behavior notes live in each adapter's README.
 | POST | `/rest/api/2/issue/{key}/comment` |
 | PUT | `/rest/api/2/issue/{key}/comment/{id}` |
 | DELETE | `/rest/api/2/issue/{key}/comment/{id}` |
-| GET | `/rest/api/2/issue/{key}/comment` |
-| POST | `/rest/api/2/issue/{key}/comment` |
 | GET | `/rest/api/3/issue/{key}/comment` |
 | GET | `/rest/api/3/issue/{key}/comment/{id}` |
 | POST | `/rest/api/3/issue/{key}/comment` |
@@ -2245,9 +2243,10 @@ behavior notes live in each adapter's README.
 - No users search, avatars, or notification endpoints
 - No workflow or field configuration management endpoints
 
-**Deviations** (5)
+**Deviations** (6)
 
 - Comment bodies are plain strings, not Atlassian Document Format objects
+- Enhanced-search nextPageToken is a plain decimal offset, not an opaque token
 - JQL subset: parenthesised grouping unsupported; unknown fields 400
 - JQL dates compare as ISO-8601 strings, not parsed datetimes
 - Single fixed simplified workflow for all projects; real workflows are configurable
@@ -3107,8 +3106,9 @@ behavior notes live in each adapter's README.
 - No Bulk API 2.0 (jobs/ingest, jobs/query)
 - No GET updated/deleted incremental-refresh endpoints
 
-**Deviations** (3)
+**Deviations** (4)
 
+- instance_url echoes the caller host over http:// (real: the org https:// instance)
 - Governor limits (100 SOQL/txn, 10k DML rows) documented but not enforced
 - SOQL WHERE subset: no parenthesized grouping; date literals compared lexically
 - Password grant accepted for convenience; real SF requires web-server or JWT flow

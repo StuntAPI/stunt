@@ -556,6 +556,7 @@ adapters:
   jira-style:
     deviations:
       - "Comment bodies are plain strings, not Atlassian Document Format objects"
+      - "Enhanced-search nextPageToken is a plain decimal offset, not an opaque token"
       - "JQL subset: parenthesised grouping unsupported; unknown fields 400"
       - "JQL dates compare as ISO-8601 strings, not parsed datetimes"
       - "Single fixed simplified workflow for all projects; real workflows are configurable"
@@ -804,6 +805,7 @@ adapters:
       - "No v2 REST surface (customers, subscriptions, entitlements)"
   salesforce-style:
     deviations:
+      - "instance_url echoes the caller host over http:// (real: the org https:// instance)"
       - "Governor limits (100 SOQL/txn, 10k DML rows) documented but not enforced"
       - "SOQL WHERE subset: no parenthesized grouping; date literals compared lexically"
       - "Password grant accepted for convenience; real SF requires web-server or JWT flow"

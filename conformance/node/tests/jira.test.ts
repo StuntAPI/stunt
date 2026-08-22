@@ -61,17 +61,20 @@ describe("jira.js against jira-style", () => {
         const comments = await jira.issueComments.getComments({
           issueIdOrKey: created.key!,
         });
-        expect((comments.comments ?? []).length).toBeGreaterThan(0);
+        expect((comments.comments ?? [])[0]?.body).toBe("a comment from jira.js");
 
         // ===== transition moves the status =====
         const transitions = await jira.issues.getTransitions({
           issueIdOrKey: created.key!,
         });
         expect((transitions.transitions ?? []).length).toBeGreaterThan(0);
+        const target = (transitions.transitions ?? [])[0];
         await jira.issues.doTransition({
           issueIdOrKey: created.key!,
-          transition: { id: transitions.transitions![0].id! },
+          transition: { id: target.id! },
         });
+        const moved = await jira.issues.getIssue({ issueIdOrKey: created.key! });
+        expect(moved.fields!.status!.name).toBe(target.to?.name ?? "In Progress");
 
         // ===== delete removes it =====
         await jira.issues.deleteIssue({ issueIdOrKey: created.key!, });

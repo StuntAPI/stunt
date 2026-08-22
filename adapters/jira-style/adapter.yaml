@@ -79,6 +79,7 @@ endpoints:
   - route: /rest/api/2/issue/{key}
     method: PUT
     handler: scripts/issue.star#on_update_issue
+    concurrency_key: key # read-modify-write on the issue fields
   - route: /rest/api/2/issue/{key}
     method: DELETE
     handler: scripts/issue.star#on_delete_issue
@@ -88,6 +89,7 @@ endpoints:
   - route: /rest/api/2/issue/{key}/transitions
     method: POST
     handler: scripts/issue.star#on_do_transition
+    concurrency_key: key # read-modify-write on the issue status
   - route: /rest/api/2/issue/{key}/comment
     method: GET
     handler: scripts/issue.star#on_list_comments
@@ -105,15 +107,6 @@ endpoints:
     handler: scripts/issue.star#on_delete_comment
 
   # --- issue comments ---
-  # jira.js and other clients post comments over /rest/api/2 (real Jira
-  # serves both versions); declared FIRST so the bare v3 route below is
-  # unaffected.
-  - route: /rest/api/2/issue/{key}/comment
-    method: GET
-    handler: scripts/issue.star#on_list_comments
-  - route: /rest/api/2/issue/{key}/comment
-    method: POST
-    handler: scripts/issue.star#on_add_comment
   - route: /rest/api/3/issue/{key}/comment
     method: GET
     handler: scripts/issue.star#on_list_comments
