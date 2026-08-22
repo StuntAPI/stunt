@@ -349,7 +349,8 @@ adapters:
       - "No rate limiting: 429 too-many-requests responses and quotas not simulated"
       - "No 403 access-denied, 415 unsupported-media-type, or 405 method problem responses"
   entra-id-style:
-    deviations: []
+    deviations:
+      - "Authorize auto-approves with an instant 302; no consent screen"
     missing:
       - "No $filter, $search, $orderby, $select, or $expand on Graph queries"
       - "No user PATCH or DELETE (/v1.0/users/{id})"
@@ -375,8 +376,8 @@ adapters:
     deviations:
       - "POST /sim/transaction/{id}/fund is a simulator-only affordance for hosted-page funding"
     missing:
-      - "No transaction list endpoint (GET /2017-09-01/transactions, filters, paging)"
-      - "No ship, receive, accept, reject, or cancel transaction actions"
+      - "No list filters on GET /2017-09-01/transaction (status, date, email)"
+      - "No reject or return-item actions (agree/accept/ship/receive/cancel exist)"
       - "No fee calculation endpoint (/2017-09-01/transaction/fees)"
   eth-jsonrpc-style:
     deviations:
@@ -879,7 +880,6 @@ adapters:
     missing:
       - "No PDF rendering, e-Factura (ANAF SPV) transmission, or email/SMS delivery"
       - "No GET /invoice/paymentstatus (paidAmount/unpaidAmount/paid reporting)"
-      - "Only /invoice has a single-doc read; no GET /estimate or GET /purchase by number"
   sqs-style:
     deviations:
       - "QueueUrl omits the 12-digit account id; http://<host>/<queueName> instead of the AWS path"

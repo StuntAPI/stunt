@@ -54,7 +54,7 @@ Verification tiers:
 | [dynamodb-style](adapters/dynamodb-style/) | Amazon DynamoDB API `2012-08-10` | 1 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 8 | [8](#dynamodb-style) | [5](#dynamodb-style) |
 | [echo-style](adapters/echo-style/) | gRPC echo demo `1.0` | 0 (+1 ws) | boot | — | — | — | — |
 | [emailoctopus-style](adapters/emailoctopus-style/) | EmailOctopus API `2.0.0` | 21 | boot | — | — | [2](#emailoctopus-style) | [3](#emailoctopus-style) |
-| [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | boot | — | — | [8](#entra-id-style) | — |
+| [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | boot | — | — | [8](#entra-id-style) | [1](#entra-id-style) |
 | [erc4337-style](adapters/erc4337-style/) | ERC-4337 Bundler RPC `0.7` | 2 | boot | — | — | [5](#erc4337-style) | [4](#erc4337-style) |
 | [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | boot | — | — | [3](#escrow-style) | [1](#escrow-style) |
 | [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | boot | — | — | [5](#eth-jsonrpc-style) | [4](#eth-jsonrpc-style) |
@@ -106,7 +106,7 @@ Verification tiers:
 | [shopify-style](adapters/shopify-style/) | Shopify Admin REST + GraphQL API `2024-10` | 21 +GQL | SDK | go-shopify/v4 @ v4.7.0 | 5 | [7](#shopify-style) | [4](#shopify-style) |
 | [signin-with-apple-style](adapters/signin-with-apple-style/) | Sign in with Apple `v2` | 3 | boot | — | — | [3](#signin-with-apple-style) | [2](#signin-with-apple-style) |
 | [slack-style](adapters/slack-style/) | Slack Web API `1.0` | 7 | boot | — | — | [6](#slack-style) | [2](#slack-style) |
-| [smartbill-style](adapters/smartbill-style/) | SmartBill Cloud API `1.0` | 18 | boot | — | — | [3](#smartbill-style) | [5](#smartbill-style) |
+| [smartbill-style](adapters/smartbill-style/) | SmartBill Cloud API `1.0` | 18 | boot | — | — | [2](#smartbill-style) | [5](#smartbill-style) |
 | [sqs-style](adapters/sqs-style/) | Amazon SQS API `2012-11-05` | 2 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 6 | [4](#sqs-style) | [5](#sqs-style) |
 | [square-style](adapters/square-style/) | Square API `2024-08-21` | 18 | boot | — | — | [7](#square-style) | [2](#square-style) |
 | [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.3.0<br>stripe-node @ 22.5.0 (floor) | 9 | [7](#stripe-style) | [5](#stripe-style) |
@@ -1330,6 +1330,10 @@ behavior notes live in each adapter's README.
 - No client-credentials or device-code token grant support
 - No signInLogs, audit logs, or user activities
 
+**Deviations** (1)
+
+- Authorize auto-approves with an instant 302; no consent screen
+
 ### erc4337-style
 
 **Covered** — 2 routes
@@ -1380,8 +1384,8 @@ behavior notes live in each adapter's README.
 
 **Missing** (3)
 
-- No transaction list endpoint (GET /2017-09-01/transactions, filters, paging)
-- No ship, receive, accept, reject, or cancel transaction actions
+- No list filters on GET /2017-09-01/transaction (status, date, email)
+- No reject or return-item actions (agree/accept/ship/receive/cancel exist)
 - No fee calculation endpoint (/2017-09-01/transaction/fees)
 
 **Deviations** (1)
@@ -3204,11 +3208,10 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Missing** (3)
+**Missing** (2)
 
 - No PDF rendering, e-Factura (ANAF SPV) transmission, or email/SMS delivery
 - No GET /invoice/paymentstatus (paidAmount/unpaidAmount/paid reporting)
-- Only /invoice has a single-doc read; no GET /estimate or GET /purchase by number
 
 **Deviations** (5)
 
