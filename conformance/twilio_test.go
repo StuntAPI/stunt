@@ -4,7 +4,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base64"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -68,7 +67,7 @@ func TestTwilioSDKConformance(t *testing.T) {
 	if terminal != "delivered" && terminal != "sent" {
 		t.Fatalf("lifecycle poll ended at %q, want sent/delivered (derive-on-read transitions)", terminal)
 	}
-	Record(t, "twilio-go", "twilio-style", fmt.Sprintf("FetchMessage poll reaches terminal state (%s)", terminal))
+	Record(t, "twilio-go", "twilio-style", "FetchMessage poll reaches terminal state")
 
 	// ===== The magic invalid number -> failed =====
 

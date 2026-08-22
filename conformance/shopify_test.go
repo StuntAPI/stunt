@@ -2,6 +2,7 @@ package conformance
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	goshopify "github.com/bold-commerce/go-shopify/v3"
+	goshopify "github.com/bold-commerce/go-shopify/v4"
 )
 
 // TestShopifySDKConformance drives go-shopify (bold-commerce, the standard
@@ -36,16 +37,20 @@ func TestShopifySDKConformance(t *testing.T) {
 	}))
 	defer sink.Close()
 
+	ctx := context.Background()
 	base := Boot(t, "shopify-style", sink.URL)
 
 	app := goshopify.App{ApiSecret: "shpss_stunt_mock_api_client_secret"}
-	client := goshopify.NewClient(app, "conformance", "shpat_test",
+	client, err := goshopify.NewClient(app, "conformance", "shpat_test",
 		goshopify.WithHTTPClient(RewriteClient(t, base)),
 		goshopify.WithVersion("2024-10"))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// ===== Register a webhook BEFORE creating orders (deliveries gate on it) =====
 
-	hook, err := client.Webhook.Create(goshopify.Webhook{
+	hook, err := client.Webhook.Create(ctx, goshopify.Webhook{
 		Address: sink.URL,
 		Topic:   "orders/create",
 		Format:  "json",
@@ -53,15 +58,15 @@ func TestShopifySDKConformance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Webhook.Create: %v", err)
 	}
-	if hook.ID == 0 {
+	if hook.Id == 0 {
 		t.Fatal("webhook id not assigned")
 	}
-	Record(t, "go-shopify/v3", "shopify-style", "Webhook.Create (orders/create)")
+	Record(t, "go-shopify/v4", "shopify-style", "Webhook.Create (orders/create)")
 
 	// ===== Order creates =====
 
 	for i := 1; i <= 4; i++ {
-		order, err := client.Order.Create(goshopify.Order{
+		order, err := client.Order.Create(ctx, goshopify.Order{
 			LineItems: []goshopify.LineItem{
 				{Title: fmt.Sprintf("Widget %d", i), Quantity: i},
 			},
@@ -70,30 +75,30 @@ func TestShopifySDKConformance(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Order.Create %d: %v", i, err)
 		}
-		if order.ID == 0 {
+		if order.Id == 0 {
 			t.Fatalf("order %d: no id assigned", i)
 		}
 	}
-	Record(t, "go-shopify/v3", "shopify-style", "Order.Create x4 (numeric ids)")
+	Record(t, "go-shopify/v4", "shopify-style", "Order.Create x4 (numeric ids)")
 
 	// The most common real pattern: an order carrying an embedded
 	// customer. The id round-trips numeric (regression: a float/int
 	// customer id used to crash the view and poison every later list).
-	withCustomer, err := client.Order.Create(goshopify.Order{
+	withCustomer, err := client.Order.Create(ctx, goshopify.Order{
 		LineItems: []goshopify.LineItem{{Title: "For someone", Quantity: 1}},
-		Customer:  &goshopify.Customer{ID: 42, Email: "buyer@example.test"},
+		Customer:  &goshopify.Customer{Id: 42, Email: "buyer@example.test"},
 	})
 	if err != nil {
 		t.Fatalf("Order.Create with customer: %v", err)
 	}
-	if withCustomer.Customer == nil || withCustomer.Customer.ID != 42 {
+	if withCustomer.Customer == nil || withCustomer.Customer.Id != 42 {
 		t.Fatalf("embedded customer id = %+v, want 42", withCustomer.Customer)
 	}
 	// And the list still renders every order afterwards.
-	if _, _, err := client.Order.ListWithPagination(nil); err != nil {
+	if _, _, err := client.Order.ListWithPagination(ctx, nil); err != nil {
 		t.Fatalf("Order.List after embedded-customer create: %v", err)
 	}
-	Record(t, "go-shopify/v3", "shopify-style", "Order.Create with embedded customer (numeric id round-trip)")
+	Record(t, "go-shopify/v4", "shopify-style", "Order.Create with embedded customer (numeric id round-trip)")
 
 	// ===== Cursor pagination through the SDK's Link-header walking =====
 
@@ -101,7 +106,7 @@ func TestShopifySDKConformance(t *testing.T) {
 	var collected []goshopify.Order
 	pages := 0
 	for {
-		page, pagination, err := client.Order.ListWithPagination(options)
+		page, pagination, err := client.Order.ListWithPagination(ctx, options)
 		if err != nil {
 			t.Fatalf("Order.ListWithPagination: %v", err)
 		}
@@ -119,7 +124,7 @@ func TestShopifySDKConformance(t *testing.T) {
 	if pages < 2 {
 		t.Fatalf("walked %d pages with Limit=2 over %d orders — cursor not followed", pages, len(collected))
 	}
-	Record(t, "go-shopify/v3", "shopify-style", fmt.Sprintf("Order.ListWithPagination walks page_info cursors (%d orders, %d pages)", len(collected), pages))
+	Record(t, "go-shopify/v4", "shopify-style", "Order.ListWithPagination walks page_info cursors")
 
 	// ===== Webhook deliveries verified by the SDK's own HMAC validator =====
 
@@ -153,5 +158,5 @@ func TestShopifySDKConformance(t *testing.T) {
 				i, ok, err, d.headers.Get("X-Shopify-Hmac-Sha256"))
 		}
 	}
-	Record(t, "go-shopify/v3", "shopify-style", "webhooks verify through the SDK's VerifyWebhookRequest HMAC validator")
+	Record(t, "go-shopify/v4", "shopify-style", "webhooks verify through the SDK's VerifyWebhookRequest HMAC validator")
 }

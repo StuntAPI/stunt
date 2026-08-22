@@ -6,8 +6,8 @@
     "test": "bun test"
   },
   "dependencies": {
-    "stripe": "^19.0.0",
-    "octokit": "^5.0.0",
-    "twilio": "^5.0.0"
+    "stripe": "^22.5.0",
+    "octokit": "^5.0.5",
+    "twilio": "^6.1.0"
   }
 }

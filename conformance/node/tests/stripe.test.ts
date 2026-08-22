@@ -89,14 +89,22 @@ describe("stripe-node against stripe-style", () => {
         // With a fresh binary the SDK path may work — try it, fall back
         // to the raw POST if the url param vanishes again.
         let registeredViaSDK = false;
+        let sdkErr: unknown = null;
         try {
           const viaSDK = await stripe.webhookEndpoints.create({
             url: h.sinkUrl,
             enabled_events: ["payment_intent.succeeded"],
           });
           registeredViaSDK = viaSDK.id != null && viaSDK.url === h.sinkUrl;
-        } catch {
-          registeredViaSDK = false;
+        } catch (e) {
+          sdkErr = e;
+        }
+        // Under bun the SDK drops the url form param; v22 surfaces that
+        // as a thrown client-side "Missing required param: url". That
+        // exact error is the known quirk — anything else is a real break
+        // in the SDK path and must fail the suite.
+        if (sdkErr != null && !String(sdkErr).includes("Missing required param: url")) {
+          throw new Error(`webhookEndpoints.create threw (not the url-param quirk): ${sdkErr}`);
         }
         if (!registeredViaSDK) {
           console.warn("webhookEndpoints.create fell back to raw POST (bun/stripe-node url-param quirk?)");

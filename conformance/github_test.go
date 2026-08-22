@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/go-github/v66/github"
+	"github.com/google/go-github/v89/github"
 	"golang.org/x/oauth2"
 )
 
@@ -19,9 +19,14 @@ func TestGitHubSDKConformance(t *testing.T) {
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: "ghp_pat_token_mock"})
 	tc := oauth2.NewClient(ctx, ts)
 	tc.Timeout = HTTPClient().Timeout
-	client := github.NewClient(tc)
-	u := base + "/"
-	client.BaseURL, _ = parseURL(u)
+	// v89 encapsulated Client: NewClient is an options constructor and
+	// BaseURL is set via WithURLs (WithEnterpriseURLs would append
+	// api/v3/ to our plain host).
+	baseURL := base + "/"
+	client, err := github.NewClient(github.WithHTTPClient(tc), github.WithURLs(&baseURL, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// The adapter serves the seeded octocat/hello-world repo and 404s
 	// unknown repos exactly like the real API.
@@ -41,7 +46,7 @@ func TestGitHubSDKConformance(t *testing.T) {
 			t.Fatalf("issue %d: number=%d title=%q", i, issue.GetNumber(), issue.GetTitle())
 		}
 	}
-	Record(t, "go-github/v66", "github-style", "Issues.Create x5 (number assignment)")
+	Record(t, "go-github/v89", "github-style", "Issues.Create x5 (number assignment)")
 
 	// ===== SDK pagination: Link header -> resp.NextPage walking =====
 
@@ -58,7 +63,7 @@ func TestGitHubSDKConformance(t *testing.T) {
 		if resp.NextPage == 0 {
 			break
 		}
-		opts.Page = resp.NextPage
+		opts.ListOptions.Page = resp.NextPage // Page is ambiguous since cursor opts merged in
 	}
 	// The seeded repo ships one pre-existing issue; ours are 5 more.
 	if len(collected) < 6 {
@@ -78,7 +83,7 @@ func TestGitHubSDKConformance(t *testing.T) {
 	if ours != 5 {
 		t.Fatalf("found %d/5 created issues across pages", ours)
 	}
-	Record(t, "go-github/v66", "github-style", fmt.Sprintf("Issues.ListByRepo walks Link headers (%d over PerPage=2, %d pages)", len(collected), pages))
+	Record(t, "go-github/v89", "github-style", "Issues.ListByRepo walks Link headers across pages")
 
 	// ===== Comment on an issue =====
 
@@ -92,7 +97,7 @@ func TestGitHubSDKConformance(t *testing.T) {
 	if cmt.GetBody() != "SDK comment" || cmt.GetID() == 0 {
 		t.Fatalf("comment = %+v", cmt)
 	}
-	Record(t, "go-github/v66", "github-style", "Issues.CreateComment")
+	Record(t, "go-github/v89", "github-style", "Issues.CreateComment")
 
 	listed, _, err := client.Issues.ListComments(ctx, owner, repo, num, nil)
 	if err != nil {
@@ -101,7 +106,7 @@ func TestGitHubSDKConformance(t *testing.T) {
 	if len(listed) == 0 || listed[len(listed)-1].GetBody() != "SDK comment" {
 		t.Fatalf("ListComments = %d comments", len(listed))
 	}
-	Record(t, "go-github/v66", "github-style", "Issues.ListComments round-trip")
+	Record(t, "go-github/v89", "github-style", "Issues.ListComments round-trip")
 
 	// ===== Close an issue (state transition) =====
 
@@ -114,5 +119,5 @@ func TestGitHubSDKConformance(t *testing.T) {
 	if closed.GetState() != "closed" {
 		t.Fatalf("state = %q, want closed", closed.GetState())
 	}
-	Record(t, "go-github/v66", "github-style", "Issues.Edit state transition")
+	Record(t, "go-github/v89", "github-style", "Issues.Edit state transition")
 }
