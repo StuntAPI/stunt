@@ -53,6 +53,11 @@ endpoints:
     handler: scripts/service_accounts.star#on_sa_post_dispatch
 
   # --- IAM Roles query ---
+  # Canonical path first (roles.queryGrantableRoles is project-less in the
+  # real API); the project-scoped form stays as an alias.
+  - route: /v1/roles:queryGrantableRoles
+    method: POST
+    handler: scripts/roles.star#on_query_grantable_roles
   - route: /v1/projects/{project}/roles:queryGrantableRoles
     method: POST
     handler: scripts/roles.star#on_query_grantable_roles

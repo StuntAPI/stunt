@@ -17,6 +17,17 @@ api:
 # matched first (the dispatch engine checks in declaration order).
 endpoints:
   # --- Admin API: account/property/stream hierarchy ---
+  # v1beta aliases: the shipped Go client drives the Admin API at v1beta;
+  # the resource shapes are shared with v1.
+  - route: /v1beta/accounts
+    method: GET
+    handler: scripts/admin.star#on_list_accounts
+  - route: /v1beta/properties
+    method: GET
+    handler: scripts/admin.star#on_list_properties
+  - route: /v1beta/properties/{property}/dataStreams
+    method: GET
+    handler: scripts/admin.star#on_list_datastreams
   - route: /v1admin/accounts
     method: GET
     handler: scripts/admin.star#on_list_accounts

@@ -1,12 +1,12 @@
 {
   "summary": {
     "adapters": 98,
-    "checks": 184,
+    "checks": 223,
     "tiers": {
       "sdk_and_vm": 2,
-      "sdk_only": 27,
+      "sdk_only": 33,
       "vm_only": 4,
-      "boot": 65
+      "boot": 59
     }
   },
   "adapters": [
@@ -467,16 +467,30 @@
       "id": "apps-script-style",
       "api_name": "Google Apps Script API",
       "api_version": "v1",
-      "routes": 7,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "routes": 11,
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "google-api-go-client",
+          "version": "v0.293.0"
+        }
+      ],
+      "behaviors": [
+        "Projects.Create + Projects.Get round-trip",
+        "Projects content update + get round-trip",
+        "Scripts.Run returns a done Operation with the function result",
+        "Scripts.Run passes parameters into the simulation",
+        "Deployments.Create + Deployments.List round-trip",
+        "Unknown project content Get -\u003e googleapi 404"
+      ],
       "missing": [
-        "No deployment list/get/update/delete — only POST create",
+        "No deployment get/update/delete — only create and list",
         "No versions endpoint (GET /v1/projects/{scriptId}/versions)"
       ],
       "deviations": [
-        ":run never executes code — known patterns return canned results, others echo parameters"
+        ":run never executes code — known patterns return canned results, others echo parameters",
+        "scripts.run also served at a legacy path form (projects/{id}/scripts/{fn}/run)",
+        "content update accepts POST as well as the real API's PUT"
       ],
       "covered": [
         {
@@ -488,11 +502,19 @@
           "route": "/v1/projects"
         },
         {
+          "method": "GET",
+          "route": "/v1/projects/{scriptId}"
+        },
+        {
           "method": "DELETE",
           "route": "/v1/projects/{scriptId}"
         },
         {
           "method": "GET",
+          "route": "/v1/projects/{scriptId}/content"
+        },
+        {
+          "method": "PUT",
           "route": "/v1/projects/{scriptId}/content"
         },
         {
@@ -502,6 +524,14 @@
         {
           "method": "POST",
           "route": "/v1/projects/{scriptId}/deployments"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/projects/{scriptId}/deployments"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/scripts/{scriptId}:run"
         },
         {
           "method": "POST",
@@ -1404,9 +1434,22 @@
       "api_name": "Cloudflare API",
       "api_version": "4",
       "routes": 35,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "cloudflare-go",
+          "version": "v0.117.0"
+        }
+      ],
+      "behaviors": [
+        "Zones list returns the seeded zone",
+        "Zones list filters by name",
+        "CreateZone + ZoneDetails round-trip",
+        "Duplicate CreateZone -\u003e error code 1061",
+        "DNS records create + list + update round-trip",
+        "Firewall rules batch create + list with filter expression",
+        "DNS record delete + zone delete then details fails"
+      ],
       "missing": [
         "No Workers KV: namespace or key-value endpoints (storage/kv/values)",
         "No Workers routes, custom domains, cron triggers, secrets, or tail endpoints",
@@ -1419,6 +1462,7 @@
       ],
       "deviations": [
         "any non-empty bearer token accepted; real token permission scoping not validated",
+        "paths served without the /client/v4 prefix — cloudflare-go's BaseURL replaces the whole base, raw REST clients must strip it",
         "zone status runs pending -\u003e initializing -\u003e active in ~4s; real waits on nameservers",
         "deployments expose a status field; real Deployment objects carry rollout percentages",
         "simulate_fail on zone create / worker deploy injects moved or failed; no real trigger",
@@ -2656,10 +2700,23 @@
       "id": "ga4-style",
       "api_name": "Google Analytics Data API + Admin API",
       "api_version": "v1beta",
-      "routes": 4,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "routes": 7,
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "google-api-go-client",
+          "version": "v0.293.0"
+        }
+      ],
+      "behaviors": [
+        "Admin Accounts.List returns the seeded account",
+        "Admin Properties.List filters by parent account",
+        "Admin DataStreams.List returns the property streams",
+        "Data runReport returns headers, rows, and rowCount",
+        "Data runReport limit pages rows deterministically",
+        "Data runRealtimeReport returns rows",
+        "Unknown dimension runReport -\u003e googleapi 400"
+      ],
       "missing": [
         "No pivots, cohortSpec, metricAggregations, or keepEmptyRows in runReport",
         "No runPivotReport, batchRunReports, getMetadata, or checkCompatibility",
@@ -2668,9 +2725,22 @@
       ],
       "deviations": [
         "Dimensions: date/country/deviceCategory only; metrics: sessions/activeUsers/screenPageViews",
-        "properties.list honors only the filter=parent:\u003caccount\u003e form"
+        "properties.list honors only the filter=parent:\u003caccount\u003e form",
+        "Admin API served at both /v1admin (GA) and /v1beta (the shipped Go client's version); shapes shared"
       ],
       "covered": [
+        {
+          "method": "GET",
+          "route": "/v1beta/accounts"
+        },
+        {
+          "method": "GET",
+          "route": "/v1beta/properties"
+        },
+        {
+          "method": "GET",
+          "route": "/v1beta/properties/{property}/dataStreams"
+        },
         {
           "method": "GET",
           "route": "/v1admin/accounts"
@@ -2768,10 +2838,21 @@
       "id": "gdocs-style",
       "api_name": "Google Docs API",
       "api_version": "v1",
-      "routes": 4,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "routes": 5,
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "google-api-go-client",
+          "version": "v0.293.0"
+        }
+      ],
+      "behaviors": [
+        "Documents.Create returns documentId + title",
+        "Documents.Get returns the structural body model",
+        "batchUpdate insertText applies and replies 1:1",
+        "batchUpdate applies ordered requests at indexes",
+        "Unknown document Get -\u003e googleapi 404"
+      ],
       "missing": [
         "Tables, headers/footers, suggestions, and writeControl not modeled",
         "Most batchUpdate request types absent: replaceAllText, replaceImage, named ranges",
@@ -2779,6 +2860,8 @@
       ],
       "deviations": [
         "batchUpdate replies map 1:1 to requests; real API may return fewer",
+        "batchUpdate also served at the legacy slash form (documents/{id}/batchUpdate)",
+        "GET revisions endpoint is extra-API; the real Docs API v1 has none",
         "Inserted text adopts the style of the run it lands in",
         "Inserting newline continues bullet/named style into the new paragraph"
       ],
@@ -2790,6 +2873,10 @@
         {
           "method": "GET",
           "route": "/v1/documents/{documentId}/revisions"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/documents/{documentId}:batchUpdate"
         },
         {
           "method": "POST",
@@ -3144,10 +3231,23 @@
       "id": "google-iam-style",
       "api_name": "Google Cloud IAM API + Service Accounts",
       "api_version": "v1",
-      "routes": 9,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "routes": 10,
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "google-api-go-client",
+          "version": "v0.293.0"
+        }
+      ],
+      "behaviors": [
+        "jwt-bearer exchange mints the SDK's access token",
+        "ServiceAccounts.List returns the seeded account",
+        "ServiceAccounts.Create + Get round-trip",
+        "ServiceAccounts.Keys.List returns managed keys",
+        "Roles.QueryGrantableRoles returns grantable roles",
+        "ServiceAccounts.Delete then Get -\u003e googleapi 404",
+        "Garbage bearer -\u003e googleapi 401"
+      ],
       "missing": [
         "No serviceAccountKeys create/delete, signJwt, or signBlob methods",
         "No serviceAccount patch, disable/enable, undelete, or getIamPolicy",
@@ -3155,7 +3255,8 @@
         "No roles list, get, create, or custom-role CRUD endpoints"
       ],
       "deviations": [
-        "JWKS serves one fixed synthetic RSA-2048 key (kid mock-google-key-1)"
+        "JWKS serves one fixed synthetic RSA-2048 key (kid mock-google-key-1)",
+        "roles:queryGrantableRoles also served project-scoped (extra form; the real path is project-less)"
       ],
       "covered": [
         {
@@ -3189,6 +3290,10 @@
         {
           "method": "POST",
           "route": "/v1/projects/{project}/serviceAccounts/{sa_verb}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/roles:queryGrantableRoles"
         },
         {
           "method": "POST",
@@ -3253,9 +3358,22 @@
       "api_name": "Google Search Console API",
       "api_version": "v1",
       "routes": 11,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "google-api-go-client",
+          "version": "v0.293.0"
+        }
+      ],
+      "behaviors": [
+        "Sites.List returns the seeded properties",
+        "Sites.Get returns the property with permissionLevel",
+        "Sites.Add starts unverified and lists immediately",
+        "Searchanalytics.Query returns keyed metric rows",
+        "Sitemaps.Submit + List round-trip",
+        "UrlInspection.Index.Inspect returns an index-status verdict",
+        "Unknown site Get -\u003e googleapi 404"
+      ],
       "missing": [
         "16-month window not modeled; ranges derive at most 90 days / ~1800 cells",
         "No country dimension in search analytics"

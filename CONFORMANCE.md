@@ -21,7 +21,7 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**98 adapters** — 2 SDK+VM, 27 SDK-only, 4 VM-only, 65 boot-tier.
+**98 adapters** — 2 SDK+VM, 33 SDK-only, 4 VM-only, 59 boot-tier.
 
 | Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |
 |---|---|---|---|---|---|---|---|
@@ -31,7 +31,7 @@ Verification tiers:
 | [apple-appstoreconnect-style](adapters/apple-appstoreconnect-style/) | App Store Connect API `v3` | 15 | boot | — | — | [7](#apple-appstoreconnect-style) | [5](#apple-appstoreconnect-style) |
 | [apple-music-style](adapters/apple-music-style/) | Apple Music API `1.0` | 18 | boot | — | — | [5](#apple-music-style) | [2](#apple-music-style) |
 | [apple-searchads-style](adapters/apple-searchads-style/) | Apple Search Ads API `v4` | 12 | boot | — | — | [4](#apple-searchads-style) | [3](#apple-searchads-style) |
-| [apps-script-style](adapters/apps-script-style/) | Google Apps Script API `v1` | 7 | boot | — | — | [2](#apps-script-style) | [1](#apps-script-style) |
+| [apps-script-style](adapters/apps-script-style/) | Google Apps Script API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 6 | [2](#apps-script-style) | [3](#apps-script-style) |
 | [auth0-style](adapters/auth0-style/) | Auth0 Authentication & Management API `v2` | 17 | VM | — | — | [3](#auth0-style) | [4](#auth0-style) |
 | [avalara-style](adapters/avalara-style/) | Avalara AvaTax REST API `2` | 8 | boot | — | — | [5](#avalara-style) | [1](#avalara-style) |
 | [aws-cognito-style](adapters/aws-cognito-style/) | Amazon Cognito Identity Provider API `2016-04-18` | 7 | VM | — | — | [6](#aws-cognito-style) | [3](#aws-cognito-style) |
@@ -45,7 +45,7 @@ Verification tiers:
 | [braintree-style](adapters/braintree-style/) | Braintree GraphQL + REST API `2024-09-01` | 15 +GQL | boot | — | — | [8](#braintree-style) | [5](#braintree-style) |
 | [braze-style](adapters/braze-style/) | Braze REST API `2.0` | 12 | boot | — | — | [8](#braze-style) | [4](#braze-style) |
 | [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | boot | — | — | [6](#chainlink-style) | [5](#chainlink-style) |
-| [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | boot | — | — | [8](#cloudflare-style) | [5](#cloudflare-style) |
+| [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | SDK | cloudflare-go @ v0.117.0 | 7 | [8](#cloudflare-style) | [6](#cloudflare-style) |
 | [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | boot | — | — | [6](#cloudkit-style) | [2](#cloudkit-style) |
 | [discord-style](adapters/discord-style/) | Discord API `v10` | 26 (+1 ws) | SDK | discord-node @ 2.6.3 (floor) | 5 | [8](#discord-style) | [5](#discord-style) |
 | [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | SDK | google-api-go-client @ v0.293.0 | 8 | [7](#drive-style) | [5](#drive-style) |
@@ -61,15 +61,15 @@ Verification tiers:
 | [etherscan-style](adapters/etherscan-style/) | Etherscan API `1.0` | 1 | boot | — | — | [3](#etherscan-style) | [1](#etherscan-style) |
 | [fattureincloud-style](adapters/fattureincloud-style/) | Fatture in Cloud API v2 `2.0.29` | 42 | boot | — | — | [3](#fattureincloud-style) | [3](#fattureincloud-style) |
 | [firebase-style](adapters/firebase-style/) | Firebase Auth + Firestore + Cloud Messaging API `v1` | 22 | boot | — | — | [4](#firebase-style) | [5](#firebase-style) |
-| [ga4-style](adapters/ga4-style/) | Google Analytics Data API + Admin API `v1beta` | 4 | boot | — | — | [4](#ga4-style) | [2](#ga4-style) |
+| [ga4-style](adapters/ga4-style/) | Google Analytics Data API + Admin API `v1beta` | 7 | SDK | google-api-go-client @ v0.293.0 | 7 | [4](#ga4-style) | [3](#ga4-style) |
 | [gcalendar-style](adapters/gcalendar-style/) | Google Calendar API `v3` | 10 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#gcalendar-style) | [2](#gcalendar-style) |
-| [gdocs-style](adapters/gdocs-style/) | Google Docs API `v1` | 4 | boot | — | — | [3](#gdocs-style) | [3](#gdocs-style) |
+| [gdocs-style](adapters/gdocs-style/) | Google Docs API `v1` | 5 | SDK | google-api-go-client @ v0.293.0 | 5 | [3](#gdocs-style) | [5](#gdocs-style) |
 | [github-style](adapters/github-style/) | GitHub REST + GraphQL API `2022-11-28` | 26 +GQL | SDK | go-github/v89 @ v89.0.0<br>octokit @ 5.0.5 (floor) | 6 | [7](#github-style) | [4](#github-style) |
 | [gmail-style](adapters/gmail-style/) | Gmail API `v1` | 16 | SDK | google-api-go-client @ v0.293.0 | 9 | [6](#gmail-style) | [3](#gmail-style) |
 | [google-admin-style](adapters/google-admin-style/) | Google Admin SDK Directory API `directory_v1` | 13 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#google-admin-style) | [4](#google-admin-style) |
-| [google-iam-style](adapters/google-iam-style/) | Google Cloud IAM API + Service Accounts `v1` | 9 | boot | — | — | [4](#google-iam-style) | [1](#google-iam-style) |
+| [google-iam-style](adapters/google-iam-style/) | Google Cloud IAM API + Service Accounts `v1` | 10 | SDK | google-api-go-client @ v0.293.0 | 7 | [4](#google-iam-style) | [2](#google-iam-style) |
 | [google-style](adapters/google-style/) | Google OAuth2 API `v2` | 4 | SDK | x/oauth2 @ v0.36.0<br>google-api-go-client/idtoken @ v0.293.0 | 7 | [2](#google-style) | [2](#google-style) |
-| [gsearchconsole-style](adapters/gsearchconsole-style/) | Google Search Console API `v1` | 11 | boot | — | — | [2](#gsearchconsole-style) | [4](#gsearchconsole-style) |
+| [gsearchconsole-style](adapters/gsearchconsole-style/) | Google Search Console API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 7 | [2](#gsearchconsole-style) | [4](#gsearchconsole-style) |
 | [gsheets-style](adapters/gsheets-style/) | Google Sheets API `v4` | 10 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#gsheets-style) | [3](#gsheets-style) |
 | [gtasks-style](adapters/gtasks-style/) | Google Tasks API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 8 | [3](#gtasks-style) | [2](#gtasks-style) |
 | [helius-style](adapters/helius-style/) | Helius Solana RPC + Enhanced API `v0` | 11 | boot | — | — | [3](#helius-style) | [4](#helius-style) |
@@ -166,6 +166,18 @@ sections in `conformance/node/tests/*.test.ts`).
 - SendMessageBatch correlated results
 - missing-queue typed error surface
 
+### cloudflare-go @ v0.117.0
+
+**cloudflare-style**
+
+- Zones list returns the seeded zone
+- Zones list filters by name
+- CreateZone + ZoneDetails round-trip
+- Duplicate CreateZone -> error code 1061
+- DNS records create + list + update round-trip
+- Firewall rules batch create + list with filter expression
+- DNS record delete + zone delete then details fails
+
 ### discord-node @ 2.6.3 (floor)
 
 **discord-style**
@@ -208,6 +220,15 @@ sections in `conformance/node/tests/*.test.ts`).
 
 ### google-api-go-client @ v0.293.0
 
+**apps-script-style**
+
+- Projects.Create + Projects.Get round-trip
+- Projects content update + get round-trip
+- Scripts.Run returns a done Operation with the function result
+- Scripts.Run passes parameters into the simulation
+- Deployments.Create + Deployments.List round-trip
+- Unknown project content Get -> googleapi 404
+
 **drive-style**
 
 - Files.List returns the seeded folder
@@ -219,6 +240,16 @@ sections in `conformance/node/tests/*.test.ts`).
 - Files.Delete then Get -> googleapi 404
 - Changes.List replays mutations from startPageToken
 
+**ga4-style**
+
+- Admin Accounts.List returns the seeded account
+- Admin Properties.List filters by parent account
+- Admin DataStreams.List returns the property streams
+- Data runReport returns headers, rows, and rowCount
+- Data runReport limit pages rows deterministically
+- Data runRealtimeReport returns rows
+- Unknown dimension runReport -> googleapi 400
+
 **gcalendar-style**
 
 - Calendars.Get resolves the primary calendar
@@ -229,6 +260,14 @@ sections in `conformance/node/tests/*.test.ts`).
 - Events.Patch updates fields and bumps sequence + etag
 - Events.Instances expands an RRULE into per-occurrence events
 - Events.Delete then Get -> googleapi 404
+
+**gdocs-style**
+
+- Documents.Create returns documentId + title
+- Documents.Get returns the structural body model
+- batchUpdate insertText applies and replies 1:1
+- batchUpdate applies ordered requests at indexes
+- Unknown document Get -> googleapi 404
 
 **gmail-style**
 
@@ -252,6 +291,26 @@ sections in `conformance/node/tests/*.test.ts`).
 - Users.Delete then Get -> decoded googleapi 404
 - Groups.Insert + Members.Insert + Members.List round-trip
 - Groups.List UserKey returns only the groups holding that member
+
+**google-iam-style**
+
+- jwt-bearer exchange mints the SDK's access token
+- ServiceAccounts.List returns the seeded account
+- ServiceAccounts.Create + Get round-trip
+- ServiceAccounts.Keys.List returns managed keys
+- Roles.QueryGrantableRoles returns grantable roles
+- ServiceAccounts.Delete then Get -> googleapi 404
+- Garbage bearer -> googleapi 401
+
+**gsearchconsole-style**
+
+- Sites.List returns the seeded properties
+- Sites.Get returns the property with permissionLevel
+- Sites.Add starts unverified and lists immediately
+- Searchanalytics.Query returns keyed metric rows
+- Sitemaps.Submit + List round-trip
+- UrlInspection.Index.Inspect returns an index-status verdict
+- Unknown site Get -> googleapi 404
 
 **gsheets-style**
 
@@ -697,7 +756,7 @@ behavior notes live in each adapter's README.
 
 ### apps-script-style
 
-**Covered** — 7 routes
+**Covered** — 11 routes
 
 <details><summary>Routes</summary>
 
@@ -705,22 +764,28 @@ behavior notes live in each adapter's README.
 |---|---|
 | GET | `/v1/projects` |
 | POST | `/v1/projects` |
+| GET | `/v1/projects/{scriptId}` |
 | DELETE | `/v1/projects/{scriptId}` |
 | GET | `/v1/projects/{scriptId}/content` |
+| PUT | `/v1/projects/{scriptId}/content` |
 | POST | `/v1/projects/{scriptId}/content` |
 | POST | `/v1/projects/{scriptId}/deployments` |
+| GET | `/v1/projects/{scriptId}/deployments` |
+| POST | `/v1/scripts/{scriptId}:run` |
 | POST | `/v1/projects/{scriptId}/scripts/{functionName}/run` |
 
 </details>
 
 **Missing** (2)
 
-- No deployment list/get/update/delete — only POST create
+- No deployment get/update/delete — only create and list
 - No versions endpoint (GET /v1/projects/{scriptId}/versions)
 
-**Deviations** (1)
+**Deviations** (3)
 
 - :run never executes code — known patterns return canned results, others echo parameters
+- scripts.run also served at a legacy path form (projects/{id}/scripts/{fn}/run)
+- content update accepts POST as well as the real API's PUT
 
 ### auth0-style
 
@@ -1240,9 +1305,10 @@ behavior notes live in each adapter's README.
 - No bulk DNS create/delete (dns_records/batch) or DNS import/export
 - No rate limiting rules or WAF custom rulesets beyond zone firewall rules
 
-**Deviations** (5)
+**Deviations** (6)
 
 - any non-empty bearer token accepted; real token permission scoping not validated
+- paths served without the /client/v4 prefix — cloudflare-go's BaseURL replaces the whole base, raw REST clients must strip it
 - zone status runs pending -> initializing -> active in ~4s; real waits on nameservers
 - deployments expose a status field; real Deployment objects carry rollout percentages
 - simulate_fail on zone create / worker deploy injects moved or failed; no real trigger
@@ -1790,12 +1856,15 @@ behavior notes live in each adapter's README.
 
 ### ga4-style
 
-**Covered** — 4 routes
+**Covered** — 7 routes
 
 <details><summary>Routes</summary>
 
 | Method | Route |
 |---|---|
+| GET | `/v1beta/accounts` |
+| GET | `/v1beta/properties` |
+| GET | `/v1beta/properties/{property}/dataStreams` |
 | GET | `/v1admin/accounts` |
 | GET | `/v1admin/properties` |
 | GET | `/v1admin/properties/{property}/dataStreams` |
@@ -1810,10 +1879,11 @@ behavior notes live in each adapter's README.
 - No Admin write ops: account/property/dataStream create, patch, delete
 - No googleAdsLinks, firebaseLinks, audiences, or conversionEvents
 
-**Deviations** (2)
+**Deviations** (3)
 
 - Dimensions: date/country/deviceCategory only; metrics: sessions/activeUsers/screenPageViews
 - properties.list honors only the filter=parent:<account> form
+- Admin API served at both /v1admin (GA) and /v1beta (the shipped Go client's version); shapes shared
 
 ### gcalendar-style
 
@@ -1850,7 +1920,7 @@ behavior notes live in each adapter's README.
 
 ### gdocs-style
 
-**Covered** — 4 routes
+**Covered** — 5 routes
 
 <details><summary>Routes</summary>
 
@@ -1858,6 +1928,7 @@ behavior notes live in each adapter's README.
 |---|---|
 | POST | `/v1/documents` |
 | GET | `/v1/documents/{documentId}/revisions` |
+| POST | `/v1/documents/{documentId}:batchUpdate` |
 | POST | `/v1/documents/{documentId}/batchUpdate` |
 | GET | `/v1/documents/{documentId}` |
 
@@ -1869,9 +1940,11 @@ behavior notes live in each adapter's README.
 - Most batchUpdate request types absent: replaceAllText, replaceImage, named ranges
 - No createTable or other table requests (insertTableRow, updateTableCellStyle)
 
-**Deviations** (3)
+**Deviations** (5)
 
 - batchUpdate replies map 1:1 to requests; real API may return fewer
+- batchUpdate also served at the legacy slash form (documents/{id}/batchUpdate)
+- GET revisions endpoint is extra-API; the real Docs API v1 has none
 - Inserted text adopts the style of the run it lands in
 - Inserting newline continues bullet/named style into the new paragraph
 
@@ -2011,7 +2084,7 @@ behavior notes live in each adapter's README.
 
 ### google-iam-style
 
-**Covered** — 9 routes
+**Covered** — 10 routes
 
 <details><summary>Routes</summary>
 
@@ -2025,6 +2098,7 @@ behavior notes live in each adapter's README.
 | DELETE | `/v1/projects/{project}/serviceAccounts/{sa}` |
 | GET | `/v1/projects/{project}/serviceAccounts/{sa}/keys` |
 | POST | `/v1/projects/{project}/serviceAccounts/{sa_verb}` |
+| POST | `/v1/roles:queryGrantableRoles` |
 | POST | `/v1/projects/{project}/roles:queryGrantableRoles` |
 
 </details>
@@ -2036,9 +2110,10 @@ behavior notes live in each adapter's README.
 - No generateIdToken method
 - No roles list, get, create, or custom-role CRUD endpoints
 
-**Deviations** (1)
+**Deviations** (2)
 
 - JWKS serves one fixed synthetic RSA-2048 key (kid mock-google-key-1)
+- roles:queryGrantableRoles also served project-scoped (extra form; the real path is project-less)
 
 ### google-style
 

@@ -340,6 +340,7 @@ func loadSidecar(path string, ids []string) (map[string]gapEntry, error) {
 // pins the major, so bumping an SDK needs no edit here.
 var goModuleBases = map[string]string{
 	"aws-sdk-go-v2": "github.com/aws/aws-sdk-go-v2",
+	"cloudflare-go": "github.com/cloudflare/cloudflare-go",
 	"go-github":     "github.com/google/go-github",
 	"go-shopify":    "github.com/bold-commerce/go-shopify",
 	"stripe-go":     "github.com/stripe/stripe-go",

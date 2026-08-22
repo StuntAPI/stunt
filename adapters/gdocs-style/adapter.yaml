@@ -29,6 +29,11 @@ endpoints:
   # --- Batch update (POST with :batchUpdate suffix) ---
   # Read-modify-write over the document's structural model: serialize
   # concurrent batchUpdate calls against the same documentId.
+  - route: /v1/documents/{documentId}:batchUpdate
+    method: POST
+    handler: scripts/documents.star#on_batch_update
+    concurrency_key: documentId
+  # Slash-form alias (pre-canonical shape kept for existing manifests).
   - route: /v1/documents/{documentId}/batchUpdate
     method: POST
     handler: scripts/documents.star#on_batch_update

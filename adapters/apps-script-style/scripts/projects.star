@@ -57,6 +57,20 @@ def on_create_project(req):
 
     return respond(200, _project_resource(project))
 
+# GET /v1/projects/{scriptId} → a single project resource.
+def on_get_project(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    _seed()
+
+    project = _find_project(req["params"]["scriptId"])
+    if project == None:
+        return _g_err(404, "Project " + req["params"]["scriptId"] + " not found.", "NOT_FOUND")
+
+    return respond(200, _project_resource(project))
+
 # DELETE /v1/projects/{scriptId} → delete a project.
 # The real Apps Script API returns an empty response body on success.
 def on_delete_project(req):
@@ -98,12 +112,37 @@ def on_create_deployment(req):
 
     dep_id = "dep-" + str(store_kv_incr("apps-script", "deploy_seq") + 1)
 
-    return respond(200, {
+    dep = {
         "deploymentId": dep_id,
         "scriptId": script_id,
         "deploymentConfig": body.get("deploymentConfig", {}),
         "version": {"versionNumber": version_number, "createTime": _now_ms()},
-    })
+    }
+    dcp = store_collection("deployments")
+    dcp.insert(dep)
+
+    return respond(200, dep)
+
+# GET /v1/projects/{scriptId}/deployments → list a project's deployments.
+def on_list_deployments(req):
+    err = _require_bearer(req)
+    if err != None:
+        return err
+
+    _seed()
+
+    script_id = req["params"]["scriptId"]
+    project = _find_project(script_id)
+    if project == None:
+        return _g_err(404, "Project " + script_id + " not found.", "NOT_FOUND")
+
+    deps = []
+    dcp = store_collection("deployments")
+    for d in dcp.list():
+        if d.get("scriptId") == script_id:
+            deps.append(d)
+
+    return respond(200, {"deployments": deps})
 
 # _project_resource builds the API response shape for a project.
 def _project_resource(p):
