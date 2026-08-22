@@ -16,7 +16,7 @@ def _bearer(req):
 # _GADMIN_STATIC_TOKENS are well-known bearer tokens seeded into the tokens
 # collection on first use so static-token clients (engine tests, quick-start
 # examples) keep working while unknown tokens 401.
-_GADMIN_STATIC_TOKENS = ["ya29.mock-admin-token"]
+_GADMIN_STATIC_TOKENS = ["ya29.mock-admin-token", "conformance-token"]
 
 # _seed_static_tokens inserts each static token into the tokens collection
 # (insert-once: get-then-insert). Seeded tokens carry a far-future

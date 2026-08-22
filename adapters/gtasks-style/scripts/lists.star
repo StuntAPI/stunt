@@ -1,7 +1,8 @@
 # Task list handlers — Google Tasks API task list endpoints.
 #
-# GET  /tasks/v1/lists → list task lists
-# POST /tasks/v1/lists → create a task list
+# GET  /tasks/v1/users/@me/lists → list task lists
+# POST /tasks/v1/users/@me/lists → create a task list
+# (/tasks/v1/lists is served as an alias for the same handlers.)
 
 def on_list_tasklists(req):
     err = _require_bearer(req)

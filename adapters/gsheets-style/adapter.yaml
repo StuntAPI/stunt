@@ -22,6 +22,10 @@ endpoints:
     handler: scripts/spreadsheets.star#on_create_spreadsheet
 
   # --- Values batch operations (literal 4th segment) ---
+  # batchGet is a GET in the real API (ranges as query params).
+  - route: /v4/spreadsheets/{spreadsheetId}/values:batchGet
+    method: GET
+    handler: scripts/values.star#on_batch_get
   - route: /v4/spreadsheets/{spreadsheetId}/values:batchGet
     method: POST
     handler: scripts/values.star#on_batch_get

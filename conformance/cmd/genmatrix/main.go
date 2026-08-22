@@ -343,7 +343,9 @@ var goModuleBases = map[string]string{
 	"stripe-go":     "github.com/stripe/stripe-go",
 	"twilio-go":     "github.com/twilio/twilio-go",
 	"x/oauth2":      "golang.org/x/oauth2",
-	// The google suite labels the subpackage, not the umbrella module.
+	// The google suites label the umbrella module (the data-plane
+	// services) or the subpackage (idtoken) — same module either way.
+	"google-api-go-client":         "google.golang.org/api",
 	"google-api-go-client/idtoken": "google.golang.org/api",
 	// go-ethereum is the canonical Go client for JSON-RPC chains (there is
 	// no single "provider" — the client library is the standard surface).

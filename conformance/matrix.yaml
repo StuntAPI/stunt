@@ -288,6 +288,8 @@ adapters:
       - "uploads take JSON {name, content, parents}; real Drive uses multipart/related bodies"
       - "list q is a limited field/op subset; queries outside it 400 rather than running"
       - "orderBy honors only the first recognized key; real Drive applies every key"
+      - "metadata-only files.create defaults mimeType to the folder type when absent; real Drive defaults to a plain file"
+      - "?alt=media on a content-less file returns 404; real Drive serves 200 with an empty body"
     missing:
       - "No permissions/sharing endpoints on files (GET/POST/DELETE permissions)"
       - "No comments or replies endpoints (/files/{id}/comments)"
@@ -432,6 +434,7 @@ adapters:
   gcalendar-style:
     deviations:
       - "Event create without start/end defaults them (now+30m, +90m); real API requires both"
+      - "quickAdd uses the text verbatim as the summary with a now+30m slot; real Calendar parses natural-language dates"
     missing:
       - "No RRULE MONTHLY/YEARLY frequencies or BY* parts (BYDAY, BYSETPOS)"
       - "No calendars CRUD or calendarList/ACL write endpoints"
@@ -476,7 +479,8 @@ adapters:
     deviations:
       - "Users query supports bare terms plus email:/name:/orgUnitPath=/isSuspended= only"
       - "Groups query silently ignores unrecognized query forms"
-      - "Static convenience token ya29.mock-admin-token seeded far-future"
+      - "Static convenience tokens (ya29.mock-admin-token, conformance-token) seeded far-future"
+      - "users.list ignores customer/domain exactly-one-of enforcement; real Directory requires one"
     missing:
       - "No orgunits, roles, roleAssignments, or schemas resources"
       - "No asps, verificationCodes, mobileDevices, or chromeosDevices"
@@ -507,14 +511,19 @@ adapters:
       - "16-month window not modeled; ranges derive at most 90 days / ~1800 cells"
       - "No country dimension in search analytics"
   gsheets-style:
-    deviations: []
+    deviations:
+      - "Repeated ranges query params collapse to the first value (engine query params are single-valued)"
+      - "Cell values always come back as strings; numeric cells stringify as floats (42 -> \"42.0\"), no USER_ENTERED/RAW typing"
+      - "Spreadsheet get ignores fields= and returns the full object"
     missing:
       - "No row-only A1 ranges (1:5) or quoted sheet titles"
       - "No copyTo, named ranges, developer metadata, or byDataFilter endpoints"
       - "batchUpdate limited to 4 request types; no insertDimension, mergeCells, sortRange"
       - "No valueRenderOption or dateTimeRenderOption on values reads"
   gtasks-style:
-    deviations: []
+    deviations:
+      - "Responses omit the kind field (tasks#task, tasks#taskList); SDKs decode fine without it"
+      - "tasks.insert ignores a client-sent status/completed (always needsAction); due is stored verbatim"
     missing:
       - "No task-list get, patch, or delete endpoints"
       - "No tasks.clear endpoint"

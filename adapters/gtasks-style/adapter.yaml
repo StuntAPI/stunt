@@ -17,6 +17,14 @@ api:
 # matched first (the dispatch engine checks in declaration order).
 endpoints:
   # --- Task lists ---
+  # The canonical path is /tasks/v1/users/@me/lists (every Google client,
+  # discovery included, hits it); /tasks/v1/lists stays as a short alias.
+  - route: /tasks/v1/users/@me/lists
+    method: GET
+    handler: scripts/lists.star#on_list_tasklists
+  - route: /tasks/v1/users/@me/lists
+    method: POST
+    handler: scripts/lists.star#on_create_tasklist
   - route: /tasks/v1/lists
     method: GET
     handler: scripts/lists.star#on_list_tasklists

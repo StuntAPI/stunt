@@ -9,6 +9,8 @@
 # DELETE <session URL> -> 499 cancel (session + partial discarded)
 # POST   /upload/youtube/v3/videos (Bearer; JSON metadata, no resumable
 #        uploadType) -> video resource directly (the simple/media path)
+# POST   /youtube/v3/videos (Bearer; JSON metadata) -> video resource —
+#        the metadata-only insert request URL the real API serves too
 # GET    /youtube/v3/videos?id=...&part=... (Bearer) -> { items: [...] }
 # DELETE /youtube/v3/videos?id=... (Bearer) -> 204
 #

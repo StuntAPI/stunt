@@ -21,7 +21,7 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**98 adapters** — 2 SDK+VM, 18 SDK-only, 4 VM-only, 74 boot-tier.
+**98 adapters** — 2 SDK+VM, 25 SDK-only, 4 VM-only, 67 boot-tier.
 
 | Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |
 |---|---|---|---|---|---|---|---|
@@ -48,7 +48,7 @@ Verification tiers:
 | [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | boot | — | — | [8](#cloudflare-style) | [5](#cloudflare-style) |
 | [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | boot | — | — | [6](#cloudkit-style) | [2](#cloudkit-style) |
 | [discord-style](adapters/discord-style/) | Discord API `v10` | 26 (+1 ws) | SDK | discord-node @ 2.6.3 (floor) | 5 | [8](#discord-style) | [5](#discord-style) |
-| [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | boot | — | — | [7](#drive-style) | [3](#drive-style) |
+| [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | SDK | google-api-go-client @ v0.293.0 | 8 | [7](#drive-style) | [5](#drive-style) |
 | [dropbox-style](adapters/dropbox-style/) | Dropbox API `2` | 8 | boot | — | — | [8](#dropbox-style) | [4](#dropbox-style) |
 | [dune-style](adapters/dune-style/) | Dune Analytics API `v1` | 6 | boot | — | — | [5](#dune-style) | [3](#dune-style) |
 | [dynamodb-style](adapters/dynamodb-style/) | Amazon DynamoDB API `2012-08-10` | 1 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 8 | [8](#dynamodb-style) | [5](#dynamodb-style) |
@@ -62,16 +62,16 @@ Verification tiers:
 | [fattureincloud-style](adapters/fattureincloud-style/) | Fatture in Cloud API v2 `2.0.29` | 42 | boot | — | — | [3](#fattureincloud-style) | [3](#fattureincloud-style) |
 | [firebase-style](adapters/firebase-style/) | Firebase Auth + Firestore + Cloud Messaging API `v1` | 22 | boot | — | — | [4](#firebase-style) | [5](#firebase-style) |
 | [ga4-style](adapters/ga4-style/) | Google Analytics Data API + Admin API `v1beta` | 4 | boot | — | — | [4](#ga4-style) | [2](#ga4-style) |
-| [gcalendar-style](adapters/gcalendar-style/) | Google Calendar API `v3` | 10 | boot | — | — | [4](#gcalendar-style) | [1](#gcalendar-style) |
+| [gcalendar-style](adapters/gcalendar-style/) | Google Calendar API `v3` | 10 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#gcalendar-style) | [2](#gcalendar-style) |
 | [gdocs-style](adapters/gdocs-style/) | Google Docs API `v1` | 4 | boot | — | — | [3](#gdocs-style) | [3](#gdocs-style) |
 | [github-style](adapters/github-style/) | GitHub REST + GraphQL API `2022-11-28` | 26 +GQL | SDK | go-github/v89 @ v89.0.0<br>octokit @ 5.0.5 (floor) | 6 | [7](#github-style) | [4](#github-style) |
-| [gmail-style](adapters/gmail-style/) | Gmail API `v1` | 16 | boot | — | — | [6](#gmail-style) | [3](#gmail-style) |
-| [google-admin-style](adapters/google-admin-style/) | Google Admin SDK Directory API `directory_v1` | 13 | boot | — | — | [4](#google-admin-style) | [3](#google-admin-style) |
+| [gmail-style](adapters/gmail-style/) | Gmail API `v1` | 16 | SDK | google-api-go-client @ v0.293.0 | 9 | [6](#gmail-style) | [3](#gmail-style) |
+| [google-admin-style](adapters/google-admin-style/) | Google Admin SDK Directory API `directory_v1` | 13 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#google-admin-style) | [4](#google-admin-style) |
 | [google-iam-style](adapters/google-iam-style/) | Google Cloud IAM API + Service Accounts `v1` | 9 | boot | — | — | [4](#google-iam-style) | [1](#google-iam-style) |
 | [google-style](adapters/google-style/) | Google OAuth2 API `v2` | 4 | SDK | x/oauth2 @ v0.36.0<br>google-api-go-client/idtoken @ v0.293.0 | 7 | [2](#google-style) | [2](#google-style) |
 | [gsearchconsole-style](adapters/gsearchconsole-style/) | Google Search Console API `v1` | 11 | boot | — | — | [2](#gsearchconsole-style) | [4](#gsearchconsole-style) |
-| [gsheets-style](adapters/gsheets-style/) | Google Sheets API `v4` | 9 | boot | — | — | [4](#gsheets-style) | — |
-| [gtasks-style](adapters/gtasks-style/) | Google Tasks API `v1` | 9 | boot | — | — | [3](#gtasks-style) | — |
+| [gsheets-style](adapters/gsheets-style/) | Google Sheets API `v4` | 10 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#gsheets-style) | [3](#gsheets-style) |
+| [gtasks-style](adapters/gtasks-style/) | Google Tasks API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 8 | [3](#gtasks-style) | [2](#gtasks-style) |
 | [helius-style](adapters/helius-style/) | Helius Solana RPC + Enhanced API `v0` | 11 | boot | — | — | [3](#helius-style) | [4](#helius-style) |
 | [hn-style](adapters/hn-style/) | Hacker News Firebase API `v0` | 11 | boot | — | — | [3](#hn-style) | [2](#hn-style) |
 | [hubspot-style](adapters/hubspot-style/) | HubSpot CRM API `v3` | 33 | SDK | hubspot-node @ 14.0.1 (floor) | 5 | [4](#hubspot-style) | — |
@@ -120,7 +120,7 @@ Verification tiers:
 | [workday-style](adapters/workday-style/) | Workday REST API `v40.0` | 8 | boot | — | — | [4](#workday-style) | [1](#workday-style) |
 | [x-articles-style](adapters/x-articles-style/) | X (Twitter) Articles API `v2` | 8 | boot | — | — | [4](#x-articles-style) | [1](#x-articles-style) |
 | [xero-style](adapters/xero-style/) | Xero Accounting API `2.0` | 15 | boot | — | — | [6](#xero-style) | [2](#xero-style) |
-| [youtube-style](adapters/youtube-style/) | YouTube Data API `v3` | 13 | boot | — | — | [7](#youtube-style) | [2](#youtube-style) |
+| [youtube-style](adapters/youtube-style/) | YouTube Data API `v3` | 14 | SDK | google-api-go-client @ v0.293.0 | 8 | [7](#youtube-style) | [2](#youtube-style) |
 | [zendesk-style](adapters/zendesk-style/) | Zendesk REST API `2` | 37 | SDK | node-zendesk @ 6.0.1 (floor) | 6 | [8](#zendesk-style) | [5](#zendesk-style) |
 | [zuora-style](adapters/zuora-style/) | Zuora REST API `v1` | 20 | boot | — | — | [8](#zuora-style) | [5](#zuora-style) |
 
@@ -205,6 +205,86 @@ sections in `conformance/node/tests/*.test.ts`).
 - Order.Create with embedded customer (numeric id round-trip)
 - Order.ListWithPagination walks page_info cursors
 - webhooks verify through the SDK's VerifyWebhookRequest HMAC validator
+
+### google-api-go-client @ v0.293.0
+
+**drive-style**
+
+- Files.List returns the seeded folder
+- Files.Create + Files.List round-trip
+- Files.Get returns the created metadata (int64 size decodes)
+- Files.Update renames the file
+- Files.List q= filters by mimeType and parents
+- Files.List PageSize + PageToken walk pages
+- Files.Delete then Get -> googleapi 404
+- Changes.List replays mutations from startPageToken
+
+**gcalendar-style**
+
+- Calendars.Get resolves the primary calendar
+- CalendarList.List returns the seeded primary entry
+- Events.Insert + Events.Get round-trip the event body
+- Events.List Q matches summary/description text
+- Events.List MaxResults + PageToken walk pages
+- Events.Patch updates fields and bumps sequence + etag
+- Events.Instances expands an RRULE into per-occurrence events
+- Events.Delete then Get -> googleapi 404
+
+**gmail-style**
+
+- Labels.List returns seeded system labels
+- Labels.Create + Labels.List round-trip
+- Messages.Send raw rfc822 -> id + threadId
+- Messages.Get parses the sent raw message into payload headers
+- Messages.List includes sent messages
+- Messages.List MaxResults + PageToken walk pages
+- Messages.Modify AddLabelIds applies
+- Messages.Get Format=metadata returns headers without body
+- Messages.Delete then Get -> googleapi 404
+
+**google-admin-style**
+
+- Users.List Customer=my_customer returns the seeded directory
+- Users.Insert + Users.Get round-trip by numeric id and email
+- Users.List Domain narrows to a single email domain
+- Users.List Query isSuspended=true returns only suspended users
+- Users.Update renames the primary email; old key stops resolving
+- Users.Delete then Get -> decoded googleapi 404
+- Groups.Insert + Members.Insert + Members.List round-trip
+- Groups.List UserKey returns only the groups holding that member
+
+**gsheets-style**
+
+- Spreadsheets.Create + Get round-trip
+- Values.Update + Values.Get round-trip an A1 range
+- Values.Get MajorDimension=COLUMNS transposes the grid
+- Values.Append writes after the last populated row
+- Values.BatchUpdate writes multiple ranges in one call
+- Values.BatchGet reads a range over GET query params
+- Spreadsheets.BatchUpdate addSheet adds a tab Values can write to
+- Get on an unknown spreadsheet -> googleapi 404
+
+**gtasks-style**
+
+- Tasklists.List returns the seeded default list
+- Tasklists.Insert + Tasklists.List round-trip
+- Tasks.Insert + Tasks.Get round-trip fields
+- Tasks.Patch status=completed derives the completed stamp
+- Tasks.List ShowCompleted=false hides completed tasks
+- Tasks.Move Parent/Previous re-parents and repositions
+- Tasks.List MaxResults + PageToken walk pages
+- Tasks.Delete then Tasks.Get -> googleapi 404
+
+**youtube-style**
+
+- OAuth2 authorize + exchange mint the access token the SDK presents
+- Videos.Insert metadata-only + Videos.List id= round-trip with part projection
+- Videos.List without id lists every user video
+- Videos.List MaxResults + PageToken walk pages
+- Channels.List mine=true returns the authenticated user's channel
+- Playlists.Insert + Playlists.List mine=true round-trip
+- PlaylistItems.Insert adds the video, Delete removes it
+- Videos.Delete -> 204; re-delete surfaces a googleapi 404
 
 ### google-api-go-client/idtoken @ v0.293.0
 
@@ -1263,11 +1343,13 @@ behavior notes live in each adapter's README.
 - No push notification channels (files.watch, changes.watch, channels/stop)
 - No generateIds, apps list, or batch (multipart/mixed) request support
 
-**Deviations** (3)
+**Deviations** (5)
 
 - uploads take JSON {name, content, parents}; real Drive uses multipart/related bodies
 - list q is a limited field/op subset; queries outside it 400 rather than running
 - orderBy honors only the first recognized key; real Drive applies every key
+- metadata-only files.create defaults mimeType to the folder type when absent; real Drive defaults to a plain file
+- ?alt=media on a content-less file returns 404; real Drive serves 200 with an empty body
 
 ### dropbox-style
 
@@ -1733,9 +1815,10 @@ behavior notes live in each adapter's README.
 - No events watch, move, or freebusy.query endpoints
 - No colors or users.settings endpoints
 
-**Deviations** (1)
+**Deviations** (2)
 
 - Event create without start/end defaults them (now+30m, +90m); real API requires both
+- quickAdd uses the text verbatim as the summary with a now+30m slot; real Calendar parses natural-language dates
 
 ### gdocs-style
 
@@ -1891,11 +1974,12 @@ behavior notes live in each adapter's README.
 - No user/group aliases, user photos, domains, or customers endpoints
 - No users.patch/groups.patch, members.get, or members.update endpoints
 
-**Deviations** (3)
+**Deviations** (4)
 
 - Users query supports bare terms plus email:/name:/orgUnitPath=/isSuspended= only
 - Groups query silently ignores unrecognized query forms
-- Static convenience token ya29.mock-admin-token seeded far-future
+- Static convenience tokens (ya29.mock-admin-token, conformance-token) seeded far-future
+- users.list ignores customer/domain exactly-one-of enforcement; real Directory requires one
 
 ### google-iam-style
 
@@ -1989,13 +2073,14 @@ behavior notes live in each adapter's README.
 
 ### gsheets-style
 
-**Covered** — 9 routes
+**Covered** — 10 routes
 
 <details><summary>Routes</summary>
 
 | Method | Route |
 |---|---|
 | POST | `/v4/spreadsheets` |
+| GET | `/v4/spreadsheets/{spreadsheetId}/values:batchGet` |
 | POST | `/v4/spreadsheets/{spreadsheetId}/values:batchGet` |
 | POST | `/v4/spreadsheets/{spreadsheetId}/values:batchUpdate` |
 | POST | `/v4/spreadsheets/{spreadsheetId}/sheets` |
@@ -2014,14 +2099,22 @@ behavior notes live in each adapter's README.
 - batchUpdate limited to 4 request types; no insertDimension, mergeCells, sortRange
 - No valueRenderOption or dateTimeRenderOption on values reads
 
+**Deviations** (3)
+
+- Repeated ranges query params collapse to the first value (engine query params are single-valued)
+- Cell values always come back as strings; numeric cells stringify as floats (42 -> "42.0"), no USER_ENTERED/RAW typing
+- Spreadsheet get ignores fields= and returns the full object
+
 ### gtasks-style
 
-**Covered** — 9 routes
+**Covered** — 11 routes
 
 <details><summary>Routes</summary>
 
 | Method | Route |
 |---|---|
+| GET | `/tasks/v1/users/@me/lists` |
+| POST | `/tasks/v1/users/@me/lists` |
 | GET | `/tasks/v1/lists` |
 | POST | `/tasks/v1/lists` |
 | POST | `/tasks/v1/lists/{tasklistId}/tasks/{taskId}/move` |
@@ -2039,6 +2132,11 @@ behavior notes live in each adapter's README.
 - No task-list get, patch, or delete endpoints
 - No tasks.clear endpoint
 - showDeleted/showHidden/showAssigned list params unmodeled
+
+**Deviations** (2)
+
+- Responses omit the kind field (tasks#task, tasks#taskList); SDKs decode fine without it
+- tasks.insert ignores a client-sent status/completed (always needsAction); due is stored verbatim
 
 ### helius-style
 
@@ -3935,7 +4033,7 @@ behavior notes live in each adapter's README.
 
 ### youtube-style
 
-**Covered** — 13 routes
+**Covered** — 14 routes
 
 <details><summary>Routes</summary>
 
@@ -3947,6 +4045,7 @@ behavior notes live in each adapter's README.
 | PUT | `/upload/youtube/v3/videos/{upload_id}` |
 | DELETE | `/upload/youtube/v3/videos/{upload_id}` |
 | GET | `/youtube/v3/videos` |
+| POST | `/youtube/v3/videos` |
 | DELETE | `/youtube/v3/videos` |
 | GET | `/youtube/v3/channels` |
 | POST | `/youtube/v3/playlists` |

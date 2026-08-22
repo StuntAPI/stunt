@@ -45,6 +45,11 @@ endpoints:
   - route: /youtube/v3/videos
     method: GET
     handler: scripts/videos.star#on_list_videos
+  # POST: metadata-only insert — the non-upload request URL the real API
+  # serves alongside /upload/youtube/v3/videos (same JSON create).
+  - route: /youtube/v3/videos
+    method: POST
+    handler: scripts/videos.star#on_upload_video
   - route: /youtube/v3/videos
     method: DELETE
     handler: scripts/videos.star#on_delete_video

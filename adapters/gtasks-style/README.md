@@ -24,8 +24,8 @@ locally.
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| GET | `/tasks/v1/lists` | List task lists. |
-| POST | `/tasks/v1/lists` | Create a task list. |
+| GET | `/tasks/v1/users/@me/lists` | List task lists (canonical path; `/tasks/v1/lists` is an alias). |
+| POST | `/tasks/v1/users/@me/lists` | Create a task list (canonical path; `/tasks/v1/lists` is an alias). |
 | GET | `/tasks/v1/lists/{tasklistId}/tasks` | List tasks in a list (params: `q`, `showCompleted`, `dueMin`, `dueMax`, `completedMin`, `completedMax`, `updatedMin`, `maxResults`, `pageToken`). |
 | POST | `/tasks/v1/lists/{tasklistId}/tasks` | Create a task. |
 | GET | `/tasks/v1/lists/{tasklistId}/tasks/{taskId}` | Get a task. |
@@ -43,7 +43,10 @@ locally.
   completed), `dueMin`/`dueMax` compare the RFC3339 `due` stamp,
   `completedMin`/`completedMax` exclude uncompleted tasks, and `updatedMin`
   compares the `updated` stamp. Filtering runs before pagination.
-- Move body: `{parent, previous}` — re-parents/reorders.
+- Move: `parent` / `previous` are **query params** (the real contract); a
+  `{parent, previous}` JSON body is accepted as a fallback.
+- Setting `status: "completed"` derives the `completed` stamp; setting it back
+  to `needsAction` clears it.
 
 ## Data model
 

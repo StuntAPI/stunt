@@ -15,12 +15,8 @@ def on_list_groups(req):
         return err
 
     gc = store_collection("groups")
+    _seed_groups()
     docs = gc.list()
-
-    if len(docs) == 0:
-        _seed_groups()
-        gc = store_collection("groups")
-        docs = gc.list()
 
     groups = []
     for d in docs:
@@ -63,8 +59,9 @@ def on_create_group(req):
             },
         })
 
-    # Check for duplicate.
+    # Seed first so duplicates are checked against the whole directory.
     gc = store_collection("groups")
+    _seed_groups()
     docs = gc.list()
     for d in docs:
         if d.get("email", "") == email:
@@ -392,6 +389,7 @@ def _apply_member_filters(req, members):
 
 def _find_group(key):
     gc = store_collection("groups")
+    _seed_groups()
     docs = gc.list()
     for d in docs:
         if d["id"] == key or d.get("email", "") == key:
@@ -422,7 +420,13 @@ def _invalid(msg):
         },
     }
 
+# _seed_groups insert-once provisions the default groups and memberships —
+# the directory pre-exists any client call, so every first touch (list,
+# create, lookup) seeds, not just the first list.
 def _seed_groups():
+    if store_kv_get("gadmin", "groups_seeded") == "yes":
+        return
+    store_kv_set("gadmin", "groups_seeded", "yes")
     gc = store_collection("groups")
     groups = [
         {

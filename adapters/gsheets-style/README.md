@@ -35,7 +35,8 @@ verification process.
 | PUT | `/v4/spreadsheets/{spreadsheetId}/values/{range}` | Write cells (`{values:[[...]], valueInputOption}`). |
 | POST | `/v4/spreadsheets/{spreadsheetId}/values/{range}:append` | Append rows after last data. |
 | POST | `/v4/spreadsheets/{spreadsheetId}/values/{range}:clear` | Clear cells. |
-| POST | `/v4/spreadsheets/{spreadsheetId}/values:batchGet` | Read multiple ranges (`majorDimension` honored). |
+| GET | `/v4/spreadsheets/{spreadsheetId}/values:batchGet` | Read multiple ranges (`majorDimension` honored; the real API's GET form — repeated `ranges` query params collapse to the first). |
+| POST | `/v4/spreadsheets/{spreadsheetId}/values:batchGet` | Read multiple ranges from a `{ranges:[...]}` body. |
 | POST | `/v4/spreadsheets/{spreadsheetId}/values:batchUpdate` | Write multiple ranges. |
 
 ## Key shapes
