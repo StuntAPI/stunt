@@ -213,7 +213,7 @@ def _handle_send_raw_tx(id, params):
         "transactionIndex": "0x0",
         "type": "0x0",
         "logs": [log_entry],
-        "logsBloom": "0x" + _hex64(),
+        "logsBloom": "0x" + _bloom_hex(),
         "contractAddress": None,
         "state": "pending",
         "_mined_at": mined_at,
@@ -249,7 +249,7 @@ def _handle_send_raw_tx(id, params):
             "extraData": "0x",
             "sha3Uncles": _deterministic_hash("uncles-" + str(block_num)),
             "stateRoot": _deterministic_hash("state-" + str(block_num)),
-            "logsBloom": "0x" + _hex64(),
+            "logsBloom": "0x" + _bloom_hex(),
         })
     else:
         bc.insert({
@@ -266,7 +266,7 @@ def _handle_send_raw_tx(id, params):
             "extraData": "0x",
             "sha3Uncles": _deterministic_hash("uncles-" + str(block_num)),
             "stateRoot": _deterministic_hash("state-" + str(block_num)),
-            "logsBloom": "0x" + _hex64(),
+            "logsBloom": "0x" + _bloom_hex(),
         })
 
     return _rpc_ok(id, tx_hash)
@@ -500,7 +500,7 @@ def _receipt_view(r):
         "transactionIndex": r.get("transactionIndex", "0x0"),
         "type": r.get("type", "0x0"),
         "logs": logs,
-        "logsBloom": r.get("logsBloom", "0x" + _hex64()),
+        "logsBloom": r.get("logsBloom", "0x" + _bloom_hex()),
         "contractAddress": r.get("contractAddress", None),
     }
 
@@ -557,7 +557,7 @@ def _block_response(blk, full_tx):
         "parentHash": blk.get("parentHash", ""),
         "nonce": blk.get("nonce", "0x0000000000000000"),
         "sha3Uncles": blk.get("sha3Uncles", ""),
-        "logsBloom": blk.get("logsBloom", "0x" + _hex64()),
+        "logsBloom": blk.get("logsBloom", "0x" + _bloom_hex()),
         "transactionsRoot": _deterministic_hash("txroot-" + str(blk.get("number", 0))),
         "stateRoot": blk.get("stateRoot", ""),
         "receiptsRoot": _deterministic_hash("rcroot-" + str(blk.get("number", 0))),

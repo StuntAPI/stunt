@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,35 +78,48 @@ describe("x", () => {
 	}
 	// The other mapped suites must exist too (parseNodeTests reads all of
 	// nodeSuiteSDK); give them minimal valid bodies.
-	stub := `bootAdapter("twilio-style");
-test("lifecycle", async () => {});`
-	if err := os.WriteFile(filepath.Join(dir, "twilio.test.ts"), []byte(stub), 0o644); err != nil {
-		t.Fatal(err)
+	writeStub := func(adapter string) {
+		t.Helper()
+		for base, sdk := range nodeSuiteSDK {
+			if sdk == "" {
+				continue
+			}
+			_ = adapter
+			if _, err := os.Stat(filepath.Join(dir, base)); err == nil {
+				continue
+			}
+			if err := os.WriteFile(filepath.Join(dir, base),
+				[]byte(fmt.Sprintf("bootAdapter(%q);\ntest(\"lifecycle\", async () => {});", adapter)), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
 	}
-	stub = `bootAdapter("github-style");
-test("lifecycle", async () => {});`
-	if err := os.WriteFile(filepath.Join(dir, "github.test.ts"), []byte(stub), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeStub("twilio-style")
 	got, err := parseNodeTests(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) != 4 { // 2 stripe sections + 2 stub test-name fallbacks
-		t.Fatalf("got %+v", got)
+	if len(got) != 2+len(nodeSuiteSDK)-1 { // 2 stripe sections + 1 per stubbed suite
+		t.Fatalf("got %d checks, want %d: %+v", len(got), 2+len(nodeSuiteSDK)-1, got)
 	}
-	// Files sort github < stripe < twilio: the stripe sections are got[1:3].
-	if got[1].SDK != "stripe-node" || got[1].Adapter != "stripe-style" {
-		t.Fatalf("got %+v", got[1])
+	// The stripe sections follow the alphabetically-earlier stub suites.
+	var stripeChecks []check
+	for _, c := range got {
+		if c.SDK == "stripe-node" {
+			stripeChecks = append(stripeChecks, c)
+		}
 	}
-	if got[2].Name != "Webhook registration, delivery verified by the SDK's own constructEvent" {
-		t.Fatalf("multiline marker not collapsed: %q", got[2].Name)
+	if len(stripeChecks) != 2 || stripeChecks[0].Adapter != "stripe-style" {
+		t.Fatalf("stripe checks: %+v", stripeChecks)
+	}
+	if stripeChecks[1].Name != "Webhook registration, delivery verified by the SDK's own constructEvent" {
+		t.Fatalf("multiline marker not collapsed: %q", stripeChecks[1].Name)
 	}
 }
 
 func TestParseNodeTestsRejectsUnmappedSuiteFile(t *testing.T) {
 	dir := t.TempDir()
-	for _, base := range []string{"github.test.ts", "stripe.test.ts", "twilio.test.ts"} {
+	for base := range nodeSuiteSDK {
 		if err := os.WriteFile(filepath.Join(dir, base),
 			[]byte(`bootAdapter("x"); test("t", async () => {});`), 0o644); err != nil {
 			t.Fatal(err)
@@ -126,13 +140,9 @@ func TestParseNodeTestsFallbackRecordsEveryTest(t *testing.T) {
 test("first", async () => {});
 test("second", async () => {});
 `
-	for base, boot := range map[string]string{
-		"github.test.ts": "github-style",
-		"stripe.test.ts": "stripe-style",
-		"twilio.test.ts": "twilio-style",
-	} {
+	for base := range nodeSuiteSDK {
 		if err := os.WriteFile(filepath.Join(dir, base),
-			[]byte(strings.Replace(body, "twilio-style", boot, 1)), 0o644); err != nil {
+			[]byte(strings.Replace(body, "twilio-style", "stub-style", 1)), 0o644); err != nil {
 			t.Fatal(err)
 		}
 	}

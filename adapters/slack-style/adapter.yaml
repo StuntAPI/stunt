@@ -28,11 +28,13 @@ endpoints:
   - route: /api/conversations.create
     method: POST
     handler: scripts/conversations.star#on_create_conversation
+  # Real Slack's Web API is POST form-encoded across the board; method is
+  # left open so the official SDKs' POST and the README's curl GETs both work.
   - route: /api/conversations.list
-    method: GET
+    method: ""
     handler: scripts/conversations.star#on_list_conversations
   - route: /api/conversations.history
-    method: GET
+    method: ""
     handler: scripts/conversations.star#on_conversation_history
 
   # --- reactions ---

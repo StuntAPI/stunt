@@ -6,8 +6,12 @@
     "test": "bun test"
   },
   "dependencies": {
-    "stripe": "^22.5.0",
+    "@hubspot/api-client": "^14.0.1",
+    "@slack/web-api": "^7.19.0",
     "octokit": "^5.0.5",
+    "plaid": "^32.0.0",
+    "square": "^45.1.0",
+    "stripe": "^22.5.0",
     "twilio": "^6.1.0"
   }
 }

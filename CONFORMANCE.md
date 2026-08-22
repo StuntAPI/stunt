@@ -21,7 +21,7 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**98 adapters** — 2 SDK+VM, 7 SDK-only, 4 VM-only, 85 boot-tier.
+**98 adapters** — 2 SDK+VM, 12 SDK-only, 4 VM-only, 80 boot-tier.
 
 | Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |
 |---|---|---|---|---|---|---|---|
@@ -57,7 +57,7 @@ Verification tiers:
 | [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | boot | — | — | [8](#entra-id-style) | [1](#entra-id-style) |
 | [erc4337-style](adapters/erc4337-style/) | ERC-4337 Bundler RPC `0.7` | 2 | boot | — | — | [5](#erc4337-style) | [4](#erc4337-style) |
 | [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | boot | — | — | [3](#escrow-style) | [1](#escrow-style) |
-| [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | boot | — | — | [5](#eth-jsonrpc-style) | [4](#eth-jsonrpc-style) |
+| [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | SDK | go-ethereum @ v1.17.5 | 5 | [5](#eth-jsonrpc-style) | [4](#eth-jsonrpc-style) |
 | [etherscan-style](adapters/etherscan-style/) | Etherscan API `1.0` | 1 | boot | — | — | [3](#etherscan-style) | [1](#etherscan-style) |
 | [fattureincloud-style](adapters/fattureincloud-style/) | Fatture in Cloud API v2 `2.0.29` | 42 | boot | — | — | [3](#fattureincloud-style) | [3](#fattureincloud-style) |
 | [firebase-style](adapters/firebase-style/) | Firebase Auth + Firestore + Cloud Messaging API `v1` | 22 | boot | — | — | [4](#firebase-style) | [5](#firebase-style) |
@@ -74,7 +74,7 @@ Verification tiers:
 | [gtasks-style](adapters/gtasks-style/) | Google Tasks API `v1` | 9 | boot | — | — | [3](#gtasks-style) | — |
 | [helius-style](adapters/helius-style/) | Helius Solana RPC + Enhanced API `v0` | 11 | boot | — | — | [3](#helius-style) | [4](#helius-style) |
 | [hn-style](adapters/hn-style/) | Hacker News Firebase API `v0` | 11 | boot | — | — | [3](#hn-style) | [2](#hn-style) |
-| [hubspot-style](adapters/hubspot-style/) | HubSpot CRM API `v3` | 33 | boot | — | — | [4](#hubspot-style) | — |
+| [hubspot-style](adapters/hubspot-style/) | HubSpot CRM API `v3` | 33 | SDK | hubspot-node @ 14.0.1 (floor) | 5 | [4](#hubspot-style) | — |
 | [instagram-style](adapters/instagram-style/) | Instagram Graph API `v21.0` | 10 | boot | — | — | [4](#instagram-style) | [2](#instagram-style) |
 | [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 18 | boot | — | — | [5](#jira-style) | [4](#jira-style) |
 | [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | boot | — | — | [3](#jumio-style) | [4](#jumio-style) |
@@ -90,7 +90,7 @@ Verification tiers:
 | [persona-style](adapters/persona-style/) | Persona Inquiry API `2023-01-05` | 5 | boot | — | — | [5](#persona-style) | [4](#persona-style) |
 | [photos-style](adapters/photos-style/) | Google Photos Library API `v1` | 12 | boot | — | — | [5](#photos-style) | [2](#photos-style) |
 | [pinata-style](adapters/pinata-style/) | Pinata API `1.0` | 6 | boot | — | — | [4](#pinata-style) | — |
-| [plaid-style](adapters/plaid-style/) | Plaid API `2020-09-14` | 13 | boot | — | — | [5](#plaid-style) | [3](#plaid-style) |
+| [plaid-style](adapters/plaid-style/) | Plaid API `2020-09-14` | 13 | SDK | plaid-node @ 32.0.0 (floor) | 4 | [5](#plaid-style) | [3](#plaid-style) |
 | [powerplatform-style](adapters/powerplatform-style/) | Microsoft Power Platform API `2` | 9 | boot | — | — | [4](#powerplatform-style) | [3](#powerplatform-style) |
 | [printful-style](adapters/printful-style/) | Printful API `v2` | 13 | boot | — | — | [5](#printful-style) | [1](#printful-style) |
 | [printify-style](adapters/printify-style/) | Printify API `v1` | 16 | boot | — | — | [5](#printify-style) | [1](#printify-style) |
@@ -105,10 +105,10 @@ Verification tiers:
 | [servicenow-style](adapters/servicenow-style/) | ServiceNow Table API `2` | 44 | boot | — | — | [5](#servicenow-style) | [1](#servicenow-style) |
 | [shopify-style](adapters/shopify-style/) | Shopify Admin REST + GraphQL API `2024-10` | 21 +GQL | SDK | go-shopify/v4 @ v4.7.0 | 5 | [7](#shopify-style) | [4](#shopify-style) |
 | [signin-with-apple-style](adapters/signin-with-apple-style/) | Sign in with Apple `v2` | 3 | boot | — | — | [3](#signin-with-apple-style) | [2](#signin-with-apple-style) |
-| [slack-style](adapters/slack-style/) | Slack Web API `1.0` | 7 | boot | — | — | [6](#slack-style) | [2](#slack-style) |
+| [slack-style](adapters/slack-style/) | Slack Web API `1.0` | 7 | SDK | slack-node @ 7.19.0 (floor) | 4 | [6](#slack-style) | [2](#slack-style) |
 | [smartbill-style](adapters/smartbill-style/) | SmartBill Cloud API `1.0` | 18 | boot | — | — | [2](#smartbill-style) | [5](#smartbill-style) |
 | [sqs-style](adapters/sqs-style/) | Amazon SQS API `2012-11-05` | 2 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 6 | [4](#sqs-style) | [5](#sqs-style) |
-| [square-style](adapters/square-style/) | Square API `2024-08-21` | 18 | boot | — | — | [7](#square-style) | [2](#square-style) |
+| [square-style](adapters/square-style/) | Square API `2024-08-21` | 18 | SDK | square-node @ 45.1.0 (floor) | 4 | [7](#square-style) | [2](#square-style) |
 | [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.3.0<br>stripe-node @ 22.5.0 (floor) | 9 | [7](#stripe-style) | [5](#stripe-style) |
 | [tenderly-style](adapters/tenderly-style/) | Tenderly Simulation API `v1` | 5 | boot | — | — | [3](#tenderly-style) | [2](#tenderly-style) |
 | [thegraph-style](adapters/thegraph-style/) | The Graph (GraphQL over subgraphs) `1.0` | 1 +GQL | boot | — | — | [3](#thegraph-style) | [1](#thegraph-style) |
@@ -166,6 +166,16 @@ sections in `conformance/node/tests/*.test.ts`).
 - SendMessageBatch correlated results
 - missing-queue typed error surface
 
+### go-ethereum @ v1.17.5
+
+**eth-jsonrpc-style**
+
+- ethclient.ChainID + BlockNumber
+- BalanceAt decodes seeded hex-quantity wei
+- CodeAt returns empty (no EVM execution)
+- HeaderByNumber returns the genesis header
+- PendingNonceAt for an untouched account
+
 ### go-github/v89 @ v89.0.0
 
 **github-style**
@@ -194,11 +204,48 @@ sections in `conformance/node/tests/*.test.ts`).
 - tampered id_token rejected by idtoken.Validate
 - adapter serves a real JWKS
 
+### hubspot-node @ 14.0.1 (floor)
+
+**hubspot-style**
+
+- basicApi.create assigns an id and echoes properties
+- basicApi.getById round-trips
+- basicApi.update patches a property
+- searchApi.doSearch finds the record by name
+- archive + restore round-trip the soft-delete state
+
 ### octokit @ 5.0.5 (floor)
 
 **github-style**
 
 - issue CRUD + paginate over Link headers
+
+### plaid-node @ 32.0.0 (floor)
+
+**plaid-style**
+
+- link/token/create mints a session
+- sandbox public_token -> exchange -> item with accounts
+- accounts/balance/get over the SDK's typed response
+- transactions/sync cursor round-trip
+
+### slack-node @ 7.19.0 (floor)
+
+**slack-style**
+
+- auth.test validates the seeded bearer token
+- conversations.create + list round-trip
+- chat.postMessage lands in conversations.history
+- reactions.add on the posted message
+
+### square-node @ 45.1.0 (floor)
+
+**square-style**
+
+- oAuth.obtainToken mints the bearer the adapter validates
+- payments.create completes immediately for the ok nonce
+- orders.create prices line items and mints an order id
+- orders.get round-trips the priced order
 
 ### stripe-go/v86 @ v86.3.0
 
@@ -3158,8 +3205,8 @@ behavior notes live in each adapter's README.
 | POST | `/api/auth.test` |
 | POST | `/api/chat.postMessage` |
 | POST | `/api/conversations.create` |
-| GET | `/api/conversations.list` |
-| GET | `/api/conversations.history` |
+|  | `/api/conversations.list` |
+|  | `/api/conversations.history` |
 | POST | `/api/reactions.add` |
 | POST | `/api/apps.events.url` |
 

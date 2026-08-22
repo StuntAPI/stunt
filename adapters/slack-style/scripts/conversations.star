@@ -100,7 +100,14 @@ def on_conversation_history(req):
     if err != None:
         return err
 
+    # The official SDKs POST form-encoded bodies; curl examples use query.
     channel_id = req["query"].get("channel", "")
+    if channel_id == "" or channel_id == None:
+        body = req.get("body")
+        if body != None:
+            channel_id = body.get("channel", "")
+    if channel_id == None:
+        channel_id = ""
     if channel_id == None:
         channel_id = ""
 
