@@ -29,6 +29,64 @@
         "simulate_fail flag on /v68/payments forces Refused (simulator-only failure injection)",
         "paymentLinks url is synthetic — no hosted checkout page; pay via the link reference",
         "paymentMethods serves a fixed 5-method catalog with empty storedPaymentMethods"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v68/payments"
+        },
+        {
+          "method": "POST",
+          "route": "/v68/payments/details"
+        },
+        {
+          "method": "GET",
+          "route": "/v68/payments"
+        },
+        {
+          "method": "POST",
+          "route": "/v68/paymentMethods"
+        },
+        {
+          "method": "POST",
+          "route": "/v68/paymentLinks"
+        },
+        {
+          "method": "GET",
+          "route": "/v68/paymentLinks/{linkId}"
+        },
+        {
+          "method": "POST",
+          "route": "/v68/payments/{paymentPspReference}/captures"
+        },
+        {
+          "method": "POST",
+          "route": "/v68/payments/{paymentPspReference}/refunds"
+        },
+        {
+          "method": "POST",
+          "route": "/v68/payments/{paymentPspReference}/reversals"
+        },
+        {
+          "method": "POST",
+          "route": "/v68/payments/{paymentPspReference}/cancels"
+        },
+        {
+          "method": "POST",
+          "route": "/v68/notifications/test"
+        },
+        {
+          "method": "POST",
+          "route": "/v68/webhooks"
+        },
+        {
+          "method": "GET",
+          "route": "/v68/webhooks"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v68/webhooks/{webhookId}"
+        }
       ]
     },
     {
@@ -49,6 +107,80 @@
         "Task state derives from the clock — IN_PROGRESS at +1s, COMPLETE at +3s",
         "simulate_fail in the task body is a simulator-only trigger (real Anaplan has none)",
         "PUT file upload is the same surface as POST; /jobs aliases /tasks"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/2/0/workspaces"
+        },
+        {
+          "method": "GET",
+          "route": "/2/0/workspaces/{workspaceId}/models"
+        },
+        {
+          "method": "GET",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/modules"
+        },
+        {
+          "method": "GET",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/files"
+        },
+        {
+          "method": "GET",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}"
+        },
+        {
+          "method": "POST",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}"
+        },
+        {
+          "method": "PUT",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}"
+        },
+        {
+          "method": "GET",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}/chunks"
+        },
+        {
+          "method": "GET",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/imports"
+        },
+        {
+          "method": "GET",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/exports"
+        },
+        {
+          "method": "GET",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/actions"
+        },
+        {
+          "method": "GET",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/processes"
+        },
+        {
+          "method": "POST",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/imports/{importId}/tasks"
+        },
+        {
+          "method": "POST",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/imports/{importId}/jobs"
+        },
+        {
+          "method": "POST",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/exports/{exportId}/tasks"
+        },
+        {
+          "method": "POST",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/exports/{exportId}/jobs"
+        },
+        {
+          "method": "GET",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}/tasks/{taskId}"
+        },
+        {
+          "method": "GET",
+          "route": "/2/0/workspaces/{workspaceId}/models/{modelId}"
+        }
       ]
     },
     {
@@ -68,6 +200,16 @@
       "deviations": [
         "Provider JWT verified against one fixed P-256 key whose private half is published",
         "GET /3/device/{token}/notifications is a simulator-only endpoint (no real fetch API)"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/3/device/{deviceToken}"
+        },
+        {
+          "method": "GET",
+          "route": "/3/device/{deviceToken}/notifications"
+        }
       ]
     },
     {
@@ -93,6 +235,68 @@
         "Builds settle PROCESSING to VALID at +3s — no separate in-flight state",
         "simulate_fail extension: app create forces build INVALID, version create REJECTED",
         "A first build is minted at app create — no build upload path"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/v1/apps"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/apps"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/appStoreVersionSubmissions"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/users"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/salesReports"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/apps/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/v1/apps/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/apps/{id}/appStoreVersions"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/apps/{id}/appStoreVersions"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/apps/{id}/builds"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/apps/{id}/appPrices"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/builds/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/appStoreVersions/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/v1/appStoreVersions/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/appStoreVersions/{id}/builds"
+        }
       ]
     },
     {
@@ -113,6 +317,80 @@
       "deviations": [
         "Developer JWT signature not verified — structural check plus exact-string token registry",
         "Music-User-Token accepts any non-empty value — no real user-token validation"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/v1/catalog/{storefront}/search"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/catalog/{storefront}/charts"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/catalog/{storefront}/songs"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/catalog/{storefront}/albums"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/catalog/{storefront}/artists"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/catalog/{storefront}/playlists"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/catalog/{storefront}/songs/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/catalog/{storefront}/albums/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/catalog/{storefront}/artists/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/me/library/songs"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/me/library/albums"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/me/library/playlists"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/me/library/recently-added"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/me/library"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/me/library/{type}/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/me/played"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/me/ratings/{type}/{id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/v1/me/ratings/{type}/{id}"
+        }
       ]
     },
     {
@@ -133,6 +411,56 @@
         "ES256 client-secret JWT is not signature-verified — structural checks only",
         "Reports group by campaign only; any other groupBy key returns 400",
         "Selector conditions cover a fixed field set per resource (id, name, budget, status, times)"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/api/oauth2/token"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v4/campaigns/find"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v4/campaigns"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v4/reports/campaigns"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v4/campaigns/{campaign_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/api/v4/campaigns/{campaign_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v4/campaigns/{campaign_id}/ads"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v4/campaigns/{campaign_id}/keywords/targeting/find"
+        },
+        {
+          "method": "PUT",
+          "route": "/api/v4/campaigns/{campaign_id}/keywords/targeting/bulk"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v4/campaigns/{campaign_id}/keywords/targeting"
+        },
+        {
+          "method": "PUT",
+          "route": "/api/v4/campaigns/{campaign_id}/keywords/targeting/{keyword_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/v4/campaigns/{campaign_id}/keywords/targeting/{keyword_id}"
+        }
       ]
     },
     {
@@ -149,6 +477,36 @@
       ],
       "deviations": [
         ":run never executes code — known patterns return canned results, others echo parameters"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/v1/projects"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/projects/{scriptId}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/projects/{scriptId}/content"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects/{scriptId}/content"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects/{scriptId}/deployments"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects/{scriptId}/scripts/{functionName}/run"
+        }
       ]
     },
     {
@@ -169,6 +527,76 @@
         "OAuth errors still 302 to unvalidated redirect_uri (RFC 6749 would refuse)",
         "q is exact-match or substring only (no Lucene)",
         "No scope enforcement — any valid RS256 token may call /api/v2/*"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/.well-known/openid-configuration"
+        },
+        {
+          "method": "GET",
+          "route": "/.well-known/jwks.json"
+        },
+        {
+          "method": "GET",
+          "route": "/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/oauth/token"
+        },
+        {
+          "method": "GET",
+          "route": "/userinfo"
+        },
+        {
+          "method": "POST",
+          "route": "/oauth/revoke"
+        },
+        {
+          "method": "POST",
+          "route": "/dbconnections/signup"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/users"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v2/users"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/roles"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v2/roles"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/users/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/api/v2/users/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/v2/users/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/users/{id}/roles"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v2/users/{id}/roles"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/v2/users/{id}/roles"
+        }
       ]
     },
     {
@@ -188,6 +616,40 @@
       ],
       "deviations": [
         "Tax is a deterministic split — State 50%, County 25%, City 20%, Special 5% of the rate"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v2/tax/calculate"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/transactions/create"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/transactions"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/transactions/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/transactions/{id}/void"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/companies"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/definitions/nexuses"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/definitions/taxcodes"
+        }
       ]
     },
     {
@@ -210,6 +672,36 @@
         "Service API SigV4 is structure-checked only — signature not cryptographically enforced",
         "Verification/reset codes are the last 6 digits of the username, zero-padded",
         "Hosted UI has no login page — authorize auto-binds login_hint user or seeded demo-user"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/oauth2/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/oauth2/token"
+        },
+        {
+          "method": "GET",
+          "route": "/oauth2/userInfo"
+        },
+        {
+          "method": "GET",
+          "route": "/login"
+        },
+        {
+          "method": "GET",
+          "route": "/logout"
+        },
+        {
+          "method": "POST",
+          "route": "/"
+        },
+        {
+          "method": "GET",
+          "route": "/{userPoolId}/.well-known/jwks.json"
+        }
       ]
     },
     {
@@ -237,6 +729,16 @@
         "Canonical path/query rebuilt from decoded values — duplicate query keys indistinguishable",
         "RFC 1123 Date header fallback not parsed — x-amz-date is required",
         "Only the documented example AKID/secret validates (single credential pair)"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/"
+        },
+        {
+          "method": "POST",
+          "route": "/"
+        }
       ]
     },
     {
@@ -272,6 +774,40 @@
         "DELETE of a missing bucket is an idempotent 204 (real S3: 404 NoSuchBucket)",
         "SigV4 canonical URI/query rebuilt from decoded values — duplicates indistinguishable",
         "No RFC 1123 Date fallback; canonical header whitespace collapsing not applied"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/{bucket}"
+        },
+        {
+          "method": "PUT",
+          "route": "/{bucket}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/{bucket}"
+        },
+        {
+          "method": "PUT",
+          "route": "/{bucket}/{key+}"
+        },
+        {
+          "method": "GET",
+          "route": "/{bucket}/{key+}"
+        },
+        {
+          "method": "HEAD",
+          "route": "/{bucket}/{key+}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/{bucket}/{key+}"
+        },
+        {
+          "method": "POST",
+          "route": "/{bucket}/{key+}"
+        }
       ]
     },
     {
@@ -295,6 +831,76 @@
         "Run state derives from clock — inProgress at +1s, completed/succeeded at +3s",
         "simulate_fail run parameter (templateParameters or top-level) forces result failed",
         "Run-state webhooks may double-emit when list/bulk reads race single-run polls"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/{org}/_apis/projects"
+        },
+        {
+          "method": "GET",
+          "route": "/{org}/{project}/_apis/pipelines"
+        },
+        {
+          "method": "GET",
+          "route": "/{org}/{project}/_apis/pipelines/{pipelineId}"
+        },
+        {
+          "method": "GET",
+          "route": "/{org}/{project}/_apis/pipelines/{pipelineId}/runs"
+        },
+        {
+          "method": "POST",
+          "route": "/{org}/{project}/_apis/pipelines/{pipelineId}/runs"
+        },
+        {
+          "method": "GET",
+          "route": "/{org}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}"
+        },
+        {
+          "method": "GET",
+          "route": "/{org}/{project}/_apis/git/repositories"
+        },
+        {
+          "method": "GET",
+          "route": "/{org}/{project}/_apis/git/repositories/{repoId}/items"
+        },
+        {
+          "method": "GET",
+          "route": "/{org}/{project}/_apis/git/repositories/{repoId}/commits"
+        },
+        {
+          "method": "POST",
+          "route": "/{org}/{project}/_apis/git/repositories/{repoId}/pushes"
+        },
+        {
+          "method": "GET",
+          "route": "/{org}/{project}/_apis/work/teamsettings/iterations"
+        },
+        {
+          "method": "GET",
+          "route": "/{org}/{project}/_apis/wit/workitems"
+        },
+        {
+          "method": "GET",
+          "route": "/{org}/{project}/_apis/wit/workitems/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/{org}/{project}/_apis/wit/workitems/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/{org}/{project}/_apis/wit/workitems/{type}"
+        },
+        {
+          "method": "POST",
+          "route": "/{org}/{project}/_apis/wit/wiql"
+        },
+        {
+          "method": "POST",
+          "route": "/{org}/_apis/hooks/subscriptions"
+        }
       ]
     },
     {
@@ -317,6 +923,80 @@
         "Default 30s peek-lock, overridable via simulator-only lockduration query param",
         "Bearer auth accepted with any non-empty token — only SAS is verified",
         "Storage queue send accepts JSON MessageText in place of the real XML body"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/{queue}/messages"
+        },
+        {
+          "method": "DELETE",
+          "route": "/{queue}/messages/head"
+        },
+        {
+          "method": "POST",
+          "route": "/{queue}/messages/{lockToken}/{action}"
+        },
+        {
+          "method": "GET",
+          "route": "/$topicInfo"
+        },
+        {
+          "method": "GET",
+          "route": "/topics"
+        },
+        {
+          "method": "PUT",
+          "route": "/topics/{topic}"
+        },
+        {
+          "method": "GET",
+          "route": "/topics/{topic}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/topics/{topic}"
+        },
+        {
+          "method": "POST",
+          "route": "/topics/{topic}/messages"
+        },
+        {
+          "method": "GET",
+          "route": "/topics/{topic}/subscriptions"
+        },
+        {
+          "method": "PUT",
+          "route": "/topics/{topic}/subscriptions/{sub}"
+        },
+        {
+          "method": "GET",
+          "route": "/topics/{topic}/subscriptions/{sub}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/topics/{topic}/subscriptions/{sub}"
+        },
+        {
+          "method": "POST",
+          "route": "/topics/{topic}/subscriptions/{sub}/messages"
+        },
+        {
+          "method": "POST",
+          "route": "/topics/{topic}/subscriptions/{sub}/messages/{lockToken}/{action}"
+        },
+        {
+          "method": "POST",
+          "route": "/{account}/{queue}/messages"
+        },
+        {
+          "method": "GET",
+          "route": "/{account}/{queue}/messages"
+        },
+        {
+          "method": "DELETE",
+          "route": "/{account}/{queue}/messages/{messageid}"
+        }
       ]
     },
     {
@@ -339,6 +1019,44 @@
         "Content-MD5 carries base64 SHA-256 (engine has no MD5) — documented deviation",
         "SAS checked structurally (sv/sig/se present) and any non-empty bearer accepted",
         "PUT on an existing container updates it in place 201 (real Azure: 409 conflict)"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/"
+        },
+        {
+          "method": "PUT",
+          "route": "/{container}"
+        },
+        {
+          "method": "GET",
+          "route": "/{container}"
+        },
+        {
+          "method": "HEAD",
+          "route": "/{container}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/{container}"
+        },
+        {
+          "method": "PUT",
+          "route": "/{container}/{blob}"
+        },
+        {
+          "method": "GET",
+          "route": "/{container}/{blob}"
+        },
+        {
+          "method": "HEAD",
+          "route": "/{container}/{blob}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/{container}/{blob}"
+        }
       ]
     },
     {
@@ -351,7 +1069,8 @@
       "sdks": [],
       "behaviors": [],
       "missing": [],
-      "deviations": []
+      "deviations": [],
+      "covered": []
     },
     {
       "id": "bluesky-style",
@@ -374,6 +1093,36 @@
         "searchPosts returns seeded synthetic results, not an index over created records",
         "createSession mints tokens for any identifier/password pair; no credential check",
         "refreshSession invalidates the old accessJwt too; real AT Protocol leaves it valid to exp"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/xrpc/com.atproto.server.createSession"
+        },
+        {
+          "method": "POST",
+          "route": "/xrpc/com.atproto.server.refreshSession"
+        },
+        {
+          "method": "POST",
+          "route": "/xrpc/com.atproto.repo.createRecord"
+        },
+        {
+          "method": "POST",
+          "route": "/xrpc/com.atproto.repo.deleteRecord"
+        },
+        {
+          "method": "GET",
+          "route": "/xrpc/com.atproto.identity.resolveHandle"
+        },
+        {
+          "method": "GET",
+          "route": "/xrpc/app.bsky.actor.getProfile"
+        },
+        {
+          "method": "GET",
+          "route": "/xrpc/app.bsky.feed.searchPosts"
+        }
       ]
     },
     {
@@ -401,6 +1150,68 @@
         "webhook deliveries are JSON + bt-* headers, not the real form-encoded bt_* POST",
         "POST /graphql is served without the Bearer/Basic auth check the REST surface enforces",
         "simulate_authorization_expiry sim-only flag: auths expire in 1s vs 7 simulated days"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/merchants/{merchantId}/transactions/advanced_search"
+        },
+        {
+          "method": "POST",
+          "route": "/merchants/{merchantId}/transactions"
+        },
+        {
+          "method": "GET",
+          "route": "/merchants/{merchantId}/transactions/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/merchants/{merchantId}/transactions/{id}/settle"
+        },
+        {
+          "method": "POST",
+          "route": "/merchants/{merchantId}/transactions/{id}/void"
+        },
+        {
+          "method": "POST",
+          "route": "/merchants/{merchantId}/transactions/{id}/refund"
+        },
+        {
+          "method": "POST",
+          "route": "/merchants/{merchantId}/payment_methods"
+        },
+        {
+          "method": "POST",
+          "route": "/merchants/{merchantId}/client_token"
+        },
+        {
+          "method": "POST",
+          "route": "/merchants/{merchantId}/plans"
+        },
+        {
+          "method": "GET",
+          "route": "/merchants/{merchantId}/plans"
+        },
+        {
+          "method": "GET",
+          "route": "/merchants/{merchantId}/plans/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/merchants/{merchantId}/subscriptions"
+        },
+        {
+          "method": "GET",
+          "route": "/merchants/{merchantId}/subscriptions/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/merchants/{merchantId}/subscriptions/{id}/cancel"
+        },
+        {
+          "method": "POST",
+          "route": "/webhooks"
+        }
       ]
     },
     {
@@ -426,6 +1237,56 @@
         "message.sent webhook payloads use a synthetic shape; Braze has no documented scheme",
         "scheduled sends flip to sent on first read past the time; message.sent fires once then",
         "key store models expiry for app-group keys; real Braze keys do not expire"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/messages/send"
+        },
+        {
+          "method": "POST",
+          "route": "/messages/schedule/create"
+        },
+        {
+          "method": "POST",
+          "route": "/users/track"
+        },
+        {
+          "method": "POST",
+          "route": "/users/alias/new"
+        },
+        {
+          "method": "POST",
+          "route": "/users/identify"
+        },
+        {
+          "method": "POST",
+          "route": "/users/delete"
+        },
+        {
+          "method": "POST",
+          "route": "/users/export/ids"
+        },
+        {
+          "method": "POST",
+          "route": "/campaigns/trigger/send"
+        },
+        {
+          "method": "GET",
+          "route": "/segments/list"
+        },
+        {
+          "method": "GET",
+          "route": "/messages/scheduled"
+        },
+        {
+          "method": "POST",
+          "route": "/webhooks"
+        },
+        {
+          "method": "GET",
+          "route": "/webhooks"
+        }
       ]
     },
     {
@@ -450,6 +1311,92 @@
         "Functions requests: queued 0-1s, running 1-3s, fulfilled at +3s (derive-on-read)",
         "createRequest accepts simulate_fail to inject failures; real sandbox has no trigger",
         "keeper performs are derived on read per elapsed cadence tick; real network performs on-chain"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/feeds"
+        },
+        {
+          "method": "GET",
+          "route": "/feeds/{feedID}"
+        },
+        {
+          "method": "GET",
+          "route": "/feeds/{feedID}/latestRoundData"
+        },
+        {
+          "method": "GET",
+          "route": "/feeds/{feedID}/rounds"
+        },
+        {
+          "method": "GET",
+          "route": "/feeds/{feedID}/rounds/{roundId}"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/functions/createSecrets"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/functions/encryptSecrets"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/functions/createRequest"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/functions/request/{requestID}"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/functions/secrets/{secretID}"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/automation/registerUpkeep"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/automation/upkeeps"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/automation/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/automation/{id}/fund"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/automation/{id}/cancel"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/automation/{id}/withdraw"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/automation/{id}/check"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/automation/{id}/perform"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/automation/{id}/performs"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/ccip/messages"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/ccip/lane/{src}/{dst}"
+        }
       ]
     },
     {
@@ -476,6 +1423,148 @@
         "deployments expose a status field; real Deployment objects carry rollout percentages",
         "simulate_fail on zone create / worker deploy injects moved or failed; no real trigger",
         "D1 query runs a small SQL subset; DROP/ALTER and other statements return 400"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/zones"
+        },
+        {
+          "method": "POST",
+          "route": "/zones"
+        },
+        {
+          "method": "GET",
+          "route": "/zones/{zone_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/zones/{zone_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/zones/{zone_id}/dns_records"
+        },
+        {
+          "method": "POST",
+          "route": "/zones/{zone_id}/dns_records"
+        },
+        {
+          "method": "GET",
+          "route": "/zones/{zone_id}/dns_records/{dns_record_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/zones/{zone_id}/dns_records/{dns_record_id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/zones/{zone_id}/dns_records/{dns_record_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/zones/{zone_id}/dns_records/{dns_record_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/zones/{zone_id}/firewall/rules"
+        },
+        {
+          "method": "POST",
+          "route": "/zones/{zone_id}/firewall/rules"
+        },
+        {
+          "method": "GET",
+          "route": "/zones/{zone_id}/firewall/rules/{rule_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/zones/{zone_id}/firewall/rules/{rule_id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/zones/{zone_id}/firewall/rules/{rule_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/zones/{zone_id}/firewall/rules/{rule_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/zones/{zone_id}/page_rules"
+        },
+        {
+          "method": "POST",
+          "route": "/zones/{zone_id}/page_rules"
+        },
+        {
+          "method": "GET",
+          "route": "/zones/{zone_id}/page_rules/{rule_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/zones/{zone_id}/page_rules/{rule_id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/zones/{zone_id}/page_rules/{rule_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/zones/{zone_id}/page_rules/{rule_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/zones/{zone_id}/purge_cache"
+        },
+        {
+          "method": "GET",
+          "route": "/accounts/{account_id}/workers/scripts"
+        },
+        {
+          "method": "PUT",
+          "route": "/accounts/{account_id}/workers/scripts/{script_name}"
+        },
+        {
+          "method": "GET",
+          "route": "/accounts/{account_id}/workers/scripts/{script_name}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/accounts/{account_id}/workers/scripts/{script_name}"
+        },
+        {
+          "method": "GET",
+          "route": "/accounts/{account_id}/workers/scripts/{script_name}/deployments"
+        },
+        {
+          "method": "GET",
+          "route": "/accounts/{account_id}/r2/buckets"
+        },
+        {
+          "method": "POST",
+          "route": "/accounts/{account_id}/r2/buckets"
+        },
+        {
+          "method": "DELETE",
+          "route": "/accounts/{account_id}/r2/buckets/{bucket_name}"
+        },
+        {
+          "method": "GET",
+          "route": "/accounts/{account_id}/d1/database"
+        },
+        {
+          "method": "POST",
+          "route": "/accounts/{account_id}/d1/database"
+        },
+        {
+          "method": "DELETE",
+          "route": "/accounts/{account_id}/d1/database/{database_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/accounts/{account_id}/d1/database/{database_id}/query"
+        }
       ]
     },
     {
@@ -497,6 +1586,28 @@
       "deviations": [
         "records/lookup and records/query are GET-with-body; real CloudKit specifies POST",
         "query comparators are a limited subset; FULL_TEXT, LIKE, and list variants missing"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/database/1/{container}/{env}/public/users/current"
+        },
+        {
+          "method": "GET",
+          "route": "/database/1/{container}/{env}/public/zones/list"
+        },
+        {
+          "method": "GET",
+          "route": "/database/1/{container}/{env}/public/records/lookup"
+        },
+        {
+          "method": "GET",
+          "route": "/database/1/{container}/{env}/public/records/query"
+        },
+        {
+          "method": "POST",
+          "route": "/database/1/{container}/{env}/public/records/modify"
+        }
       ]
     },
     {
@@ -535,6 +1646,116 @@
         "POST /interactions answers ping with type 1, everything else a type 5 deferred ack",
         "posted messages emit signed MESSAGE_CREATE webhooks; real Discord dispatches via gateway",
         "message listing pages via opaque after cursors + Link headers, not snowflake ids"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/oauth2/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/oauth2/token"
+        },
+        {
+          "method": "GET",
+          "route": "/oauth2/@me"
+        },
+        {
+          "method": "GET",
+          "route": "/users/@me/guilds"
+        },
+        {
+          "method": "GET",
+          "route": "/users/@me"
+        },
+        {
+          "method": "GET",
+          "route": "/guilds/{guild_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/guilds/{guild_id}/channels"
+        },
+        {
+          "method": "POST",
+          "route": "/channels/{channel_id}/messages"
+        },
+        {
+          "method": "GET",
+          "route": "/channels/{channel_id}/messages"
+        },
+        {
+          "method": "GET",
+          "route": "/channels/{channel_id}/messages/{message_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v10/channels/{channel_id}/messages/{message_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me"
+        },
+        {
+          "method": "POST",
+          "route": "/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me"
+        },
+        {
+          "method": "POST",
+          "route": "/interactions"
+        },
+        {
+          "method": "GET",
+          "route": "/v10/oauth2/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/v10/oauth2/token"
+        },
+        {
+          "method": "GET",
+          "route": "/v10/oauth2/@me"
+        },
+        {
+          "method": "GET",
+          "route": "/v10/users/@me/guilds"
+        },
+        {
+          "method": "GET",
+          "route": "/v10/users/@me"
+        },
+        {
+          "method": "GET",
+          "route": "/v10/guilds/{guild_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v10/guilds/{guild_id}/channels"
+        },
+        {
+          "method": "POST",
+          "route": "/v10/channels/{channel_id}/messages"
+        },
+        {
+          "method": "GET",
+          "route": "/v10/channels/{channel_id}/messages"
+        },
+        {
+          "method": "PUT",
+          "route": "/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me"
+        },
+        {
+          "method": "POST",
+          "route": "/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me"
+        },
+        {
+          "method": "POST",
+          "route": "/v10/interactions"
+        },
+        {
+          "method": "WS",
+          "route": "/gateway"
+        }
       ]
     },
     {
@@ -558,6 +1779,60 @@
         "uploads take JSON {name, content, parents}; real Drive uses multipart/related bodies",
         "list q is a limited field/op subset; queries outside it 400 rather than running",
         "orderBy honors only the first recognized key; real Drive applies every key"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/o/oauth2/auth"
+        },
+        {
+          "method": "POST",
+          "route": "/o/oauth2/token"
+        },
+        {
+          "method": "POST",
+          "route": "/upload/drive/v3/files"
+        },
+        {
+          "method": "PUT",
+          "route": "/upload/drive/v3/files/{upload_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/upload/drive/v3/files/{upload_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/drive/v3/files"
+        },
+        {
+          "method": "POST",
+          "route": "/drive/v3/files"
+        },
+        {
+          "method": "GET",
+          "route": "/drive/v3/files/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/drive/v3/files/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/drive/v3/files/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/drive/v3/about"
+        },
+        {
+          "method": "GET",
+          "route": "/drive/v3/changes/startPageToken"
+        },
+        {
+          "method": "GET",
+          "route": "/drive/v3/changes"
+        }
       ]
     },
     {
@@ -583,6 +1858,40 @@
         "upload takes JSON {path, content}; real /2/files/upload posts raw bytes + Dropbox-API-Arg",
         "list_folder returns the entire path-prefix subtree in one response",
         "get_temporary_link mints a synthetic URL that does not serve the content"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/2/files/upload"
+        },
+        {
+          "method": "POST",
+          "route": "/2/files/download"
+        },
+        {
+          "method": "POST",
+          "route": "/2/files/list_folder"
+        },
+        {
+          "method": "POST",
+          "route": "/2/files/get_metadata"
+        },
+        {
+          "method": "POST",
+          "route": "/2/files/create_folder"
+        },
+        {
+          "method": "POST",
+          "route": "/2/files/delete"
+        },
+        {
+          "method": "POST",
+          "route": "/2/files/get_temporary_link"
+        },
+        {
+          "method": "POST",
+          "route": "/2/users/get_current_account"
+        }
       ]
     },
     {
@@ -604,6 +1913,32 @@
         "executions follow a fixed clock: EXECUTING at +1s, COMPLETED at +3s after execute",
         "queries come from a static 3-entry catalog; no real SQL is executed",
         "simulate_fail body flag forces QUERY_STATE_FAILED; real API has no failure trigger"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/api/v1/query/{query_id}/execute"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v1/query/{query_id}/result"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v1/auth/validate"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v1/execution/{execution_id}/status"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v1/execution/{execution_id}/results/csv"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v1/execution/{execution_id}/results"
+        }
       ]
     },
     {
@@ -644,6 +1979,12 @@
         "UnprocessedKeys/UnprocessedItems always empty; no throttling, ConsumedCapacity fixed at 1",
         "Query/Scan Limit caps returned post-filter items; real caps items evaluated",
         "UpdateItem REMOVE on a key attribute silently no-ops instead of erroring"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/"
+        }
       ]
     },
     {
@@ -657,7 +1998,13 @@
       "sdks": [],
       "behaviors": [],
       "missing": [],
-      "deviations": []
+      "deviations": [],
+      "covered": [
+        {
+          "method": "WS",
+          "route": "/ws/echo"
+        }
+      ]
     },
     {
       "id": "emailoctopus-style",
@@ -675,6 +2022,92 @@
         "any non-empty bearer token is accepted; real keys are dashboard-issued API keys",
         "contact ids use truncated SHA-256 of the email; the real API uses MD5",
         "v2 has no webhooks; adapter emits unsigned lifecycle events as a local extension"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/lists"
+        },
+        {
+          "method": "POST",
+          "route": "/lists"
+        },
+        {
+          "method": "GET",
+          "route": "/lists/{list_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/lists/{list_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/lists/{list_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/lists/{list_id}/fields"
+        },
+        {
+          "method": "PUT",
+          "route": "/lists/{list_id}/fields/{tag}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/lists/{list_id}/fields/{tag}"
+        },
+        {
+          "method": "GET",
+          "route": "/lists/{list_id}/contacts"
+        },
+        {
+          "method": "POST",
+          "route": "/lists/{list_id}/contacts"
+        },
+        {
+          "method": "PUT",
+          "route": "/lists/{list_id}/contacts"
+        },
+        {
+          "method": "PUT",
+          "route": "/lists/{list_id}/contacts/batch"
+        },
+        {
+          "method": "GET",
+          "route": "/lists/{list_id}/contacts/{contact_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/lists/{list_id}/contacts/{contact_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/lists/{list_id}/contacts/{contact_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/campaigns"
+        },
+        {
+          "method": "GET",
+          "route": "/campaigns/{campaign_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/campaigns/{campaign_id}/reports/summary"
+        },
+        {
+          "method": "GET",
+          "route": "/campaigns/{campaign_id}/reports/links"
+        },
+        {
+          "method": "GET",
+          "route": "/campaigns/{campaign_id}/reports"
+        },
+        {
+          "method": "POST",
+          "route": "/automations/{automation_id}/queue"
+        }
       ]
     },
     {
@@ -697,6 +2130,44 @@
       ],
       "deviations": [
         "Authorize auto-approves with an instant 302; no consent screen"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/common/oauth2/v2.0/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/common/oauth2/v2.0/token"
+        },
+        {
+          "method": "GET",
+          "route": "/common/discovery/v2.0/keys"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/users"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/users"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/users/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/applications"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/servicePrincipals"
+        }
       ]
     },
     {
@@ -719,6 +2190,16 @@
         "inclusion runs on a fixed clock: mempool 0-1s, bundled 1-3s, included at \u003e=3s",
         "eth_sendUserOperation accepts {simulate_fail:true} as a third params element",
         "mock paymaster POST /paymaster/sign mints synthetic sponsorship signatures"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/"
+        },
+        {
+          "method": "POST",
+          "route": "/paymaster/sign"
+        }
       ]
     },
     {
@@ -736,6 +2217,44 @@
       ],
       "deviations": [
         "POST /sim/transaction/{id}/fund is a simulator-only affordance for hosted-page funding"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/2017-09-01/customer/me"
+        },
+        {
+          "method": "GET",
+          "route": "/2017-09-01/transaction"
+        },
+        {
+          "method": "POST",
+          "route": "/2017-09-01/transaction"
+        },
+        {
+          "method": "GET",
+          "route": "/2017-09-01/transaction/reference/{reference}"
+        },
+        {
+          "method": "GET",
+          "route": "/2017-09-01/transaction/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/2017-09-01/transaction/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/2017-09-01/customer/me/webhook"
+        },
+        {
+          "method": "GET",
+          "route": "/2017-09-01/customer/me/webhook"
+        },
+        {
+          "method": "POST",
+          "route": "/sim/transaction/{id}/fund"
+        }
       ]
     },
     {
@@ -769,6 +2288,12 @@
         "Tx hashes derive from a pseudo-keccak, not real keccak256",
         "Mining delay fixed at 3s; blockNumber advances one block per sent tx",
         "eth_sendRawTransaction accepts simulator-only {simulate_fail: true} for a revert"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/"
+        }
       ]
     },
     {
@@ -786,6 +2311,12 @@
       ],
       "deviations": [
         "Auth accepts any non-empty apikey; only a missing key yields the error envelope"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/api"
+        }
       ]
     },
     {
@@ -805,6 +2336,176 @@
         "Any non-empty bearer accepted; missing/malformed header is a genuine 401",
         "POST /entities/{c}/archive takes JSON; the real endpoint is multipart",
         "Webhook HMAC uses fixed secret fic-stunt-webhook-signing-secret"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/user/companies"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/company/info"
+        },
+        {
+          "method": "PUT",
+          "route": "/c/{company_id}/company/info"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/received_documents"
+        },
+        {
+          "method": "POST",
+          "route": "/c/{company_id}/received_documents"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/received_documents/info"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/received_documents/{id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/c/{company_id}/received_documents/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/c/{company_id}/received_documents/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/issued_documents"
+        },
+        {
+          "method": "POST",
+          "route": "/c/{company_id}/issued_documents"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/issued_documents/info"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/issued_documents/{id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/c/{company_id}/issued_documents/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/c/{company_id}/issued_documents/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/suppliers"
+        },
+        {
+          "method": "POST",
+          "route": "/c/{company_id}/suppliers"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/suppliers/{id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/c/{company_id}/suppliers/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/c/{company_id}/suppliers/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/clients"
+        },
+        {
+          "method": "POST",
+          "route": "/c/{company_id}/clients"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/clients/{id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/c/{company_id}/clients/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/c/{company_id}/clients/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/products"
+        },
+        {
+          "method": "POST",
+          "route": "/c/{company_id}/products"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/products/{id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/c/{company_id}/products/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/c/{company_id}/products/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/taxes"
+        },
+        {
+          "method": "POST",
+          "route": "/c/{company_id}/taxes"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/taxes/{id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/c/{company_id}/taxes/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/c/{company_id}/taxes/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/cashbook/{year}/{month}"
+        },
+        {
+          "method": "POST",
+          "route": "/c/{company_id}/archive"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/subscriptions"
+        },
+        {
+          "method": "POST",
+          "route": "/c/{company_id}/subscriptions"
+        },
+        {
+          "method": "GET",
+          "route": "/c/{company_id}/subscriptions/{id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/c/{company_id}/subscriptions/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/c/{company_id}/subscriptions/{id}"
+        }
       ]
     },
     {
@@ -827,6 +2528,96 @@
         "Auth checks credential presence only; Bearer or key value never validated",
         "FCM topic :subscribe/:unsubscribe stand in for the Instance ID API",
         "GET .../messages lists sent messages — simulator extension, no real endpoint"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v1/accounts:signInWithPassword"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/accounts:signUp"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/accounts:signInWithIdp"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/accounts:getAccountInfo"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/accounts:lookup"
+        },
+        {
+          "method": "POST",
+          "route": "/identitytoolkit/v3/relyingparty/{action}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/token"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects/{project}/databases/(default)/documents:runQuery"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/projects/{project}/databases/(default)/documents/{collection}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects/{project}/databases/(default)/documents/{collection}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/projects/{project}/databases/(default)/documents/{collection}/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/v1/projects/{project}/databases/(default)/documents/{collection}/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/projects/{project}/databases/(default)/documents/{collection}/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects/{project}/messages:send"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/projects/{project}/messages"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects/{project}/topics/{topic}:subscribe"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects/{project}/topics/{topic}:unsubscribe"
+        }
       ]
     },
     {
@@ -846,6 +2637,24 @@
       "deviations": [
         "Dimensions: date/country/deviceCategory only; metrics: sessions/activeUsers/screenPageViews",
         "properties.list honors only the filter=parent:\u003caccount\u003e form"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/v1admin/accounts"
+        },
+        {
+          "method": "GET",
+          "route": "/v1admin/properties"
+        },
+        {
+          "method": "GET",
+          "route": "/v1admin/properties/{property}/dataStreams"
+        },
+        {
+          "method": "POST",
+          "route": "/v1beta/properties/{resource}"
+        }
       ]
     },
     {
@@ -864,6 +2673,48 @@
       ],
       "deviations": [
         "Event create without start/end defaults them (now+30m, +90m); real API requires both"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/calendar/v3/users/me/calendarList"
+        },
+        {
+          "method": "GET",
+          "route": "/calendar/v3/calendars/primary"
+        },
+        {
+          "method": "POST",
+          "route": "/calendar/v3/calendars/{calendarId}/events/quickAdd"
+        },
+        {
+          "method": "POST",
+          "route": "/calendar/v3/calendars/{calendarId}/events/import"
+        },
+        {
+          "method": "GET",
+          "route": "/calendar/v3/calendars/{calendarId}/events"
+        },
+        {
+          "method": "POST",
+          "route": "/calendar/v3/calendars/{calendarId}/events"
+        },
+        {
+          "method": "GET",
+          "route": "/calendar/v3/calendars/{calendarId}/events/{eventId}/instances"
+        },
+        {
+          "method": "GET",
+          "route": "/calendar/v3/calendars/{calendarId}/events/{eventId}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/calendar/v3/calendars/{calendarId}/events/{eventId}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/calendar/v3/calendars/{calendarId}/events/{eventId}"
+        }
       ]
     },
     {
@@ -883,6 +2734,24 @@
         "batchUpdate replies map 1:1 to requests; real API may return fewer",
         "Inserted text adopts the style of the run it lands in",
         "Inserting newline continues bullet/named style into the new paragraph"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v1/documents"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/documents/{documentId}/revisions"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/documents/{documentId}/batchUpdate"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/documents/{documentId}"
+        }
       ]
     },
     {
@@ -924,6 +2793,112 @@
         "App JWT RS256 signature not verified; the credential store is the check",
         "Webhook body is a stunt {type, payload} envelope, not GitHub's bare event body",
         "Runs advance on fixed clock (queued+1s, in_progress+3s); dispatch takes simulate_fail"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/app"
+        },
+        {
+          "method": "GET",
+          "route": "/app/installations"
+        },
+        {
+          "method": "POST",
+          "route": "/app/installations/{installation_id}/access_tokens"
+        },
+        {
+          "method": "GET",
+          "route": "/installation"
+        },
+        {
+          "method": "GET",
+          "route": "/repos/{owner}/{repo}"
+        },
+        {
+          "method": "GET",
+          "route": "/repos/{owner}/{repo}/issues"
+        },
+        {
+          "method": "POST",
+          "route": "/repos/{owner}/{repo}/issues"
+        },
+        {
+          "method": "GET",
+          "route": "/repos/{owner}/{repo}/issues/{issue_number}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/repos/{owner}/{repo}/issues/{issue_number}"
+        },
+        {
+          "method": "GET",
+          "route": "/repos/{owner}/{repo}/issues/{issue_number}/comments"
+        },
+        {
+          "method": "POST",
+          "route": "/repos/{owner}/{repo}/issues/{issue_number}/comments"
+        },
+        {
+          "method": "POST",
+          "route": "/repos/{owner}/{repo}/issues/{issue_number}/labels/{name}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/repos/{owner}/{repo}/issues/{issue_number}/labels/{name}"
+        },
+        {
+          "method": "GET",
+          "route": "/repos/{owner}/{repo}/issues/{issue_number}/events"
+        },
+        {
+          "method": "GET",
+          "route": "/repos/{owner}/{repo}/pulls"
+        },
+        {
+          "method": "POST",
+          "route": "/repos/{owner}/{repo}/pulls"
+        },
+        {
+          "method": "GET",
+          "route": "/repos/{owner}/{repo}/pulls/{pull_number}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/repos/{owner}/{repo}/pulls/{pull_number}"
+        },
+        {
+          "method": "PUT",
+          "route": "/repos/{owner}/{repo}/pulls/{pull_number}/merge"
+        },
+        {
+          "method": "GET",
+          "route": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
+        },
+        {
+          "method": "POST",
+          "route": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews"
+        },
+        {
+          "method": "POST",
+          "route": "/repos/{owner}/{repo}/dispatches"
+        },
+        {
+          "method": "GET",
+          "route": "/repos/{owner}/{repo}/actions/runs"
+        },
+        {
+          "method": "GET",
+          "route": "/repos/{owner}/{repo}/actions/runs/{run_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/repos/{owner}/{repo}/hooks"
+        },
+        {
+          "method": "POST",
+          "route": "/webhooks/receive"
+        }
       ]
     },
     {
@@ -946,6 +2921,72 @@
         "q is substring match on snippet + Subject header only",
         "Omitted/0 maxResults returns everything; real API defaults to 100",
         "Label create is idempotent on existing name; real Gmail returns 409"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/gmail/v1/users/{userId}/labels"
+        },
+        {
+          "method": "POST",
+          "route": "/gmail/v1/users/{userId}/labels"
+        },
+        {
+          "method": "DELETE",
+          "route": "/gmail/v1/users/{userId}/labels/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/gmail/v1/users/{userId}/messages/send"
+        },
+        {
+          "method": "GET",
+          "route": "/gmail/v1/users/{userId}/messages"
+        },
+        {
+          "method": "POST",
+          "route": "/gmail/v1/users/{userId}/messages"
+        },
+        {
+          "method": "POST",
+          "route": "/gmail/v1/users/{userId}/messages/batchModify"
+        },
+        {
+          "method": "POST",
+          "route": "/gmail/v1/users/{userId}/messages/{messageId}/trash"
+        },
+        {
+          "method": "POST",
+          "route": "/gmail/v1/users/{userId}/messages/{messageId}/modify"
+        },
+        {
+          "method": "GET",
+          "route": "/gmail/v1/users/{userId}/messages/{messageId}/attachments/{attachmentId}"
+        },
+        {
+          "method": "GET",
+          "route": "/gmail/v1/users/{userId}/messages/{messageId}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/gmail/v1/users/{userId}/messages/{messageId}"
+        },
+        {
+          "method": "GET",
+          "route": "/gmail/v1/users/{userId}/drafts"
+        },
+        {
+          "method": "POST",
+          "route": "/gmail/v1/users/{userId}/drafts"
+        },
+        {
+          "method": "DELETE",
+          "route": "/gmail/v1/users/{userId}/drafts/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/gmail/v1/users/{userId}/threads/{threadId}"
+        }
       ]
     },
     {
@@ -966,6 +3007,60 @@
         "Users query supports bare terms plus email:/name:/orgUnitPath=/isSuspended= only",
         "Groups query silently ignores unrecognized query forms",
         "Static convenience token ya29.mock-admin-token seeded far-future"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/admin/directory/v1/users"
+        },
+        {
+          "method": "POST",
+          "route": "/admin/directory/v1/users"
+        },
+        {
+          "method": "GET",
+          "route": "/admin/directory/v1/users/{userKey}"
+        },
+        {
+          "method": "PUT",
+          "route": "/admin/directory/v1/users/{userKey}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/admin/directory/v1/users/{userKey}"
+        },
+        {
+          "method": "GET",
+          "route": "/admin/directory/v1/users/{userKey}/tokens"
+        },
+        {
+          "method": "GET",
+          "route": "/admin/directory/v1/groups"
+        },
+        {
+          "method": "POST",
+          "route": "/admin/directory/v1/groups"
+        },
+        {
+          "method": "GET",
+          "route": "/admin/directory/v1/groups/{groupKey}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/admin/directory/v1/groups/{groupKey}"
+        },
+        {
+          "method": "GET",
+          "route": "/admin/directory/v1/groups/{groupKey}/members"
+        },
+        {
+          "method": "POST",
+          "route": "/admin/directory/v1/groups/{groupKey}/members"
+        },
+        {
+          "method": "DELETE",
+          "route": "/admin/directory/v1/groups/{groupKey}/members/{memberKey}"
+        }
       ]
     },
     {
@@ -984,6 +3079,44 @@
       ],
       "deviations": [
         "JWKS serves one fixed synthetic RSA-2048 key (kid mock-google-key-1)"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/oauth2/v4/token"
+        },
+        {
+          "method": "GET",
+          "route": "/oauth2/v3/certs"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/projects/{project}/serviceAccounts"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects/{project}/serviceAccounts"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/projects/{project}/serviceAccounts/{sa}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/projects/{project}/serviceAccounts/{sa}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/projects/{project}/serviceAccounts/{sa}/keys"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects/{project}/serviceAccounts/{sa_verb}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/projects/{project}/roles:queryGrantableRoles"
+        }
       ]
     },
     {
@@ -1018,6 +3151,24 @@
       "deviations": [
         "Authorize auto-approves with an instant 302; no consent screen",
         "id_tokens signed by a fixed synthetic RSA key (kid mock-google-key-1)"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/o/oauth2/auth"
+        },
+        {
+          "method": "POST",
+          "route": "/o/oauth2/token"
+        },
+        {
+          "method": "GET",
+          "route": "/oauth2/v3/certs"
+        },
+        {
+          "method": "GET",
+          "route": "/oauth2/v3/userinfo"
+        }
       ]
     },
     {
@@ -1037,6 +3188,52 @@
         "Site verification completes ~2s after sites.add via derive-on-read clock",
         "Inspection verdicts keyed to magic path tokens (noindex, soft404, servererror)",
         "URL-prefix sites/sitemaps addressed by single-segment paths (decoded routing)"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/webmasters/v3/sites"
+        },
+        {
+          "method": "GET",
+          "route": "/webmasters/v3/sites/{siteUrl}"
+        },
+        {
+          "method": "PUT",
+          "route": "/webmasters/v3/sites/{siteUrl}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/webmasters/v3/sites/{siteUrl}"
+        },
+        {
+          "method": "POST",
+          "route": "/webmasters/v3/sites/{siteUrl}/searchAnalytics/query"
+        },
+        {
+          "method": "GET",
+          "route": "/webmasters/v3/sites/{siteUrl}/sitemaps"
+        },
+        {
+          "method": "GET",
+          "route": "/webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}"
+        },
+        {
+          "method": "PUT",
+          "route": "/webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/urlInspection/index:inspect"
+        },
+        {
+          "method": "POST",
+          "route": "/webmasters/v3/sites/{siteUrl}/inspect"
+        }
       ]
     },
     {
@@ -1053,7 +3250,45 @@
         "batchUpdate limited to 4 request types; no insertDimension, mergeCells, sortRange",
         "No valueRenderOption or dateTimeRenderOption on values reads"
       ],
-      "deviations": []
+      "deviations": [],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v4/spreadsheets"
+        },
+        {
+          "method": "POST",
+          "route": "/v4/spreadsheets/{spreadsheetId}/values:batchGet"
+        },
+        {
+          "method": "POST",
+          "route": "/v4/spreadsheets/{spreadsheetId}/values:batchUpdate"
+        },
+        {
+          "method": "POST",
+          "route": "/v4/spreadsheets/{spreadsheetId}/sheets"
+        },
+        {
+          "method": "POST",
+          "route": "/v4/spreadsheets/{ss_id_or_verb}"
+        },
+        {
+          "method": "GET",
+          "route": "/v4/spreadsheets/{spreadsheetId}"
+        },
+        {
+          "method": "GET",
+          "route": "/v4/spreadsheets/{spreadsheetId}/values/{range}"
+        },
+        {
+          "method": "PUT",
+          "route": "/v4/spreadsheets/{spreadsheetId}/values/{range}"
+        },
+        {
+          "method": "POST",
+          "route": "/v4/spreadsheets/{spreadsheetId}/values/{range_verb}"
+        }
+      ]
     },
     {
       "id": "gtasks-style",
@@ -1068,7 +3303,45 @@
         "No tasks.clear endpoint",
         "showDeleted/showHidden/showAssigned list params unmodeled"
       ],
-      "deviations": []
+      "deviations": [],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/tasks/v1/lists"
+        },
+        {
+          "method": "POST",
+          "route": "/tasks/v1/lists"
+        },
+        {
+          "method": "POST",
+          "route": "/tasks/v1/lists/{tasklistId}/tasks/{taskId}/move"
+        },
+        {
+          "method": "GET",
+          "route": "/tasks/v1/lists/{tasklistId}/tasks"
+        },
+        {
+          "method": "POST",
+          "route": "/tasks/v1/lists/{tasklistId}/tasks"
+        },
+        {
+          "method": "GET",
+          "route": "/tasks/v1/lists/{tasklistId}/tasks/{taskId}"
+        },
+        {
+          "method": "PUT",
+          "route": "/tasks/v1/lists/{tasklistId}/tasks/{taskId}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/tasks/v1/lists/{tasklistId}/tasks/{taskId}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/tasks/v1/lists/{tasklistId}/tasks/{taskId}"
+        }
+      ]
     },
     {
       "id": "helius-style",
@@ -1088,6 +3361,52 @@
         "Confirmation milestones fixed by clock: processed 1-2s, confirmed 2-3s, final 3s+",
         "sendTransaction config takes simulate_fail/simulate_type/simulate_address",
         "Enhanced transactions limit capped at 100 (real API max 1000)"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/"
+        },
+        {
+          "method": "POST",
+          "route": "/v0/transactions"
+        },
+        {
+          "method": "GET",
+          "route": "/v0/addresses/{address}/transactions"
+        },
+        {
+          "method": "GET",
+          "route": "/v0/addresses/{address}/balances"
+        },
+        {
+          "method": "GET",
+          "route": "/v0/addresses/{address}/nfts"
+        },
+        {
+          "method": "POST",
+          "route": "/v0/names"
+        },
+        {
+          "method": "POST",
+          "route": "/v0/webhooks"
+        },
+        {
+          "method": "GET",
+          "route": "/v0/webhooks"
+        },
+        {
+          "method": "GET",
+          "route": "/v0/webhooks/{webhookId}"
+        },
+        {
+          "method": "PUT",
+          "route": "/v0/webhooks/{webhookId}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v0/webhooks/{webhookId}"
+        }
       ]
     },
     {
@@ -1106,6 +3425,52 @@
       "deviations": [
         "Write flow /login + /submit from a reference client; official Firebase API is read-only",
         "Challenge injection after N submits (anti-abuse) mirrors mock_hn, configurable via KV"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/v0/topstories.json"
+        },
+        {
+          "method": "GET",
+          "route": "/v0/newstories.json"
+        },
+        {
+          "method": "GET",
+          "route": "/v0/beststories.json"
+        },
+        {
+          "method": "GET",
+          "route": "/v0/askstories.json"
+        },
+        {
+          "method": "GET",
+          "route": "/v0/showstories.json"
+        },
+        {
+          "method": "GET",
+          "route": "/v0/jobstories.json"
+        },
+        {
+          "method": "POST",
+          "route": "/login"
+        },
+        {
+          "method": "GET",
+          "route": "/logout"
+        },
+        {
+          "method": "POST",
+          "route": "/submit"
+        },
+        {
+          "method": "GET",
+          "route": "/v0/item/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v0/user/{id}"
+        }
       ]
     },
     {
@@ -1133,7 +3498,141 @@
         "No engagements (calls, emails, meetings, notes, tasks) endpoints",
         "No properties, pipelines, or import/export endpoints"
       ],
-      "deviations": []
+      "deviations": [],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/crm/v3/objects/contacts"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/contacts"
+        },
+        {
+          "method": "GET",
+          "route": "/crm/v3/objects/contacts/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/crm/v3/objects/contacts/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/crm/v3/objects/contacts/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/contacts/{id}/associations/{toObjectType}/batch/create"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/contacts/{id}/associations/{toObjectType}/batch/archive"
+        },
+        {
+          "method": "PUT",
+          "route": "/crm/v3/objects/contacts/{id}/associations/{toObjectType}/{toObjectId}/{associationType}"
+        },
+        {
+          "method": "GET",
+          "route": "/crm/v3/objects/contacts/{id}/associations/{toObjectType}"
+        },
+        {
+          "method": "GET",
+          "route": "/crm/v3/objects/companies"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/companies"
+        },
+        {
+          "method": "GET",
+          "route": "/crm/v3/objects/companies/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/crm/v3/objects/companies/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/crm/v3/objects/companies/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/crm/v3/objects/deals"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/deals"
+        },
+        {
+          "method": "GET",
+          "route": "/crm/v3/objects/deals/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/crm/v3/objects/deals/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/crm/v3/objects/deals/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/crm/v3/objects/tickets"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/tickets"
+        },
+        {
+          "method": "GET",
+          "route": "/crm/v3/objects/tickets/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/crm/v3/objects/tickets/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/crm/v3/objects/tickets/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/{objectType}/search"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/{objectType}/batch/create"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/{objectType}/batch/read"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/{objectType}/batch/update"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/{objectType}/batch/archive"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/{objectType}/{id}/restore"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/{objectType}/{id}/associations/{toObjectType}/batch/create"
+        },
+        {
+          "method": "POST",
+          "route": "/crm/v3/objects/{objectType}/{id}/associations/{toObjectType}/batch/archive"
+        },
+        {
+          "method": "DELETE",
+          "route": "/crm/v3/objects/{objectType}/{id}/associations/{toObjectType}/{toObjectId}/{associationType}"
+        }
+      ]
     },
     {
       "id": "instagram-style",
@@ -1152,6 +3651,48 @@
       "deviations": [
         "Container processing fixed at ~3s IN_PROGRESS before FINISHED or ERROR",
         "simulate_fail=true create flag forces container ERROR; real API has no such switch"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/oauth/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/oauth/access_token"
+        },
+        {
+          "method": "GET",
+          "route": "/v21.0/me"
+        },
+        {
+          "method": "GET",
+          "route": "/v21.0/refresh_access_token"
+        },
+        {
+          "method": "GET",
+          "route": "/v21.0/{container_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v21.0/{media_id}/comments"
+        },
+        {
+          "method": "GET",
+          "route": "/v21.0/{media_id}/insights"
+        },
+        {
+          "method": "POST",
+          "route": "/v21.0/{ig_user_id}/media_publish"
+        },
+        {
+          "method": "POST",
+          "route": "/v21.0/{ig_user_id}/media"
+        },
+        {
+          "method": "GET",
+          "route": "/v21.0/{ig_user_id}/media"
+        }
       ]
     },
     {
@@ -1189,6 +3730,136 @@
         "JQL dates compare as ISO-8601 strings, not parsed datetimes",
         "Single fixed simplified workflow for all projects; real workflows are configurable",
         "GET /rest/api/3/webhook (list registrations) marked simulator-only"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/rest/api/3/myself"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/3/serverInfo"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/3/project"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/3/project/search"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/3/project/{key}"
+        },
+        {
+          "method": "POST",
+          "route": "/rest/api/3/search/jql"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/3/search"
+        },
+        {
+          "method": "POST",
+          "route": "/rest/api/3/issue"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/3/issue/{key}"
+        },
+        {
+          "method": "PUT",
+          "route": "/rest/api/3/issue/{key}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/rest/api/3/issue/{key}"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/3/issue/{key}/transitions"
+        },
+        {
+          "method": "POST",
+          "route": "/rest/api/3/issue/{key}/transitions"
+        },
+        {
+          "method": "POST",
+          "route": "/rest/api/2/issue"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/2/issue/{key}"
+        },
+        {
+          "method": "PUT",
+          "route": "/rest/api/2/issue/{key}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/rest/api/2/issue/{key}"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/2/issue/{key}/transitions"
+        },
+        {
+          "method": "POST",
+          "route": "/rest/api/2/issue/{key}/transitions"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/2/issue/{key}/comment"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/2/issue/{key}/comment/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/rest/api/2/issue/{key}/comment"
+        },
+        {
+          "method": "PUT",
+          "route": "/rest/api/2/issue/{key}/comment/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/rest/api/2/issue/{key}/comment/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/3/issue/{key}/comment"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/3/issue/{key}/comment/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/rest/api/3/issue/{key}/comment"
+        },
+        {
+          "method": "PUT",
+          "route": "/rest/api/3/issue/{key}/comment/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/rest/api/3/issue/{key}/comment/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/rest/api/3/webhook"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/api/3/webhook"
+        },
+        {
+          "method": "DELETE",
+          "route": "/rest/api/3/webhook"
+        }
       ]
     },
     {
@@ -1209,6 +3880,28 @@
         "simulate_fail and simulate_reject_reason create fields are stunt-only hooks",
         "Webhook HMAC secret is the public constant stunt_jumio_mock_signing_key",
         "POST /netverify/v2/webhooks is a local stand-in receiver, not a Jumio endpoint"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/netverify/v2/scans"
+        },
+        {
+          "method": "GET",
+          "route": "/netverify/v2/scans/{scan_reference}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/netverify/v2/scans/{scan_reference}"
+        },
+        {
+          "method": "GET",
+          "route": "/netverify/v2/scans/{scan_reference}/data"
+        },
+        {
+          "method": "POST",
+          "route": "/netverify/v2/webhooks"
+        }
       ]
     },
     {
@@ -1227,6 +3920,40 @@
       ],
       "deviations": [
         "Rate-limit injection on POST /v2/ugcPosts publish is a simulator test hook"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/oauth/v2/authorization"
+        },
+        {
+          "method": "POST",
+          "route": "/oauth/v2/accessToken"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/userinfo"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/ugcPosts"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/comments"
+        },
+        {
+          "method": "POST",
+          "route": "/rest/comments"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/posts/{urn}"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/memberCreatorPostAnalytics"
+        }
       ]
     },
     {
@@ -1255,6 +3982,20 @@
         "Responses deterministic: echo of the last user message; no model or randomness",
         "Reply derived solely from the last user message; earlier history ignored",
         "stream:true (OpenAI) returns one SSE chunk plus [DONE], not token-by-token"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v1/chat/completions"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/models"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/messages"
+        }
       ]
     },
     {
@@ -1276,6 +4017,92 @@
         "Export job timing fixed: Processing after ~1s, Completed after ~3s",
         "Signed completion webhook (X-Stunt-Signature, fixed secret) is a simulator extension",
         "Daily quota 602 modeled but threshold set to 100k so tests are unaffected"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/identity/oauth/token"
+        },
+        {
+          "method": "POST",
+          "route": "/rest/v1/leads.json"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/v1/leads"
+        },
+        {
+          "method": "POST",
+          "route": "/rest/v1/leads"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/v1/leads/describe"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/v1/leads/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/v1/leads/{id}.json"
+        },
+        {
+          "method": "POST",
+          "route": "/rest/v1/campaigns/{id}/trigger"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/v1/campaigns"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/v1/programs"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/v1/folders"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/v1/activities/pagingtoken"
+        },
+        {
+          "method": "GET",
+          "route": "/rest/v1/activities"
+        },
+        {
+          "method": "POST",
+          "route": "/bulk/v1/leads/export/create"
+        },
+        {
+          "method": "POST",
+          "route": "/bulk/v1/leads/export/create.json"
+        },
+        {
+          "method": "GET",
+          "route": "/bulk/v1/leads/export/{exportId}/status"
+        },
+        {
+          "method": "GET",
+          "route": "/bulk/v1/leads/export/{exportId}/status.json"
+        },
+        {
+          "method": "GET",
+          "route": "/bulk/v1/leads/export/{exportId}/file"
+        },
+        {
+          "method": "GET",
+          "route": "/bulk/v1/leads/export/{exportId}/file.json"
+        },
+        {
+          "method": "POST",
+          "route": "/bulk/v1/leads/export/{exportId}/cancel"
+        },
+        {
+          "method": "POST",
+          "route": "/bulk/v1/leads/export/{exportId}/cancel.json"
+        }
       ]
     },
     {
@@ -1301,6 +4128,228 @@
         "Upload session ids are deterministic counters, not unguessable tokens",
         "OData $filter limited to the equality pattern (field eq value)",
         "Static seeded mock-bearer-token bypasses the entra-id token flow"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/v1.0/me"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/subscriptions"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/subscriptions"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/subscriptions/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1.0/subscriptions/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/users"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/users/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/mailFolders"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/mailFolders/{id}/messages"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/messages"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/messages"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/messages/{id}/send"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/messages/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/v1.0/me/messages/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1.0/me/messages/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/sendMail"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/calendarView"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/calendar/calendarView"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/events"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/events"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/events/{id}/accept"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/events/{id}/decline"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/events/{id}/tentativelyAccept"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/events/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1.0/me/events/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/v1.0/me/events/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/drive"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/drive/root/children"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/drive/root/children"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/drive/items/{id}/children"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/drive/items/{id}/children"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/drive/items/{id}/content"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/drive/items/{id}/restore"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/drive/items/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1.0/me/drive/items/{id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/v1.0/me/drive/root:/{item}/content"
+        },
+        {
+          "method": "PUT",
+          "route": "/v1.0/me/drive/items/{parent}/{item}/content"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/drive/root:/{item}/createUploadSession"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/drive/items/{parent}/{item}/createUploadSession"
+        },
+        {
+          "method": "PUT",
+          "route": "/v1.0/_upload/{session}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/drive/root:/{item}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/groups/{id}/sites"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/chats"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/chats"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1.0/chats/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/chats/{id}/messages"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/chats/{id}/messages"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1.0/chats/{id}/messages/{messageId}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/drive/items/{id}/workbook/worksheets"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/add"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows"
+        },
+        {
+          "method": "PATCH",
+          "route": "/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/{index}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/{index}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me/drive/items/{id}/workbook/tables/{name}/range"
+        }
       ]
     },
     {
@@ -1320,6 +4369,44 @@
       "deviations": [
         "TBA/NLAuth/Bearer only structurally checked; OAuth 1.0a HMAC not validated",
         "SuiteQL matches only the FROM table; WHERE and ORDER BY clauses are ignored"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/services/rest/query/v1/suiteql"
+        },
+        {
+          "method": "POST",
+          "route": "/services/rest/v1/suiteql"
+        },
+        {
+          "method": "GET",
+          "route": "/services/rest/record/v1/metadata-catalog"
+        },
+        {
+          "method": "GET",
+          "route": "/services/rest/record/v1/{recordType}"
+        },
+        {
+          "method": "POST",
+          "route": "/services/rest/record/v1/{recordType}"
+        },
+        {
+          "method": "GET",
+          "route": "/services/rest/record/v1/{recordType}/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/services/rest/record/v1/{recordType}/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/services/rest/record/v1/{recordType}/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/services/rest/record/v1/{recordType}/{id}/!transform/{target}"
+        }
       ]
     },
     {
@@ -1337,6 +4424,28 @@
       ],
       "deviations": [
         "Quotes deterministic from src/dst/amount; same input yields same toAmount and split"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/v6.0/1/approve/spender"
+        },
+        {
+          "method": "GET",
+          "route": "/v6.0/1/approve/calldata"
+        },
+        {
+          "method": "GET",
+          "route": "/v6.0/1/tokens"
+        },
+        {
+          "method": "GET",
+          "route": "/v6.0/1/quote"
+        },
+        {
+          "method": "GET",
+          "route": "/v6.0/1/swap"
+        }
       ]
     },
     {
@@ -1359,6 +4468,36 @@
         "simulate_fail yields result consider; real sandbox uses special sandbox documents",
         "Webhook HMAC secret is the public constant stunt_onfido_mock_signing_key",
         "POST /v3.6/webhooks is a local stand-in receiver, not an Onfido endpoint"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v3.6/applicants"
+        },
+        {
+          "method": "POST",
+          "route": "/v3.6/documents"
+        },
+        {
+          "method": "POST",
+          "route": "/v3.6/live_photos"
+        },
+        {
+          "method": "POST",
+          "route": "/v3.6/checks"
+        },
+        {
+          "method": "GET",
+          "route": "/v3.6/applicants/{applicant_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v3.6/checks/{check_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v3.6/webhooks"
+        }
       ]
     },
     {
@@ -1377,6 +4516,36 @@
       ],
       "deviations": [
         "X-API-KEY accepted as any non-empty value; no real key validation"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/api/v2/assets"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/assets/{chain}/{address}/{identifier}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/collections/{slug}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/events"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/orders/{chain}/{protocol}/listings"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/orders/{chain}/{protocol}/offers"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v2/offers"
+        }
       ]
     },
     {
@@ -1400,6 +4569,76 @@
         "Webhook deliveries unsigned; real PayPal uses a certificate-based signature scheme",
         "verify-webhook-signature returns SUCCESS for any known webhook_id, no real check",
         "Refund derives terminal state on read after fixed ~3s (PENDING to COMPLETED/FAILED)"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v1/oauth2/token"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/checkout/orders"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/checkout/orders/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/checkout/orders/{id}/approve"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/checkout/orders/{id}/capture"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/checkout/orders/{id}/authorize"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/payments/authorizations/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/payments/authorizations/{id}/reauthorize"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/payments/authorizations/{id}/void"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/payments/authorizations/{id}/capture"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/payments/captures/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/payments/captures/{capture_id}/refund"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/payments/refunds/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/notifications/webhooks"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/notifications/webhooks"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/notifications/webhooks/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/notifications/verify-webhook-signature"
+        }
       ]
     },
     {
@@ -1422,6 +4661,28 @@
         "simulate_fail create flag yields declined instead of completed (stunt-only)",
         "Webhook HMAC secret is the public constant stunt_persona_mock_signing_key",
         "POST /api/inquiry/v1/webhooks is a local stand-in receiver with 5-minute replay window"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/api/inquiry/v1/inquiries"
+        },
+        {
+          "method": "GET",
+          "route": "/api/inquiry/v1/inquiries/{inquiry_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/api/inquiry/v1/inquiries/{inquiry_id}/resume"
+        },
+        {
+          "method": "GET",
+          "route": "/api/inquiry/v1/inquiries/{inquiry_id}/verifications"
+        },
+        {
+          "method": "POST",
+          "route": "/api/inquiry/v1/webhooks"
+        }
       ]
     },
     {
@@ -1442,6 +4703,56 @@
       "deviations": [
         "Bare-id media download returns derivative bytes; =d/=dv return original upload",
         "search honors mediaTypeFilter and dateFilter only (no contentFilter or album filters)"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/o/oauth2/auth"
+        },
+        {
+          "method": "POST",
+          "route": "/o/oauth2/token"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/uploads"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/mediaItems:batchCreate"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/mediaItems:search"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/mediaItems"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/mediaItems/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/media-dl/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/albums"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/albums"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/albums/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/albums/{id}"
+        }
       ]
     },
     {
@@ -1458,7 +4769,33 @@
         "No metadata update or pin-policy change (POST /pinning/hashMetadata)",
         "No pinned-data-usage endpoint (GET /data/userPinnedDataTotal)"
       ],
-      "deviations": []
+      "deviations": [],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/pinning/pinFileToIPFS"
+        },
+        {
+          "method": "POST",
+          "route": "/pinning/pinJSONToIPFS"
+        },
+        {
+          "method": "DELETE",
+          "route": "/pinning/unpin/{cid}"
+        },
+        {
+          "method": "GET",
+          "route": "/data/pinList"
+        },
+        {
+          "method": "GET",
+          "route": "/data/testAuthentication"
+        },
+        {
+          "method": "GET",
+          "route": "/data/pinByHash"
+        }
+      ]
     },
     {
       "id": "plaid-style",
@@ -1489,6 +4826,60 @@
         "X-Plaid-Signature JWT-style webhook signature is documented but never enforced",
         "fire_webhook SYNC_UPDATES_AVAILABLE doubles as transaction mutation (one posted, one removed)",
         "client_id/secret credentials are presence-checked only, never validated"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/link/token/create"
+        },
+        {
+          "method": "POST",
+          "route": "/item/public_token/exchange"
+        },
+        {
+          "method": "POST",
+          "route": "/accounts/balance/get"
+        },
+        {
+          "method": "POST",
+          "route": "/accounts/get"
+        },
+        {
+          "method": "POST",
+          "route": "/transactions/sync"
+        },
+        {
+          "method": "POST",
+          "route": "/identity/get"
+        },
+        {
+          "method": "POST",
+          "route": "/item/get"
+        },
+        {
+          "method": "POST",
+          "route": "/item/remove"
+        },
+        {
+          "method": "POST",
+          "route": "/institutions/get"
+        },
+        {
+          "method": "POST",
+          "route": "/institutions/get_by_id"
+        },
+        {
+          "method": "POST",
+          "route": "/sandbox/public_token/create"
+        },
+        {
+          "method": "POST",
+          "route": "/sandbox/item/reset_login"
+        },
+        {
+          "method": "POST",
+          "route": "/sandbox/item/fire_webhook"
+        }
       ]
     },
     {
@@ -1509,6 +4900,44 @@
         "No default page size: whole list returns unless $top is set; real Dataverse pages at 5000",
         "Client-supplied accountid accepted on create; auto ids are acc-\u003cn\u003e, not GUIDs",
         "Environments with no stored flows list a fallback seeded seeded-flow-001 entry"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/v2/environments"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/environments/{env}/connectors"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/environments/{env}/api/data/v9.2/accounts"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/environments/{env}/api/data/v9.2/accounts"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/environments/{env}/api/data/v9.2/accounts({accountid})"
+        },
+        {
+          "method": "PATCH",
+          "route": "/v2/environments/{env}/api/data/v9.2/accounts({accountid})"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v2/environments/{env}/api/data/v9.2/accounts({accountid})"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/environments/{env}/flows"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/environments/{env}/flows"
+        }
       ]
     },
     {
@@ -1528,6 +4957,60 @@
       ],
       "deviations": [
         "Webhook set without a secret signs with built-in mock secret stunt_mock_pful_webhook_secret"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/v2/store/products"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/store/products"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/store/products/{product_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/orders"
+        },
+        {
+          "method": "GET",
+          "route": "/orders/{order_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/store/orders"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/store/orders"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/store/orders/{order_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/shipping/rates"
+        },
+        {
+          "method": "GET",
+          "route": "/webhooks"
+        },
+        {
+          "method": "POST",
+          "route": "/webhooks"
+        },
+        {
+          "method": "PUT",
+          "route": "/webhooks"
+        },
+        {
+          "method": "DELETE",
+          "route": "/webhooks"
+        }
       ]
     },
     {
@@ -1547,6 +5030,72 @@
       ],
       "deviations": [
         "Webhook without a secret signs with built-in mock secret stunt_mock_potify_webhook_secret"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/v1/catalog/blueprints.json"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/catalog/blueprints/{blueprint_id}/variants.json"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/shops/{shop_id}/products.json"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/shops/{shop_id}/products.json"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/shops/{shop_id}/products/{product_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/v1/shops/{shop_id}/products/{product_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/shops/{shop_id}/products/{product_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/shops/{shop_id}/orders.json"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/shops/{shop_id}/orders/{order_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/orders.json"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/orders.json"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/orders/{order_id}/send.json"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/shops/{shop_id}/webhooks.json"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/shops/{shop_id}/webhooks.json"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/shops/{shop_id}/webhooks/{webhook_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/shops/{shop_id}/webhooks/{webhook_id}"
+        }
       ]
     },
     {
@@ -1566,7 +5115,8 @@
       "deviations": [
         "GraphQL served at /v2/api/graphql.json; real Product Hunt path is /v2/api/graphql",
         "GraphQL endpoint is open — no OAuth developer-token check (transport has no auth hook)"
-      ]
+      ],
+      "covered": []
     },
     {
       "id": "psd2-style",
@@ -1590,6 +5140,84 @@
         "simulate_fail: true in POST /payments forces RJCT (simulator-only trigger)",
         "Signed transition webhooks are a simulator extension; NextGenPSD2 defines none",
         "scaRedirect _links URL is synthetic — no real bank SCA login page behind it"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v1/oauth/token"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/consents"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/consents/{consentId}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/consents/{consentId}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/consents/{consentId}/authorisations"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/consents/{consentId}/authorisations/{authorisationId}"
+        },
+        {
+          "method": "PUT",
+          "route": "/v1/consents/{consentId}/authorisations/{authorisationId}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/consents/{consentId}/authorisations/{authorisationId}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/accounts"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/accounts/{resourceId}/balances"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/accounts/{resourceId}/transactions"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payments/{product}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/payments/{product}/{paymentId}/status"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payments/{product}/{paymentId}/authorisations"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/payments/{product}/{paymentId}/authorisations/{authorisationId}"
+        },
+        {
+          "method": "PUT",
+          "route": "/v1/payments/{product}/{paymentId}/authorisations/{authorisationId}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payments/{product}/{paymentId}/authorisations/{authorisationId}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/payments/{product}/{paymentId}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/payments/{product}/{paymentId}"
+        }
       ]
     },
     {
@@ -1610,6 +5238,52 @@
       ],
       "deviations": [
         "Malformed FROM tokens fall back to substring entity matching instead of erroring"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/oauth/v2/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/oauth/v2/tokens/bearer"
+        },
+        {
+          "method": "GET",
+          "route": "/v3/company/{realmId}/query"
+        },
+        {
+          "method": "POST",
+          "route": "/v3/company/{realmId}/query"
+        },
+        {
+          "method": "GET",
+          "route": "/v3/company/{realmId}/customer"
+        },
+        {
+          "method": "POST",
+          "route": "/v3/company/{realmId}/customer"
+        },
+        {
+          "method": "GET",
+          "route": "/v3/company/{realmId}/customer/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v3/company/{realmId}/customer/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v3/company/{realmId}/invoice"
+        },
+        {
+          "method": "GET",
+          "route": "/v3/company/{realmId}/invoice/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v3/company/{realmId}/invoice/{id}"
+        }
       ]
     },
     {
@@ -1629,6 +5303,16 @@
       ],
       "deviations": [
         "User-Agent gate simplified: any UA containing / and ( passes, else 429"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/api/v1/access_token"
+        },
+        {
+          "method": "POST",
+          "route": "/api/submit"
+        }
       ]
     },
     {
@@ -1661,6 +5345,32 @@
         "Delivery derives on read: sent at +1s, delivered at +3s — fixed, not async",
         "simulate_fail: true in POST /emails forces bounced terminal (simulator extension)",
         "Webhook events fire exactly once on the first deriving read, not on real delivery"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/emails"
+        },
+        {
+          "method": "GET",
+          "route": "/emails"
+        },
+        {
+          "method": "GET",
+          "route": "/emails/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/webhooks"
+        },
+        {
+          "method": "GET",
+          "route": "/webhooks"
+        },
+        {
+          "method": "DELETE",
+          "route": "/webhooks/{id}"
+        }
       ]
     },
     {
@@ -1683,6 +5393,36 @@
         "fetch_token prefixed with invalid is the deterministic bad-receipt 400 path",
         "Subscription expiry is derive-on-read; first read past it fires EXPIRATION",
         "POST /v1/subscribers accepts _expires_at seeding to drive EXPIRATION in tests"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v1/receipts"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/webhooks"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/webhooks"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/subscribers/{app_user_id}/subscriptions/{product_id}/revoke"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/subscribers/{app_user_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/subscribers/{app_user_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/subscribers/{app_user_id}"
+        }
       ]
     },
     {
@@ -1719,6 +5459,124 @@
         "Governor limits (100 SOQL/txn, 10k DML rows) documented but not enforced",
         "SOQL WHERE subset: no parenthesized grouping; date literals compared lexically",
         "Password grant accepted for convenience; real SF requires web-server or JWT flow"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/services/oauth2/token"
+        },
+        {
+          "method": "GET",
+          "route": "/services/data/v60.0/sobjects"
+        },
+        {
+          "method": "GET",
+          "route": "/services/data/v60.0/sobjects/Account"
+        },
+        {
+          "method": "GET",
+          "route": "/services/data/v60.0/sobjects/Contact"
+        },
+        {
+          "method": "GET",
+          "route": "/services/data/v60.0/sobjects/Opportunity"
+        },
+        {
+          "method": "GET",
+          "route": "/services/data/v60.0/sobjects/Lead"
+        },
+        {
+          "method": "GET",
+          "route": "/services/data/v60.0/sobjects/User"
+        },
+        {
+          "method": "POST",
+          "route": "/services/data/v60.0/sobjects/Account"
+        },
+        {
+          "method": "GET",
+          "route": "/services/data/v60.0/sobjects/Account/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/services/data/v60.0/sobjects/Account/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/services/data/v60.0/sobjects/Account/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/services/data/v60.0/sobjects/Account/{extIdField}/{extIdValue}"
+        },
+        {
+          "method": "POST",
+          "route": "/services/data/v60.0/sobjects/Contact"
+        },
+        {
+          "method": "GET",
+          "route": "/services/data/v60.0/sobjects/Contact/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/services/data/v60.0/sobjects/Contact/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/services/data/v60.0/sobjects/Contact/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/services/data/v60.0/sobjects/Contact/{extIdField}/{extIdValue}"
+        },
+        {
+          "method": "POST",
+          "route": "/services/data/v60.0/sobjects/Opportunity"
+        },
+        {
+          "method": "GET",
+          "route": "/services/data/v60.0/sobjects/Opportunity/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/services/data/v60.0/sobjects/Opportunity/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/services/data/v60.0/sobjects/Opportunity/{id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/services/data/v60.0/sobjects/Opportunity/{extIdField}/{extIdValue}"
+        },
+        {
+          "method": "GET",
+          "route": "/services/data/v60.0/query"
+        },
+        {
+          "method": "GET",
+          "route": "/services/data/v60.0/queryAll"
+        },
+        {
+          "method": "GET",
+          "route": "/services/data/v60.0/query/{queryLocator}"
+        },
+        {
+          "method": "POST",
+          "route": "/services/data/v60.0/composite"
+        },
+        {
+          "method": "POST",
+          "route": "/services/data/v60.0/composite/sobjects"
+        },
+        {
+          "method": "PATCH",
+          "route": "/services/data/v60.0/composite/sobjects"
+        },
+        {
+          "method": "DELETE",
+          "route": "/services/data/v60.0/composite/sobjects"
+        }
       ]
     },
     {
@@ -1744,6 +5602,28 @@
         "delivered derives at fixed +3s on first list read, not real async delivery",
         "Webhook deliveries are single stunt-enveloped objects; real SendGrid POSTs a JSON array",
         "Email Activity query subset: =, !=, CONTAINS terms AND-ed over six fields"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v3/mail/send"
+        },
+        {
+          "method": "GET",
+          "route": "/v3/messages"
+        },
+        {
+          "method": "POST",
+          "route": "/v3/user/webhooks/event/settings"
+        },
+        {
+          "method": "GET",
+          "route": "/v3/user/webhooks/event/settings"
+        },
+        {
+          "method": "POST",
+          "route": "/v3/user/webhooks/event/test"
+        }
       ]
     },
     {
@@ -1763,6 +5643,184 @@
       ],
       "deviations": [
         "sysparm_query supports an operator subset; NOT LIKE and similar 400-rejected"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/api/now/table/incident"
+        },
+        {
+          "method": "POST",
+          "route": "/api/now/table/incident"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/incident/{sys_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/api/now/table/incident/{sys_id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/api/now/table/incident/{sys_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/now/table/incident/{sys_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/task"
+        },
+        {
+          "method": "POST",
+          "route": "/api/now/table/task"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/task/{sys_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/api/now/table/task/{sys_id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/api/now/table/task/{sys_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/now/table/task/{sys_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/change_request"
+        },
+        {
+          "method": "POST",
+          "route": "/api/now/table/change_request"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/change_request/{sys_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/api/now/table/change_request/{sys_id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/api/now/table/change_request/{sys_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/now/table/change_request/{sys_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/cmdb_ci"
+        },
+        {
+          "method": "POST",
+          "route": "/api/now/table/cmdb_ci"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/cmdb_ci/{sys_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/api/now/table/cmdb_ci/{sys_id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/api/now/table/cmdb_ci/{sys_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/now/table/cmdb_ci/{sys_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/sys_user"
+        },
+        {
+          "method": "POST",
+          "route": "/api/now/table/sys_user"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/sys_user/{sys_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/api/now/table/sys_user/{sys_id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/api/now/table/sys_user/{sys_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/now/table/sys_user/{sys_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/sys_user_group"
+        },
+        {
+          "method": "POST",
+          "route": "/api/now/table/sys_user_group"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/sys_user_group/{sys_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/api/now/table/sys_user_group/{sys_id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/api/now/table/sys_user_group/{sys_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/now/table/sys_user_group/{sys_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/sc_req_item"
+        },
+        {
+          "method": "POST",
+          "route": "/api/now/table/sc_req_item"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/sc_req_item/{sys_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/api/now/table/sc_req_item/{sys_id}"
+        },
+        {
+          "method": "PATCH",
+          "route": "/api/now/table/sc_req_item/{sys_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/now/table/sc_req_item/{sys_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/now/table/sys_metadata"
+        },
+        {
+          "method": "POST",
+          "route": "/api/now/import/u_my_table"
+        }
       ]
     },
     {
@@ -1799,6 +5857,92 @@
         "Webhook payloads ride stunt {type, payload} envelope, not raw Shopify event bodies",
         "OAuth authorize redirect omits the hmac query-param signature it documents",
         "GraphQL query arg subset: bare substring plus field:value equality tokens only"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/admin/oauth/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/admin/oauth/access_token"
+        },
+        {
+          "method": "GET",
+          "route": "/admin/api/2024-10/products.json"
+        },
+        {
+          "method": "POST",
+          "route": "/admin/api/2024-10/products.json"
+        },
+        {
+          "method": "GET",
+          "route": "/admin/api/2024-10/products/{product_id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/admin/api/2024-10/products/{product_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/admin/api/2024-10/products/{product_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/admin/api/2024-10/orders.json"
+        },
+        {
+          "method": "POST",
+          "route": "/admin/api/2024-10/orders.json"
+        },
+        {
+          "method": "GET",
+          "route": "/admin/api/2024-10/orders/{order_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/admin/api/2024-10/orders/{order_id}/cancel.json"
+        },
+        {
+          "method": "POST",
+          "route": "/admin/api/2024-10/orders/{order_id}/close.json"
+        },
+        {
+          "method": "POST",
+          "route": "/admin/api/2024-10/orders/{order_id}/fulfillments.json"
+        },
+        {
+          "method": "POST",
+          "route": "/admin/api/2024-10/orders/{order_id}/transactions.json"
+        },
+        {
+          "method": "GET",
+          "route": "/admin/api/2024-10/customers.json"
+        },
+        {
+          "method": "POST",
+          "route": "/admin/api/2024-10/customers.json"
+        },
+        {
+          "method": "PUT",
+          "route": "/admin/api/2024-10/customers/{customer_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/admin/api/2024-10/customers/{customer_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/admin/api/2024-10/webhooks.json"
+        },
+        {
+          "method": "POST",
+          "route": "/admin/api/2024-10/webhooks.json"
+        },
+        {
+          "method": "DELETE",
+          "route": "/admin/api/2024-10/webhooks/{webhook_id}"
+        }
       ]
     },
     {
@@ -1817,6 +5961,20 @@
       "deviations": [
         "JWKS serves one fixed synthetic P-256 key (kid mock-siwa-key-1) — no rotation",
         "client_secret checks alg, signature, aud, exp only — iss/sub claims not enforced"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/auth/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/auth/token"
+        },
+        {
+          "method": "GET",
+          "route": "/auth/keys"
+        }
       ]
     },
     {
@@ -1848,6 +6006,36 @@
       "deviations": [
         "apps.events.url config endpoint is simulator-only; real Slack sets it in the app dashboard",
         "Events deliveries wrap Slack event_callback payloads in an extra stunt envelope"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/api/auth.test"
+        },
+        {
+          "method": "POST",
+          "route": "/api/chat.postMessage"
+        },
+        {
+          "method": "POST",
+          "route": "/api/conversations.create"
+        },
+        {
+          "method": "",
+          "route": "/api/conversations.list"
+        },
+        {
+          "method": "",
+          "route": "/api/conversations.history"
+        },
+        {
+          "method": "POST",
+          "route": "/api/reactions.add"
+        },
+        {
+          "method": "POST",
+          "route": "/api/apps.events.url"
+        }
       ]
     },
     {
@@ -1868,6 +6056,80 @@
         "Simplified shapes: series not seriesname; keyed arrays, not the real {list:[...]}",
         "paymentId on POST /invoice/payment is a simulator extension for the delete flow",
         "Payment create skips the real {payment:{companyVatCode,value,type,isCash}} envelope"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/invoice"
+        },
+        {
+          "method": "GET",
+          "route": "/invoice"
+        },
+        {
+          "method": "PUT",
+          "route": "/invoice/cancel"
+        },
+        {
+          "method": "PUT",
+          "route": "/invoice/restore"
+        },
+        {
+          "method": "GET",
+          "route": "/invoice/paymentstatus"
+        },
+        {
+          "method": "POST",
+          "route": "/estimate"
+        },
+        {
+          "method": "GET",
+          "route": "/estimate"
+        },
+        {
+          "method": "PUT",
+          "route": "/estimate/cancel"
+        },
+        {
+          "method": "POST",
+          "route": "/purchase"
+        },
+        {
+          "method": "GET",
+          "route": "/purchase"
+        },
+        {
+          "method": "POST",
+          "route": "/payment"
+        },
+        {
+          "method": "DELETE",
+          "route": "/payment/v2"
+        },
+        {
+          "method": "GET",
+          "route": "/stocks"
+        },
+        {
+          "method": "POST",
+          "route": "/document/send"
+        },
+        {
+          "method": "GET",
+          "route": "/tax"
+        },
+        {
+          "method": "GET",
+          "route": "/series"
+        },
+        {
+          "method": "POST",
+          "route": "/sim/company"
+        },
+        {
+          "method": "POST",
+          "route": "/sim/stocks/movement"
+        }
       ]
     },
     {
@@ -1902,6 +6164,16 @@
         "MD5OfMessageAttributes omitted (compound encoding not reproduced), only body MD5",
         "PurgeQueue is immediate, not async; the one-purge-per-60s rule is still enforced",
         "Message ids and receipt handles are synthetic deterministic strings, not real AWS ids"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/"
+        },
+        {
+          "method": "POST",
+          "route": "/{queueName}"
+        }
       ]
     },
     {
@@ -1934,6 +6206,80 @@
       "deviations": [
         "DELETE /v2/payments/{id} and DELETE /v2/orders/{id} are stunt extensions, not real Square",
         "Square-Version header is required (400 when absent); real Square defaults it"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/oauth2/token"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/payments"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/payments"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/payments/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v2/payments/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/payments/{id}/complete"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/payments/{id}/capture"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/refunds"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/refunds"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/locations"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/catalog/search"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/orders"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/orders/calculate"
+        },
+        {
+          "method": "GET",
+          "route": "/v2/orders/{id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/v2/orders/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v2/orders/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/orders/{id}/pay"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/orders/{id}/complete"
+        }
       ]
     },
     {
@@ -1978,6 +6324,640 @@
         "Checkout hosted page auto-completes 3DS/SCA cards instead of issuing a challenge",
         "Webhooks go to one sink; registered endpoints gate event types, not per-endpoint URLs",
         "Lifecycles compressed: refunds settle at +3s, payouts at +60s, disputes in 1 day"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v1/tokens"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/events"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/events/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/test_clocks"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/test_clocks"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/test_clocks/{id}/advance"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/test_clocks/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/test_clocks/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/test_helpers/test_clocks"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/test_helpers/test_clocks"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/test_helpers/test_clocks/{id}/advance"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/test_helpers/test_clocks/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/test_helpers/test_clocks/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/charges"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/charges/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/charges"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/charges/{id}/capture"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/charges/{id}/refund"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payment_intents"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payment_intents/{id}/confirm"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payment_intents/{id}/capture"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/payment_intents/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/payment_intents"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payment_methods"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payment_methods/{id}/attach"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payment_methods/{id}/detach"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/payment_methods/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/payment_methods"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/refunds"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/refunds/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/refunds"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/refunds/{id}/cancel"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/customers"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/customers/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/customers"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/customers/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/customers/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/products"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/products"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/products/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/products/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/products/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/prices"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/prices"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/prices/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/prices/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/subscriptions"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/subscriptions"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/subscriptions/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/subscriptions/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/subscriptions/{id}/cancel"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/subscription_items"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/subscription_items"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/subscription_items/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/subscription_items/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/subscription_items/{id}/usage_records"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/subscription_items/{id}/usage_records"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/invoices"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/invoices"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/invoices/upcoming"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/invoices/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/invoices/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/invoices/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/invoices/{id}/finalize"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/invoices/{id}/pay"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/invoices/{id}/send"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/invoices/{id}/void"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/invoices/{id}/mark_uncollectible"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/invoices/{id}/lines"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/invoice_items"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/invoice_items"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/invoice_items/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/invoice_items/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/invoice_items/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/credit_notes"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/credit_notes"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/credit_notes/preview"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/credit_notes/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/credit_notes/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/credit_notes/{id}/void"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/coupons"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/coupons"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/coupons/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/coupons/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/coupons/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/promotion_codes"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/promotion_codes"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/promotion_codes/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/promotion_codes/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/tax_rates"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/tax_rates"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/tax_rates/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/tax_rates/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/tax_rates/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/balance"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/balance_transactions"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/balance_transactions/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/disputes"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/disputes/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/disputes/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/disputes/{id}/close"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/application_fees"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/application_fees/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/application_fees/{id}/refunds"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/application_fees/{id}/refunds"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/application_fees/{id}/refund"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/checkout/sessions"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/checkout/sessions"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/checkout/sessions/{id}/line_items"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/checkout/sessions/{id}/expire"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/checkout/sessions/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/c/pay/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/setup_intents"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/setup_intents"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/setup_intents/{id}/confirm"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/setup_intents/{id}/cancel"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/setup_intents/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/setup_intents/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/webhook_endpoints"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/webhook_endpoints"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/webhook_endpoints/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/webhook_endpoints/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/webhook_endpoints/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/files"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/files"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/files/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/file_links"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/file_links"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/file_links/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/file_links/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/accounts"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/accounts/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/accounts/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/accounts"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/accounts/{id}/persons"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/accounts/{id}/persons"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/accounts/{id}/persons/{person_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/accounts/{id}/persons/{person_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/accounts/{id}/persons/{person_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/persons/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/persons/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/accounts/{id}/external_accounts"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/accounts/{id}/external_accounts"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/accounts/{id}/external_accounts/{ea_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/accounts/{id}/external_accounts/{ea_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/accounts/{id}/login_links"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/account_links"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/transfers"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/transfers/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/transfers"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/transfers/{id}/reversals"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/transfers/{id}/reversals"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/transfers/{id}/reversals/{tr_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payouts"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/payouts"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/payouts/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payouts/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payouts/{id}/cancel"
+        }
       ]
     },
     {
@@ -1996,6 +6976,28 @@
       "deviations": [
         "gas_used is derived from input length, not real EVM execution; status defaults to true",
         "An explicit revert:true body flag forces the revert path; real API has no such switch"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/api/v1/account/{account}/project/{project}/simulate"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v1/account/{account}/project/{project}/simulate-bundle"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v1/account/{account}/project/{project}/simulations"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v1/account/{account}/project/{project}/simulations/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v1/networks"
+        }
       ]
     },
     {
@@ -2014,6 +7016,12 @@
       ],
       "deviations": [
         "One merged schema serves Uniswap and ENS entities; real Graph serves one per deployment"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/subgraphs/id/{subgraphId}/graphql"
+        }
       ]
     },
     {
@@ -2033,6 +7041,40 @@
         "Container processing is a fixed ~3s clock-derived window; text needs no real poll",
         "simulate_fail=true on container create is a simulator-only failure switch",
         "Refresh-grant response omits the rotated refresh_token; only the code exchange returns one"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/oauth/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/oauth/access_token"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/me"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/{container_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/{id}/insights"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/{id}/threads_publish"
+        },
+        {
+          "method": "POST",
+          "route": "/v1.0/{id}/threads"
+        },
+        {
+          "method": "GET",
+          "route": "/v1.0/{id}/threads"
+        }
       ]
     },
     {
@@ -2074,6 +7116,32 @@
         "Verify codes are deterministic: last 6 digits of the To number, not a random SMS code",
         "simulate_fail:true in the POST body is a simulator extension forcing undelivered (30007)",
         "PageSize omitted returns all messages in one page; real Twilio defaults to 50"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/2010-04-01/Accounts/{account_sid}/Messages.json"
+        },
+        {
+          "method": "GET",
+          "route": "/2010-04-01/Accounts/{account_sid}/Messages.json"
+        },
+        {
+          "method": "GET",
+          "route": "/2010-04-01/Accounts/{account_sid}/Messages/{sid}"
+        },
+        {
+          "method": "POST",
+          "route": "/2010-04-01/Accounts/{account_sid}/Calls.json"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/Services/{service_sid}/Verification"
+        },
+        {
+          "method": "POST",
+          "route": "/v2/Services/{service_sid}/VerificationCheck"
+        }
       ]
     },
     {
@@ -2097,6 +7165,44 @@
         "Auth is mock and not enforced; any or no Authorization header is accepted everywhere",
         "POST /2/oauth2/token always succeeds, minting a fake token (no PKCE or client creds)",
         "GET /2/tweets list-all is a simulator extension; the real API has no such list endpoint"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/2/oauth2/token"
+        },
+        {
+          "method": "GET",
+          "route": "/2/users/me"
+        },
+        {
+          "method": "GET",
+          "route": "/2/users/by/username/{username}"
+        },
+        {
+          "method": "GET",
+          "route": "/2/users/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/2/tweets"
+        },
+        {
+          "method": "GET",
+          "route": "/2/tweets/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/2/tweets"
+        },
+        {
+          "method": "DELETE",
+          "route": "/2/tweets/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/2/users/{id}/timelines/reverse_chronological"
+        }
       ]
     },
     {
@@ -2115,6 +7221,36 @@
       "deviations": [
         "Pairing, session approve, and JSON-RPC requests are auto-approved (no wallet device)",
         "personal_sign and eth_sendTransaction return synthetic hashes; nothing is signed"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v1/pairings"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/sessions"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/sessions"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/sessions/{topic}/approve"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/sessions/{topic}/request"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/sessions/{topic}/extend"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/sessions/{topic}"
+        }
       ]
     },
     {
@@ -2137,6 +7273,40 @@
         "delivered is clock-derived at a fixed +3s after send, not real carrier delivery",
         "simulate_fail:true on send is a simulator extension forcing terminal failed status",
         "Template review is client-driven: POST {template_id} flips PENDING to APPROVED/REJECTED"
+      ],
+      "covered": [
+        {
+          "method": "POST",
+          "route": "/v21.0/{phone_number_id}/messages"
+        },
+        {
+          "method": "POST",
+          "route": "/v21.0/{phone_number_id}/register"
+        },
+        {
+          "method": "POST",
+          "route": "/v21.0/{phone_number_id}/media"
+        },
+        {
+          "method": "GET",
+          "route": "/v21.0/{media_id}/content"
+        },
+        {
+          "method": "GET",
+          "route": "/v21.0/{waba_id}/message_templates"
+        },
+        {
+          "method": "POST",
+          "route": "/v21.0/{waba_id}/message_templates"
+        },
+        {
+          "method": "GET",
+          "route": "/v21.0/{resource_id}"
+        },
+        {
+          "method": "POST",
+          "route": "/v21.0/{template_id}"
+        }
       ]
     },
     {
@@ -2155,6 +7325,40 @@
       ],
       "deviations": [
         "Auth validates only Authorization header presence; any bearer/basic value passes"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/wbs/v40.0/staffing/workers"
+        },
+        {
+          "method": "GET",
+          "route": "/wbs/v40.0/staffing/workers/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/wbs/v40.0/compensation/workers/{id}/compensation"
+        },
+        {
+          "method": "GET",
+          "route": "/wbs/v40.0/payroll/pay_components"
+        },
+        {
+          "method": "GET",
+          "route": "/wbs/v40.0/human_resources/positions"
+        },
+        {
+          "method": "GET",
+          "route": "/wbs/v40.0/financials/accounts"
+        },
+        {
+          "method": "GET",
+          "route": "/ccx/v1/{tenant}/RaaS/Custom_Report"
+        },
+        {
+          "method": "POST",
+          "route": "/ccx/v1/{tenant}/staffing/Create_Worker"
+        }
       ]
     },
     {
@@ -2173,6 +7377,40 @@
       ],
       "deviations": [
         "PKCE is relaxed: code_verifier must be non-empty but the S256 hash match is not verified"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/2/oauth2/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/2/oauth2/token"
+        },
+        {
+          "method": "POST",
+          "route": "/2/articles/draft"
+        },
+        {
+          "method": "POST",
+          "route": "/2/articles/{id}/publish"
+        },
+        {
+          "method": "GET",
+          "route": "/2/articles/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/2/media/upload"
+        },
+        {
+          "method": "POST",
+          "route": "/2/tweets"
+        },
+        {
+          "method": "GET",
+          "route": "/2/tweets/{id}"
+        }
       ]
     },
     {
@@ -2194,6 +7432,68 @@
       "deviations": [
         "No tax-rate registry; line tax is the given TaxAmount, not computed from TaxType",
         "Responses carry a sim-only nextPage field; real Xero signals the last page by item count"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/connections"
+        },
+        {
+          "method": "GET",
+          "route": "/api.xro/2.0/Contacts"
+        },
+        {
+          "method": "PUT",
+          "route": "/api.xro/2.0/Contacts"
+        },
+        {
+          "method": "GET",
+          "route": "/api.xro/2.0/Contacts/{id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/api.xro/2.0/Contacts/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/api.xro/2.0/Invoices"
+        },
+        {
+          "method": "PUT",
+          "route": "/api.xro/2.0/Invoices"
+        },
+        {
+          "method": "GET",
+          "route": "/api.xro/2.0/Invoices/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api.xro/2.0/Invoices/{id}"
+        },
+        {
+          "method": "POST",
+          "route": "/api.xro/2.0/Invoices/{id}/Payments"
+        },
+        {
+          "method": "GET",
+          "route": "/api.xro/2.0/Accounts"
+        },
+        {
+          "method": "GET",
+          "route": "/api.xro/2.0/BankTransactions"
+        },
+        {
+          "method": "GET",
+          "route": "/api.xro/2.0/Items"
+        },
+        {
+          "method": "GET",
+          "route": "/api.xro/2.0/TrackingCategories"
+        },
+        {
+          "method": "POST",
+          "route": "/webhooks"
+        }
       ]
     },
     {
@@ -2216,6 +7516,60 @@
       "deviations": [
         "GET /youtube/v3/videos without id lists all user videos; real API requires id or chart",
         "maxResults omitted returns everything; real API defaults to 5 per page"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/o/oauth2/auth"
+        },
+        {
+          "method": "POST",
+          "route": "/o/oauth2/token"
+        },
+        {
+          "method": "POST",
+          "route": "/upload/youtube/v3/videos"
+        },
+        {
+          "method": "PUT",
+          "route": "/upload/youtube/v3/videos/{upload_id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/upload/youtube/v3/videos/{upload_id}"
+        },
+        {
+          "method": "GET",
+          "route": "/youtube/v3/videos"
+        },
+        {
+          "method": "DELETE",
+          "route": "/youtube/v3/videos"
+        },
+        {
+          "method": "GET",
+          "route": "/youtube/v3/channels"
+        },
+        {
+          "method": "POST",
+          "route": "/youtube/v3/playlists"
+        },
+        {
+          "method": "GET",
+          "route": "/youtube/v3/playlists"
+        },
+        {
+          "method": "DELETE",
+          "route": "/youtube/v3/playlists"
+        },
+        {
+          "method": "POST",
+          "route": "/youtube/v3/playlistItems"
+        },
+        {
+          "method": "DELETE",
+          "route": "/youtube/v3/playlistItems"
+        }
       ]
     },
     {
@@ -2254,6 +7608,156 @@
         "Webhook deliveries use the {type, payload} envelope, not Zendesk placeholder bodies",
         "Webhook signing_secret is caller-supplied (omitted falls back to a public mock secret)",
         "per_page \u003c= 0 disables cursor paging: all records returned, links.next null"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/api/v2/tickets.json"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v2/tickets.json"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v2/tickets/{id}/comments.json"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/tickets/{id}/comments.json"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v2/tickets/{id}/tags.json"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/tickets/{id}.json"
+        },
+        {
+          "method": "PUT",
+          "route": "/api/v2/tickets/{id}.json"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/v2/tickets/{id}.json"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/users.json"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/organizations.json"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/groups.json"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/requests.json"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/views.json"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/triggers.json"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/webhooks.json"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v2/webhooks.json"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/v2/webhooks/{id}.json"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/suspended_tickets.json"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/tickets"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v2/tickets"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v2/tickets/{id}/comments"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/tickets/{id}/comments"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v2/tickets/{id}/tags"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/tickets/{id}"
+        },
+        {
+          "method": "PUT",
+          "route": "/api/v2/tickets/{id}"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/v2/tickets/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/users"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/organizations"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/groups"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/search.json"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/requests"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/views"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/triggers"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/webhooks"
+        },
+        {
+          "method": "POST",
+          "route": "/api/v2/webhooks"
+        },
+        {
+          "method": "DELETE",
+          "route": "/api/v2/webhooks/{id}"
+        },
+        {
+          "method": "GET",
+          "route": "/api/v2/suspended_tickets"
+        }
       ]
     },
     {
@@ -2280,6 +7784,88 @@
         "Webhook reg via /v1/webhooks (real: Notifications UI only); deliveries JSON not form-encoded",
         "List filter[] applies a single condition per request; multiple filters cannot be ANDed",
         "Subscriptions become Active immediately on create; no Pending Activation state"
+      ],
+      "covered": [
+        {
+          "method": "GET",
+          "route": "/v1/accounts"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/accounts"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/accounts/{accountKey}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/subscriptions"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/subscriptions/{subscriptionKey}/cancel"
+        },
+        {
+          "method": "PUT",
+          "route": "/v1/subscriptions/{subscriptionKey}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/subscriptions/{subscriptionKey}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/usage"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/usage"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/invoices/{invoiceId}"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/payments"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payments"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payments/{paymentId}/unapply"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/payments/{paymentId}"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/payment-methods/credit-cards"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/transactions/billing/preview"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/action/query"
+        },
+        {
+          "method": "POST",
+          "route": "/v1/webhooks"
+        },
+        {
+          "method": "GET",
+          "route": "/v1/webhooks"
+        },
+        {
+          "method": "DELETE",
+          "route": "/v1/webhooks/{id}"
+        }
       ]
     }
   ]
