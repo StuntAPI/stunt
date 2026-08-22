@@ -295,7 +295,7 @@ func TestRenderSurfaceDetailBlock(t *testing.T) {
 		},
 	}
 	gaps := map[string]gapEntry{"demo-style": {Deviations: []string{"covered but different"}, Missing: []string{"no DELETE /v9/things"}}}
-	doc, err := render(adapters, nil, map[string]string{}, gaps, ".")
+	doc, err := render(adapters, nil, map[string]string{}, gaps, map[string]*surfaceOut{}, ".")
 	if err != nil {
 		t.Fatal(err)
 	}

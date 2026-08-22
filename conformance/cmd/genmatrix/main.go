@@ -32,6 +32,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"stuntapi.com/stunt/conformance/sdkmap"
 	"stuntapi.com/stunt/internal/adapter"
 )
 
@@ -76,8 +77,12 @@ func run(root, jsonOut string) error {
 	if err != nil {
 		return err
 	}
+	surfaces, err := deriveSurfaces(adapters, sdkVer, filepath.Join(root, "conformance"))
+	if err != nil {
+		return err
+	}
 
-	doc, err := render(adapters, checks, sdkVer, gaps, root)
+	doc, err := render(adapters, checks, sdkVer, gaps, surfaces, root)
 	if err != nil {
 		return err
 	}
@@ -86,7 +91,7 @@ func run(root, jsonOut string) error {
 		return err
 	}
 	if jsonOut != "" {
-		data, err := renderJSON(adapters, checks, sdkVer, gaps, root)
+		data, err := renderJSON(adapters, checks, sdkVer, gaps, surfaces, root)
 		if err != nil {
 			return err
 		}
@@ -407,6 +412,105 @@ func resolveVersions(checks []check, versions map[string]string) (map[string]str
 	return out, nil
 }
 
+// ---- derived provider surfaces -------------------------------------------
+
+// surfaceSpec names the pinned-SDK route table an adapter's provider
+// surface is derived from: a Google service dir inside the
+// google-api-go-client module (the Discovery doc ships in the module), or
+// an npm package under conformance/node (its embedded codegen route
+// table). Label resolves the display version via the usual maps.
+type surfaceSpec struct {
+	Kind  string // "google" | "node"
+	Ref   string
+	Label string
+}
+
+// surfaceSource intentionally lists only adapters whose SDK embeds a
+// trustworthy full-API table. cloudflare-go and go-shopify are hand-written
+// subsets; zendesk ships minified; salesforce/discord/graph expose none —
+// those stay curated until the vendored-spec pass.
+var surfaceSource = map[string]surfaceSpec{
+	// Google Discovery docs, read from the pinned module.
+	"apps-script-style":    {Kind: "google", Ref: "script/v1", Label: "google-api-go-client"},
+	"ga4-style":            {Kind: "google", Ref: "analyticsdata/v1beta", Label: "google-api-go-client"},
+	"gcalendar-style":      {Kind: "google", Ref: "calendar/v3", Label: "google-api-go-client"},
+	"gdocs-style":          {Kind: "google", Ref: "docs/v1", Label: "google-api-go-client"},
+	"gmail-style":          {Kind: "google", Ref: "gmail/v1", Label: "google-api-go-client"},
+	"google-admin-style":   {Kind: "google", Ref: "admin/directory/v1", Label: "google-api-go-client"},
+	"google-iam-style":     {Kind: "google", Ref: "iam/v1", Label: "google-api-go-client"},
+	"gsearchconsole-style": {Kind: "google", Ref: "searchconsole/v1", Label: "google-api-go-client"},
+	"gsheets-style":        {Kind: "google", Ref: "sheets/v4", Label: "google-api-go-client"},
+	"gtasks-style":         {Kind: "google", Ref: "tasks/v1", Label: "google-api-go-client"},
+	"drive-style":          {Kind: "google", Ref: "drive/v3", Label: "google-api-go-client"},
+	"youtube-style":        {Kind: "google", Ref: "youtube/v3", Label: "google-api-go-client"},
+	// Node SDK embedded tables.
+	"github-style":  {Kind: "node", Ref: "@octokit/plugin-rest-endpoint-methods", Label: "octokit"},
+	"hubspot-style": {Kind: "node", Ref: "@hubspot/api-client", Label: "hubspot-node"},
+	"jira-style":    {Kind: "node", Ref: "jira.js", Label: "jira-js"},
+	"llm-style":     {Kind: "node", Ref: "openai", Label: "openai-node"},
+	"plaid-style":   {Kind: "node", Ref: "plaid", Label: "plaid-node"},
+	"resend-style":  {Kind: "node", Ref: "resend", Label: "resend-node"},
+	"slack-style":   {Kind: "node", Ref: "@slack/web-api", Label: "slack-node"},
+	"square-style":  {Kind: "node", Ref: "square", Label: "square-node"},
+	"stripe-style":  {Kind: "node", Ref: "stripe", Label: "stripe-node"},
+	"twilio-style":  {Kind: "node", Ref: "twilio", Label: "twilio-node"},
+}
+
+// surfaceOut is the derived coverage for one adapter.
+type surfaceOut struct {
+	Source   string // "sdk @ version"
+	Provider int
+	Covered  int
+	Pct      int
+	Missing  []sdkmap.Route
+}
+
+// deriveSurfaces extracts each mapped provider table and diffs it against
+// the adapter's manifest routes. Any failure is fatal: a missing module
+// cache or an extractor that lost the source layout must never render as
+// an empty (100%-covered) table.
+func deriveSurfaces(adapters []*adapter.Adapter, sdkVer map[string]string, confDir string) (map[string]*surfaceOut, error) {
+	out := map[string]*surfaceOut{}
+	tables := map[string][]sdkmap.Route{}
+	for _, a := range adapters {
+		spec, ok := surfaceSource[a.ID]
+		if !ok {
+			continue
+		}
+		ver, ok := sdkVer[spec.Label]
+		if !ok {
+			return nil, fmt.Errorf("surface source for %s: sdk label %q has no resolved version — is its suite installed?", a.ID, spec.Label)
+		}
+		cacheKey := spec.Kind + " " + spec.Ref
+		table, done := tables[cacheKey]
+		if !done {
+			var err error
+			table, err = sdkmap.Extract(spec.Kind, spec.Ref, confDir)
+			if err != nil {
+				return nil, fmt.Errorf("surface for %s: %w", a.ID, err)
+			}
+			tables[cacheKey] = table
+		}
+		var adapterRoutes []sdkmap.AdapterRoute
+		for _, ep := range a.Endpoints {
+			adapterRoutes = append(adapterRoutes, sdkmap.AdapterRoute{Method: ep.Method, Path: ep.Route})
+		}
+		diff := sdkmap.Diff(table, adapterRoutes)
+		pct := 0
+		if diff.Provider > 0 {
+			pct = diff.Covered * 100 / diff.Provider
+		}
+		out[a.ID] = &surfaceOut{
+			Source:   "sdk " + spec.Label + " @ " + ver,
+			Provider: diff.Provider,
+			Covered:  diff.Covered,
+			Pct:      pct,
+			Missing:  diff.Missing,
+		}
+	}
+	return out, nil
+}
+
 // ---- rendering ----------------------------------------------------------
 
 type sdkGroup struct {
@@ -415,7 +519,7 @@ type sdkGroup struct {
 	byAdapter map[string][]string
 }
 
-func render(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, root string) (string, error) {
+func render(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, surfaces map[string]*surfaceOut, root string) (string, error) {
 	byAdapterChecks := map[string][]check{}
 	groups := map[string]*sdkGroup{}
 	var groupOrder []string
@@ -495,6 +599,10 @@ Verification tiers:
 	}
 	fmt.Fprintf(&b, "**%d adapters** — %d SDK+VM, %d SDK-only, %d VM-only, %d boot-tier.\n\n",
 		len(adapters), nBoth, nSDK, nVM, len(adapters)-nBoth-nSDK-nVM)
+
+	if len(surfaces) > 0 {
+		fmt.Fprintf(&b, "**%d adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) — mechanical, network-free, and refreshed by SDK bumps. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no SDK table worth trusting and stay fully curated.\n\n", len(surfaces))
+	}
 
 	b.WriteString("| Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |\n")
 	b.WriteString("|---|---|---|---|---|---|---|---|\n")
@@ -590,6 +698,25 @@ sections in ` + "`conformance/node/tests/*.test.ts`" + `).
 			}
 			fmt.Fprintf(&b, "\n</details>\n\n")
 		}
+		if s, ok := surfaces[a.ID]; ok {
+			fmt.Fprintf(&b, "**Provider surface** — derived from %s: %d real routes · %d covered · %d%% · %d not implemented\n\n",
+				s.Source, s.Provider, s.Covered, s.Pct, len(s.Missing))
+			if len(s.Missing) > 0 {
+				fmt.Fprintf(&b, "<details><summary>not implemented (%d)</summary>\n\n", len(s.Missing))
+				shown := len(s.Missing)
+				if shown > 50 {
+					shown = 50
+				}
+				for i, m := range s.Missing {
+					if i >= shown {
+						fmt.Fprintf(&b, "… and %d more\n\n", len(s.Missing)-shown)
+						break
+					}
+					fmt.Fprintf(&b, "- `%s` `%s`\n", m.Method, m.Path)
+				}
+				fmt.Fprintf(&b, "\n</details>\n\n")
+			}
+		}
 		if len(g.Missing) > 0 {
 			fmt.Fprintf(&b, "**Missing** (%d)\n\n", len(g.Missing))
 			for _, m := range g.Missing {
@@ -670,6 +797,19 @@ type adapterJSON struct {
 	// Covered is the adapter's exposed API surface, straight from its
 	// manifest — the programmatic half of "what stunt provides".
 	Covered []routeJSON `json:"covered"`
+	// Surface is the derived provider-surface coverage (real-API route
+	// table diffed against the manifest), present only where the pinned
+	// SDK embeds a trustworthy table.
+	Surface *surfaceJSON `json:"surface,omitempty"`
+}
+
+type surfaceJSON struct {
+	Source         string      `json:"source"` // "sdk <label> @ <version>"
+	ProviderRoutes int         `json:"provider_routes"`
+	CoveredRoutes  int         `json:"covered_routes"`
+	CoveragePct    int         `json:"coverage_pct"`
+	MissingRoutes  []routeJSON `json:"missing_routes"`
+	Derived        bool        `json:"derived"`
 }
 
 type routeJSON struct {
@@ -682,7 +822,7 @@ type sdkJSON struct {
 	Version string `json:"version"`
 }
 
-func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, root string) ([]byte, error) {
+func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, surfaces map[string]*surfaceOut, root string) ([]byte, error) {
 	byAdapterChecks := map[string][]check{}
 	for _, c := range checks {
 		byAdapterChecks[c.Adapter] = append(byAdapterChecks[c.Adapter], c)
@@ -744,6 +884,22 @@ func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]s
 		}
 		for _, ws := range a.Websockets {
 			row.Covered = append(row.Covered, routeJSON{Method: "WS", Route: ws.Route})
+		}
+		if s, ok := surfaces[a.ID]; ok {
+			sj := &surfaceJSON{
+				Source:         s.Source,
+				ProviderRoutes: s.Provider,
+				CoveredRoutes:  s.Covered,
+				CoveragePct:    s.Pct,
+				Derived:        true,
+			}
+			for _, m := range s.Missing {
+				sj.MissingRoutes = append(sj.MissingRoutes, routeJSON{Method: m.Method, Route: m.Path})
+			}
+			if sj.MissingRoutes == nil {
+				sj.MissingRoutes = []routeJSON{}
+			}
+			row.Surface = sj
 		}
 		seen := map[string]bool{}
 		for _, c := range byAdapterChecks[a.ID] {
