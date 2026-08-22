@@ -30,6 +30,21 @@ default:
 ci: build test vet fmt-check mod-tidy cross-build lint-adapters
     @echo "✓ all CI checks passed"
 
+# The exact GitHub CI job: `just ci` plus the SDK suites and the generated
+# conformance artifacts (CONFORMANCE.md + matrix.json, incl. the derived
+# coverage numbers). Local parity — the freshness gate fails here first
+# instead of on the runner. Needs bun (conformance-node installs node deps).
+ci-full: ci conformance conformance-node
+    #!/bin/sh
+    set -e
+    just conformance-matrix
+    if ! git diff --quiet CONFORMANCE.md conformance/matrix.json; then
+        echo "✗ CONFORMANCE.md or conformance/matrix.json is stale — run 'just conformance-matrix' and commit" >&2
+        git diff --stat CONFORMANCE.md conformance/matrix.json >&2
+        exit 1
+    fi
+    echo "✓ conformance matrix fresh"
+
 # ---- release --------------------------------------------------------------
 # Cut a release NOW from your machine — no GitHub Actions dependency.
 # Works even when Actions can't run (billing exhausted, outage, fresh machine).

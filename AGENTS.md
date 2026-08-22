@@ -361,8 +361,10 @@ def on_list(req):
 - **SDK conformance + the matrix:** real provider SDKs are driven against booted adapters
   (`just conformance` Go suites, `just conformance-node` Node suites via bun). Coverage is
   published in the generated **`CONFORMANCE.md`** (one row per adapter: SDKs + versions,
-  covered behaviors, documented deviations, verification tier). It regenerates from
+  covered behaviors, documented deviations, verification tier, and — where the pinned SDK
+  embeds a route table — derived real-API coverage). It regenerates from
   `conformance/cmd/genmatrix` — rerun `just conformance-matrix` (CI fails on drift) after
   touching adapters, `Record(...)` calls, node test sections, SDK versions, or
   `conformance/matrix.yaml` (the hand-curated deviations sidecar; every adapter must have
-  an entry, empty list allowed).
+  an entry, empty list allowed). `just ci-full` runs the exact GitHub CI job locally,
+  including the matrix freshness gate.
