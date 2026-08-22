@@ -6,7 +6,7 @@ import { describe, expect, test } from "bun:test";
 import twilio from "twilio";
 import { bootAdapter, type Harness } from "../helpers";
 
-const SID = "AC0123456789abcdef0123456789abcdef".replace("AC0", "AC" + "0");
+const SID = "AC0123456789abcdef0123456789abcdef";
 const AUTH_TOKEN = "feed0000face1111beef2222cafe3333";
 
 // FetchBackedClient implements the RequestClient contract

@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -112,6 +113,11 @@ func newSQSFixtureProfile(t *testing.T, start time.Time, active func() string) *
 }
 
 // --- SigV4 (mirrors the adapter's recomputation: service "sqs") ---
+
+func sqsMD5Hex(b []byte) string {
+	sum := md5.Sum(b)
+	return hex.EncodeToString(sum[:])
+}
 
 func sqsSHA256Hex(b []byte) string {
 	sum := sha256.Sum256(b)
@@ -286,8 +292,8 @@ func TestSQSSigV4Verification(t *testing.T) {
 	if send.Status != 200 {
 		t.Fatalf("queue-URL SendMessage -> %d: %v", send.Status, send.Body)
 	}
-	if got := sqsBodyStr(send, "MD5OfMessageBody"); got != sqsSHA256Hex([]byte("sigv4-body")) {
-		t.Fatalf("MD5OfMessageBody = %q, want sha256 of the body (%q)", got, sqsSHA256Hex([]byte("sigv4-body")))
+	if got := sqsBodyStr(send, "MD5OfMessageBody"); got != sqsMD5Hex([]byte("sigv4-body")) {
+		t.Fatalf("MD5OfMessageBody = %q, want the real MD5 of the body (%q)", got, sqsMD5Hex([]byte("sigv4-body")))
 	}
 
 	// No Authorization header -> 403 MissingAuthenticationToken.
@@ -403,8 +409,8 @@ func TestSQSVisibilityTimeoutLifecycle(t *testing.T) {
 	if msg1["Body"] != "delayed-job" || id1 == "" || handle1 == "" {
 		t.Fatalf("first receive message = %v", msg1)
 	}
-	if msg1["MD5OfBody"] != sqsSHA256Hex([]byte("delayed-job")) {
-		t.Fatalf("MD5OfBody = %v, want sha256 of the body", msg1["MD5OfBody"])
+	if msg1["MD5OfBody"] != sqsMD5Hex([]byte("delayed-job")) {
+		t.Fatalf("MD5OfBody = %v, want the real MD5 of the body", msg1["MD5OfBody"])
 	}
 	attrs1 := msg1["Attributes"].(map[string]any)
 	if attrs1["ApproximateReceiveCount"] != "1" {
@@ -546,8 +552,8 @@ func TestSQSSendMessageBatchPartialFailure(t *testing.T) {
 	if ok1["MessageId"] == "" || ok1["MessageId"] == ok3["MessageId"] {
 		t.Fatalf("Successful MessageIds = %v / %v, want distinct non-empty", ok1["MessageId"], ok3["MessageId"])
 	}
-	if ok1["MD5OfMessageBody"] != sqsSHA256Hex([]byte("first")) {
-		t.Fatalf("MD5OfMessageBody = %v, want sha256 of the entry body", ok1["MD5OfMessageBody"])
+	if ok1["MD5OfMessageBody"] != sqsMD5Hex([]byte("first")) {
+		t.Fatalf("MD5OfMessageBody = %v, want the real MD5 of the entry body", ok1["MD5OfMessageBody"])
 	}
 	fail := failed[0].(map[string]any)
 	if fail["Id"] != "id-2" || fail["SenderFault"] != true || fail["Code"] != "InvalidParameterValue" {
@@ -583,7 +589,7 @@ func TestSQSSendMessageBatchPartialFailure(t *testing.T) {
 	if !ok || prio["DataType"] != "Number" || prio["StringValue"] != "1" {
 		t.Fatalf("message attribute did not round-trip: %v", mattrs)
 	}
-	if third["MD5OfMessageAttributes"] == "" {
+	if _, present := third["MD5OfMessageAttributes"]; present {
 		t.Fatal("MD5OfMessageAttributes missing on the attributed message")
 	}
 	if _, present := bodies["first"]["MessageAttributes"]; present {

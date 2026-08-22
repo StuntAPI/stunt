@@ -123,6 +123,7 @@ Builtins:
   events_target()                            # the service's registered webhook URL (for URL-in-MAC schemes: Twilio, Square)
   profile_active()                           # THIS service's active behavior profile name (None if none) — branch to codify adapter-authored modes
   events_body(type, payload?)               # EXACT on-wire JSON body events_emit will POST — MAC this for signing
+  crypto.md5(data, encoding?)  # PROTOCOL CHECKSUMS only (SQS MD5OfMessage) — never signatures
   crypto.hmac_sha256/sha1(key, data, encoding?)  # MAC → hex (default) or "base64"; also sha256, base64_encode/decode, base64url_encode/decode
   crypto.ecdsa_sign_p256/verify(priv/pub_pem, data, sig, encoding="hex")  # ES256 raw r‖s
   crypto.rsa_sign/verify(priv/pub_pem, data, sig, encoding="hex")         # RS256 PKCS#1 v1.5
