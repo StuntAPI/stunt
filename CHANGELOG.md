@@ -50,6 +50,40 @@ All notable changes to **stunt** are documented here. The format is based on
   embedded copy and refreshed on mismatch (caches from older binaries
   refresh once on first use). Found live while verifying this release.
 
+
+### Fixed (audit hardening round)
+
+- **`behavior: timeout` now actually drops the connection.** The request-log
+  wrapper broke the hijack chain (`statusRecorder` type-asserted its
+  immediate inner writer, which implements only `Unwrap`), so every timeout
+  silently degraded to a clean 504. Hijack now delegates through
+  `http.NewResponseController`.
+- **`stunt plan` no longer emits one bogus `undefined: clock` warning per
+  handler** (158 on stripe-style): plan-time builtin compilation now
+  includes the clock module.
+- **Services' `when.chance` streams are independent.** The rules RNG used
+  the raw manifest seed, making every service's chance rules produce the
+  identical sequence (perfectly correlated failures). The seed is now salted
+  per service; the determinism contract is documented in AGENTS.md.
+- **A second manifest in the same directory can no longer hijack
+  `stunt down`/`stunt profile`.** Runtime files and registry entries store
+  absolute manifest paths, and commands refuse a runtime file written by a
+  different manifest (previously `stunt down` could kill the WRONG server
+  and report success).
+- **`--token` is honored without `--url`** (a wrong token used to silently
+  succeed against the runtime file's token).
+- **`POST /api/profile` validates its payload**: unknown fields, missing or
+  null `name` are 400s — a typo'd key previously returned 200 while
+  deactivating everything.
+- `stunt adapter lint` now loads the adapter manifest (bad profile names,
+  malformed handlers fail at lint instead of boot) and warns on declared
+  behavior modes no script ever reads.
+- `stunt profile list --json` emits `[]` (never `null`); manifest profile
+  names enforce `[a-z0-9][a-z0-9-]{0,31}`; the runtime-only contract is
+  printed at activation and in the `--profile` boot banner; profiles docs
+  gained copy-pasteable YAML, the WS/GraphQL caveat, the determinism
+  contract, and an `/api/profile` section in docs/dashboard.md.
+
 ## [0.50.0] — 2026-08-21
 
 ### Adapters
