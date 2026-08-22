@@ -86,8 +86,10 @@ adapters:
   apps-script-style:
     deviations:
       - ":run never executes code — known patterns return canned results, others echo parameters"
+      - "scripts.run also served at a legacy path form (projects/{id}/scripts/{fn}/run)"
+      - "content update accepts POST as well as the real API's PUT"
     missing:
-      - "No deployment list/get/update/delete — only POST create"
+      - "No deployment get/update/delete — only create and list"
       - "No versions endpoint (GET /v1/projects/{scriptId}/versions)"
   auth0-style:
     deviations:
@@ -243,6 +245,7 @@ adapters:
   cloudflare-style:
     deviations:
       - "any non-empty bearer token accepted; real token permission scoping not validated"
+      - "paths served without the /client/v4 prefix — cloudflare-go's BaseURL replaces the whole base, raw REST clients must strip it"
       - "zone status runs pending -> initializing -> active in ~4s; real waits on nameservers"
       - "deployments expose a status field; real Deployment objects carry rollout percentages"
       - "simulate_fail on zone create / worker deploy injects moved or failed; no real trigger"
@@ -428,6 +431,7 @@ adapters:
     deviations:
       - "Dimensions: date/country/deviceCategory only; metrics: sessions/activeUsers/screenPageViews"
       - "properties.list honors only the filter=parent:<account> form"
+      - "Admin API served at both /v1admin (GA) and /v1beta (the shipped Go client's version); shapes shared"
     missing:
       - "No pivots, cohortSpec, metricAggregations, or keepEmptyRows in runReport"
       - "No runPivotReport, batchRunReports, getMetadata, or checkCompatibility"
@@ -445,6 +449,8 @@ adapters:
   gdocs-style:
     deviations:
       - "batchUpdate replies map 1:1 to requests; real API may return fewer"
+      - "batchUpdate also served at the legacy slash form (documents/{id}/batchUpdate)"
+      - "GET revisions endpoint is extra-API; the real Docs API v1 has none"
       - "Inserted text adopts the style of the run it lands in"
       - "Inserting newline continues bullet/named style into the new paragraph"
     missing:
@@ -491,6 +497,7 @@ adapters:
   google-iam-style:
     deviations:
       - "JWKS serves one fixed synthetic RSA-2048 key (kid mock-google-key-1)"
+      - "roles:queryGrantableRoles also served project-scoped (extra form; the real path is project-less)"
     missing:
       - "No serviceAccountKeys create/delete, signJwt, or signBlob methods"
       - "No serviceAccount patch, disable/enable, undelete, or getIamPolicy"
