@@ -661,6 +661,14 @@ type adapterJSON struct {
 	Behaviors    []string  `json:"behaviors"`
 	Missing      []string  `json:"missing"`
 	Deviations   []string  `json:"deviations"`
+	// Covered is the adapter's exposed API surface, straight from its
+	// manifest — the programmatic half of "what stunt provides".
+	Covered []routeJSON `json:"covered"`
+}
+
+type routeJSON struct {
+	Method string `json:"method"`
+	Route  string `json:"route"`
 }
 
 type sdkJSON struct {
@@ -723,6 +731,13 @@ func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]s
 		}
 		if a.Grpc != nil {
 			row.GRPCService = a.Grpc.Service
+		}
+		row.Covered = []routeJSON{}
+		for _, ep := range a.Endpoints {
+			row.Covered = append(row.Covered, routeJSON{Method: ep.Method, Route: ep.Route})
+		}
+		for _, ws := range a.Websockets {
+			row.Covered = append(row.Covered, routeJSON{Method: "WS", Route: ws.Route})
 		}
 		seen := map[string]bool{}
 		for _, c := range byAdapterChecks[a.ID] {
