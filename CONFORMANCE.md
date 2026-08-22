@@ -212,7 +212,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - basicApi.getById round-trips
 - basicApi.update patches a property
 - searchApi.doSearch finds the record by name
-- archive + restore round-trip the soft-delete state
+- archive hides the record from reads
 
 ### octokit @ 5.0.5 (floor)
 
@@ -243,7 +243,7 @@ sections in `conformance/node/tests/*.test.ts`).
 **square-style**
 
 - oAuth.obtainToken mints the bearer the adapter validates
-- payments.create completes immediately for the ok nonce
+- payments.create + payments.get round-trip
 - orders.create prices line items and mints an order id
 - orders.get round-trips the priced order
 

@@ -129,8 +129,8 @@ if expected != r.Header.Get("X-Slack-Signature") { return 401 }
 | POST | `/api/auth.test` | `auth.star#on_auth_test` | Authenticate and get workspace info |
 | POST | `/api/chat.postMessage` | `chat.star#on_post_message` | Post a message (stateful) |
 | POST | `/api/conversations.create` | `conversations.star#on_create_conversation` | Create a channel |
-| GET | `/api/conversations.list` | `conversations.star#on_list_conversations` | List all channels |
-| GET | `/api/conversations.history` | `conversations.star#on_conversation_history` | Channel message history (stateful) |
+| any | `/api/conversations.list` | `conversations.star#on_list_conversations` | List all channels (SDK POST form or GET query) |
+| any | `/api/conversations.history` | `conversations.star#on_conversation_history` | Channel message history (stateful; SDK POST form or GET query) |
 | POST | `/api/reactions.add` | `reactions.star#on_add_reaction` | Add a reaction to a message |
 | POST | `/api/apps.events.url` | `events.star#on_set_events_url` | Set the Events API Request URL (local analog of the dashboard setting) |
 

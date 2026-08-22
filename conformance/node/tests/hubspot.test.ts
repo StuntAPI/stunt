@@ -50,11 +50,17 @@ describe("@hubspot/api-client against hubspot-style", () => {
         });
         expect(found.results.some((r) => r.id === created.id)).toBe(true);
 
-        // ===== archive + restore round-trip the soft-delete state =====
+        // ===== archive hides the record from reads =====
         await hubspot.crm.companies.basicApi.archive(created.id);
         const page = await hubspot.crm.companies.basicApi.getPage();
         expect(page.results.some((r) => r.id === created.id)).toBe(false);
-        await hubspot.crm.companies.basicApi.restore?.(created.id).catch(() => {});
+        let gone = false;
+        try {
+          await hubspot.crm.companies.basicApi.getById(created.id);
+        } catch {
+          gone = true; // the SDK throws on the adapter's 404
+        }
+        expect(gone).toBe(true);
       } finally {
         await h.stop();
       }

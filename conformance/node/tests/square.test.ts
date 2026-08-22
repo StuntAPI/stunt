@@ -34,7 +34,7 @@ describe("square-node against square-style", () => {
           baseUrl: h.base,
         });
 
-        // ===== payments.create completes immediately for the ok nonce =====
+        // ===== payments.create + payments.get round-trip =====
         const pay = await client.payments.create({
           sourceId: "cnon:card-nonce-ok",
           idempotencyKey: "sdk-pay-1",
