@@ -132,6 +132,20 @@ except `PurgeQueueInProgress`, which real SQS returns as 403:
 | `EmptyBatchRequest` / `TooManyEntriesInBatchRequest` / `BatchEntryIdsNotDistinct` | 400 | batch shape violations |
 | `UnsupportedOperation` | 400 | unknown `X-Amz-Target` operation |
 
+## Behavior modes
+
+The adapter ships one authored profile (activatable at runtime via
+`stunt profile activate throttled` or the dashboard; runtime-only — a restart
+clears the activation):
+
+| Mode | Behavior |
+|---|---|
+| `throttled` | Alternate `ReceiveMessage` calls return empty (deterministic — parity of a per-queue counter), exercising consumer retry/backoff paths without killing the queue. |
+
+The parity counter lives in service state: a restart resets the *activation*
+but not the counter — run `stunt reset sqs` (or `stunt clean`) for a fully
+fresh sequence with the mode still active.
+
 ## Divergences from real SQS (documented)
 
 - **Queue URL shape**: real SQS embeds a 12-digit account id in the path

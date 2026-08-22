@@ -54,7 +54,7 @@ func TestRuntimeFileWriteRead(t *testing.T) {
 func TestRunDownNoServer(t *testing.T) {
 	dir := t.TempDir()
 	var buf bytes.Buffer
-	if err := runDown(&buf, dir); err != nil {
+	if err := runDown(&buf, dir, ""); err != nil {
 		t.Fatalf("runDown: %v", err)
 	}
 	out := buf.String()
@@ -74,7 +74,7 @@ func TestRunDownStaleRuntimeFile(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := runDown(&buf, dir); err != nil {
+	if err := runDown(&buf, dir, ""); err != nil {
 		t.Fatalf("runDown: %v", err)
 	}
 	out := buf.String()
@@ -112,7 +112,7 @@ func TestRunDownStopsRunningProcess(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := runDown(&buf, dir); err != nil {
+	if err := runDown(&buf, dir, ""); err != nil {
 		t.Fatalf("runDown: %v", err)
 	}
 
@@ -221,5 +221,37 @@ services:
 	// Runtime file should be gone.
 	if _, err := os.Stat(runtimeFilePath(mDir)); !os.IsNotExist(err) {
 		t.Errorf("runtime file should be gone after down, got err: %v", err)
+	}
+}
+
+// TestReadRuntimeFileForRejectsForeignManifest: a second manifest's `stunt
+// up` in the same directory overwrites up.json — acting on it stops or
+// drives the WRONG server (audit finding). The guard refuses instead.
+func TestReadRuntimeFileForRejectsForeignManifest(t *testing.T) {
+	dir := t.TempDir()
+	if err := writeRuntimeFile(dir, RuntimeFile{PID: 42, Manifest: "/elsewhere/alt.yaml"}); err != nil {
+		t.Fatal(err)
+	}
+	mine := filepath.Join(dir, "stunt.yaml")
+	_, err := readRuntimeFileFor(mine)
+	if err == nil {
+		t.Fatal("expected foreign-manifest error, got nil")
+	}
+	if !strings.Contains(err.Error(), "belongs to /elsewhere/alt.yaml") || !strings.Contains(err.Error(), "--url/--token") {
+		t.Fatalf("error should name both manifests and the escape hatch: %v", err)
+	}
+	// A matching manifest (abs or relative to the same file) passes.
+	if err := writeRuntimeFile(dir, RuntimeFile{PID: 42, Manifest: mine}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readRuntimeFileFor(mine); err != nil {
+		t.Fatalf("matching manifest rejected: %v", err)
+	}
+	// Empty Manifest (legacy files) still passes — nothing to compare.
+	if err := writeRuntimeFile(dir, RuntimeFile{PID: 42}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := readRuntimeFileFor(mine); err != nil {
+		t.Fatalf("legacy empty-manifest runtime file rejected: %v", err)
 	}
 }

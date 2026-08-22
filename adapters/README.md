@@ -175,10 +175,24 @@ handler. Webhooks are delivered as HTTP POST with a JSON body `{type, payload}`.
 | Builtin | Signature | Returns | Notes |
 |---------|-----------|---------|-------|
 | `events_register(url)` | `(url: str)` | `None` | Registers a webhook URL for the current service |
-| `profile_active()` | `()` | `str` or `None` | The name of THIS service's active behavior profile (or `None`). Branch on it to codify adapter-authored modes (`profiles:` in adapter.yaml); activation is runtime-only via `stunt profile` / the dashboard |
 | `events_target()` | `()` | `str` or `None` | The currently-registered webhook URL for this service (or `None`). Use it when a provider's signature MACs the destination URL (Twilio, Square) |
 | `events_emit(event_type, payload?, headers?)` | `(event_type: str, payload: dict = {}, headers: dict = {})` | `None` | Emits an event to registered webhook(s). `headers` are set on the POST on top of `Content-Type: application/json` (a caller `Content-Type` overrides it); `Host`/`Content-Length` and any CR/LF are rejected |
 | `events_body(event_type, payload?)` | `(event_type: str, payload: dict = {})` | `str` | The exact JSON body `events_emit(event_type, payload)` will POST. Use it to compute a signature over the real wire bytes (see Signing webhooks below) |
+
+### Behavior-mode builtin (`profile_active`)
+
+Adapters ship named behavior modes in `adapter.yaml` (`profiles: {name: description}`);
+handlers read the active one to codify degraded/throttled states the user activates at
+runtime (`stunt profile activate` / dashboard — runtime-only, resets on restart).
+
+| Builtin | Signature | Returns | Notes |
+|---------|-----------|---------|-------|
+| `profile_active()` | `()` | `str` or `None` | THIS service's active profile name, or `None`. Branch on it; never errors |
+
+**Determinism rule:** branch on a monotonic counter's parity (or another deterministic
+function of state) — never on `clock.now_unix()` or anything time/randomness-shaped, or
+the mode's behavior becomes unreproducible. See sqs-style's `throttled` mode for the
+reference pattern (a KV counter: alternate ReceiveMessage calls return empty).
 
 ### Pagination builtin (`paginate`)
 

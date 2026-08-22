@@ -746,15 +746,41 @@ func (d *Dashboard) handleProfile(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, d.profileView())
 		return
 	case http.MethodPost:
-		var body struct {
-			Name    string `json:"name"`
-			Service string `json:"service"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			http.Error(w, "invalid JSON body: "+err.Error(), http.StatusBadRequest)
+		// Validate the payload BEFORE acting: an absent or typo'd "name"
+		// key used to decode as "" (= deactivate-all) and returned 200 —
+		// a malformed bot payload silently detonated the whole scenario
+		// (audit finding). Unknown keys are rejected the same way so
+		// typos surface instead of no-oping.
+		var raw map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": "invalid JSON body: " + err.Error()})
 			return
 		}
-		if err := d.profileApply(body.Name, body.Service); err != nil {
+		for k := range raw {
+			if k != "name" && k != "service" {
+				writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": fmt.Sprintf("unknown field %q (recognized: name, service)", k)})
+				return
+			}
+		}
+		nameV, hasName := raw["name"]
+		if !hasName || nameV == nil {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": `missing "name" — pass {"name": "<profile>"} to activate, {"name": ""} to deactivate`})
+			return
+		}
+		name, ok := nameV.(string)
+		if !ok {
+			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": `"name" must be a string`})
+			return
+		}
+		service := ""
+		if svcV, ok := raw["service"]; ok && svcV != nil {
+			service, ok = svcV.(string)
+			if !ok {
+				writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": `"service" must be a string`})
+				return
+			}
+		}
+		if err := d.profileApply(name, service); err != nil {
 			writeJSONStatus(w, http.StatusBadRequest, map[string]any{"error": err.Error()})
 			return
 		}

@@ -35,11 +35,13 @@ Declare per service in stunt.yaml (profiles: rule bundles), author in adapter.ya
 profiles: name -> set: service -> profile). Activate at runtime — resets on restart;
 stunt up --profile <name> for a boot default. Bare-name activation resolves a preset,
 else a name exactly one service defines; errors list everything available.
+  # service block:            profiles: {degraded: {rules: [{match: {path: /v1/**}, when: {chance: 30}, respond: {status: 429}}]}}
+  # preset:                   profiles: {launch-day: {set: {stripe: degraded, sqs: throttled}}}
   profile list [--json]         everything activatable + what is active
   profile show <name>           one profile, where it is defined/active
   profile activate <name> [--service svc]
   profile deactivate [--service svc|all]
-Dashboard: profiles panel (presets + per-service selects). API: GET/POST /api/profile.
+Pre-dispatch override (reaches handler-backed routes; NOT websocket/graphql). API: GET/POST /api/profile.
 
 ## Dashboard (every ` + "`stunt up`" + `)
 Each running server serves its OWN localhost dashboard (loopback + token auth): a live

@@ -78,8 +78,8 @@ func Validate(m *Manifest) error {
 		}
 		sort.Strings(pnames)
 		for _, p := range pnames {
-			if !validNameRe.MatchString(p) {
-				return fmt.Errorf("manifest: service %q profile %q contains invalid characters (allowed: letters, digits, dots, underscores, hyphens)", n, p)
+			if !profileNameRe.MatchString(p) {
+				return fmt.Errorf("manifest: service %q profile %q contains invalid characters (allowed: lowercase letters, digits, hyphens; 1-32 chars — activation is a CLI/dashboard action)", n, p)
 			}
 			if err := validateRules(s.Profiles[p].Rules, fmt.Sprintf("service %q profile %q", n, p)); err != nil {
 				return err
@@ -95,8 +95,8 @@ func Validate(m *Manifest) error {
 	}
 	sort.Strings(gnames)
 	for _, g := range gnames {
-		if !validNameRe.MatchString(g) {
-			return fmt.Errorf("manifest: profile %q contains invalid characters (allowed: letters, digits, dots, underscores, hyphens)", g)
+		if !profileNameRe.MatchString(g) {
+			return fmt.Errorf("manifest: profile %q contains invalid characters (allowed: lowercase letters, digits, hyphens; 1-32 chars — activation is a CLI/dashboard action)", g)
 		}
 		svcs := make([]string, 0, len(m.Profiles[g].Set))
 		for s := range m.Profiles[g].Set {
@@ -111,6 +111,11 @@ func Validate(m *Manifest) error {
 	}
 	return nil
 }
+
+// profileNameRe constrains profile names across both layers — activation
+// is a CLI/dashboard action, so names stay shell- and URL-safe and match
+// what adapter.yaml enforces.
+var profileNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,31}$`)
 
 // validateRules shallowly checks one rules list: every rule needs something
 // to respond with.

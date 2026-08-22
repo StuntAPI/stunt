@@ -2,7 +2,6 @@ package engine
 
 import (
 	"bufio"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -24,12 +23,12 @@ func (sr *statusRecorder) WriteHeader(code int) {
 
 // Hijack proxies the underlying ResponseWriter's Hijack method so WebSocket
 // upgrades and connection hijacking work through the logging middleware.
+// A ResponseController walks the inner writers' Unwrap chain — asserting
+// the immediate inner writer directly fails when a middleware between us
+// and the real writer (e.g. the request-log capture wrapper) implements
+// only Unwrap, which silently degraded behavior:timeout into a clean 504.
 func (sr *statusRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
-	h, ok := sr.ResponseWriter.(http.Hijacker)
-	if !ok {
-		return nil, nil, fmt.Errorf("response writer does not support hijacking")
-	}
-	return h.Hijack()
+	return http.NewResponseController(sr.ResponseWriter).Hijack()
 }
 
 // requestLogger returns middleware that logs each request to the given

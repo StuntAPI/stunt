@@ -30,9 +30,10 @@ running server from there, so you almost never need `--url`/`--token`.
 
 1. [Request inspector](#1-request-inspector)
 2. [State browser](#2-state-browser)
-3. [Snapshot, restore & reset — deterministic runs](#3-snapshot-restore--reset--deterministic-runs)
-4. [Instance manager](#4-instance-manager)
-5. [The CLI at a glance](#5-the-cli-at-a-glance)
+3. [Profiles panel](#3-profiles-panel)
+4. [Snapshot, restore & reset — deterministic runs](#4-snapshot-restore--reset--deterministic-runs)
+5. [Instance manager](#5-instance-manager)
+6. [The CLI at a glance](#6-the-cli-at-a-glance)
 6. [Architecture](#architecture)
 7. [Security](#security)
 8. [Common workflows](#common-workflows)
@@ -164,7 +165,30 @@ stunt state collections stripe --json
 
 ---
 
-## 3. Snapshot, restore & reset — deterministic runs
+## 3. Profiles panel
+
+The **profiles** tab flips the simulated world's behavior at runtime: preset buttons
+(one activation assigns profiles across services) and a per-service dropdown. The same
+surface is scriptable:
+
+```
+GET  /api/profile                      # current state + everything activatable
+POST /api/profile   {"name": "launch-day"}            # activate a preset
+POST /api/profile   {"name": "throttled"}             # unique name → auto-targeted
+POST /api/profile   {"name": "degraded", "service": "stripe"}
+POST /api/profile   {"name": ""}                      # deactivate all
+```
+
+Auth is the standard `X-Stunt-Token` header (or the browser cookie). Both methods return
+the full post-state view; errors are structured JSON — resolution failures carry the
+complete availability line (`unknown profile "x" — nothing defines it. available — presets: …`)
+so a bot self-corrects in one round trip. Malformed payloads (typo'd keys, missing/null
+`name`) are rejected with 400 — they never read as deactivate-all. Activation is
+runtime-only: a restart resets the world (`stunt up --profile <name>` boots with one).
+See the CLI counterpart (`stunt profile list|show|activate|deactivate`) for the same
+operations from a terminal or CI script.
+
+## 4. Snapshot, restore & reset — deterministic runs
 
 Non-determinism is the enemy of reliable tests. stunt gives you three levers, from
 lightest to strongest:
@@ -218,7 +242,7 @@ controls.
 
 ---
 
-## 4. Instance manager
+## 5. Instance manager
 
 Running more than one stunt server (one per project, or several manifests)? The
 **global registry** (`~/.stunt/instances.json`) tracks every running server across
@@ -262,7 +286,7 @@ either way.
 
 ---
 
-## 5. The CLI at a glance
+## 6. The CLI at a glance
 
 Every dashboard feature is reachable from the CLI, with `--json` for agents & CI.
 Commands auto-discover the running server for the current manifest.

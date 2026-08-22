@@ -871,3 +871,77 @@ func TestScriptDriftIgnoresLibStar(t *testing.T) {
 		}
 	}
 }
+
+func TestLintManifestLoadRejectsInvalidAdapter(t *testing.T) {
+	dir := t.TempDir()
+	yaml := `id: p
+name: P
+api:
+  name: P
+  version: v1
+profiles:
+  BadName: "uppercase profile name"
+`
+	if err := os.WriteFile(filepath.Join(dir, "adapter.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saw bool
+	for _, f := range findings {
+		if f.Severity == SeverityError && strings.Contains(f.Message, "stunt up would refuse") && strings.Contains(f.Message, "BadName") {
+			saw = true
+		}
+	}
+	if !saw {
+		t.Fatalf("expected load-error finding for BadName, got %+v", findings)
+	}
+}
+
+func TestLintDeadProfileModeWarns(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	yaml := `id: p
+name: P
+api:
+  name: P
+  version: v1
+endpoints:
+  - route: /x
+    method: GET
+    handler: scripts/x.star#on_x
+profiles:
+  throttled: "empty receives"
+  never-used: "declared but no script reads it"
+`
+	if err := os.WriteFile(filepath.Join(dir, "adapter.yaml"), []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	script := "def on_x(req):\n    if profile_active() == \"throttled\":\n        return respond(200, {})\n    return respond(200, {})\n"
+	if err := os.WriteFile(filepath.Join(dir, "scripts", "x.star"), []byte(script), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	findings, err := Lint(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var dead, live bool
+	for _, f := range findings {
+		if strings.Contains(f.Message, `profile "never-used"`) && f.Severity == SeverityWarn {
+			dead = true
+		}
+		if strings.Contains(f.Message, `profile "throttled"`) {
+			live = true
+		}
+	}
+	if !dead {
+		t.Fatalf("expected dead-mode warning for never-used, got %+v", findings)
+	}
+	if live {
+		t.Fatalf("referenced mode throttled should not warn: %+v", findings)
+	}
+}

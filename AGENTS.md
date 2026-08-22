@@ -91,9 +91,12 @@ services:
     # profiles: named rule bundles activatable at runtime on THIS service.
     # An active profile's rules run as a PRE-DISPATCH override layer — they
     # can intercept routes that handlers or base rules would otherwise take.
-    # Adapters may also author profiles (adapter.yaml `profiles:`), readable
-    # from handlers via profile_active(); activation treats both sets as one
-    # namespace per service.
+    # (WebSocket upgrades and GraphQL dispatch run BEFORE the profile layer,
+    # so profiles do not intercept those transports.) Adapters may also
+    # author profiles (adapter.yaml `profiles:`), readable from handlers via
+    # profile_active(); activation treats both sets as one namespace per
+    # service. On a name defined in BOTH places, one activation drives both
+    # layers (manifest rules + the adapter's authored behavior).
     # profiles:
     #   degraded:
     #     description: slow + occasional 429
@@ -132,6 +135,20 @@ rules:
 Rules in a service are checked in **declaration order**; the first match wins. A catch-all
 `match: { path: "/**" }` is the usual 404 backstop. Templates use Go `text/template` with
 `{{ faker.Email }}`, `{{ uuid }}`, `{{ now.Format "2006-01-02T15:04:05Z07:00" }}`.
+`behavior: timeout` with no `latency_ms` defaults to a **30-second** hang before the
+connection drops.
+
+### Determinism contract
+
+With a fixed `rng_seed`: chance rules are deterministic for **serial traffic from a fresh
+boot**, per service (each service draws its own stream — services' faults are independent).
+Within one service, every chance rule (base rules AND active profile rules) draws one
+shared stream in evaluation order, so any traffic to a chanced path shifts subsequent
+rolls on that service — readiness-probe a chance-free path. Parallel traffic preserves
+failure COUNTS, not per-request order. Adapter-authored modes that keep counters (like
+sqs-style's `throttled` parity) persist in service state: a restart resets the
+*activation*, not the counter — pair state-backed modes with `stunt reset <service>` /
+`stunt clean` for a fully fresh world.
 
 ## Adapter manifest schema (`adapters/<name>/adapter.yaml`)
 

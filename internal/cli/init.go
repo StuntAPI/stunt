@@ -23,6 +23,11 @@ services:
       - name: success
         match: { method: GET, path: /hello }
         respond: { status: 200, body: { inline: { message: hello from stunt } } }
+      # Runtime-activatable behavior profiles (stunt profile activate <name>):
+      # - name: degraded
+      #   match: { method: GET, path: /hello }
+      #   when: { chance: 30 }
+      #   respond: { status: 503, body: { inline: { error: degraded } } }
       - name: slow-timeout
         match: { method: GET, path: /slow }
         when: { chance: 10 }
