@@ -119,11 +119,16 @@ type check struct {
 	Name    string
 }
 
-var recordRe = regexp.MustCompile(`Record\(t,\s*"([^"]*)"\s*,\s*"([^"]*)"\s*,\s*"([^"]*)"\)`)
+var (
+	recordRe     = regexp.MustCompile(`Record\(t,\s*"([^"]*)"\s*,\s*"([^"]*)"\s*,\s*"([^"]*)"\)`)
+	recordCallRe = regexp.MustCompile(`Record\(\s*t,`)
+)
 
 // parseGoRecords extracts Record literals from the Go suites. Non-literal
-// calls (fmt.Sprintf...) are invisible to static extraction, so a count
-// mismatch is a hard error rather than a silently missing row entry.
+// calls (fmt.Sprintf...) and line-broken argument lists are invisible to
+// the literal regex, so the call count (matched permissively) must equal
+// the literal count — any mismatch is a hard error rather than a silently
+// missing row entry.
 func parseGoRecords(dir string) ([]check, error) {
 	files, err := filepath.Glob(filepath.Join(dir, "*_test.go"))
 	if err != nil {
@@ -137,7 +142,7 @@ func parseGoRecords(dir string) ([]check, error) {
 			return nil, err
 		}
 		matches := recordRe.FindAllStringSubmatch(string(data), -1)
-		total := strings.Count(string(data), "Record(t,")
+		total := len(recordCallRe.FindAllString(string(data), -1))
 		if len(matches) != total {
 			return nil, fmt.Errorf("%s: %d Record calls but only %d literal — genmatrix parses literals only",
 				filepath.Base(f), total, len(matches))
@@ -164,6 +169,18 @@ var (
 )
 
 func parseNodeTests(dir string) ([]check, error) {
+	// An unmapped *.test.ts in the dir would silently vanish from the
+	// matrix — fail instead, mirroring the sidecar stale-entry check.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range entries {
+		name := e.Name()
+		if strings.HasSuffix(name, ".test.ts") && nodeSuiteSDK[name] == "" {
+			return nil, fmt.Errorf("%s: no SDK label mapping — add it to nodeSuiteSDK", name)
+		}
+	}
 	// Deterministic order: by filename.
 	files := make([]string, 0, len(nodeSuiteSDK))
 	for base := range nodeSuiteSDK {
@@ -186,8 +203,9 @@ func parseNodeTests(dir string) ([]check, error) {
 			names = append(names, collapse(m[1]))
 		}
 		if len(names) == 0 {
-			// No section markers: fall back to the enclosing test name.
-			if m := nodeTestRe.FindStringSubmatch(string(data)); m != nil {
+			// No section markers: fall back to the enclosing test names
+			// (all of them — a second test() block must not vanish).
+			for _, m := range nodeTestRe.FindAllStringSubmatch(string(data), -1) {
 				names = append(names, m[1])
 			}
 		}

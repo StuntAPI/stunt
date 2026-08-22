@@ -40,6 +40,22 @@ func TestY(t *testing.T) {
 	if _, err := parseGoRecords(dir); err == nil || !strings.Contains(err.Error(), "literals only") {
 		t.Fatalf("non-literal Record not rejected: %v", err)
 	}
+
+	dir2 := t.TempDir()
+	// gofmt preserves a line-broken argument list; the call-count guard
+	// must still see it.
+	write2 := func(name, body string) {
+		if err := os.WriteFile(filepath.Join(dir2, name), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write2("wrapped_test.go", `Record(
+	t, "sdk", "adapter", "wrapped call",
+)
+`)
+	if _, err := parseGoRecords(dir2); err == nil || !strings.Contains(err.Error(), "literals only") {
+		t.Fatalf("line-broken Record not rejected: %v", err)
+	}
 }
 
 func TestParseNodeTests(t *testing.T) {
@@ -82,6 +98,54 @@ test("lifecycle", async () => {});`
 	}
 	if got[2].Name != "Webhook registration, delivery verified by the SDK's own constructEvent" {
 		t.Fatalf("multiline marker not collapsed: %q", got[2].Name)
+	}
+}
+
+func TestParseNodeTestsRejectsUnmappedSuiteFile(t *testing.T) {
+	dir := t.TempDir()
+	for _, base := range []string{"github.test.ts", "stripe.test.ts", "twilio.test.ts"} {
+		if err := os.WriteFile(filepath.Join(dir, base),
+			[]byte(`bootAdapter("x"); test("t", async () => {});`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(dir, "shopify.test.ts"),
+		[]byte(`bootAdapter("shopify-style"); test("t", async () => {});`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := parseNodeTests(dir); err == nil || !strings.Contains(err.Error(), "no SDK label mapping") {
+		t.Fatalf("unmapped suite file not rejected: %v", err)
+	}
+}
+
+func TestParseNodeTestsFallbackRecordsEveryTest(t *testing.T) {
+	dir := t.TempDir()
+	body := `bootAdapter("twilio-style");
+test("first", async () => {});
+test("second", async () => {});
+`
+	for base, boot := range map[string]string{
+		"github.test.ts": "github-style",
+		"stripe.test.ts": "stripe-style",
+		"twilio.test.ts": "twilio-style",
+	} {
+		if err := os.WriteFile(filepath.Join(dir, base),
+			[]byte(strings.Replace(body, "twilio-style", boot, 1)), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := parseNodeTests(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	perSDK := map[string]int{}
+	for _, c := range got {
+		perSDK[c.SDK]++
+	}
+	for _, sdk := range []string{"octokit", "stripe-node", "twilio-node"} {
+		if perSDK[sdk] != 2 {
+			t.Fatalf("sdk %s recorded %d checks, want 2 (second test() must not vanish)", sdk, perSDK[sdk])
+		}
 	}
 }
 
