@@ -354,6 +354,8 @@ adapters:
   entra-id-style:
     deviations:
       - "Authorize auto-approves with an instant 302; no consent screen"
+      - "nextLink cursor param is $skipToken (camelCase); real Graph emits $skiptoken"
+      - "users create ignores mailNickname; mail defaults to the UPN"
     missing:
       - "No $filter, $search, $orderby, $select, or $expand on Graph queries"
       - "No user PATCH or DELETE (/v1.0/users/{id})"
@@ -621,6 +623,8 @@ adapters:
       - "Upload session ids are deterministic counters, not unguessable tokens"
       - "OData $filter limited to the equality pattern (field eq value)"
       - "Static seeded mock-bearer-token bypasses the entra-id token flow"
+      - "@odata.nextLink/@odata.context point at graph.microsoft.com, not the serving host (prod-faithful; a local SDK harness must rebase)"
+      - "Resumable upload session URLs are absolute http:// — the JS SDK's OneDriveLargeFileUploadTask urlJoins them into a broken path"
     missing:
       - "No Excel workbook sessions (createSession, refreshSession, closeSession)"
       - "No mail reply/forward, attachments, or message move/copy endpoints"

@@ -8,6 +8,7 @@
   "dependencies": {
     "@discordjs/rest": "^2.6.3",
     "@hubspot/api-client": "^14.0.1",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
     "@slack/web-api": "^7.19.0",
     "discord-api-types": "^0.38.0",
     "jira.js": "^6.1.0",

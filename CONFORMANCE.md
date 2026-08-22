@@ -21,7 +21,7 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**98 adapters** — 2 SDK+VM, 25 SDK-only, 4 VM-only, 67 boot-tier.
+**98 adapters** — 2 SDK+VM, 27 SDK-only, 4 VM-only, 65 boot-tier.
 
 | Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |
 |---|---|---|---|---|---|---|---|
@@ -54,7 +54,7 @@ Verification tiers:
 | [dynamodb-style](adapters/dynamodb-style/) | Amazon DynamoDB API `2012-08-10` | 1 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 8 | [8](#dynamodb-style) | [5](#dynamodb-style) |
 | [echo-style](adapters/echo-style/) | gRPC echo demo `1.0` | 0 (+1 ws) | boot | — | — | — | — |
 | [emailoctopus-style](adapters/emailoctopus-style/) | EmailOctopus API `2.0.0` | 21 | boot | — | — | [2](#emailoctopus-style) | [3](#emailoctopus-style) |
-| [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | boot | — | — | [8](#entra-id-style) | [1](#entra-id-style) |
+| [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 8 | [8](#entra-id-style) | [3](#entra-id-style) |
 | [erc4337-style](adapters/erc4337-style/) | ERC-4337 Bundler RPC `0.7` | 2 | boot | — | — | [5](#erc4337-style) | [4](#erc4337-style) |
 | [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | boot | — | — | [3](#escrow-style) | [1](#escrow-style) |
 | [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | SDK | go-ethereum @ v1.17.5 | 5 | [5](#eth-jsonrpc-style) | [4](#eth-jsonrpc-style) |
@@ -81,7 +81,7 @@ Verification tiers:
 | [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | boot | — | — | [4](#linkedin-style) | [1](#linkedin-style) |
 | [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | SDK | openai-node @ 7.5.0 (floor) | 2 | [4](#llm-style) | [3](#llm-style) |
 | [marketo-style](adapters/marketo-style/) | Marketo Engage REST API `1.0` | 21 | boot | — | — | [5](#marketo-style) | [3](#marketo-style) |
-| [microsoft-graph-style](adapters/microsoft-graph-style/) | Microsoft Graph API `v1.0` | 55 | boot | — | — | [8](#microsoft-graph-style) | [4](#microsoft-graph-style) |
+| [microsoft-graph-style](adapters/microsoft-graph-style/) | Microsoft Graph API `v1.0` | 55 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 10 | [8](#microsoft-graph-style) | [6](#microsoft-graph-style) |
 | [netsuite-style](adapters/netsuite-style/) | NetSuite SuiteTalk REST API `1.0` | 9 | boot | — | — | [4](#netsuite-style) | [2](#netsuite-style) |
 | [oneinch-style](adapters/oneinch-style/) | 1inch Aggregation Protocol API `v6.0` | 5 | boot | — | — | [3](#oneinch-style) | [1](#oneinch-style) |
 | [onfido-style](adapters/onfido-style/) | Onfido API `v3.6` | 7 | boot | — | — | [5](#onfido-style) | [4](#onfido-style) |
@@ -326,6 +326,32 @@ sections in `conformance/node/tests/*.test.ts`).
 - update patches and persists
 - SOQL through the SDK's query parser
 - destroy removes the record
+
+### microsoft-graph-client @ 3.0.7 (floor)
+
+**entra-id-style**
+
+- authorize redirects with code + state
+- token exchange mints a JWKS-verifiable RS256 bearer
+- authProvider feeds the SDK; /v1.0/me resolves the token's user
+- users create + get round-trip (by id and by UPN)
+- users list pages via $top + $skipToken + PageIterator
+- applications + servicePrincipals reads
+- refresh grant rotates the token the SDK presents
+- error decoding: 404 and 401 surface as GraphError
+
+**microsoft-graph-style**
+
+- /me resolves the signed-in profile
+- users directory pages via $top and the @odata.nextLink cursor
+- $filter and $select are applied server-side
+- draft lifecycle: create, PATCH, send, land in Sent Items
+- sendMail posts straight to Sent Items (no draft)
+- subscription lifecycle with clientState-echoed notifications
+- calendar: create, calendarView window, accept records the response
+- teams chat: create chat, send message, list, delete
+- drive: quota, simple upload round-trip, path resolution
+- error envelope: unknown user 404, unknown token 401
 
 ### node-zendesk @ 6.0.1 (floor)
 
@@ -1536,9 +1562,11 @@ behavior notes live in each adapter's README.
 - No client-credentials or device-code token grant support
 - No signInLogs, audit logs, or user activities
 
-**Deviations** (1)
+**Deviations** (3)
 
 - Authorize auto-approves with an instant 302; no consent screen
+- nextLink cursor param is $skipToken (camelCase); real Graph emits $skiptoken
+- users create ignores mailNickname; mail defaults to the UPN
 
 ### erc4337-style
 
@@ -2559,12 +2587,14 @@ behavior notes live in each adapter's README.
 - No Excel worksheet or table create/update/delete, no workbook calculate
 - No todo, planner, contacts, presence, or /search surfaces
 
-**Deviations** (4)
+**Deviations** (6)
 
 - Webhook validationToken handshake not enforced; subscription accepted immediately
 - Upload session ids are deterministic counters, not unguessable tokens
 - OData $filter limited to the equality pattern (field eq value)
 - Static seeded mock-bearer-token bypasses the entra-id token flow
+- @odata.nextLink/@odata.context point at graph.microsoft.com, not the serving host (prod-faithful; a local SDK harness must rebase)
+- Resumable upload session URLs are absolute http:// — the JS SDK's OneDriveLargeFileUploadTask urlJoins them into a broken path
 
 ### netsuite-style
 

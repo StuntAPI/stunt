@@ -103,7 +103,10 @@ def _list_page(req, docs, base_path):
 
     next_link = None
     if next_cursor != None:
-        next_link = base_path + "?$top=" + str(top) + "&$skipToken=" + next_cursor
+        # Real Graph serves ABSOLUTE @odata.nextLink URLs on the graph host —
+        # graph clients (microsoft-graph-client PageIterator) parse host and
+        # version straight out of them via Client.api(nextLink).
+        next_link = "https://graph.microsoft.com" + base_path + "?$top=" + str(top) + "&$skipToken=" + next_cursor
     return page, next_link
 
 # _pad3 zero-pads a number to 3 digits.
