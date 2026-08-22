@@ -92,7 +92,7 @@ func (e *Engine) SetProfile(name string) error {
 	case 0:
 		return fmt.Errorf("unknown profile %q — nothing defines it. %s", name, e.describeAvailable())
 	default:
-		return fmt.Errorf("profile %q is ambiguous — defined by services %s; activate it with an explicit service", name, strings.Join(matches, ", "))
+		return fmt.Errorf("profile %q is ambiguous — defined by services %s; activate it with --service <service> or {\"service\": \"...\"}", name, strings.Join(matches, ", "))
 	}
 }
 
@@ -176,9 +176,11 @@ func (e *Engine) serviceProfileDefs(service string) map[string]profileDef {
 }
 
 // AvailableProfiles builds the full catalog: global presets plus each
-// service's profiles, sorted for stable output.
+// service's profiles, sorted for stable output. Empty collections are
+// always non-nil so JSON consumers see [] rather than null (audit finding:
+// naive fixtures crash indexing null).
 func (e *Engine) AvailableProfiles() ProfileCatalog {
-	cat := ProfileCatalog{Services: make(map[string][]ProfileInfo)}
+	cat := ProfileCatalog{Presets: []ProfileInfo{}, Services: make(map[string][]ProfileInfo)}
 	for n, gp := range e.manifest.Profiles {
 		cat.Presets = append(cat.Presets, ProfileInfo{Name: n, Description: gp.Description, Source: "manifest"})
 	}

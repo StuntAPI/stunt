@@ -19,7 +19,7 @@ If you started stunt in the foreground with "stunt up", stop it with Ctrl-C
 instead — this command is for background/service-managed instances.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, _ := cmd.Flags().GetString("manifest")
-			return runDown(cmd.OutOrStdout(), manifestDir(path))
+			return runDown(cmd.OutOrStdout(), manifestDir(path), path)
 		},
 	}
 }
@@ -27,8 +27,16 @@ instead — this command is for background/service-managed instances.`,
 // runDown reads the runtime file for the given manifest dir, sends SIGTERM
 // to the recorded PID, waits for the process to exit, and removes the
 // runtime file. If no server is running, it prints a friendly message.
-func runDown(out io.Writer, mDir string) error {
-	rt, err := readRuntimeFile(mDir)
+// manifestPath may be empty (tests/legacy callers): the identity check is
+// skipped and the directory's runtime file is trusted as before.
+func runDown(out io.Writer, mDir, manifestPath string) error {
+	var rt *RuntimeFile
+	var err error
+	if manifestPath != "" {
+		rt, err = readRuntimeFileFor(manifestPath)
+	} else {
+		rt, err = readRuntimeFile(mDir)
+	}
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Fprintln(out, "no running stunt server found")

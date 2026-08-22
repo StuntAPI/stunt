@@ -159,3 +159,35 @@ func TestProfileEndpointUnavailable(t *testing.T) {
 		t.Fatalf("unwired GET -> %d, want 503", res.StatusCode)
 	}
 }
+
+// Regression (audit F1): a malformed payload must NEVER read as
+// deactivate-all — a typo'd key, a missing name, or a null name are 400s.
+func TestProfileEndpointRejectsMalformedPayloads(t *testing.T) {
+	active := map[string]string{"hello": "chaos"}
+	_, srv := newProfileDashboard(t, active)
+	post := func(body string) int {
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+"/api/profile", strings.NewReader(body))
+		req.Header.Set("X-Stunt-Token", "tok")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res.Body.Close()
+		return res.StatusCode
+	}
+	cases := []string{
+		`{"nam": "chaos"}`,          // typo'd key
+		`{"name": null}`,            // null name
+		`{}`,                        // nothing recognized
+		`{"service": "hello"}`,      // service without name
+		`{"name": "chaos", "x": 1}`, // unknown extra field
+	}
+	for _, body := range cases {
+		if code := post(body); code != 400 {
+			t.Fatalf("POST %s -> %d, want 400", body, code)
+		}
+	}
+	if active["hello"] != "chaos" {
+		t.Fatalf("malformed payloads mutated state: %v", active)
+	}
+}

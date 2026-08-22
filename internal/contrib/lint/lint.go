@@ -15,12 +15,16 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"stuntapi.com/stunt/internal/adapter"
 )
 
 // Severity levels for findings.
@@ -108,6 +112,13 @@ func Lint(dir string) ([]Finding, error) {
 		return nil, err
 	}
 	findings = append(findings, gqlFindings...)
+
+	// Load the adapter manifest with the same validation `stunt up` uses —
+	// lint must not green-light an adapter that dies at boot (audit
+	// finding: bad profile names, malformed handlers all passed lint), and
+	// declared behavior modes that no script ever reads are dead weight.
+	loadFindings := lintManifestLoad(dir)
+	findings = append(findings, loadFindings...)
 
 	// Check scripts/ for helper-drift (same function name in multiple files).
 	driftFindings, err := lintScriptDrift(dir)
@@ -714,3 +725,77 @@ var rePhone = regexp.MustCompile(`\+?\(?\d{1,4}\)?[ .\-]?\(?\d{1,4}\)?[ .\-]?\d{
 // reBase64 matches long base64-encoded blobs (40+ chars), characteristic of
 // real encoded payloads (JWT bodies, certificates, binary blobs).
 var reBase64 = regexp.MustCompile(`[A-Za-z0-9+/]{40,}={0,2}`)
+
+// lintManifestLoad runs the real adapter manifest validation (the same
+// adapter.Load `stunt up` performs) plus a dead-mode check: every profile
+// declared in adapter.yaml must be referenced by at least one handler
+// script, otherwise activating it is a silent no-op.
+func lintManifestLoad(dir string) []Finding {
+	// No adapter.yaml at all is not lint's business (the empty-dir contract
+	// stays clean); only a PRESENT-but-invalid manifest is a finding.
+	if _, err := os.Stat(filepath.Join(dir, "adapter.yaml")); err != nil {
+		return nil
+	}
+	a, err := adapter.Load(dir)
+	if err != nil {
+		return []Finding{{
+			File:     "adapter.yaml",
+			Line:     1,
+			Severity: "error",
+			Value:    "manifest",
+			Message:  "adapter manifest fails to load (stunt up would refuse it): " + err.Error(),
+		}}
+	}
+	if len(a.Profiles) == 0 {
+		return nil
+	}
+	// One pass over the handler scripts; a mode is live if its name (or
+	// any profile_active reference, for switch-style dispatch) appears.
+	scripts := readAllStarScripts(dir)
+	var findings []Finding
+	for _, name := range sortedProfileNames(a.Profiles) {
+		if !scriptsMention(scripts, name) {
+			findings = append(findings, Finding{
+				File:     "adapter.yaml",
+				Line:     1,
+				Severity: "warn",
+				Value:    "profile:" + name,
+				Message:  fmt.Sprintf("profile %q is declared but never referenced in scripts/ (dead mode — activating it changes nothing)", name),
+			})
+		}
+	}
+	return findings
+}
+
+func readAllStarScripts(dir string) []string {
+	var out []string
+	root := filepath.Join(dir, "scripts")
+	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".star") {
+			return nil
+		}
+		if data, rerr := os.ReadFile(path); rerr == nil {
+			out = append(out, string(data))
+		}
+		return nil
+	})
+	return out
+}
+
+func scriptsMention(scripts []string, name string) bool {
+	for _, src := range scripts {
+		if strings.Contains(src, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func sortedProfileNames(m map[string]string) []string {
+	names := make([]string, 0, len(m))
+	for n := range m {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return names
+}

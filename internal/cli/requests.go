@@ -49,21 +49,29 @@ func newRequestsCmd() *cobra.Command {
 }
 
 // resolveDashboard determines the dashboard URL+token to talk to. Explicit
-// --url/--token flags win; otherwise the values are read from the manifest
-// dir's runtime file (written by `stunt up`). An empty --url with no runtime
-// file yields a friendly error pointing the user at `stunt up`.
+// --url/--token flags win per dimension; otherwise values come from the
+// manifest's runtime file (written by `stunt up`). An explicit --token is
+// honored even with an --url-less invocation (the URL is discovered from
+// the runtime file, the token override is NOT silently dropped — audit
+// finding: `--token wrong` succeeded, lulling credential-checking bots).
+// An empty --url with no runtime file yields a friendly error pointing the
+// user at `stunt up`.
 func resolveDashboard(flagURL, flagToken, manifestPath string) (string, string, error) {
 	if flagURL != "" {
 		return flagURL, flagToken, nil
 	}
-	rt, err := readRuntimeFile(manifestDir(manifestPath))
+	rt, err := readRuntimeFileFor(manifestPath)
 	if err != nil {
 		return "", "", fmt.Errorf("no running stunt server for %s: run `stunt up` (or pass --url/--token): %w", manifestPath, err)
 	}
 	if rt.DashboardURL == "" {
 		return "", "", fmt.Errorf("running server for %s has no dashboard", manifestPath)
 	}
-	return rt.DashboardURL, rt.DashboardToken, nil
+	token := rt.DashboardToken
+	if flagToken != "" {
+		token = flagToken
+	}
+	return rt.DashboardURL, token, nil
 }
 
 func runRequests(out io.Writer, url, token, manifestPath string, asJSON bool, limit int) error {

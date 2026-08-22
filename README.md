@@ -171,7 +171,35 @@ signed webhook delivery (HMAC/ECDSA/Ed25519 schemes), derive-on-read async state
   compose global presets that assign several services at once. `stunt profile activate <name>` (or the
   dashboard panel) flips the world — "launch-day latency", "degraded dependency" — without touching YAML or
   restarting; active profile rules run as a pre-dispatch override, so they reach handler-backed routes base
-  rules can't. Runtime-only by design: a restart resets the world; `stunt up --profile <name>` boots with one.
+  rules can't (WebSocket and GraphQL transports dispatch earlier — profiles don't intercept those). Runtime-only
+  by design: a restart resets the world; `stunt up --profile <name>` boots with one.
+
+  ```yaml
+  services:
+    stripe:
+      adapter: embedded:stripe-style
+      profiles:                       # rule bundles for THIS service
+        degraded:
+          description: occasional 429s
+          rules:
+            - match: { path: /v1/** }
+              when: { chance: 30 }
+              respond: { status: 429, body: { inline: { error: rate_limited } } }
+  profiles:                           # one activation assigns across services
+    launch-day:
+      set:
+        stripe: degraded
+        sqs: throttled                # authored by the sqs-style adapter
+  ```
+
+  ```
+  $ stunt profile activate launch-day
+  $ stunt profile activate throttled          # unique name → auto-targeted
+  $ stunt profile deactivate
+  ```
+  Determinism contract: with a fixed `rng_seed`, chance rules are deterministic for serial
+  traffic from boot (per service); parallel traffic preserves counts, not order; every chance
+  rule on a service draws one shared stream.
 
 ## Observability dashboard
 

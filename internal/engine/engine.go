@@ -3,6 +3,7 @@ package engine
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -439,8 +440,22 @@ func (e *Engine) HTTPServerForTest() *http.Server {
 // not set max_body_bytes in the manifest.
 const defaultMaxBodyBytes = 1 << 20 // 1 MiB
 
+// serviceRNGSeed derives the per-service rules-RNG seed:
+// int64 of the first 8 bytes of sha256("<rngSeed>:<serviceName>") — the
+// same derivation the issuer secret uses.
+func serviceRNGSeed(rngSeed int64, name string) int64 {
+	h := sha256.Sum256([]byte(fmt.Sprintf("%d:%s", rngSeed, name)))
+	return int64(binary.BigEndian.Uint64(h[:8]))
+}
+
 func (e *Engine) serviceHandler(name string, svc manifest.Service) http.Handler {
-	rng := rules.NewRNG(e.manifest.RNGSeed)
+	// Per-service rules RNG: salt the manifest seed with the service name
+	// (same derivation as the issuer secret) so services' chance rules
+	// draw INDEPENDENT streams — a raw shared seed made every service's
+	// chance: 50 produce the identical sequence (perfectly correlated
+	// failures; audit finding). Faker keeps the raw seed: synthetic DATA
+	// identity across services is desirable, correlated faults are not.
+	rng := rules.NewRNG(serviceRNGSeed(e.manifest.RNGSeed, name))
 	fk := rules.NewFaker(e.manifest.RNGSeed)
 	baseDir := filepath.Dir(e.manifest.Path)
 	st := e.states[name]          // nil for rules-only services

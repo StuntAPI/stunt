@@ -215,6 +215,8 @@ func runProfileActivate(out io.Writer, url, token, manifestPath, name, service s
 			fmt.Fprintf(out, "activated %q on %s\n", view.Active[s], s)
 		}
 	}
+	// At the moment of use, not buried in docs: activation is runtime-only.
+	fmt.Fprintln(out, "(runtime-only — resets on restart; `stunt up --profile` boots with one)")
 	return nil
 }
 

@@ -73,7 +73,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		defer e.Close()
-		if err := applyBootProfile(cmd, e); err != nil {
+		if err := applyBootProfile(cmd, out, e); err != nil {
 			return err
 		}
 		return runUpPort(ctx, stop, e, m, out)
@@ -83,7 +83,7 @@ func runUp(cmd *cobra.Command, args []string) error {
 // applyBootProfile activates the --profile flag's profile before serving.
 // Failing here (rather than after binding ports) keeps `stunt up --profile
 // typo` loud and port-clean.
-func applyBootProfile(cmd *cobra.Command, e *engine.Engine) error {
+func applyBootProfile(cmd *cobra.Command, out io.Writer, e *engine.Engine) error {
 	name, _ := cmd.Flags().GetString("profile")
 	if name == "" {
 		return nil
@@ -91,6 +91,7 @@ func applyBootProfile(cmd *cobra.Command, e *engine.Engine) error {
 	if err := e.SetProfile(name); err != nil {
 		return fmt.Errorf("--profile: %w", err)
 	}
+	fmt.Fprintf(out, "  profile:   %s (runtime-only — resets on restart)\n", name)
 	return nil
 }
 
@@ -118,7 +119,7 @@ func runUpPort(ctx context.Context, signalCancel context.CancelFunc, e *engine.E
 	}
 	rt := RuntimeFile{
 		PID:            os.Getpid(),
-		Manifest:       m.Path,
+		Manifest:       manifestAbs(m.Path),
 		Mode:           "port",
 		Addresses:      addrList,
 		StartedAt:      time.Now().Format(time.RFC3339),
@@ -136,7 +137,7 @@ func runUpPort(ctx context.Context, signalCancel context.CancelFunc, e *engine.E
 	if reg, err := OpenRegistry(); err == nil {
 		_ = reg.Register(Instance{
 			PID:            os.Getpid(),
-			Manifest:       m.Path,
+			Manifest:       manifestAbs(m.Path),
 			Mode:           "port",
 			Services:       sortedServiceNames(m.Services),
 			Addresses:      addrList,
@@ -396,7 +397,7 @@ func runUpSubdomain(ctx context.Context, signalCancel context.CancelFunc, cmd *c
 		return err
 	}
 	defer e.Close()
-	if err := applyBootProfile(cmd, e); err != nil {
+	if err := applyBootProfile(cmd, out, e); err != nil {
 		return err
 	}
 
@@ -461,7 +462,7 @@ func runUpSubdomain(ctx context.Context, signalCancel context.CancelFunc, cmd *c
 	// Write the runtime file so `stunt down` can stop this server.
 	subRt := RuntimeFile{
 		PID:            os.Getpid(),
-		Manifest:       manifestPath,
+		Manifest:       manifestAbs(manifestPath),
 		Mode:           "subdomain",
 		Addresses:      []string{fmt.Sprintf("%s://%s:%s", map[bool]string{true: "https", false: "http"}[useTLS], tld, actualPort)},
 		StartedAt:      time.Now().Format(time.RFC3339),
@@ -477,7 +478,7 @@ func runUpSubdomain(ctx context.Context, signalCancel context.CancelFunc, cmd *c
 	if reg, err := OpenRegistry(); err == nil {
 		_ = reg.Register(Instance{
 			PID:            os.Getpid(),
-			Manifest:       manifestPath,
+			Manifest:       manifestAbs(manifestPath),
 			Mode:           "subdomain",
 			Services:       sortedServiceNames(m.Services),
 			Addresses:      subRt.Addresses,

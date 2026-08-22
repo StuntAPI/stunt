@@ -1,8 +1,14 @@
 package engine
 
 import (
+	"encoding/json"
+	"net"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"stuntapi.com/stunt/internal/engine/requestlog"
 
 	"stuntapi.com/stunt/internal/manifest"
 	"stuntapi.com/stunt/internal/rules"
@@ -228,5 +234,121 @@ func TestProfileActiveWithoutRulesPassesThrough(t *testing.T) {
 	body, status := get(t, addr+"/ok")
 	if status != 200 || !strings.Contains(body, "hi") {
 		t.Fatalf("rules-less profile changed dispatch: %d %q", status, body)
+	}
+}
+
+// Regression (5-persona audit): behavior:timeout must DROP the connection —
+// through the full production middleware chain (request-log capture wrapper
+// + statusRecorder), not degrade to a clean 504. The old statusRecorder
+// type-asserted its immediate inner writer, which the capture wrapper
+// (Unwrap-only) is not, so the hijack silently failed.
+func TestTimeoutDecisionDropsConnection(t *testing.T) {
+	okRule := rules.Rule{Match: rules.Match{Method: "GET", Path: "/ok"}, Respond: rules.Respond{Status: 200, Body: &rules.Body{Inline: map[string]any{"ok": true}}}}
+	hangRule := rules.Rule{Match: rules.Match{Method: "GET", Path: "/hang"}, Respond: rules.Respond{Behavior: "timeout", LatencyMS: 50}}
+	m := &manifest.Manifest{
+		Version:  1,
+		Network:  manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{"api": {Rules: []rules.Rule{hangRule, okRule}}},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Serve through the SAME wrapping as production: recorder → logger →
+	// handler (serve.go:71).
+	h := requestlog.NewRecorder(e.reqLog, "api", e.seq).Wrap(e.serviceHandler("api", m.Services["api"]))
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+
+	// Sanity: the non-timeout route answers normally through the chain.
+	if _, status := get(t, srv.URL+"/ok"); status != 200 {
+		t.Fatalf("GET /ok -> %d", status)
+	}
+
+	// The hang route: after the configured latency the connection must be
+	// severed — a raw read sees EOF (or reset) with NO 504 body.
+	conn, err := net.DialTimeout("tcp", strings.TrimPrefix(srv.URL, "http://"), 2*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	conn.SetDeadline(time.Now().Add(3 * time.Second))
+	if _, err := conn.Write([]byte("GET /hang HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n")); err != nil {
+		t.Fatal(err)
+	}
+	buf := make([]byte, 512)
+	n, readErr := conn.Read(buf)
+	body := string(buf[:n])
+	if n > 0 && strings.Contains(body, "504") {
+		t.Fatalf("timeout rule degraded to a 504 response: %q", body)
+	}
+	// EOF (readErr != nil with no bytes) is the expected severed-connection
+	// outcome; any bytes received must not form a complete response.
+	if readErr == nil && n > 0 {
+		t.Fatalf("expected connection drop, got %d bytes: %q", n, body)
+	}
+}
+
+// Regression (audit F2): services must draw INDEPENDENT chance streams —
+// with a raw shared seed, every service's chance: 50 rule produced the
+// identical sequence (perfectly correlated failures).
+func TestPerServiceRNGStreamsAreIndependent(t *testing.T) {
+	flaky := func() rules.Rule {
+		return rules.Rule{Match: rules.Match{Method: "GET", Path: "/flaky"},
+			When:    &rules.When{Chance: 50},
+			Respond: rules.Respond{Status: 500, Body: &rules.Body{Inline: map[string]any{"flake": true}}}}
+	}
+	m := &manifest.Manifest{
+		Version: 1,
+		RNGSeed: 42,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"api":     {Rules: []rules.Rule{flaky()}},
+			"billing": {Rules: []rules.Rule{flaky()}},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	collect := func(svc string) string {
+		h := e.serviceHandler(svc, m.Services[svc])
+		srv := httptest.NewServer(requestlog.NewRecorder(e.reqLog, svc, e.seq).Wrap(h))
+		t.Cleanup(srv.Close)
+		out := ""
+		for i := 0; i < 20; i++ {
+			_, status := get(t, srv.URL+"/flaky")
+			if status == 500 {
+				out += "F"
+			} else {
+				out += "."
+			}
+		}
+		return out
+	}
+	a, b := collect("api"), collect("billing")
+	if a == b {
+		t.Fatalf("services produced IDENTICAL chance sequences (%s) — correlated failures", a)
+	}
+}
+
+// Regression (audit): empty catalog collections must serialize as [] not
+// null — naive JSON fixtures index them directly.
+func TestProfileCatalogEmptyCollectionsSerializeAsArrays(t *testing.T) {
+	m := profileManifest(t)
+	m.Profiles = nil // no presets
+	delete(m.Services, "other")
+	delete(m.Services, "hello")
+	m.Services["solo"] = manifest.Service{Rules: []rules.Rule{{Match: rules.Match{Path: "/"}, Respond: rules.Respond{Status: 200}}}}
+	e, err := New(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(e.ProfileSnapshot())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"presets":[]`) {
+		t.Fatalf("presets serialized as null: %s", string(data))
 	}
 }

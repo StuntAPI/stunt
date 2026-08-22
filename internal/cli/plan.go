@@ -16,6 +16,7 @@ import (
 	"stuntapi.com/stunt/internal/adapter/runtime"
 	"stuntapi.com/stunt/internal/adapterdist"
 	"stuntapi.com/stunt/internal/manifest"
+	"stuntapi.com/stunt/internal/primitives/clock"
 	"stuntapi.com/stunt/internal/starlark"
 )
 
@@ -245,8 +246,13 @@ func planResolveAdapter(spec, manifestDir string) (*adapter.Adapter, error) {
 func planCheckHandlers(out interface{ Write([]byte) (int, error) }, serviceName string, a *adapter.Adapter) {
 	// Dummy builtins so name resolution passes during compilation — handler
 	// scripts reference store_collection etc. which must resolve at compile
-	// time even though we never call them.
-	dummyBuiltins := runtime.BuildAllBuiltins(runtime.BuiltinOptions{})
+	// time even though we never call them. A real clock is required:
+	// buildClockBuiltins(nil) registers NO clock module, and most adapters
+	// call clock.now_unix() — plan-time resolution then fails for every
+	// such script while `stunt up` runs them fine (audit: 158 bogus
+	// warnings on stripe-style). Handlers are never invoked here, so the
+	// wall clock is inert.
+	dummyBuiltins := runtime.BuildAllBuiltins(runtime.BuiltinOptions{Clock: clock.NewClock()})
 
 	check := func(spec string) {
 		if spec == "" {

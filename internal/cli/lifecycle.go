@@ -45,6 +45,33 @@ func writeRuntimeFile(manifestDir string, rt RuntimeFile) error {
 	return os.WriteFile(runtimeFilePath(manifestDir), data, 0o644)
 }
 
+// manifestAbs returns the absolute manifest path — the identity key for
+// runtime files and registry entries. Relative paths made same-named
+// manifests in different dirs indistinguishable in `stunt ps`.
+func manifestAbs(p string) string {
+	if abs, err := filepath.Abs(p); err == nil {
+		return abs
+	}
+	return p
+}
+
+// readRuntimeFileFor reads this manifest's runtime file and REFUSES one
+// written by a different manifest in the same directory: a second `stunt
+// up` with another manifest overwrites <dir>/.stunt/runtime/up.json, and
+// acting on it silently stops or drives the WRONG server (audit finding —
+// `stunt down` killed the other manifest's server and reported success).
+func readRuntimeFileFor(manifestPath string) (*RuntimeFile, error) {
+	rt, err := readRuntimeFile(manifestDir(manifestPath))
+	if err != nil {
+		return nil, err
+	}
+	if rt.Manifest != "" && manifestAbs(rt.Manifest) != manifestAbs(manifestPath) {
+		return nil, fmt.Errorf("runtime file in %s belongs to %s, not %s — a second stunt up in this directory overwrote it; pass --url/--token or stop by pid via `stunt ps`",
+			manifestDir(manifestPath), rt.Manifest, manifestPath)
+	}
+	return rt, nil
+}
+
 // readRuntimeFile reads and parses the runtime file. Returns an error
 // wrapping os.ErrNotExist if the file does not exist.
 func readRuntimeFile(manifestDir string) (*RuntimeFile, error) {
