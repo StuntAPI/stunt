@@ -19,6 +19,26 @@ def on_list_projects(req):
 
     return respond(200, projects)
 
+# on_search_projects serves GET /rest/api/3/project/search — the modern
+# paginated form real clients (jira.js v6+) call instead of the bare list.
+def on_search_projects(req):
+    _, err = _require_auth(req)
+    if err != None:
+        return err
+
+    c = store_collection("projects")
+    docs = c.list()
+    projects = []
+    for d in docs:
+        projects.append(_project_summary(d))
+
+    return respond(200, {
+        "isLast": True,
+        "maxResults": 50,
+        "total": len(projects),
+        "values": projects,
+    })
+
 def on_get_project(req):
     _, err = _require_auth(req)
     if err != None:

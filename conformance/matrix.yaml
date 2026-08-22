@@ -555,6 +555,7 @@ adapters:
       - "No comment replies, delete, hide, or moderation endpoints"
   jira-style:
     deviations:
+      - "Comment bodies are plain strings, not Atlassian Document Format objects"
       - "JQL subset: parenthesised grouping unsupported; unknown fields 400"
       - "JQL dates compare as ISO-8601 strings, not parsed datetimes"
       - "Single fixed simplified workflow for all projects; real workflows are configurable"

@@ -67,3 +67,62 @@ def _issue_shape(d):
         "self": "https://mock-jira.atlassian.net/rest/api/3/issue/" + d.get("id", ""),
         "fields": d.get("fields", {}),
     }
+
+
+# on_search_jql serves POST /rest/api/3/search/jql — the enhanced-search
+# endpoint (jira.js v6+, /rest/api/3/search/jql) over the same JQL subset.
+# Body: {jql, maxResults?, nextPageToken?}; token paging is offset-encoded.
+def on_search_jql(req):
+    _, err = _require_auth(req)
+    if err != None:
+        return err
+
+    body = req["body"]
+    if body == None:
+        body = {}
+    jql = body.get("jql", "")
+    if jql == None:
+        jql = ""
+    parsed = _jql_parse(jql)
+    if parsed == None:
+        return respond(400, {
+            "errorMessages": ["Error in the JQL Query: The query '" + jql + "' is not valid. Check the fields and syntax."],
+            "errors": {},
+        })
+
+    c = store_collection("issues")
+    matched = []
+    for d in c.list():
+        if _jql_matches(d, parsed["groups"]):
+            matched.append(d)
+    order = parsed["order"]
+    for i in range(len(order) - 1, -1, -1):
+        matched = query_select(matched, None, order[i][0], order[i][1], None, None, None)
+
+    # JSON numbers arrive as ints, not strings — normalize before _to_int.
+    max_raw = body.get("maxResults", "50")
+    if type(max_raw) == "float" or type(max_raw) == "int":
+        max_results = int(max_raw)
+    else:
+        max_results = _to_int(max_raw)
+    if max_results <= 0:
+        max_results = 50
+    offset = 0
+    token = body.get("nextPageToken", "")
+    if token != None and token != "":
+        if type(token) == "float" or type(token) == "int":
+            offset = int(token)
+        else:
+            offset = _to_int(token)
+        if offset < 0:
+            offset = 0
+    paged = query_select(matched, None, None, None, max_results, offset, None)
+
+    issues = []
+    for d in paged:
+        issues.append(_issue_shape(d))
+
+    out = {"issues": issues}
+    if offset + len(paged) < len(matched):
+        out["nextPageToken"] = str(offset + len(paged))
+    return respond(200, out)

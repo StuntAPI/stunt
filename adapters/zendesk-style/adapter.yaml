@@ -16,6 +16,63 @@ api:
 # NOTE: literal routes must come BEFORE parameterized routes so they are
 # matched first (the dispatch engine checks in declaration order).
 endpoints:
+  # Canonical .json aliases — real Zendesk serves every resource at
+  # both forms and official clients (node-zendesk) request the .json one.
+  - route: /api/v2/tickets.json
+    method: GET
+    handler: scripts/tickets.star#on_list
+  - route: /api/v2/tickets.json
+    method: POST
+    handler: scripts/tickets.star#on_create
+  - route: /api/v2/tickets/{id}/comments.json
+    method: POST
+    handler: scripts/tickets.star#on_add_comment
+  - route: /api/v2/tickets/{id}/comments.json
+    method: GET
+    handler: scripts/tickets.star#on_list_comments
+  - route: /api/v2/tickets/{id}/tags.json
+    method: POST
+    handler: scripts/tickets.star#on_set_tags
+  - route: /api/v2/tickets/{id}.json
+    method: GET
+    handler: scripts/tickets.star#on_get
+  - route: /api/v2/tickets/{id}.json
+    method: PUT
+    handler: scripts/tickets.star#on_update
+  - route: /api/v2/tickets/{id}.json
+    method: DELETE
+    handler: scripts/tickets.star#on_delete
+  - route: /api/v2/users.json
+    method: GET
+    handler: scripts/users.star#on_list_users
+  - route: /api/v2/organizations.json
+    method: GET
+    handler: scripts/users.star#on_list_organizations
+  - route: /api/v2/groups.json
+    method: GET
+    handler: scripts/users.star#on_list_groups
+  - route: /api/v2/requests.json
+    method: GET
+    handler: scripts/tickets.star#on_list_requests
+  - route: /api/v2/views.json
+    method: GET
+    handler: scripts/users.star#on_list_views
+  - route: /api/v2/triggers.json
+    method: GET
+    handler: scripts/users.star#on_list_triggers
+  - route: /api/v2/webhooks.json
+    method: GET
+    handler: scripts/webhooks.star#on_list_webhooks
+  - route: /api/v2/webhooks.json
+    method: POST
+    handler: scripts/webhooks.star#on_create_webhook
+  - route: /api/v2/webhooks/{id}.json
+    method: DELETE
+    handler: scripts/webhooks.star#on_delete_webhook
+  - route: /api/v2/suspended_tickets.json
+    method: GET
+    handler: scripts/tickets.star#on_list_suspended
+
   # --- Tickets ---
   - route: /api/v2/tickets
     method: GET

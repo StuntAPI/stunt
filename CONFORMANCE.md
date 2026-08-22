@@ -21,7 +21,7 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**98 adapters** — 2 SDK+VM, 15 SDK-only, 4 VM-only, 77 boot-tier.
+**98 adapters** — 2 SDK+VM, 18 SDK-only, 4 VM-only, 74 boot-tier.
 
 | Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |
 |---|---|---|---|---|---|---|---|
@@ -76,7 +76,7 @@ Verification tiers:
 | [hn-style](adapters/hn-style/) | Hacker News Firebase API `v0` | 11 | boot | — | — | [3](#hn-style) | [2](#hn-style) |
 | [hubspot-style](adapters/hubspot-style/) | HubSpot CRM API `v3` | 33 | SDK | hubspot-node @ 14.0.1 (floor) | 5 | [4](#hubspot-style) | — |
 | [instagram-style](adapters/instagram-style/) | Instagram Graph API `v21.0` | 10 | boot | — | — | [4](#instagram-style) | [2](#instagram-style) |
-| [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 18 | boot | — | — | [5](#jira-style) | [4](#jira-style) |
+| [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 34 | SDK | jira-js @ 6.1.0 (floor) | 7 | [5](#jira-style) | [5](#jira-style) |
 | [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | boot | — | — | [3](#jumio-style) | [4](#jumio-style) |
 | [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | boot | — | — | [4](#linkedin-style) | [1](#linkedin-style) |
 | [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | SDK | openai-node @ 7.5.0 (floor) | 2 | [4](#llm-style) | [3](#llm-style) |
@@ -100,7 +100,7 @@ Verification tiers:
 | [reddit-style](adapters/reddit-style/) | Reddit API `1.0` | 2 | boot | — | — | [5](#reddit-style) | [1](#reddit-style) |
 | [resend-style](adapters/resend-style/) | Resend API `1.0.0` | 6 | SDK | resend-node @ 6.22.0 (floor) | 4 | [6](#resend-style) | [3](#resend-style) |
 | [revenuecat-style](adapters/revenuecat-style/) | RevenueCat API `v1` | 7 | boot | — | — | [5](#revenuecat-style) | [4](#revenuecat-style) |
-| [salesforce-style](adapters/salesforce-style/) | Salesforce REST API `v60.0` | 29 | boot | — | — | [7](#salesforce-style) | [3](#salesforce-style) |
+| [salesforce-style](adapters/salesforce-style/) | Salesforce REST API `v60.0` | 29 | SDK | jsforce @ 3.10.22 (floor) | 6 | [7](#salesforce-style) | [3](#salesforce-style) |
 | [sendgrid-style](adapters/sendgrid-style/) | Twilio SendGrid v3 API `v3` | 5 | boot | — | — | [7](#sendgrid-style) | [5](#sendgrid-style) |
 | [servicenow-style](adapters/servicenow-style/) | ServiceNow Table API `2` | 44 | boot | — | — | [5](#servicenow-style) | [1](#servicenow-style) |
 | [shopify-style](adapters/shopify-style/) | Shopify Admin REST + GraphQL API `2024-10` | 21 +GQL | SDK | go-shopify/v4 @ v4.7.0 | 5 | [7](#shopify-style) | [4](#shopify-style) |
@@ -121,7 +121,7 @@ Verification tiers:
 | [x-articles-style](adapters/x-articles-style/) | X (Twitter) Articles API `v2` | 8 | boot | — | — | [4](#x-articles-style) | [1](#x-articles-style) |
 | [xero-style](adapters/xero-style/) | Xero Accounting API `2.0` | 15 | boot | — | — | [6](#xero-style) | [2](#xero-style) |
 | [youtube-style](adapters/youtube-style/) | YouTube Data API `v3` | 13 | boot | — | — | [7](#youtube-style) | [2](#youtube-style) |
-| [zendesk-style](adapters/zendesk-style/) | Zendesk REST API `2` | 19 | boot | — | — | [8](#zendesk-style) | [5](#zendesk-style) |
+| [zendesk-style](adapters/zendesk-style/) | Zendesk REST API `2` | 37 | SDK | node-zendesk @ 6.0.1 (floor) | 6 | [8](#zendesk-style) | [5](#zendesk-style) |
 | [zuora-style](adapters/zuora-style/) | Zuora REST API `v1` | 20 | boot | — | — | [8](#zuora-style) | [5](#zuora-style) |
 
 ## Verified behaviors
@@ -223,6 +223,40 @@ sections in `conformance/node/tests/*.test.ts`).
 - basicApi.update patches a property
 - searchApi.doSearch finds the record by name
 - archive hides the record from reads
+
+### jira-js @ 6.1.0 (floor)
+
+**jira-style**
+
+- myself + project resolve
+- create assigns a TEST-n key
+- get round-trips; edit persists
+- JQL search finds it
+- add comment + list
+- transition moves the status
+- delete removes it
+
+### jsforce @ 3.10.22 (floor)
+
+**salesforce-style**
+
+- password grant mints a session; the adapter echoes our host as instance_url (like real Salesforce), which becomes jsforce's API base for every call below
+- sobject create assigns an id
+- retrieve round-trips the fields
+- update patches and persists
+- SOQL through the SDK's query parser
+- destroy removes the record
+
+### node-zendesk @ 6.0.1 (floor)
+
+**zendesk-style**
+
+- create assigns a numeric id
+- show round-trips; status update persists
+- comment created at ticket-create time is readable
+- list includes the ticket
+- substring search finds it by subject
+- delete removes it
 
 ### octokit @ 5.0.5 (floor)
 
@@ -2160,7 +2194,7 @@ behavior notes live in each adapter's README.
 
 ### jira-style
 
-**Covered** — 18 routes
+**Covered** — 34 routes
 
 <details><summary>Routes</summary>
 
@@ -2169,7 +2203,9 @@ behavior notes live in each adapter's README.
 | GET | `/rest/api/3/myself` |
 | GET | `/rest/api/3/serverInfo` |
 | GET | `/rest/api/3/project` |
+| GET | `/rest/api/3/project/search` |
 | GET | `/rest/api/3/project/{key}` |
+| POST | `/rest/api/3/search/jql` |
 | GET | `/rest/api/3/search` |
 | POST | `/rest/api/3/issue` |
 | GET | `/rest/api/3/issue/{key}` |
@@ -2177,7 +2213,21 @@ behavior notes live in each adapter's README.
 | DELETE | `/rest/api/3/issue/{key}` |
 | GET | `/rest/api/3/issue/{key}/transitions` |
 | POST | `/rest/api/3/issue/{key}/transitions` |
+| POST | `/rest/api/2/issue` |
+| GET | `/rest/api/2/issue/{key}` |
+| PUT | `/rest/api/2/issue/{key}` |
+| DELETE | `/rest/api/2/issue/{key}` |
+| GET | `/rest/api/2/issue/{key}/transitions` |
+| POST | `/rest/api/2/issue/{key}/transitions` |
+| GET | `/rest/api/2/issue/{key}/comment` |
+| GET | `/rest/api/2/issue/{key}/comment/{id}` |
+| POST | `/rest/api/2/issue/{key}/comment` |
+| PUT | `/rest/api/2/issue/{key}/comment/{id}` |
+| DELETE | `/rest/api/2/issue/{key}/comment/{id}` |
+| GET | `/rest/api/2/issue/{key}/comment` |
+| POST | `/rest/api/2/issue/{key}/comment` |
 | GET | `/rest/api/3/issue/{key}/comment` |
+| GET | `/rest/api/3/issue/{key}/comment/{id}` |
 | POST | `/rest/api/3/issue/{key}/comment` |
 | PUT | `/rest/api/3/issue/{key}/comment/{id}` |
 | DELETE | `/rest/api/3/issue/{key}/comment/{id}` |
@@ -2195,8 +2245,9 @@ behavior notes live in each adapter's README.
 - No users search, avatars, or notification endpoints
 - No workflow or field configuration management endpoints
 
-**Deviations** (4)
+**Deviations** (5)
 
+- Comment bodies are plain strings, not Atlassian Document Format objects
 - JQL subset: parenthesised grouping unsupported; unknown fields 400
 - JQL dates compare as ISO-8601 strings, not parsed datetimes
 - Single fixed simplified workflow for all projects; real workflows are configurable
@@ -3923,12 +3974,30 @@ behavior notes live in each adapter's README.
 
 ### zendesk-style
 
-**Covered** — 19 routes
+**Covered** — 37 routes
 
 <details><summary>Routes</summary>
 
 | Method | Route |
 |---|---|
+| GET | `/api/v2/tickets.json` |
+| POST | `/api/v2/tickets.json` |
+| POST | `/api/v2/tickets/{id}/comments.json` |
+| GET | `/api/v2/tickets/{id}/comments.json` |
+| POST | `/api/v2/tickets/{id}/tags.json` |
+| GET | `/api/v2/tickets/{id}.json` |
+| PUT | `/api/v2/tickets/{id}.json` |
+| DELETE | `/api/v2/tickets/{id}.json` |
+| GET | `/api/v2/users.json` |
+| GET | `/api/v2/organizations.json` |
+| GET | `/api/v2/groups.json` |
+| GET | `/api/v2/requests.json` |
+| GET | `/api/v2/views.json` |
+| GET | `/api/v2/triggers.json` |
+| GET | `/api/v2/webhooks.json` |
+| POST | `/api/v2/webhooks.json` |
+| DELETE | `/api/v2/webhooks/{id}.json` |
+| GET | `/api/v2/suspended_tickets.json` |
 | GET | `/api/v2/tickets` |
 | POST | `/api/v2/tickets` |
 | POST | `/api/v2/tickets/{id}/comments` |
