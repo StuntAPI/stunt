@@ -74,7 +74,9 @@ def on_upload(req):
         "id": file_id,
         "name": name,
         "mimeType": mime_type,
-        "size": size,
+        # size is int64-as-string, like the real API (SDK int64 fields are
+        # declared ,string — a bare JSON number fails their decode).
+        "size": str(size),
         "createdTime": _now(),
         "modifiedTime": _now(),
         "trashed": False,
@@ -104,7 +106,8 @@ def on_create_metadata(req):
         "id": file_id,
         "name": name,
         "mimeType": mime_type,
-        "size": 0,
+        # size is int64-as-string, like the real API (see on_upload).
+        "size": "0",
         "createdTime": _now(),
         "modifiedTime": _now(),
         "trashed": False,
@@ -689,7 +692,8 @@ def on_resumable_chunk(req):
             "id": file_id,
             "name": sess.get("name", "untitled"),
             "mimeType": sess.get("mimeType", "application/octet-stream"),
-            "size": len(full),
+            # size is int64-as-string, like the real API (see on_upload).
+            "size": str(len(full)),
             "createdTime": _now(),
             "modifiedTime": _now(),
             "trashed": False,

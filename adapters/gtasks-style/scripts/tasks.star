@@ -116,6 +116,14 @@ def on_update_task(req):
         if val != None:
             task[field] = val
 
+    # The real API derives completed from status: flipping to completed stamps
+    # it, flipping back to needsAction clears it (clients never send it).
+    status = task.get("status", None)
+    if status == "completed" and task.get("completed", None) == None:
+        task["completed"] = _now_ms()
+    elif status != "completed":
+        task["completed"] = None
+
     task["updated"] = _now_ms()
 
     tc = store_collection("tasks")
@@ -156,15 +164,23 @@ def on_move_task(req):
     if body == None:
         body = {}
 
-    # Move updates parent and previous (for positioning in the tree).
-    parent = body.get("parent", None)
+    # The real move endpoint takes parent/previous as QUERY params; the body
+    # form is kept as a fallback so direct curl callers keep working.
+    parent = req["query"].get("parent", None)
+    if parent == None or parent == "":
+        parent = body.get("parent", None)
     if parent != None:
         task["parent"] = parent
 
-    previous = body.get("previous", None)
-    if previous != None:
-        # Assign a new position based on the previous task.
-        new_pos = store_kv_incr("gtasks", "move_seq") + 1
+    previous = req["query"].get("previous", None)
+    if previous == None or previous == "":
+        previous = body.get("previous", None)
+    if previous != None and previous != "":
+        # Assign a new position based on the previous task. It draws from the
+        # same counter as create so every position stays unique — a private
+        # move counter can collide with a task's own position and report a
+        # no-op reorder.
+        new_pos = store_kv_incr("gtasks", "task_seq") + 1
         task["position"] = str(new_pos * 1000)
 
     task["updated"] = _now_ms()

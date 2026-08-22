@@ -4,7 +4,8 @@
 # PUT    /v4/spreadsheets/{spreadsheetId}/values/{range}           → write cells
 # POST   /v4/spreadsheets/{spreadsheetId}/values/{range}:append    → append rows
 # POST   /v4/spreadsheets/{spreadsheetId}/values/{range}:clear     → clear cells
-# POST   /v4/spreadsheets/{spreadsheetId}/values:batchGet          → multi-range read
+# GET    /v4/spreadsheets/{spreadsheetId}/values:batchGet          → multi-range read
+# POST   /v4/spreadsheets/{spreadsheetId}/values:batchGet          → multi-range read (body form)
 # POST   /v4/spreadsheets/{spreadsheetId}/values:batchUpdate       → multi-range write
 #
 # STATEFUL: cells written via PUT are readable by a subsequent GET. The grid
@@ -232,7 +233,10 @@ def _clear_values(req, range_str):
         "clearedCells": cleared,
     })
 
-# on_batch_get reads multiple ranges in a single request.
+# on_batch_get reads multiple ranges in a single request. The real API is a
+# GET with ranges as repeated query params; the POST form (ranges in the
+# body) is kept for direct callers. Repeated query keys collapse to their
+# first value, so a GET with several ranges reads only the first.
 def on_batch_get(req):
     err = _require_bearer(req)
     if err != None:
@@ -251,9 +255,13 @@ def on_batch_get(req):
     ranges = body.get("ranges", [])
     if ranges == None:
         ranges = []
+    if len(ranges) == 0:
+        first = req["query"].get("ranges", "")
+        if first != None and first != "":
+            ranges = [first]
     major = body.get("majorDimension", "")
-    if major == None:
-        major = ""
+    if major == None or major == "":
+        major = req["query"].get("majorDimension", "")
     out_dimension = "ROWS"
     if major == "COLUMNS":
         out_dimension = "COLUMNS"

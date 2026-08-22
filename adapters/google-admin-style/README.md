@@ -46,7 +46,7 @@ Applied before paging, like the real API:
 
 ### Seeded data
 
-The directory self-seeds on first use: three users (`admin@`, `alice@`, `bob@mock-domain.com` — Bob is suspended) and two groups (`engineering@`, `all-staff@mock-domain.com`) with four members. Creating a user or group with an email that already exists returns a Google-style `409` duplicate error.
+The directory self-seeds on first use (insert-once, regardless of which endpoint is hit first): three users (`admin@`, `alice@`, `bob@mock-domain.com` — Bob is suspended) and two groups (`engineering@`, `all-staff@mock-domain.com`) with four members. Creating a user or group with an email that already exists returns a Google-style `409` duplicate error.
 
 ## Key shapes
 
@@ -63,7 +63,8 @@ against the `tokens` collection**: unknown tokens — and tokens whose stored
 (`{"error":{"code":401,"message":"Login Required.","errors":[{"message":"Login Required.","domain":"global","reason":"required"}]}}`).
 A static convenience token,
 `ya29.mock-admin-token`, is seeded on first use with a far-future expiry for
-quick local testing.
+quick local testing (`conformance-token` is seeded the same way for the
+conformance suite).
 
 ## Usage
 

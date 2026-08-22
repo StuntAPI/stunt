@@ -1,12 +1,12 @@
 {
   "summary": {
     "adapters": 98,
-    "checks": 109,
+    "checks": 166,
     "tiers": {
       "sdk_and_vm": 2,
-      "sdk_only": 18,
+      "sdk_only": 25,
       "vm_only": 4,
-      "boot": 74
+      "boot": 67
     }
   },
   "adapters": [
@@ -1763,9 +1763,23 @@
       "api_name": "Google Drive API",
       "api_version": "v3",
       "routes": 13,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "google-api-go-client",
+          "version": "v0.293.0"
+        }
+      ],
+      "behaviors": [
+        "Files.List returns the seeded folder",
+        "Files.Create + Files.List round-trip",
+        "Files.Get returns the created metadata (int64 size decodes)",
+        "Files.Update renames the file",
+        "Files.List q= filters by mimeType and parents",
+        "Files.List PageSize + PageToken walk pages",
+        "Files.Delete then Get -\u003e googleapi 404",
+        "Changes.List replays mutations from startPageToken"
+      ],
       "missing": [
         "No permissions/sharing endpoints on files (GET/POST/DELETE permissions)",
         "No comments or replies endpoints (/files/{id}/comments)",
@@ -1778,7 +1792,9 @@
       "deviations": [
         "uploads take JSON {name, content, parents}; real Drive uses multipart/related bodies",
         "list q is a limited field/op subset; queries outside it 400 rather than running",
-        "orderBy honors only the first recognized key; real Drive applies every key"
+        "orderBy honors only the first recognized key; real Drive applies every key",
+        "metadata-only files.create defaults mimeType to the folder type when absent; real Drive defaults to a plain file",
+        "?alt=media on a content-less file returns 404; real Drive serves 200 with an empty body"
       ],
       "covered": [
         {
@@ -2662,9 +2678,23 @@
       "api_name": "Google Calendar API",
       "api_version": "v3",
       "routes": 10,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "google-api-go-client",
+          "version": "v0.293.0"
+        }
+      ],
+      "behaviors": [
+        "Calendars.Get resolves the primary calendar",
+        "CalendarList.List returns the seeded primary entry",
+        "Events.Insert + Events.Get round-trip the event body",
+        "Events.List Q matches summary/description text",
+        "Events.List MaxResults + PageToken walk pages",
+        "Events.Patch updates fields and bumps sequence + etag",
+        "Events.Instances expands an RRULE into per-occurrence events",
+        "Events.Delete then Get -\u003e googleapi 404"
+      ],
       "missing": [
         "No RRULE MONTHLY/YEARLY frequencies or BY* parts (BYDAY, BYSETPOS)",
         "No calendars CRUD or calendarList/ACL write endpoints",
@@ -2672,7 +2702,8 @@
         "No colors or users.settings endpoints"
       ],
       "deviations": [
-        "Event create without start/end defaults them (now+30m, +90m); real API requires both"
+        "Event create without start/end defaults them (now+30m, +90m); real API requires both",
+        "quickAdd uses the text verbatim as the summary with a now+30m slot; real Calendar parses natural-language dates"
       ],
       "covered": [
         {
@@ -2906,9 +2937,24 @@
       "api_name": "Gmail API",
       "api_version": "v1",
       "routes": 16,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "google-api-go-client",
+          "version": "v0.293.0"
+        }
+      ],
+      "behaviors": [
+        "Labels.List returns seeded system labels",
+        "Labels.Create + Labels.List round-trip",
+        "Messages.Send raw rfc822 -\u003e id + threadId",
+        "Messages.Get parses the sent raw message into payload headers",
+        "Messages.List includes sent messages",
+        "Messages.List MaxResults + PageToken walk pages",
+        "Messages.Modify AddLabelIds applies",
+        "Messages.Get Format=metadata returns headers without body",
+        "Messages.Delete then Get -\u003e googleapi 404"
+      ],
       "missing": [
         "No Gmail search operators (from:, to:, after:, has:attachment) in q",
         "No threads.list, history.list, or watch/stop push endpoints",
@@ -2994,9 +3040,23 @@
       "api_name": "Google Admin SDK Directory API",
       "api_version": "directory_v1",
       "routes": 13,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "google-api-go-client",
+          "version": "v0.293.0"
+        }
+      ],
+      "behaviors": [
+        "Users.List Customer=my_customer returns the seeded directory",
+        "Users.Insert + Users.Get round-trip by numeric id and email",
+        "Users.List Domain narrows to a single email domain",
+        "Users.List Query isSuspended=true returns only suspended users",
+        "Users.Update renames the primary email; old key stops resolving",
+        "Users.Delete then Get -\u003e decoded googleapi 404",
+        "Groups.Insert + Members.Insert + Members.List round-trip",
+        "Groups.List UserKey returns only the groups holding that member"
+      ],
       "missing": [
         "No orgunits, roles, roleAssignments, or schemas resources",
         "No asps, verificationCodes, mobileDevices, or chromeosDevices",
@@ -3006,7 +3066,8 @@
       "deviations": [
         "Users query supports bare terms plus email:/name:/orgUnitPath=/isSuspended= only",
         "Groups query silently ignores unrecognized query forms",
-        "Static convenience token ya29.mock-admin-token seeded far-future"
+        "Static convenience tokens (ya29.mock-admin-token, conformance-token) seeded far-future",
+        "users.list ignores customer/domain exactly-one-of enforcement; real Directory requires one"
       ],
       "covered": [
         {
@@ -3240,21 +3301,43 @@
       "id": "gsheets-style",
       "api_name": "Google Sheets API",
       "api_version": "v4",
-      "routes": 9,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "routes": 10,
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "google-api-go-client",
+          "version": "v0.293.0"
+        }
+      ],
+      "behaviors": [
+        "Spreadsheets.Create + Get round-trip",
+        "Values.Update + Values.Get round-trip an A1 range",
+        "Values.Get MajorDimension=COLUMNS transposes the grid",
+        "Values.Append writes after the last populated row",
+        "Values.BatchUpdate writes multiple ranges in one call",
+        "Values.BatchGet reads a range over GET query params",
+        "Spreadsheets.BatchUpdate addSheet adds a tab Values can write to",
+        "Get on an unknown spreadsheet -\u003e googleapi 404"
+      ],
       "missing": [
         "No row-only A1 ranges (1:5) or quoted sheet titles",
         "No copyTo, named ranges, developer metadata, or byDataFilter endpoints",
         "batchUpdate limited to 4 request types; no insertDimension, mergeCells, sortRange",
         "No valueRenderOption or dateTimeRenderOption on values reads"
       ],
-      "deviations": [],
+      "deviations": [
+        "Repeated ranges query params collapse to the first value (engine query params are single-valued)",
+        "Cell values always come back as strings; numeric cells stringify as floats (42 -\u003e \"42.0\"), no USER_ENTERED/RAW typing",
+        "Spreadsheet get ignores fields= and returns the full object"
+      ],
       "covered": [
         {
           "method": "POST",
           "route": "/v4/spreadsheets"
+        },
+        {
+          "method": "GET",
+          "route": "/v4/spreadsheets/{spreadsheetId}/values:batchGet"
         },
         {
           "method": "POST",
@@ -3294,17 +3377,42 @@
       "id": "gtasks-style",
       "api_name": "Google Tasks API",
       "api_version": "v1",
-      "routes": 9,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "routes": 11,
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "google-api-go-client",
+          "version": "v0.293.0"
+        }
+      ],
+      "behaviors": [
+        "Tasklists.List returns the seeded default list",
+        "Tasklists.Insert + Tasklists.List round-trip",
+        "Tasks.Insert + Tasks.Get round-trip fields",
+        "Tasks.Patch status=completed derives the completed stamp",
+        "Tasks.List ShowCompleted=false hides completed tasks",
+        "Tasks.Move Parent/Previous re-parents and repositions",
+        "Tasks.List MaxResults + PageToken walk pages",
+        "Tasks.Delete then Tasks.Get -\u003e googleapi 404"
+      ],
       "missing": [
         "No task-list get, patch, or delete endpoints",
         "No tasks.clear endpoint",
         "showDeleted/showHidden/showAssigned list params unmodeled"
       ],
-      "deviations": [],
+      "deviations": [
+        "Responses omit the kind field (tasks#task, tasks#taskList); SDKs decode fine without it",
+        "tasks.insert ignores a client-sent status/completed (always needsAction); due is stored verbatim"
+      ],
       "covered": [
+        {
+          "method": "GET",
+          "route": "/tasks/v1/users/@me/lists"
+        },
+        {
+          "method": "POST",
+          "route": "/tasks/v1/users/@me/lists"
+        },
         {
           "method": "GET",
           "route": "/tasks/v1/lists"
@@ -7500,10 +7608,24 @@
       "id": "youtube-style",
       "api_name": "YouTube Data API",
       "api_version": "v3",
-      "routes": 13,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "routes": 14,
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "google-api-go-client",
+          "version": "v0.293.0"
+        }
+      ],
+      "behaviors": [
+        "OAuth2 authorize + exchange mint the access token the SDK presents",
+        "Videos.Insert metadata-only + Videos.List id= round-trip with part projection",
+        "Videos.List without id lists every user video",
+        "Videos.List MaxResults + PageToken walk pages",
+        "Channels.List mine=true returns the authenticated user's channel",
+        "Playlists.Insert + Playlists.List mine=true round-trip",
+        "PlaylistItems.Insert adds the video, Delete removes it",
+        "Videos.Delete -\u003e 204; re-delete surfaces a googleapi 404"
+      ],
       "missing": [
         "No search endpoint (/youtube/v3/search)",
         "No comments or commentThreads endpoints",
@@ -7540,6 +7662,10 @@
         },
         {
           "method": "GET",
+          "route": "/youtube/v3/videos"
+        },
+        {
+          "method": "POST",
           "route": "/youtube/v3/videos"
         },
         {

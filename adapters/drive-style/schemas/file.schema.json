@@ -18,8 +18,8 @@
       "description": "MIME type of the file content"
     },
     "size": {
-      "type": "integer",
-      "description": "Size of file content in bytes (0 for folders)"
+      "type": "string",
+      "description": "Size of file content in bytes, int64-as-string like the real API (\"0\" for folders)"
     },
     "createdTime": {
       "type": "string",

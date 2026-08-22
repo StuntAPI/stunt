@@ -149,7 +149,23 @@ def on_add_playlist_item(req):
         "user": user["sub"],
     })
 
-    return respond(200, {"id": item_id})
+    # Real API returns the full resource, snippet included.
+    vsnip = video.get("snippet", {})
+    return respond(200, {
+        "id": item_id,
+        "playlistId": playlist_id,
+        "videoId": video_id,
+        "snippet": {
+            "playlistId": playlist_id,
+            "title": vsnip.get("title", ""),
+            "description": vsnip.get("description", ""),
+            "channelTitle": user.get("name", ""),
+            "resourceId": {
+                "kind": "youtube#video",
+                "videoId": video_id,
+            },
+        },
+    })
 
 # on_delete_playlist deletes a playlist by id.
 def on_delete_playlist(req):

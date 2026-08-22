@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -226,8 +227,8 @@ func TestDriveStyleResumableUpload(t *testing.T) {
 	if fileID == "" || file["name"] != "resumable.bin" {
 		t.Fatalf("final chunk file = %v, want id + name resumable.bin", file)
 	}
-	if file["size"] != float64(len(full)) {
-		t.Fatalf("final chunk size = %v, want %d", file["size"], len(full))
+	if file["size"] != strconv.Itoa(len(full)) {
+		t.Fatalf("final chunk size = %v, want %d (int64-as-string)", file["size"], len(full))
 	}
 
 	// Byte-exact download.
@@ -562,8 +563,8 @@ func TestDriveStyleAdapter(t *testing.T) {
 	if file["name"] != "test-document.txt" {
 		t.Fatalf("file name = %v, want test-document.txt", file["name"])
 	}
-	if file["size"] != float64(len("Hello, Drive-style world!")) {
-		t.Fatalf("file size = %v, want %d", file["size"], len("Hello, Drive-style world!"))
+	if file["size"] != strconv.Itoa(len("Hello, Drive-style world!")) {
+		t.Fatalf("file size = %v, want %d (int64-as-string)", file["size"], len("Hello, Drive-style world!"))
 	}
 	if ps, ok := file["parents"].([]any); !ok || len(ps) != 1 || ps[0] != folderID {
 		t.Fatalf("file parents = %v, want [%s]", file["parents"], folderID)

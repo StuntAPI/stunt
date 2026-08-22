@@ -16,13 +16,8 @@ def on_list_users(req):
         return err
 
     uc = store_collection("users")
+    _seed_users()
     docs = uc.list()
-
-    # Seed initial users if empty.
-    if len(docs) == 0:
-        _seed_users()
-        uc = store_collection("users")
-        docs = uc.list()
 
     users = []
     for d in docs:
@@ -58,8 +53,9 @@ def on_create_user(req):
     if email == "":
         email = "user" + str(seq) + "@mock-domain.com"
 
-    # Check for duplicate email.
+    # Seed first so duplicates are checked against the whole directory.
     uc = store_collection("users")
+    _seed_users()
     docs = uc.list()
     for d in docs:
         if d.get("primaryEmail", "") == email:
@@ -305,6 +301,7 @@ def _dig_path(d, path):
 
 def _find_user(key):
     uc = store_collection("users")
+    _seed_users()
     docs = uc.list()
     # Try by id first.
     for d in docs:
@@ -330,7 +327,13 @@ def _user_entity(d):
         "changePasswordAtNextLogin": d.get("changePasswordAtNextLogin", False),
     }
 
+# _seed_users insert-once provisions the default directory users — the
+# directory pre-exists any client call, so every first touch (list, create,
+# lookup) seeds, not just the first list.
 def _seed_users():
+    if store_kv_get("gadmin", "users_seeded") == "yes":
+        return
+    store_kv_set("gadmin", "users_seeded", "yes")
     uc = store_collection("users")
     seed = [
         {

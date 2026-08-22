@@ -23,7 +23,8 @@ upload, listing, playlists, and channels:
   until the final chunk creates the video (see
   [Resumable upload](#resumable-upload)). A plain metadata POST (no
   `uploadType=resumable`) still returns the video resource directly for
-  the simple/media path.
+  the simple/media path — served at both `/upload/youtube/v3/videos` and
+  the metadata-only request URL `/youtube/v3/videos`, like the real API.
 - **Video list:** `GET /youtube/v3/videos?id=...&part=snippet` →
   `{items:[{id, snippet:{title, description}}]}` — STATEFUL: uploaded videos
   appear here. With no `id`, returns all of the authenticated user's videos
@@ -50,6 +51,7 @@ session.
 | GET | `/o/oauth2/auth` | `oauth.star#on_authorize` | 302 redirect with code + state |
 | POST | `/o/oauth2/token` | `oauth.star#on_token` | Token exchange (auth code + refresh) |
 | POST | `/upload/youtube/v3/videos` | `videos.star#on_upload_video` | Upload video → video resource (with `?uploadType=resumable`: initiate a session → `Location`) |
+| POST | `/youtube/v3/videos` | `videos.star#on_upload_video` | Metadata-only video insert (the real API's non-upload request URL; same create as the `/upload/` path without `uploadType`) |
 | PUT | `/upload/youtube/v3/videos?uploadType=resumable&upload_id=…` | `videos.star#on_resumable_chunk` | Resumable chunk / status probe (308 + `Range` until the final chunk) |
 | DELETE | `/upload/youtube/v3/videos?uploadType=resumable&upload_id=…` | `videos.star#on_resumable_cancel` | Cancel a resumable session (499) |
 | GET | `/youtube/v3/videos` | `videos.star#on_list_videos` | List/get videos (stateful, paginated; `id` list + `part` projection honored) |
