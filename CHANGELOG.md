@@ -51,6 +51,40 @@ All notable changes to **stunt** are documented here. The format is based on
   refresh once on first use). Found live while verifying this release.
 
 
+## [0.51.2] — 2026-08-22
+
+### Testing
+
+- **SDK conformance wave 4 — aws-sdk-go-v2 against the new AWS adapters.**
+  14 capabilities, all through genuine SigV4 and the SDKs' own serialization:
+  - **dynamodb-style** — CreateTable, typed Put/Get round-trip (S/N/BOOL/SS),
+    `UpdateItem` SET+ADD with exact decimal arithmetic (10 + 0.5 → `"10.5"`),
+    ConditionExpression → typed `ConditionalCheckFailedException`, Query
+    numeric sort-key ordering (1, 2, 10 — not lexicographic), BETWEEN +
+    `ScanIndexForward=false`, Scan + FilterExpression, typed
+    `ResourceNotFoundException`.
+  - **sqs-style** — queue lifecycle, send/receive with client-validated
+    checksums, visibility hide → expire → redeliver, delete-by-receipt-handle,
+    batch correlation, typed `QueueDoesNotExist` — with middleware asserting
+    the SDK targets the adapter instance, not the regional endpoint.
+
+### Engine
+
+- **`crypto.md5(data, encoding?)`** — protocol CHECKSUMS only (never
+  signatures; documented as such). Unblocked by, and required for, the fix
+  below.
+
+### Adapters
+
+- **sqs-style: `MD5OfMessageBody` is now the REAL MD5.** The SDK
+  conformance suite exposed that provider SDKs validate it client-side and
+  hard-fail on the previously documented SHA-256 stand-in — the genuine
+  aws-sdk-go-v2 client simply rejected our responses. `MD5OfMessageAttributes`
+  is omitted (the compound length-prefixed encoding is not reproduced; SDKs
+  skip validation on a missing field — verified against sqs@v1.46.7).
+  Transport docs corrected: boto3 resolves the queue URL as the endpoint;
+  the aws Go SDK always targets `POST /` with `QueueUrl` in the body.
+
 ## [0.51.1] — 2026-08-22
 
 ### Fixed (audit hardening round — the v0.51.0 build predates it)
