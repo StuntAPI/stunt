@@ -70,12 +70,12 @@ func run(root string) error {
 	for i, a := range adapters {
 		ids[i] = a.ID
 	}
-	deviations, err := loadSidecar(filepath.Join(root, "conformance", "matrix.yaml"), ids)
+	gaps, err := loadSidecar(filepath.Join(root, "conformance", "matrix.yaml"), ids)
 	if err != nil {
 		return err
 	}
 
-	doc, err := render(adapters, checks, sdkVer, deviations, root)
+	doc, err := render(adapters, checks, sdkVer, gaps, root)
 	if err != nil {
 		return err
 	}
@@ -264,6 +264,14 @@ var (
 
 type sidecarAdapter struct {
 	Deviations []string `yaml:"deviations"`
+	Missing    []string `yaml:"missing"`
+}
+
+// gapEntry is the curated gap record for one adapter: capabilities of the
+// real API that are absent (missing) vs covered-but-different (deviations).
+type gapEntry struct {
+	Deviations []string
+	Missing    []string
 }
 
 type sidecar struct {
@@ -272,7 +280,7 @@ type sidecar struct {
 
 // loadSidecar validates that the sidecar covers exactly the given adapter
 // ids: a stale entry or a missing adapter is an error, never a silent hole.
-func loadSidecar(path string, ids []string) (map[string][]string, error) {
+func loadSidecar(path string, ids []string) (map[string]gapEntry, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -290,13 +298,13 @@ func loadSidecar(path string, ids []string) (map[string][]string, error) {
 			return nil, fmt.Errorf("%s: entry %q matches no adapter — stale entry", path, id)
 		}
 	}
-	out := map[string][]string{}
+	out := map[string]gapEntry{}
 	for _, id := range ids {
 		entry, ok := sc.Adapters[id]
 		if !ok {
-			return nil, fmt.Errorf("%s: adapter %q has no entry — every adapter must carry a deviations list (empty is fine)", path, id)
+			return nil, fmt.Errorf("%s: adapter %q has no entry — every adapter must carry deviations and missing lists (empty is fine)", path, id)
 		}
-		out[id] = entry.Deviations
+		out[id] = gapEntry{Deviations: entry.Deviations, Missing: entry.Missing}
 	}
 	return out, nil
 }
@@ -366,7 +374,7 @@ type sdkGroup struct {
 	byAdapter map[string][]string
 }
 
-func render(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, deviations map[string][]string, root string) (string, error) {
+func render(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, root string) (string, error) {
 	byAdapterChecks := map[string][]check{}
 	groups := map[string]*sdkGroup{}
 	var groupOrder []string
@@ -447,8 +455,8 @@ Verification tiers:
 	fmt.Fprintf(&b, "**%d adapters** — %d SDK+VM, %d SDK-only, %d VM-only, %d boot-tier.\n\n",
 		len(adapters), nBoth, nSDK, nVM, len(adapters)-nBoth-nSDK-nVM)
 
-	b.WriteString("| Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Deviations |\n")
-	b.WriteString("|---|---|---|---|---|---|---|\n")
+	b.WriteString("| Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |\n")
+	b.WriteString("|---|---|---|---|---|---|---|---|\n")
 	for _, a := range adapters {
 		api := "—"
 		if a.API != nil {
@@ -477,12 +485,16 @@ Verification tiers:
 		if n := len(byAdapterChecks[a.ID]); n > 0 {
 			checksCell = fmt.Sprintf("%d", n)
 		}
-		devCell := "—"
-		if n := len(deviations[a.ID]); n > 0 {
-			devCell = fmt.Sprintf("[%d](#documented-deviations)", n)
+		missingCell := "—"
+		if n := len(gaps[a.ID].Missing); n > 0 {
+			missingCell = fmt.Sprintf("[%d](#%s)", n, a.ID)
 		}
-		fmt.Fprintf(&b, "| [%s](adapters/%s/) | %s | %s | %s | %s | %s | %s |\n",
-			a.ID, a.ID, api, routes, tierOf(a.ID), sdkCell, checksCell, devCell)
+		devCell := "—"
+		if n := len(gaps[a.ID].Deviations); n > 0 {
+			devCell = fmt.Sprintf("[%d](#%s)", n, a.ID)
+		}
+		fmt.Fprintf(&b, "| [%s](adapters/%s/) | %s | %s | %s | %s | %s | %s | %s |\n",
+			a.ID, a.ID, api, routes, tierOf(a.ID), sdkCell, checksCell, missingCell, devCell)
 	}
 
 	b.WriteString(`
@@ -505,24 +517,52 @@ sections in ` + "`conformance/node/tests/*.test.ts`" + `).
 		}
 	}
 
-	b.WriteString(`## Documented deviations
-
-Curated in ` + "`conformance/matrix.yaml`" + ` (the generator fails if an adapter is
-missing from it). These are the intentional divergences from the real API
-each adapter documents; everything else mirrors the provider wherever it is
-observable over the wire.
-
-`)
+	fmt.Fprintf(&b, "## Adapter surface detail\n\n")
+	fmt.Fprintf(&b, "Per adapter: the **covered surface** — the exact routes served, read\n")
+	fmt.Fprintf(&b, "straight from `adapter.yaml` — and the curated gaps from\n")
+	fmt.Fprintf(&b, "`conformance/matrix.yaml`: **missing** (a real-API capability that is\n")
+	fmt.Fprintf(&b, "absent) vs **deviations** (covered, but documented to differ). Deep\n")
+	fmt.Fprintf(&b, "behavior notes live in each adapter's README.\n\n")
 	for _, a := range adapters {
-		devs := deviations[a.ID]
-		if len(devs) == 0 {
-			continue
-		}
+		g := gaps[a.ID]
 		fmt.Fprintf(&b, "### %s\n\n", a.ID)
-		for _, d := range devs {
-			fmt.Fprintf(&b, "- %s\n", d)
+		covered := fmt.Sprintf("%d routes", len(a.Endpoints))
+		if n := len(a.Websockets); n > 0 {
+			covered += fmt.Sprintf(" (+%d ws)", n)
 		}
-		b.WriteString("\n")
+		if a.Grpc != nil {
+			covered += fmt.Sprintf(" · gRPC `%s`", a.Grpc.Service)
+		}
+		if a.Graphql != nil {
+			covered += " · GraphQL schema"
+		}
+		fmt.Fprintf(&b, "**Covered** — %s\n\n", covered)
+		if len(a.Endpoints) > 0 || len(a.Websockets) > 0 {
+			fmt.Fprintf(&b, "<details><summary>Routes</summary>\n\n")
+			fmt.Fprintf(&b, "| Method | Route |\n")
+			fmt.Fprintf(&b, "|---|---|\n")
+			for _, ep := range a.Endpoints {
+				fmt.Fprintf(&b, "| %s | `%s` |\n", ep.Method, ep.Route)
+			}
+			for _, ws := range a.Websockets {
+				fmt.Fprintf(&b, "| WS | `%s` |\n", ws.Route)
+			}
+			fmt.Fprintf(&b, "\n</details>\n\n")
+		}
+		if len(g.Missing) > 0 {
+			fmt.Fprintf(&b, "**Missing** (%d)\n\n", len(g.Missing))
+			for _, m := range g.Missing {
+				fmt.Fprintf(&b, "- %s\n", m)
+			}
+			b.WriteString("\n")
+		}
+		if len(g.Deviations) > 0 {
+			fmt.Fprintf(&b, "**Deviations** (%d)\n\n", len(g.Deviations))
+			for _, d := range g.Deviations {
+				fmt.Fprintf(&b, "- %s\n", d)
+			}
+			b.WriteString("\n")
+		}
 	}
 
 	b.WriteString(`---

@@ -231,7 +231,7 @@ func TestResolveVersions(t *testing.T) {
 
 func TestLoadSidecarRejectsGapsAndStaleEntries(t *testing.T) {
 	dir := t.TempDir()
-	sc := "adapters:\n  stripe-style:\n    deviations:\n      - \"no X\"\n  ghost-style:\n    deviations: []\n"
+	sc := "adapters:\n  stripe-style:\n    deviations:\n      - \"no X\"\n    missing:\n      - \"threads.list\"\n  ghost-style:\n    deviations: []\n    missing: []\n"
 	if err := os.WriteFile(filepath.Join(dir, "matrix.yaml"), []byte(sc), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -241,12 +241,25 @@ func TestLoadSidecarRejectsGapsAndStaleEntries(t *testing.T) {
 		!strings.Contains(err.Error(), "ghost-style") {
 		t.Fatalf("stale entry not rejected: %v", err)
 	}
-	sc = "adapters:\n  stripe-style:\n    deviations: []\n"
+	sc = "adapters:\n  stripe-style:\n    deviations: []\n    missing: []\n"
 	if err := os.WriteFile(filepath.Join(dir, "matrix.yaml"), []byte(sc), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadSidecar(filepath.Join(dir, "matrix.yaml"), ids); err == nil ||
-		!strings.Contains(err.Error(), "a-style") {
+	got, err := loadSidecar(filepath.Join(dir, "matrix.yaml"), ids)
+	if err == nil || !strings.Contains(err.Error(), "a-style") {
 		t.Fatalf("missing adapter entry not rejected: %v", err)
 	}
+	// Full-coverage sidecar round-trips both lists.
+	sc = "adapters:\n  a-style:\n    deviations: []\n    missing: []\n  stripe-style:\n    deviations:\n      - \"d\"\n    missing:\n      - \"m1\"\n      - \"m2\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "matrix.yaml"), []byte(sc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err = loadSidecar(filepath.Join(dir, "matrix.yaml"), ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got["stripe-style"].Missing) != 2 || got["stripe-style"].Missing[0] != "m1" {
+		t.Fatalf("missing list not round-tripped: %+v", got["stripe-style"])
+	}
+	_ = got
 }
