@@ -127,7 +127,7 @@ stunt adapter test ./myapi-style              # conformance vs your local real t
 stunt catalog search stripe                   # browse the adapter registry
 ```
 
-**Reference adapters in this repo** — 95 of them (Stripe, Salesforce, Discord, Twilio,
+**Reference adapters in this repo** — 98 of them (Stripe, Salesforce, Discord, Twilio,
 Square, Adyen, AWS S3, Google/Microsoft/Apple families, blockchain RPCs, …; all unofficial,
 synthetic-data-only, with a DISCLAIMER). Browse them with `stunt catalog search`. Every one
 passes an adversarial input-safety sweep (garbage params, null/malformed bodies, ~30 tampered
@@ -135,7 +135,11 @@ cursor/limit param names — never a 5xx), coverage-guided fuzzing of the engine
 dispatch (`just fuzz`), and conformance suites that drive **real provider SDKs** — stripe-go,
 aws-sdk-go-v2, go-github, twilio-go, go-shopify, google-api-go-client — end-to-end against
 the adapters (`just conformance`), plus Node suites driving **stripe-node, octokit, and
-twilio-node** through the real `stunt` binary (`just conformance-node`). Highlights:
+twilio-node** through the real `stunt` binary (`just conformance-node`). The full
+per-adapter scorecard — which SDK at which version, covered behaviors, documented
+deviations, verification tier — is generated into
+**[`CONFORMANCE.md`](CONFORMANCE.md)** (`just conformance-matrix`; CI fails on drift).
+Highlights:
 
 | Adapter | Simulates | Backing |
 |---|---|---|

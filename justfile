@@ -105,6 +105,13 @@ conformance-node:
     cd conformance/node && bun install --frozen-lockfile
     STUNT_BIN=/tmp/stunt-ci bun test
 
+# Regenerate CONFORMANCE.md (the per-adapter SDK conformance matrix) from
+# adapter manifests, conformance test sources and conformance/matrix.yaml.
+# CI regenerates and fails on drift — rerun after touching adapters,
+# Record(...) calls, node test sections, or matrix.yaml.
+conformance-matrix:
+    cd conformance && go run ./cmd/genmatrix
+
 # Coverage-guided fuzzing — each target for the given time (default 30s;
 # pass just fuzz 2m for longer rounds). The fuzz seed corpora also run as
 # regular tests in `just test`, so discovered inputs stay pinned forever.

@@ -358,3 +358,11 @@ def on_list(req):
   `-style` naming + a `DISCLAIMER`. See `TRADEMARKS.md`.
 - **Host-safe tests:** temp dirs, free high ports, `file://` git fixtures, `httptest` sinks. Never
   touch `~/.stunt`, `/etc/hosts`, trust stores, or real network in tests.
+- **SDK conformance + the matrix:** real provider SDKs are driven against booted adapters
+  (`just conformance` Go suites, `just conformance-node` Node suites via bun). Coverage is
+  published in the generated **`CONFORMANCE.md`** (one row per adapter: SDKs + versions,
+  covered behaviors, documented deviations, verification tier). It regenerates from
+  `conformance/cmd/genmatrix` — rerun `just conformance-matrix` (CI fails on drift) after
+  touching adapters, `Record(...)` calls, node test sections, SDK versions, or
+  `conformance/matrix.yaml` (the hand-curated deviations sidecar; every adapter must have
+  an entry, empty list allowed).
