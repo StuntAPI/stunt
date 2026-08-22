@@ -63,6 +63,27 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAP_GITHUB_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
 
+      # Artifact provenance: a v0.51.0 re-tag shipped PRE-hardening binaries
+      # while every run log claimed the correct checkout (stunt-bt7). The
+      # mechanism is unknown, so trust nothing: build a reference binary
+      # from THIS checkout and require the shipped one to behave
+      # identically. `stunt llm` embeds the hand-maintained reference text,
+      # which changes with docs commits — a source-vs-artifact skew of any
+      # kind shows up as a diff.
+      - name: Verify shipped binary matches this checkout
+        run: |
+          set -euo pipefail
+          go build -o /tmp/ref-stunt ./cmd/stunt
+          BIN="$(find dist -name stunt -path '*darwin_arm64*' | head -1)"
+          test -x "$BIN"
+          /tmp/ref-stunt llm > /tmp/ref.txt
+          "$BIN" llm > /tmp/dist.txt
+          if ! diff -u /tmp/ref.txt /tmp/dist.txt; then
+            echo "::error::shipped binary does not match this checkout (stunt llm differs) — refusing to trust the release artifacts"
+            exit 1
+          fi
+          echo "provenance check: shipped darwin_arm64 binary matches this checkout"
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         if: always()
