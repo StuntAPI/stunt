@@ -6,10 +6,14 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@discordjs/rest": "^2.6.3",
     "@hubspot/api-client": "^14.0.1",
     "@slack/web-api": "^7.19.0",
+    "discord-api-types": "^0.38.0",
     "octokit": "^5.0.5",
+    "openai": "^7.5.0",
     "plaid": "^32.0.0",
+    "resend": "^6.22.0",
     "square": "^45.1.0",
     "stripe": "^22.5.0",
     "twilio": "^6.1.0"

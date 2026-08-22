@@ -135,8 +135,9 @@ cursor/limit param names — never a 5xx), coverage-guided fuzzing of the engine
 dispatch (`just fuzz`), and conformance suites that drive **real provider SDKs** — stripe-go,
 aws-sdk-go-v2, go-github, go-ethereum, twilio-go, go-shopify, google-api-go-client —
 end-to-end against the adapters (`just conformance`), plus Node suites driving
-**stripe-node, octokit, twilio-node, @slack/web-api, plaid, @hubspot/api-client, and
-square** through the real `stunt` binary (`just conformance-node`). The full
+**stripe-node, octokit, twilio-node, @slack/web-api, plaid, @hubspot/api-client,
+square, openai, resend, and @discordjs/rest** through the real `stunt` binary
+(`just conformance-node`). The full
 per-adapter scorecard — which SDK at which version, covered behaviors, the exact
 route surface covered, what's missing from the real API, documented deviations,
 verification tier — is generated into

@@ -270,6 +270,7 @@ adapters:
   discord-style:
     deviations:
       - "gateway is a fixed script: HELLO, lenient IDENTIFY, READY, one synthetic MESSAGE_CREATE"
+      - "Reactions are 204 no-ops — no reaction state is stored or echoed on messages"
       - "POST /interactions answers ping with type 1, everything else a type 5 deferred ack"
       - "posted messages emit signed MESSAGE_CREATE webhooks; real Discord dispatches via gateway"
       - "message listing pages via opaque after cursors + Link headers, not snowflake ids"

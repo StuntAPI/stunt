@@ -28,6 +28,9 @@ endpoints:
     handler: scripts/oauth.star#on_oauth_me
 
   # --- Bot REST: user resolution ---
+  - route: /users/@me/guilds
+    method: GET
+    handler: scripts/bot.star#on_user_guilds
   - route: /users/@me
     method: GET
     handler: scripts/bot.star#on_bot_user
@@ -48,9 +51,16 @@ endpoints:
     method: GET
     handler: scripts/messages.star#on_list_messages
 
-  # --- Bot REST: reactions ---
+  - route: /channels/{channel_id}/messages/{message_id}
+    method: GET
+    handler: scripts/messages.star#on_get_message
+  - route: /v10/channels/{channel_id}/messages/{message_id}
+    method: GET
+    handler: scripts/messages.star#on_get_message
+
+  # --- Bot REST: reactions (real API is PUT; POST kept for curl users) ---
   - route: /channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me
-    method: POST
+    method: ""
     handler: scripts/messages.star#on_react
 
   # --- Interactions (slash-command webhook; inbound, signature-verified) ---
@@ -59,6 +69,42 @@ endpoints:
     handler: scripts/interactions.star#on_interactions
 
 # --- WebSocket Gateway ---
+  # Versioned aliases (/v10) — the real API's shape; every official SDK
+  # requests versioned paths. Unversioned routes above stay for curl.
+  - route: /v10/oauth2/authorize
+    method: GET
+    handler: scripts/oauth.star#on_authorize
+  - route: /v10/oauth2/token
+    method: POST
+    handler: scripts/oauth.star#on_token
+  - route: /v10/oauth2/@me
+    method: GET
+    handler: scripts/oauth.star#on_oauth_me
+  - route: /v10/users/@me/guilds
+    method: GET
+    handler: scripts/bot.star#on_user_guilds
+  - route: /v10/users/@me
+    method: GET
+    handler: scripts/bot.star#on_bot_user
+  - route: /v10/guilds/{guild_id}
+    method: GET
+    handler: scripts/bot.star#on_guild
+  - route: /v10/guilds/{guild_id}/channels
+    method: GET
+    handler: scripts/bot.star#on_guild_channels
+  - route: /v10/channels/{channel_id}/messages
+    method: POST
+    handler: scripts/messages.star#on_send_message
+  - route: /v10/channels/{channel_id}/messages
+    method: GET
+    handler: scripts/messages.star#on_list_messages
+  - route: /v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me
+    method: ""
+    handler: scripts/messages.star#on_react
+  - route: /v10/interactions
+    method: POST
+    handler: scripts/interactions.star#on_interactions
+
 ws:
   - route: /gateway
     handler: scripts/gateway.star#on_connect

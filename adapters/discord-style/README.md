@@ -22,7 +22,8 @@ during local development:
 - **Send message:** `POST /channels/{id}/messages` (JSON `{content, embeds?, tts?}`).
 - **List messages:** `GET /channels/{id}/messages?limit=N&after=<cursor>` (bare
   array, newest first, cursor-paginated).
-- **Reactions:** `POST /channels/{id}/messages/{msg}/reactions/{emoji}/@me` → 204.
+- **Reactions:** `PUT /channels/{id}/messages/{msg}/reactions/{emoji}/@me` → 204
+  (the real API's method; `POST` also accepted).
 - **Interactions webhook:** `POST /interactions` — Ed25519-verified slash-command
   endpoint (ping → type 1 PONG, otherwise a type 5 deferred ack; bad/missing
   signature → 401).
@@ -44,7 +45,7 @@ same channel, enabling customer-chat round-trip testing locally.
 | GET | `/guilds/{guild_id}/channels` | `bot.star#on_guild_channels` | Channel list |
 | POST | `/channels/{channel_id}/messages` | `messages.star#on_send_message` | Send a message |
 | GET | `/channels/{channel_id}/messages` | `messages.star#on_list_messages` | List messages (stateful, paginated) |
-| POST | `/channels/.../reactions/{emoji}/@me` | `messages.star#on_react` | Add reaction → 204 |
+| PUT (POST also accepted) | `/channels/.../reactions/{emoji}/@me` | `messages.star#on_react` | Add reaction → 204 |
 | POST | `/interactions` | `interactions.star#on_interactions` | Signed slash-command webhook (Ed25519) |
 | WS | `/gateway` | `gateway.star#on_connect` | Gateway: HELLO → IDENTIFY → READY → dispatch |
 

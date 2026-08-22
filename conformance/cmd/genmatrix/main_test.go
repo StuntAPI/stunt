@@ -163,9 +163,15 @@ test("second", async () => {});
 
 func TestParseNodeTestsRequiresExactlyOneBoot(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "github.test.ts"),
-		[]byte(`bootAdapter("a"); bootAdapter("b");`), 0o644); err != nil {
-		t.Fatal(err)
+	for base := range nodeSuiteSDK {
+		body := `bootAdapter("x");
+test("t", async () => {});`
+		if base == "github.test.ts" {
+			body = `bootAdapter("a"); bootAdapter("b");`
+		}
+		if err := os.WriteFile(filepath.Join(dir, base), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	if _, err := parseNodeTests(dir); err == nil || !strings.Contains(err.Error(), "want exactly 1") {
 		t.Fatalf("multi-boot not rejected: %v", err)

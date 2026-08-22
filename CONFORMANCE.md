@@ -21,7 +21,7 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**98 adapters** — 2 SDK+VM, 12 SDK-only, 4 VM-only, 80 boot-tier.
+**98 adapters** — 2 SDK+VM, 15 SDK-only, 4 VM-only, 77 boot-tier.
 
 | Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |
 |---|---|---|---|---|---|---|---|
@@ -47,7 +47,7 @@ Verification tiers:
 | [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | boot | — | — | [6](#chainlink-style) | [5](#chainlink-style) |
 | [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | boot | — | — | [8](#cloudflare-style) | [5](#cloudflare-style) |
 | [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | boot | — | — | [6](#cloudkit-style) | [2](#cloudkit-style) |
-| [discord-style](adapters/discord-style/) | Discord API `v10` | 10 (+1 ws) | boot | — | — | [8](#discord-style) | [4](#discord-style) |
+| [discord-style](adapters/discord-style/) | Discord API `v10` | 24 (+1 ws) | SDK | discord-node @ 2.6.3 (floor) | 5 | [8](#discord-style) | [5](#discord-style) |
 | [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | boot | — | — | [7](#drive-style) | [3](#drive-style) |
 | [dropbox-style](adapters/dropbox-style/) | Dropbox API `2` | 8 | boot | — | — | [8](#dropbox-style) | [4](#dropbox-style) |
 | [dune-style](adapters/dune-style/) | Dune Analytics API `v1` | 6 | boot | — | — | [5](#dune-style) | [3](#dune-style) |
@@ -79,7 +79,7 @@ Verification tiers:
 | [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 18 | boot | — | — | [5](#jira-style) | [4](#jira-style) |
 | [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | boot | — | — | [3](#jumio-style) | [4](#jumio-style) |
 | [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | boot | — | — | [4](#linkedin-style) | [1](#linkedin-style) |
-| [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | boot | — | — | [4](#llm-style) | [3](#llm-style) |
+| [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | SDK | openai-node @ 7.5.0 (floor) | 2 | [4](#llm-style) | [3](#llm-style) |
 | [marketo-style](adapters/marketo-style/) | Marketo Engage REST API `1.0` | 21 | boot | — | — | [5](#marketo-style) | [3](#marketo-style) |
 | [microsoft-graph-style](adapters/microsoft-graph-style/) | Microsoft Graph API `v1.0` | 55 | boot | — | — | [8](#microsoft-graph-style) | [4](#microsoft-graph-style) |
 | [netsuite-style](adapters/netsuite-style/) | NetSuite SuiteTalk REST API `1.0` | 9 | boot | — | — | [4](#netsuite-style) | [2](#netsuite-style) |
@@ -98,7 +98,7 @@ Verification tiers:
 | [psd2-style](adapters/psd2-style/) | Open Banking / PSD2 (Berlin Group NextGenPSD2) `1.3.6` | 19 | boot | — | — | [6](#psd2-style) | [5](#psd2-style) |
 | [qbo-style](adapters/qbo-style/) | QuickBooks Online API `v3` | 11 | boot | — | — | [6](#qbo-style) | [1](#qbo-style) |
 | [reddit-style](adapters/reddit-style/) | Reddit API `1.0` | 2 | boot | — | — | [5](#reddit-style) | [1](#reddit-style) |
-| [resend-style](adapters/resend-style/) | Resend API `1.0.0` | 6 | boot | — | — | [6](#resend-style) | [3](#resend-style) |
+| [resend-style](adapters/resend-style/) | Resend API `1.0.0` | 6 | SDK | resend-node @ 6.22.0 (floor) | 4 | [6](#resend-style) | [3](#resend-style) |
 | [revenuecat-style](adapters/revenuecat-style/) | RevenueCat API `v1` | 7 | boot | — | — | [5](#revenuecat-style) | [4](#revenuecat-style) |
 | [salesforce-style](adapters/salesforce-style/) | Salesforce REST API `v60.0` | 29 | boot | — | — | [7](#salesforce-style) | [3](#salesforce-style) |
 | [sendgrid-style](adapters/sendgrid-style/) | Twilio SendGrid v3 API `v3` | 5 | boot | — | — | [7](#sendgrid-style) | [5](#sendgrid-style) |
@@ -166,6 +166,16 @@ sections in `conformance/node/tests/*.test.ts`).
 - SendMessageBatch correlated results
 - missing-queue typed error surface
 
+### discord-node @ 2.6.3 (floor)
+
+**discord-style**
+
+- users/@me resolves the bot user
+- guilds resolve with channels
+- message post lands in the channel history
+- single-message fetch round-trips
+- add-reaction is the real PUT and returns 204
+
 ### go-ethereum @ v1.17.5
 
 **eth-jsonrpc-style**
@@ -220,6 +230,13 @@ sections in `conformance/node/tests/*.test.ts`).
 
 - issue CRUD + paginate over Link headers
 
+### openai-node @ 7.5.0 (floor)
+
+**llm-style**
+
+- models.list returns the catalog
+- chat.completions.create returns a typed echo response
+
 ### plaid-node @ 32.0.0 (floor)
 
 **plaid-style**
@@ -228,6 +245,15 @@ sections in `conformance/node/tests/*.test.ts`).
 - sandbox public_token -> exchange -> item with accounts
 - accounts/balance/get over the SDK's typed response
 - transactions/sync cursor round-trip
+
+### resend-node @ 6.22.0 (floor)
+
+**resend-style**
+
+- emails.send mints a re_* id
+- emails.get round-trips the message
+- emails.list includes it
+- delivery state derives on read (sent -> delivered)
 
 ### slack-node @ 7.19.0 (floor)
 
@@ -1114,7 +1140,7 @@ behavior notes live in each adapter's README.
 
 ### discord-style
 
-**Covered** — 10 routes (+1 ws)
+**Covered** — 24 routes (+1 ws)
 
 <details><summary>Routes</summary>
 
@@ -1123,13 +1149,27 @@ behavior notes live in each adapter's README.
 | GET | `/oauth2/authorize` |
 | POST | `/oauth2/token` |
 | GET | `/oauth2/@me` |
+| GET | `/users/@me/guilds` |
 | GET | `/users/@me` |
 | GET | `/guilds/{guild_id}` |
 | GET | `/guilds/{guild_id}/channels` |
 | POST | `/channels/{channel_id}/messages` |
 | GET | `/channels/{channel_id}/messages` |
-| POST | `/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` |
+| GET | `/channels/{channel_id}/messages/{message_id}` |
+| GET | `/v10/channels/{channel_id}/messages/{message_id}` |
+|  | `/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` |
 | POST | `/interactions` |
+| GET | `/v10/oauth2/authorize` |
+| POST | `/v10/oauth2/token` |
+| GET | `/v10/oauth2/@me` |
+| GET | `/v10/users/@me/guilds` |
+| GET | `/v10/users/@me` |
+| GET | `/v10/guilds/{guild_id}` |
+| GET | `/v10/guilds/{guild_id}/channels` |
+| POST | `/v10/channels/{channel_id}/messages` |
+| GET | `/v10/channels/{channel_id}/messages` |
+|  | `/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` |
+| POST | `/v10/interactions` |
 | WS | `/gateway` |
 
 </details>
@@ -1145,9 +1185,10 @@ behavior notes live in each adapter's README.
 - No OAuth token revoke (/oauth2/token/revoke) or /applications/@me
 - No pins, typing, threads, or audit log endpoints
 
-**Deviations** (4)
+**Deviations** (5)
 
 - gateway is a fixed script: HELLO, lenient IDENTIFY, READY, one synthetic MESSAGE_CREATE
+- Reactions are 204 no-ops — no reaction state is stored or echoed on messages
 - POST /interactions answers ping with type 1, everything else a type 5 deferred ack
 - posted messages emit signed MESSAGE_CREATE webhooks; real Discord dispatches via gateway
 - message listing pages via opaque after cursors + Link headers, not snowflake ids

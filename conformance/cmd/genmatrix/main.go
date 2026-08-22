@@ -157,9 +157,12 @@ func parseGoRecords(dir string) ([]check, error) {
 // nodeSuiteSDK maps a node test file to the SDK label its sections are
 // attributed to.
 var nodeSuiteSDK = map[string]string{
+	"discord.test.ts": "discord-node",
 	"github.test.ts":  "octokit",
 	"hubspot.test.ts": "hubspot-node",
+	"llm.test.ts":     "openai-node",
 	"plaid.test.ts":   "plaid-node",
+	"resend.test.ts":  "resend-node",
 	"slack.test.ts":   "slack-node",
 	"square.test.ts":  "square-node",
 	"stripe.test.ts":  "stripe-node",
@@ -333,9 +336,12 @@ var goModuleBases = map[string]string{
 }
 
 var nodePackages = map[string]string{
+	"discord-node": "@discordjs/rest",
 	"hubspot-node": "@hubspot/api-client",
 	"octokit":      "octokit",
+	"openai-node":  "openai",
 	"plaid-node":   "plaid",
+	"resend-node":  "resend",
 	"slack-node":   "@slack/web-api",
 	"square-node":  "square",
 	"stripe-node":  "stripe",
