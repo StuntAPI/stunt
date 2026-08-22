@@ -23,106 +23,106 @@ Verification tiers:
 
 **98 adapters** — 2 SDK+VM, 7 SDK-only, 4 VM-only, 85 boot-tier.
 
-| Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Deviations |
-|---|---|---|---|---|---|---|
-| [adyen-style](adapters/adyen-style/) | Adyen Checkout + Notification API `v68` | 14 | boot | — | — | [4](#documented-deviations) |
-| [anaplan-style](adapters/anaplan-style/) | Anaplan API `2.0` | 18 | boot | — | — | [3](#documented-deviations) |
-| [apple-apns-style](adapters/apple-apns-style/) | Apple Push Notification service (APNs) `v2` | 2 | boot | — | — | [2](#documented-deviations) |
-| [apple-appstoreconnect-style](adapters/apple-appstoreconnect-style/) | App Store Connect API `v3` | 15 | boot | — | — | [5](#documented-deviations) |
-| [apple-music-style](adapters/apple-music-style/) | Apple Music API `1.0` | 18 | boot | — | — | [2](#documented-deviations) |
-| [apple-searchads-style](adapters/apple-searchads-style/) | Apple Search Ads API `v4` | 12 | boot | — | — | [3](#documented-deviations) |
-| [apps-script-style](adapters/apps-script-style/) | Google Apps Script API `v1` | 7 | boot | — | — | [1](#documented-deviations) |
-| [auth0-style](adapters/auth0-style/) | Auth0 Authentication & Management API `v2` | 17 | VM | — | — | [5](#documented-deviations) |
-| [avalara-style](adapters/avalara-style/) | Avalara AvaTax REST API `2` | 8 | boot | — | — | [1](#documented-deviations) |
-| [aws-cognito-style](adapters/aws-cognito-style/) | Amazon Cognito Identity Provider API `2016-04-18` | 7 | VM | — | — | [3](#documented-deviations) |
-| [aws-iam-sts-style](adapters/aws-iam-sts-style/) | AWS STS + IAM API `2011-06-15` | 2 | SDK | aws-sdk-go-v2 @ v1.43.7 | 2 | [4](#documented-deviations) |
-| [aws-s3-style](adapters/aws-s3-style/) | Amazon S3 API `2006-03-01` | 8 | SDK | aws-sdk-go-v2 @ v1.43.7 | 6 | [5](#documented-deviations) |
-| [azure-devops-style](adapters/azure-devops-style/) | Azure DevOps REST API `7.1` | 17 | boot | — | — | [4](#documented-deviations) |
-| [azure-servicebus-style](adapters/azure-servicebus-style/) | Azure Service Bus + Storage `2024-01-01` | 18 | VM | — | — | [3](#documented-deviations) |
-| [azure-storage-style](adapters/azure-storage-style/) | Azure Storage Blob REST API `2024-08-04` | 9 | VM | — | — | [3](#documented-deviations) |
-| [blog-style](adapters/blog-style/) | GraphQL demo `1.0` | 0 +GQL | boot | — | — | — |
-| [bluesky-style](adapters/bluesky-style/) | Bluesky AT Protocol `com.atproto (2024-Q4)` | 7 | boot | — | — | [3](#documented-deviations) |
-| [braintree-style](adapters/braintree-style/) | Braintree GraphQL + REST API `2024-09-01` | 15 +GQL | boot | — | — | [5](#documented-deviations) |
-| [braze-style](adapters/braze-style/) | Braze REST API `2.0` | 12 | boot | — | — | [4](#documented-deviations) |
-| [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | boot | — | — | [5](#documented-deviations) |
-| [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | boot | — | — | [5](#documented-deviations) |
-| [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | boot | — | — | [3](#documented-deviations) |
-| [discord-style](adapters/discord-style/) | Discord API `v10` | 10 (+1 ws) | boot | — | — | [4](#documented-deviations) |
-| [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | boot | — | — | [3](#documented-deviations) |
-| [dropbox-style](adapters/dropbox-style/) | Dropbox API `2` | 8 | boot | — | — | [4](#documented-deviations) |
-| [dune-style](adapters/dune-style/) | Dune Analytics API `v1` | 6 | boot | — | — | [3](#documented-deviations) |
-| [dynamodb-style](adapters/dynamodb-style/) | Amazon DynamoDB API `2012-08-10` | 1 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 8 | [5](#documented-deviations) |
-| [echo-style](adapters/echo-style/) | gRPC echo demo `1.0` | 0 (+1 ws) | boot | — | — | — |
-| [emailoctopus-style](adapters/emailoctopus-style/) | EmailOctopus API `2.0.0` | 21 | boot | — | — | [4](#documented-deviations) |
-| [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | boot | — | — | [2](#documented-deviations) |
-| [erc4337-style](adapters/erc4337-style/) | ERC-4337 Bundler RPC `0.7` | 2 | boot | — | — | [4](#documented-deviations) |
-| [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | boot | — | — | [2](#documented-deviations) |
-| [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | boot | — | — | [5](#documented-deviations) |
-| [etherscan-style](adapters/etherscan-style/) | Etherscan API `1.0` | 1 | boot | — | — | [2](#documented-deviations) |
-| [fattureincloud-style](adapters/fattureincloud-style/) | Fatture in Cloud API v2 `2.0.29` | 42 | boot | — | — | [4](#documented-deviations) |
-| [firebase-style](adapters/firebase-style/) | Firebase Auth + Firestore + Cloud Messaging API `v1` | 22 | boot | — | — | [5](#documented-deviations) |
-| [ga4-style](adapters/ga4-style/) | Google Analytics Data API + Admin API `v1beta` | 4 | boot | — | — | [3](#documented-deviations) |
-| [gcalendar-style](adapters/gcalendar-style/) | Google Calendar API `v3` | 10 | boot | — | — | [2](#documented-deviations) |
-| [gdocs-style](adapters/gdocs-style/) | Google Docs API `v1` | 4 | boot | — | — | [5](#documented-deviations) |
-| [github-style](adapters/github-style/) | GitHub REST + GraphQL API `2022-11-28` | 26 +GQL | SDK | go-github/v89 @ v89.0.0<br>octokit @ 5.0.5 (floor) | 6 | [5](#documented-deviations) |
-| [gmail-style](adapters/gmail-style/) | Gmail API `v1` | 16 | boot | — | — | [4](#documented-deviations) |
-| [google-admin-style](adapters/google-admin-style/) | Google Admin SDK Directory API `directory_v1` | 13 | boot | — | — | [4](#documented-deviations) |
-| [google-iam-style](adapters/google-iam-style/) | Google Cloud IAM API + Service Accounts `v1` | 9 | boot | — | — | [2](#documented-deviations) |
-| [google-style](adapters/google-style/) | Google OAuth2 API `v2` | 4 | SDK | x/oauth2 @ v0.36.0<br>google-api-go-client/idtoken @ v0.293.0 | 7 | [3](#documented-deviations) |
-| [gsearchconsole-style](adapters/gsearchconsole-style/) | Google Search Console API `v1` | 11 | boot | — | — | [5](#documented-deviations) |
-| [gsheets-style](adapters/gsheets-style/) | Google Sheets API `v4` | 9 | boot | — | — | [3](#documented-deviations) |
-| [gtasks-style](adapters/gtasks-style/) | Google Tasks API `v1` | 9 | boot | — | — | [2](#documented-deviations) |
-| [helius-style](adapters/helius-style/) | Helius Solana RPC + Enhanced API `v0` | 11 | boot | — | — | [4](#documented-deviations) |
-| [hn-style](adapters/hn-style/) | Hacker News Firebase API `v0` | 11 | boot | — | — | [2](#documented-deviations) |
-| [hubspot-style](adapters/hubspot-style/) | HubSpot CRM API `v3` | 33 | boot | — | — | [1](#documented-deviations) |
-| [instagram-style](adapters/instagram-style/) | Instagram Graph API `v21.0` | 10 | boot | — | — | [2](#documented-deviations) |
-| [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 18 | boot | — | — | [4](#documented-deviations) |
-| [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | boot | — | — | [4](#documented-deviations) |
-| [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | boot | — | — | [1](#documented-deviations) |
-| [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | boot | — | — | [3](#documented-deviations) |
-| [marketo-style](adapters/marketo-style/) | Marketo Engage REST API `1.0` | 21 | boot | — | — | [3](#documented-deviations) |
-| [microsoft-graph-style](adapters/microsoft-graph-style/) | Microsoft Graph API `v1.0` | 55 | boot | — | — | [5](#documented-deviations) |
-| [netsuite-style](adapters/netsuite-style/) | NetSuite SuiteTalk REST API `1.0` | 9 | boot | — | — | [2](#documented-deviations) |
-| [oneinch-style](adapters/oneinch-style/) | 1inch Aggregation Protocol API `v6.0` | 5 | boot | — | — | [1](#documented-deviations) |
-| [onfido-style](adapters/onfido-style/) | Onfido API `v3.6` | 7 | boot | — | — | [4](#documented-deviations) |
-| [opensea-style](adapters/opensea-style/) | OpenSea API `2.0.0` | 7 | boot | — | — | [1](#documented-deviations) |
-| [paypal-style](adapters/paypal-style/) | PayPal Orders API `v2` | 17 | boot | — | — | [5](#documented-deviations) |
-| [persona-style](adapters/persona-style/) | Persona Inquiry API `2023-01-05` | 5 | boot | — | — | [4](#documented-deviations) |
-| [photos-style](adapters/photos-style/) | Google Photos Library API `v1` | 12 | boot | — | — | [1](#documented-deviations) |
-| [pinata-style](adapters/pinata-style/) | Pinata API `1.0` | 6 | boot | — | — | — |
-| [plaid-style](adapters/plaid-style/) | Plaid API `2020-09-14` | 13 | boot | — | — | [3](#documented-deviations) |
-| [powerplatform-style](adapters/powerplatform-style/) | Microsoft Power Platform API `2` | 9 | boot | — | — | [4](#documented-deviations) |
-| [printful-style](adapters/printful-style/) | Printful API `v2` | 13 | boot | — | — | [2](#documented-deviations) |
-| [printify-style](adapters/printify-style/) | Printify API `v1` | 16 | boot | — | — | [1](#documented-deviations) |
-| [producthunt-style](adapters/producthunt-style/) | Product Hunt GraphQL API `2` | 0 +GQL | boot | — | — | [2](#documented-deviations) |
-| [psd2-style](adapters/psd2-style/) | Open Banking / PSD2 (Berlin Group NextGenPSD2) `1.3.6` | 19 | boot | — | — | [5](#documented-deviations) |
-| [qbo-style](adapters/qbo-style/) | QuickBooks Online API `v3` | 11 | boot | — | — | [3](#documented-deviations) |
-| [reddit-style](adapters/reddit-style/) | Reddit API `1.0` | 2 | boot | — | — | [2](#documented-deviations) |
-| [resend-style](adapters/resend-style/) | Resend API `1.0.0` | 6 | boot | — | — | [3](#documented-deviations) |
-| [revenuecat-style](adapters/revenuecat-style/) | RevenueCat API `v1` | 7 | boot | — | — | [4](#documented-deviations) |
-| [salesforce-style](adapters/salesforce-style/) | Salesforce REST API `v60.0` | 29 | boot | — | — | [5](#documented-deviations) |
-| [sendgrid-style](adapters/sendgrid-style/) | Twilio SendGrid v3 API `v3` | 5 | boot | — | — | [5](#documented-deviations) |
-| [servicenow-style](adapters/servicenow-style/) | ServiceNow Table API `2` | 44 | boot | — | — | [2](#documented-deviations) |
-| [shopify-style](adapters/shopify-style/) | Shopify Admin REST + GraphQL API `2024-10` | 21 +GQL | SDK | go-shopify/v4 @ v4.7.0 | 5 | [4](#documented-deviations) |
-| [signin-with-apple-style](adapters/signin-with-apple-style/) | Sign in with Apple `v2` | 3 | boot | — | — | [2](#documented-deviations) |
-| [slack-style](adapters/slack-style/) | Slack Web API `1.0` | 7 | boot | — | — | [2](#documented-deviations) |
-| [smartbill-style](adapters/smartbill-style/) | SmartBill Cloud API `1.0` | 18 | boot | — | — | [5](#documented-deviations) |
-| [sqs-style](adapters/sqs-style/) | Amazon SQS API `2012-11-05` | 2 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 6 | [5](#documented-deviations) |
-| [square-style](adapters/square-style/) | Square API `2024-08-21` | 18 | boot | — | — | [1](#documented-deviations) |
-| [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.3.0<br>stripe-node @ 22.5.0 (floor) | 9 | [5](#documented-deviations) |
-| [tenderly-style](adapters/tenderly-style/) | Tenderly Simulation API `v1` | 5 | boot | — | — | [2](#documented-deviations) |
-| [thegraph-style](adapters/thegraph-style/) | The Graph (GraphQL over subgraphs) `1.0` | 1 +GQL | boot | — | — | [1](#documented-deviations) |
-| [threads-style](adapters/threads-style/) | Threads API (Meta) `v1.0` | 8 | boot | — | — | [3](#documented-deviations) |
-| [twilio-style](adapters/twilio-style/) | Twilio API `2010-04-01` | 6 | SDK | twilio-go @ v1.30.9<br>twilio-node @ 6.1.0 (floor) | 8 | [3](#documented-deviations) |
-| [twitter-style](adapters/twitter-style/) | Twitter/X API `v2` | 9 | boot | — | — | [2](#documented-deviations) |
-| [walletconnect-style](adapters/walletconnect-style/) | WalletConnect (Relay Protocol v2) `2.0` | 7 | boot | — | — | [2](#documented-deviations) |
-| [whatsapp-style](adapters/whatsapp-style/) | WhatsApp Business Cloud API (Meta) `v21.0` | 8 | boot | — | — | [4](#documented-deviations) |
-| [workday-style](adapters/workday-style/) | Workday REST API `v40.0` | 8 | boot | — | — | [2](#documented-deviations) |
-| [x-articles-style](adapters/x-articles-style/) | X (Twitter) Articles API `v2` | 8 | boot | — | — | [1](#documented-deviations) |
-| [xero-style](adapters/xero-style/) | Xero Accounting API `2.0` | 15 | boot | — | — | [1](#documented-deviations) |
-| [youtube-style](adapters/youtube-style/) | YouTube Data API `v3` | 13 | boot | — | — | — |
-| [zendesk-style](adapters/zendesk-style/) | Zendesk REST API `2` | 19 | boot | — | — | [5](#documented-deviations) |
-| [zuora-style](adapters/zuora-style/) | Zuora REST API `v1` | 20 | boot | — | — | [5](#documented-deviations) |
+| Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |
+|---|---|---|---|---|---|---|---|
+| [adyen-style](adapters/adyen-style/) | Adyen Checkout + Notification API `v68` | 14 | boot | — | — | [4](#adyen-style) | [4](#adyen-style) |
+| [anaplan-style](adapters/anaplan-style/) | Anaplan API `2.0` | 18 | boot | — | — | [4](#anaplan-style) | [3](#anaplan-style) |
+| [apple-apns-style](adapters/apple-apns-style/) | Apple Push Notification service (APNs) `v2` | 2 | boot | — | — | [4](#apple-apns-style) | [2](#apple-apns-style) |
+| [apple-appstoreconnect-style](adapters/apple-appstoreconnect-style/) | App Store Connect API `v3` | 15 | boot | — | — | [7](#apple-appstoreconnect-style) | [5](#apple-appstoreconnect-style) |
+| [apple-music-style](adapters/apple-music-style/) | Apple Music API `1.0` | 18 | boot | — | — | [5](#apple-music-style) | [2](#apple-music-style) |
+| [apple-searchads-style](adapters/apple-searchads-style/) | Apple Search Ads API `v4` | 12 | boot | — | — | [4](#apple-searchads-style) | [3](#apple-searchads-style) |
+| [apps-script-style](adapters/apps-script-style/) | Google Apps Script API `v1` | 7 | boot | — | — | [2](#apps-script-style) | [1](#apps-script-style) |
+| [auth0-style](adapters/auth0-style/) | Auth0 Authentication & Management API `v2` | 17 | VM | — | — | [3](#auth0-style) | [4](#auth0-style) |
+| [avalara-style](adapters/avalara-style/) | Avalara AvaTax REST API `2` | 8 | boot | — | — | [5](#avalara-style) | [1](#avalara-style) |
+| [aws-cognito-style](adapters/aws-cognito-style/) | Amazon Cognito Identity Provider API `2016-04-18` | 7 | VM | — | — | [6](#aws-cognito-style) | [3](#aws-cognito-style) |
+| [aws-iam-sts-style](adapters/aws-iam-sts-style/) | AWS STS + IAM API `2011-06-15` | 2 | SDK | aws-sdk-go-v2 @ v1.43.7 | 2 | [3](#aws-iam-sts-style) | [3](#aws-iam-sts-style) |
+| [aws-s3-style](adapters/aws-s3-style/) | Amazon S3 API `2006-03-01` | 8 | SDK | aws-sdk-go-v2 @ v1.43.7 | 6 | [5](#aws-s3-style) | [5](#aws-s3-style) |
+| [azure-devops-style](adapters/azure-devops-style/) | Azure DevOps REST API `7.1` | 17 | boot | — | — | [7](#azure-devops-style) | [3](#azure-devops-style) |
+| [azure-servicebus-style](adapters/azure-servicebus-style/) | Azure Service Bus + Storage `2024-01-01` | 18 | VM | — | — | [6](#azure-servicebus-style) | [3](#azure-servicebus-style) |
+| [azure-storage-style](adapters/azure-storage-style/) | Azure Storage Blob REST API `2024-08-04` | 9 | VM | — | — | [6](#azure-storage-style) | [3](#azure-storage-style) |
+| [blog-style](adapters/blog-style/) | GraphQL demo `1.0` | 0 +GQL | boot | — | — | — | — |
+| [bluesky-style](adapters/bluesky-style/) | Bluesky AT Protocol `com.atproto (2024-Q4)` | 7 | boot | — | — | [7](#bluesky-style) | [3](#bluesky-style) |
+| [braintree-style](adapters/braintree-style/) | Braintree GraphQL + REST API `2024-09-01` | 15 +GQL | boot | — | — | [8](#braintree-style) | [5](#braintree-style) |
+| [braze-style](adapters/braze-style/) | Braze REST API `2.0` | 12 | boot | — | — | [8](#braze-style) | [4](#braze-style) |
+| [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | boot | — | — | [6](#chainlink-style) | [5](#chainlink-style) |
+| [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | boot | — | — | [8](#cloudflare-style) | [5](#cloudflare-style) |
+| [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | boot | — | — | [6](#cloudkit-style) | [2](#cloudkit-style) |
+| [discord-style](adapters/discord-style/) | Discord API `v10` | 10 (+1 ws) | boot | — | — | [8](#discord-style) | [4](#discord-style) |
+| [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | boot | — | — | [7](#drive-style) | [3](#drive-style) |
+| [dropbox-style](adapters/dropbox-style/) | Dropbox API `2` | 8 | boot | — | — | [8](#dropbox-style) | [4](#dropbox-style) |
+| [dune-style](adapters/dune-style/) | Dune Analytics API `v1` | 6 | boot | — | — | [5](#dune-style) | [3](#dune-style) |
+| [dynamodb-style](adapters/dynamodb-style/) | Amazon DynamoDB API `2012-08-10` | 1 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 8 | [8](#dynamodb-style) | [5](#dynamodb-style) |
+| [echo-style](adapters/echo-style/) | gRPC echo demo `1.0` | 0 (+1 ws) | boot | — | — | — | — |
+| [emailoctopus-style](adapters/emailoctopus-style/) | EmailOctopus API `2.0.0` | 21 | boot | — | — | [2](#emailoctopus-style) | [3](#emailoctopus-style) |
+| [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | boot | — | — | [8](#entra-id-style) | [1](#entra-id-style) |
+| [erc4337-style](adapters/erc4337-style/) | ERC-4337 Bundler RPC `0.7` | 2 | boot | — | — | [5](#erc4337-style) | [4](#erc4337-style) |
+| [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | boot | — | — | [3](#escrow-style) | [1](#escrow-style) |
+| [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | boot | — | — | [5](#eth-jsonrpc-style) | [4](#eth-jsonrpc-style) |
+| [etherscan-style](adapters/etherscan-style/) | Etherscan API `1.0` | 1 | boot | — | — | [3](#etherscan-style) | [1](#etherscan-style) |
+| [fattureincloud-style](adapters/fattureincloud-style/) | Fatture in Cloud API v2 `2.0.29` | 42 | boot | — | — | [3](#fattureincloud-style) | [3](#fattureincloud-style) |
+| [firebase-style](adapters/firebase-style/) | Firebase Auth + Firestore + Cloud Messaging API `v1` | 22 | boot | — | — | [4](#firebase-style) | [5](#firebase-style) |
+| [ga4-style](adapters/ga4-style/) | Google Analytics Data API + Admin API `v1beta` | 4 | boot | — | — | [4](#ga4-style) | [2](#ga4-style) |
+| [gcalendar-style](adapters/gcalendar-style/) | Google Calendar API `v3` | 10 | boot | — | — | [4](#gcalendar-style) | [1](#gcalendar-style) |
+| [gdocs-style](adapters/gdocs-style/) | Google Docs API `v1` | 4 | boot | — | — | [3](#gdocs-style) | [3](#gdocs-style) |
+| [github-style](adapters/github-style/) | GitHub REST + GraphQL API `2022-11-28` | 26 +GQL | SDK | go-github/v89 @ v89.0.0<br>octokit @ 5.0.5 (floor) | 6 | [7](#github-style) | [4](#github-style) |
+| [gmail-style](adapters/gmail-style/) | Gmail API `v1` | 16 | boot | — | — | [6](#gmail-style) | [3](#gmail-style) |
+| [google-admin-style](adapters/google-admin-style/) | Google Admin SDK Directory API `directory_v1` | 13 | boot | — | — | [4](#google-admin-style) | [3](#google-admin-style) |
+| [google-iam-style](adapters/google-iam-style/) | Google Cloud IAM API + Service Accounts `v1` | 9 | boot | — | — | [4](#google-iam-style) | [1](#google-iam-style) |
+| [google-style](adapters/google-style/) | Google OAuth2 API `v2` | 4 | SDK | x/oauth2 @ v0.36.0<br>google-api-go-client/idtoken @ v0.293.0 | 7 | [2](#google-style) | [2](#google-style) |
+| [gsearchconsole-style](adapters/gsearchconsole-style/) | Google Search Console API `v1` | 11 | boot | — | — | [2](#gsearchconsole-style) | [4](#gsearchconsole-style) |
+| [gsheets-style](adapters/gsheets-style/) | Google Sheets API `v4` | 9 | boot | — | — | [4](#gsheets-style) | — |
+| [gtasks-style](adapters/gtasks-style/) | Google Tasks API `v1` | 9 | boot | — | — | [3](#gtasks-style) | — |
+| [helius-style](adapters/helius-style/) | Helius Solana RPC + Enhanced API `v0` | 11 | boot | — | — | [3](#helius-style) | [4](#helius-style) |
+| [hn-style](adapters/hn-style/) | Hacker News Firebase API `v0` | 11 | boot | — | — | [3](#hn-style) | [2](#hn-style) |
+| [hubspot-style](adapters/hubspot-style/) | HubSpot CRM API `v3` | 33 | boot | — | — | [4](#hubspot-style) | — |
+| [instagram-style](adapters/instagram-style/) | Instagram Graph API `v21.0` | 10 | boot | — | — | [4](#instagram-style) | [2](#instagram-style) |
+| [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 18 | boot | — | — | [5](#jira-style) | [4](#jira-style) |
+| [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | boot | — | — | [3](#jumio-style) | [4](#jumio-style) |
+| [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | boot | — | — | [4](#linkedin-style) | [1](#linkedin-style) |
+| [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | boot | — | — | [4](#llm-style) | [3](#llm-style) |
+| [marketo-style](adapters/marketo-style/) | Marketo Engage REST API `1.0` | 21 | boot | — | — | [5](#marketo-style) | [3](#marketo-style) |
+| [microsoft-graph-style](adapters/microsoft-graph-style/) | Microsoft Graph API `v1.0` | 55 | boot | — | — | [8](#microsoft-graph-style) | [4](#microsoft-graph-style) |
+| [netsuite-style](adapters/netsuite-style/) | NetSuite SuiteTalk REST API `1.0` | 9 | boot | — | — | [4](#netsuite-style) | [2](#netsuite-style) |
+| [oneinch-style](adapters/oneinch-style/) | 1inch Aggregation Protocol API `v6.0` | 5 | boot | — | — | [3](#oneinch-style) | [1](#oneinch-style) |
+| [onfido-style](adapters/onfido-style/) | Onfido API `v3.6` | 7 | boot | — | — | [5](#onfido-style) | [4](#onfido-style) |
+| [opensea-style](adapters/opensea-style/) | OpenSea API `2.0.0` | 7 | boot | — | — | [4](#opensea-style) | [1](#opensea-style) |
+| [paypal-style](adapters/paypal-style/) | PayPal Orders API `v2` | 17 | boot | — | — | [5](#paypal-style) | [5](#paypal-style) |
+| [persona-style](adapters/persona-style/) | Persona Inquiry API `2023-01-05` | 5 | boot | — | — | [5](#persona-style) | [4](#persona-style) |
+| [photos-style](adapters/photos-style/) | Google Photos Library API `v1` | 12 | boot | — | — | [5](#photos-style) | [2](#photos-style) |
+| [pinata-style](adapters/pinata-style/) | Pinata API `1.0` | 6 | boot | — | — | [4](#pinata-style) | — |
+| [plaid-style](adapters/plaid-style/) | Plaid API `2020-09-14` | 13 | boot | — | — | [5](#plaid-style) | [3](#plaid-style) |
+| [powerplatform-style](adapters/powerplatform-style/) | Microsoft Power Platform API `2` | 9 | boot | — | — | [4](#powerplatform-style) | [3](#powerplatform-style) |
+| [printful-style](adapters/printful-style/) | Printful API `v2` | 13 | boot | — | — | [5](#printful-style) | [1](#printful-style) |
+| [printify-style](adapters/printify-style/) | Printify API `v1` | 16 | boot | — | — | [5](#printify-style) | [1](#printify-style) |
+| [producthunt-style](adapters/producthunt-style/) | Product Hunt GraphQL API `2` | 0 +GQL | boot | — | — | [3](#producthunt-style) | [2](#producthunt-style) |
+| [psd2-style](adapters/psd2-style/) | Open Banking / PSD2 (Berlin Group NextGenPSD2) `1.3.6` | 19 | boot | — | — | [6](#psd2-style) | [5](#psd2-style) |
+| [qbo-style](adapters/qbo-style/) | QuickBooks Online API `v3` | 11 | boot | — | — | [6](#qbo-style) | [1](#qbo-style) |
+| [reddit-style](adapters/reddit-style/) | Reddit API `1.0` | 2 | boot | — | — | [5](#reddit-style) | [1](#reddit-style) |
+| [resend-style](adapters/resend-style/) | Resend API `1.0.0` | 6 | boot | — | — | [6](#resend-style) | [3](#resend-style) |
+| [revenuecat-style](adapters/revenuecat-style/) | RevenueCat API `v1` | 7 | boot | — | — | [5](#revenuecat-style) | [4](#revenuecat-style) |
+| [salesforce-style](adapters/salesforce-style/) | Salesforce REST API `v60.0` | 29 | boot | — | — | [7](#salesforce-style) | [3](#salesforce-style) |
+| [sendgrid-style](adapters/sendgrid-style/) | Twilio SendGrid v3 API `v3` | 5 | boot | — | — | [7](#sendgrid-style) | [5](#sendgrid-style) |
+| [servicenow-style](adapters/servicenow-style/) | ServiceNow Table API `2` | 44 | boot | — | — | [5](#servicenow-style) | [1](#servicenow-style) |
+| [shopify-style](adapters/shopify-style/) | Shopify Admin REST + GraphQL API `2024-10` | 21 +GQL | SDK | go-shopify/v4 @ v4.7.0 | 5 | [7](#shopify-style) | [4](#shopify-style) |
+| [signin-with-apple-style](adapters/signin-with-apple-style/) | Sign in with Apple `v2` | 3 | boot | — | — | [3](#signin-with-apple-style) | [2](#signin-with-apple-style) |
+| [slack-style](adapters/slack-style/) | Slack Web API `1.0` | 7 | boot | — | — | [6](#slack-style) | [2](#slack-style) |
+| [smartbill-style](adapters/smartbill-style/) | SmartBill Cloud API `1.0` | 18 | boot | — | — | [2](#smartbill-style) | [5](#smartbill-style) |
+| [sqs-style](adapters/sqs-style/) | Amazon SQS API `2012-11-05` | 2 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 6 | [4](#sqs-style) | [5](#sqs-style) |
+| [square-style](adapters/square-style/) | Square API `2024-08-21` | 18 | boot | — | — | [7](#square-style) | [2](#square-style) |
+| [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.3.0<br>stripe-node @ 22.5.0 (floor) | 9 | [7](#stripe-style) | [5](#stripe-style) |
+| [tenderly-style](adapters/tenderly-style/) | Tenderly Simulation API `v1` | 5 | boot | — | — | [3](#tenderly-style) | [2](#tenderly-style) |
+| [thegraph-style](adapters/thegraph-style/) | The Graph (GraphQL over subgraphs) `1.0` | 1 +GQL | boot | — | — | [3](#thegraph-style) | [1](#thegraph-style) |
+| [threads-style](adapters/threads-style/) | Threads API (Meta) `v1.0` | 8 | boot | — | — | [3](#threads-style) | [3](#threads-style) |
+| [twilio-style](adapters/twilio-style/) | Twilio API `2010-04-01` | 6 | SDK | twilio-go @ v1.30.9<br>twilio-node @ 6.1.0 (floor) | 8 | [6](#twilio-style) | [4](#twilio-style) |
+| [twitter-style](adapters/twitter-style/) | Twitter/X API `v2` | 9 | boot | — | — | [7](#twitter-style) | [3](#twitter-style) |
+| [walletconnect-style](adapters/walletconnect-style/) | WalletConnect (Relay Protocol v2) `2.0` | 7 | boot | — | — | [3](#walletconnect-style) | [2](#walletconnect-style) |
+| [whatsapp-style](adapters/whatsapp-style/) | WhatsApp Business Cloud API (Meta) `v21.0` | 8 | boot | — | — | [5](#whatsapp-style) | [4](#whatsapp-style) |
+| [workday-style](adapters/workday-style/) | Workday REST API `v40.0` | 8 | boot | — | — | [4](#workday-style) | [1](#workday-style) |
+| [x-articles-style](adapters/x-articles-style/) | X (Twitter) Articles API `v2` | 8 | boot | — | — | [4](#x-articles-style) | [1](#x-articles-style) |
+| [xero-style](adapters/xero-style/) | Xero Accounting API `2.0` | 15 | boot | — | — | [6](#xero-style) | [2](#xero-style) |
+| [youtube-style](adapters/youtube-style/) | YouTube Data API `v3` | 13 | boot | — | — | [7](#youtube-style) | [2](#youtube-style) |
+| [zendesk-style](adapters/zendesk-style/) | Zendesk REST API `2` | 19 | boot | — | — | [8](#zendesk-style) | [5](#zendesk-style) |
+| [zuora-style](adapters/zuora-style/) | Zuora REST API `v1` | 20 | boot | — | — | [8](#zuora-style) | [5](#zuora-style) |
 
 ## Verified behaviors
 
@@ -246,14 +246,47 @@ sections in `conformance/node/tests/*.test.ts`).
 - refresh grant rotates the access token
 - userinfo honors the refreshed token
 
-## Documented deviations
+## Adapter surface detail
 
-Curated in `conformance/matrix.yaml` (the generator fails if an adapter is
-missing from it). These are the intentional divergences from the real API
-each adapter documents; everything else mirrors the provider wherever it is
-observable over the wire.
+Per adapter: the **covered surface** — the exact routes served, read
+straight from `adapter.yaml` — and the curated gaps from
+`conformance/matrix.yaml`: **missing** (a real-API capability that is
+absent) vs **deviations** (covered, but documented to differ). Deep
+behavior notes live in each adapter's README.
 
 ### adyen-style
+
+**Covered** — 14 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v68/payments` |
+| POST | `/v68/payments/details` |
+| GET | `/v68/payments` |
+| POST | `/v68/paymentMethods` |
+| POST | `/v68/paymentLinks` |
+| GET | `/v68/paymentLinks/{linkId}` |
+| POST | `/v68/payments/{paymentPspReference}/captures` |
+| POST | `/v68/payments/{paymentPspReference}/refunds` |
+| POST | `/v68/payments/{paymentPspReference}/reversals` |
+| POST | `/v68/payments/{paymentPspReference}/cancels` |
+| POST | `/v68/notifications/test` |
+| POST | `/v68/webhooks` |
+| GET | `/v68/webhooks` |
+| DELETE | `/v68/webhooks/{webhookId}` |
+
+</details>
+
+**Missing** (4)
+
+- No Payouts, Disputes, or Terminal API (cloud/POS) endpoints
+- No paymentMethods/balance, gift-card, or stored-value endpoints
+- No amountUpdates, technicalCancels, or auto-rescue modification routes
+- No stored payment method lifecycle — tokens cannot be stored, listed, or disabled
+
+**Deviations** (4)
 
 - Per-hook hmacKey and events filter are local extensions — real Adyen hides the key
 - simulate_fail flag on /v68/payments forces Refused (simulator-only failure injection)
@@ -262,16 +295,108 @@ observable over the wire.
 
 ### anaplan-style
 
+**Covered** — 18 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/2/0/workspaces` |
+| GET | `/2/0/workspaces/{workspaceId}/models` |
+| GET | `/2/0/workspaces/{workspaceId}/models/{modelId}/modules` |
+| GET | `/2/0/workspaces/{workspaceId}/models/{modelId}/files` |
+| GET | `/2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}` |
+| POST | `/2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}` |
+| PUT | `/2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}` |
+| GET | `/2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}/chunks` |
+| GET | `/2/0/workspaces/{workspaceId}/models/{modelId}/imports` |
+| GET | `/2/0/workspaces/{workspaceId}/models/{modelId}/exports` |
+| GET | `/2/0/workspaces/{workspaceId}/models/{modelId}/actions` |
+| GET | `/2/0/workspaces/{workspaceId}/models/{modelId}/processes` |
+| POST | `/2/0/workspaces/{workspaceId}/models/{modelId}/imports/{importId}/tasks` |
+| POST | `/2/0/workspaces/{workspaceId}/models/{modelId}/imports/{importId}/jobs` |
+| POST | `/2/0/workspaces/{workspaceId}/models/{modelId}/exports/{exportId}/tasks` |
+| POST | `/2/0/workspaces/{workspaceId}/models/{modelId}/exports/{exportId}/jobs` |
+| GET | `/2/0/workspaces/{workspaceId}/models/{modelId}/tasks/{taskId}` |
+| GET | `/2/0/workspaces/{workspaceId}/models/{modelId}` |
+
+</details>
+
+**Missing** (4)
+
+- No line-item, list, view, or module-data endpoints — data moves via CSV only
+- No file DELETE; no workspace or model CRUD (catalogs are read-only)
+- No ALM surface — revisions, comparisons, synthetic models
+- No Anaplan token service (/token/authenticate) — Basic/Bearer only
+
+**Deviations** (3)
+
 - Task state derives from the clock — IN_PROGRESS at +1s, COMPLETE at +3s
 - simulate_fail in the task body is a simulator-only trigger (real Anaplan has none)
 - PUT file upload is the same surface as POST; /jobs aliases /tasks
 
 ### apple-apns-style
 
+**Covered** — 2 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/3/device/{deviceToken}` |
+| GET | `/3/device/{deviceToken}/notifications` |
+
+</details>
+
+**Missing** (4)
+
+- No apns-topic, apns-push-type, apns-priority, or apns-collapse-id handling
+- No provider-certificate auth — only JWT provider tokens
+- No 429 TooManyRequests or 503 ServiceUnavailable rate-limit responses
+- No Web Push endpoints (Safari webpush) or VOIP push handling
+
+**Deviations** (2)
+
 - Provider JWT verified against one fixed P-256 key whose private half is published
 - GET /3/device/{token}/notifications is a simulator-only endpoint (no real fetch API)
 
 ### apple-appstoreconnect-style
+
+**Covered** — 15 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/v1/apps` |
+| POST | `/v1/apps` |
+| POST | `/v1/appStoreVersionSubmissions` |
+| GET | `/v1/users` |
+| GET | `/v1/salesReports` |
+| GET | `/v1/apps/{id}` |
+| PATCH | `/v1/apps/{id}` |
+| GET | `/v1/apps/{id}/appStoreVersions` |
+| POST | `/v1/apps/{id}/appStoreVersions` |
+| GET | `/v1/apps/{id}/builds` |
+| GET | `/v1/apps/{id}/appPrices` |
+| GET | `/v1/builds/{id}` |
+| GET | `/v1/appStoreVersions/{id}` |
+| PATCH | `/v1/appStoreVersions/{id}` |
+| GET | `/v1/appStoreVersions/{id}/builds` |
+
+</details>
+
+**Missing** (7)
+
+- No TestFlight beta testing (betaGroups, betaTesters, buildBetaDetails)
+- No IAP or subscriptions (inAppPurchasesV2, subscriptionGroups)
+- No provisioning surface — bundleIds, certificates, devices, profiles
+- No app metadata: localizations, ageRating, categories, phased release
+- No customer reviews endpoints (customerReviews and responses)
+- No user invitations or user CRUD (GET /v1/users list only)
+- No App Analytics (analyticsReportRequests, metrics) — salesReports only
+
+**Deviations** (5)
 
 - JWT signature crypto NOT verified — structural plus registry check only
 - Review is clock-driven: WAITING_FOR_REVIEW +1s to IN_REVIEW, +3s to READY_FOR_SALE
@@ -281,10 +406,77 @@ observable over the wire.
 
 ### apple-music-style
 
+**Covered** — 18 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/v1/catalog/{storefront}/search` |
+| GET | `/v1/catalog/{storefront}/charts` |
+| GET | `/v1/catalog/{storefront}/songs` |
+| GET | `/v1/catalog/{storefront}/albums` |
+| GET | `/v1/catalog/{storefront}/artists` |
+| GET | `/v1/catalog/{storefront}/playlists` |
+| GET | `/v1/catalog/{storefront}/songs/{id}` |
+| GET | `/v1/catalog/{storefront}/albums/{id}` |
+| GET | `/v1/catalog/{storefront}/artists/{id}` |
+| GET | `/v1/me/library/songs` |
+| GET | `/v1/me/library/albums` |
+| GET | `/v1/me/library/playlists` |
+| GET | `/v1/me/library/recently-added` |
+| POST | `/v1/me/library` |
+| DELETE | `/v1/me/library/{type}/{id}` |
+| POST | `/v1/me/played` |
+| GET | `/v1/me/ratings/{type}/{id}` |
+| PUT | `/v1/me/ratings/{type}/{id}` |
+
+</details>
+
+**Missing** (5)
+
+- No music-videos, stations, genres, or curators catalog endpoints
+- No storefronts endpoint (GET /v1/storefronts)
+- No library search (GET /v1/me/library/search)
+- No personal playlist create or add-tracks (POST /v1/me/library/playlists)
+- No recommendations or play history (heavy-rotation, recent/played)
+
+**Deviations** (2)
+
 - Developer JWT signature not verified — structural check plus exact-string token registry
 - Music-User-Token accepts any non-empty value — no real user-token validation
 
 ### apple-searchads-style
+
+**Covered** — 12 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/api/oauth2/token` |
+| POST | `/api/v4/campaigns/find` |
+| POST | `/api/v4/campaigns` |
+| POST | `/api/v4/reports/campaigns` |
+| GET | `/api/v4/campaigns/{campaign_id}` |
+| PUT | `/api/v4/campaigns/{campaign_id}` |
+| POST | `/api/v4/campaigns/{campaign_id}/ads` |
+| POST | `/api/v4/campaigns/{campaign_id}/keywords/targeting/find` |
+| PUT | `/api/v4/campaigns/{campaign_id}/keywords/targeting/bulk` |
+| POST | `/api/v4/campaigns/{campaign_id}/keywords/targeting` |
+| PUT | `/api/v4/campaigns/{campaign_id}/keywords/targeting/{keyword_id}` |
+| DELETE | `/api/v4/campaigns/{campaign_id}/keywords/targeting/{keyword_id}` |
+
+</details>
+
+**Missing** (4)
+
+- No ad group find or update — only POST campaigns/{id}/ads create
+- No negative keywords endpoints (keywords/negative find/create/update)
+- No search-terms, keyword, or ads reports — only /reports/campaigns
+- No audience targeting, geo/demographic dimensions, or bid adjustments
+
+**Deviations** (3)
 
 - ES256 client-secret JWT is not signature-verified — structural checks only
 - Reports group by campaign only; any other groupBy key returns 400
@@ -292,21 +484,131 @@ observable over the wire.
 
 ### apps-script-style
 
+**Covered** — 7 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/v1/projects` |
+| POST | `/v1/projects` |
+| DELETE | `/v1/projects/{scriptId}` |
+| GET | `/v1/projects/{scriptId}/content` |
+| POST | `/v1/projects/{scriptId}/content` |
+| POST | `/v1/projects/{scriptId}/deployments` |
+| POST | `/v1/projects/{scriptId}/scripts/{functionName}/run` |
+
+</details>
+
+**Missing** (2)
+
+- No deployment list/get/update/delete — only POST create
+- No versions endpoint (GET /v1/projects/{scriptId}/versions)
+
+**Deviations** (1)
+
 - :run never executes code — known patterns return canned results, others echo parameters
 
 ### auth0-style
 
+**Covered** — 17 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/.well-known/openid-configuration` |
+| GET | `/.well-known/jwks.json` |
+| GET | `/authorize` |
+| POST | `/oauth/token` |
+| GET | `/userinfo` |
+| POST | `/oauth/revoke` |
+| POST | `/dbconnections/signup` |
+| GET | `/api/v2/users` |
+| POST | `/api/v2/users` |
+| GET | `/api/v2/roles` |
+| POST | `/api/v2/roles` |
+| GET | `/api/v2/users/{id}` |
+| PATCH | `/api/v2/users/{id}` |
+| DELETE | `/api/v2/users/{id}` |
+| GET | `/api/v2/users/{id}/roles` |
+| POST | `/api/v2/users/{id}/roles` |
+| DELETE | `/api/v2/users/{id}/roles` |
+
+</details>
+
+**Missing** (3)
+
+- No MFA, Organizations, actions/hooks/flows, or email delivery
+- No user blocking or password change endpoints
+- No from/take checkpoint paging (page/per_page only)
+
+**Deviations** (4)
+
 - No hosted login or consent screen — /authorize auto-authenticates login_hint or first user
 - OAuth errors still 302 to unvalidated redirect_uri (RFC 6749 would refuse)
-- q is exact-match or substring only (no Lucene); no from/take checkpoint paging
+- q is exact-match or substring only (no Lucene)
 - No scope enforcement — any valid RS256 token may call /api/v2/*
-- No MFA, Organizations, actions/flows, email delivery, blocking, password change
 
 ### avalara-style
+
+**Covered** — 8 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v2/tax/calculate` |
+| POST | `/v2/transactions/create` |
+| GET | `/v2/transactions` |
+| GET | `/v2/transactions/{id}` |
+| POST | `/v2/transactions/{id}/void` |
+| GET | `/v2/companies` |
+| GET | `/v2/definitions/nexuses` |
+| GET | `/v2/definitions/taxcodes` |
+
+</details>
+
+**Missing** (5)
+
+- No company CRUD — GET /v2/companies list only
+- No address validation (/v2/addresses/resolve)
+- No createoradjust, settle, or per-line transaction operations
+- No customers, certificates, or exemption endpoints
+- No jurisdiction lookups — definitions serve nexuses and taxcodes only
+
+**Deviations** (1)
 
 - Tax is a deterministic split — State 50%, County 25%, City 20%, Special 5% of the rate
 
 ### aws-cognito-style
+
+**Covered** — 7 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/oauth2/authorize` |
+| POST | `/oauth2/token` |
+| GET | `/oauth2/userInfo` |
+| GET | `/login` |
+| GET | `/logout` |
+| POST | `/` |
+| GET | `/{userPoolId}/.well-known/jwks.json` |
+
+</details>
+
+**Missing** (6)
+
+- No USER_SRP_AUTH — only USER_PASSWORD_AUTH and admin flows
+- No AdminGetUser, AdminDeleteUser, or attribute-update operations
+- No groups, custom auth challenges, or lambda triggers
+- No ResendConfirmationCode or ChangePassword operations
+- No GetOpenIdToken or developer-authenticated identity flows
+- No hosted-UI OIDC discovery or /oauth2/revoke endpoints
+
+**Deviations** (3)
 
 - Service API SigV4 is structure-checked only — signature not cryptographically enforced
 - Verification/reset codes are the last 6 digits of the username, zero-padded
@@ -314,12 +616,57 @@ observable over the wire.
 
 ### aws-iam-sts-style
 
+**Covered** — 2 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/` |
+| POST | `/` |
+
+</details>
+
+**Missing** (3)
+
+- No UpdateRole/DeleteRole, role policy ops, user CRUD, groups, or policies
+- No access-key list/update/delete beyond CreateAccessKey
+- No AssumeRoleWithSAML
+
+**Deviations** (3)
+
 - Canonical path/query rebuilt from decoded values — duplicate query keys indistinguishable
 - RFC 1123 Date header fallback not parsed — x-amz-date is required
 - Only the documented example AKID/secret validates (single credential pair)
-- IAM actions limited to role CRUD, ListUsers, CreateAccessKey
 
 ### aws-s3-style
+
+**Covered** — 8 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/{bucket}` |
+| PUT | `/{bucket}` |
+| DELETE | `/{bucket}` |
+| PUT | `/{bucket}/{key+}` |
+| GET | `/{bucket}/{key+}` |
+| HEAD | `/{bucket}/{key+}` |
+| DELETE | `/{bucket}/{key+}` |
+| POST | `/{bucket}/{key+}` |
+
+</details>
+
+**Missing** (5)
+
+- No bucket policy, tagging, ACL, CORS, lifecycle, or website subresources
+- No object versioning (?versions listing, versionId delete) or object lock
+- No CopyObject (x-amz-copy-source) or UploadPartCopy
+- No browser form POST uploads (POST policy)
+- No ListMultipartUploads (GET /{bucket}?uploads)
+
+**Deviations** (5)
 
 - ETags are SHA-256-based (real S3 uses MD5); multipart ETag is sha256(etags)-N
 - Multipart 5 MiB minimum part size not enforced (small parts allowed)
@@ -329,12 +676,87 @@ observable over the wire.
 
 ### azure-devops-style
 
+**Covered** — 17 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/{org}/_apis/projects` |
+| GET | `/{org}/{project}/_apis/pipelines` |
+| GET | `/{org}/{project}/_apis/pipelines/{pipelineId}` |
+| GET | `/{org}/{project}/_apis/pipelines/{pipelineId}/runs` |
+| POST | `/{org}/{project}/_apis/pipelines/{pipelineId}/runs` |
+| GET | `/{org}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}` |
+| GET | `/{org}/{project}/_apis/git/repositories` |
+| GET | `/{org}/{project}/_apis/git/repositories/{repoId}/items` |
+| GET | `/{org}/{project}/_apis/git/repositories/{repoId}/commits` |
+| POST | `/{org}/{project}/_apis/git/repositories/{repoId}/pushes` |
+| GET | `/{org}/{project}/_apis/work/teamsettings/iterations` |
+| GET | `/{org}/{project}/_apis/wit/workitems` |
+| GET | `/{org}/{project}/_apis/wit/workitems/{id}` |
+| PATCH | `/{org}/{project}/_apis/wit/workitems/{id}` |
+| POST | `/{org}/{project}/_apis/wit/workitems/{type}` |
+| POST | `/{org}/{project}/_apis/wit/wiql` |
+| POST | `/{org}/_apis/hooks/subscriptions` |
+
+</details>
+
+**Missing** (7)
+
+- No WIQL OR predicates, @Me/@Project macros, or non-WorkItems FROM targets
+- No work-item comments, links/attachments, or revisions endpoints
+- No project CRUD — projects are list-only
+- No pipeline create/update or run artifacts/logs/approvals endpoints
+- No repo create, refs/branch ops, pull requests, or tags
+- No team-settings writes — iterations are list-only, no boards/columns
+- No service-hook list/update/delete or publisher/consumer discovery
+
+**Deviations** (3)
+
 - Run state derives from clock — inProgress at +1s, completed/succeeded at +3s
 - simulate_fail run parameter (templateParameters or top-level) forces result failed
-- WIQL subset: no OR, no @Me macros, non-WorkItems FROM targets return 400
 - Run-state webhooks may double-emit when list/bulk reads race single-run polls
 
 ### azure-servicebus-style
+
+**Covered** — 18 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/{queue}/messages` |
+| DELETE | `/{queue}/messages/head` |
+| POST | `/{queue}/messages/{lockToken}/{action}` |
+| GET | `/$topicInfo` |
+| GET | `/topics` |
+| PUT | `/topics/{topic}` |
+| GET | `/topics/{topic}` |
+| DELETE | `/topics/{topic}` |
+| POST | `/topics/{topic}/messages` |
+| GET | `/topics/{topic}/subscriptions` |
+| PUT | `/topics/{topic}/subscriptions/{sub}` |
+| GET | `/topics/{topic}/subscriptions/{sub}` |
+| DELETE | `/topics/{topic}/subscriptions/{sub}` |
+| POST | `/topics/{topic}/subscriptions/{sub}/messages` |
+| POST | `/topics/{topic}/subscriptions/{sub}/messages/{lockToken}/{action}` |
+| POST | `/{account}/{queue}/messages` |
+| GET | `/{account}/{queue}/messages` |
+| DELETE | `/{account}/{queue}/messages/{messageid}` |
+
+</details>
+
+**Missing** (6)
+
+- No queue management — queues are neither created nor listed
+- No subscription rules — fan-out is the default match-all broadcast only
+- No dead-letter settle action or DLQ receive (subqueue $deadletterqueue)
+- No sessions, scheduled send, or duplicate detection
+- No AMQP 1.0 transport — HTTP/REST surface only
+- No Storage queue peek, update, clear, or queue create/list/delete
+
+**Deviations** (3)
 
 - Default 30s peek-lock, overridable via simulator-only lockduration query param
 - Bearer auth accepted with any non-empty token — only SAS is verified
@@ -342,17 +764,115 @@ observable over the wire.
 
 ### azure-storage-style
 
+**Covered** — 9 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/` |
+| PUT | `/{container}` |
+| GET | `/{container}` |
+| HEAD | `/{container}` |
+| DELETE | `/{container}` |
+| PUT | `/{container}/{blob}` |
+| GET | `/{container}/{blob}` |
+| HEAD | `/{container}/{blob}` |
+| DELETE | `/{container}/{blob}` |
+
+</details>
+
+**Missing** (6)
+
+- No Append Blob or Page Blob types — Block Blob only
+- No lease operations (?comp=lease) on blobs or containers
+- No blob snapshots or copy (?comp=copy, from URL)
+- No container ACL or metadata set/get — HEAD metadata only
+- No service-level properties, stats, CORS, or user delegation keys
+- No blob tags/index (?comp=tags) or soft delete/immutability
+
+**Deviations** (3)
+
 - Content-MD5 carries base64 SHA-256 (engine has no MD5) — documented deviation
 - SAS checked structurally (sv/sig/se present) and any non-empty bearer accepted
 - PUT on an existing container updates it in place 201 (real Azure: 409 conflict)
 
+### blog-style
+
+**Covered** — 0 routes · GraphQL schema
+
 ### bluesky-style
+
+**Covered** — 7 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/xrpc/com.atproto.server.createSession` |
+| POST | `/xrpc/com.atproto.server.refreshSession` |
+| POST | `/xrpc/com.atproto.repo.createRecord` |
+| POST | `/xrpc/com.atproto.repo.deleteRecord` |
+| GET | `/xrpc/com.atproto.identity.resolveHandle` |
+| GET | `/xrpc/app.bsky.actor.getProfile` |
+| GET | `/xrpc/app.bsky.feed.searchPosts` |
+
+</details>
+
+**Missing** (7)
+
+- No repo reads: com.atproto.repo getRecord, listRecords, describeRepo, uploadBlob
+- No com.atproto.server getSession or deleteSession
+- No app.bsky.feed getTimeline, getPostThread, getFeed, getLikes
+- No app.bsky.graph getFollows, getFollowers, mutes, blocks
+- No app.bsky.notification listNotifications or getUnreadCount
+- No app.bsky.actor updateProfile or preference endpoints
+- No com.atproto.moderation createReport; no app.bsky.chat conversations
+
+**Deviations** (3)
 
 - searchPosts returns seeded synthetic results, not an index over created records
 - createSession mints tokens for any identifier/password pair; no credential check
 - refreshSession invalidates the old accessJwt too; real AT Protocol leaves it valid to exp
 
 ### braintree-style
+
+**Covered** — 15 routes · GraphQL schema
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/merchants/{merchantId}/transactions/advanced_search` |
+| POST | `/merchants/{merchantId}/transactions` |
+| GET | `/merchants/{merchantId}/transactions/{id}` |
+| POST | `/merchants/{merchantId}/transactions/{id}/settle` |
+| POST | `/merchants/{merchantId}/transactions/{id}/void` |
+| POST | `/merchants/{merchantId}/transactions/{id}/refund` |
+| POST | `/merchants/{merchantId}/payment_methods` |
+| POST | `/merchants/{merchantId}/client_token` |
+| POST | `/merchants/{merchantId}/plans` |
+| GET | `/merchants/{merchantId}/plans` |
+| GET | `/merchants/{merchantId}/plans/{id}` |
+| POST | `/merchants/{merchantId}/subscriptions` |
+| GET | `/merchants/{merchantId}/subscriptions/{id}` |
+| POST | `/merchants/{merchantId}/subscriptions/{id}/cancel` |
+| POST | `/webhooks` |
+
+</details>
+
+**Missing** (8)
+
+- No REST customer endpoints: create, get, search, update, delete (/customers)
+- No payment method fetch or delete: GET/DELETE /payment_methods/{token}
+- No addresses or credit_card_verifications endpoints
+- No subscription update, retry, or search; no plan delete
+- No disputes endpoints: search, open, accept, add evidence
+- No merchant accounts, settlements, or documents endpoints
+- GraphQL subset: no paymentMethod, clientToken, PayPal, or dispute operations
+- No Braintree Auth OAuth endpoints (token exchange, merchant onboarding)
+
+**Deviations** (5)
 
 - timings compressed: transactions settle at +3s, subscriptions bill a cycle every 2s
 - webhook registration exposed at POST /webhooks; real Braintree is Control Panel only
@@ -362,12 +882,87 @@ observable over the wire.
 
 ### braze-style
 
+**Covered** — 12 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/messages/send` |
+| POST | `/messages/schedule/create` |
+| POST | `/users/track` |
+| POST | `/users/alias/new` |
+| POST | `/users/identify` |
+| POST | `/users/delete` |
+| POST | `/users/export/ids` |
+| POST | `/campaigns/trigger/send` |
+| GET | `/segments/list` |
+| GET | `/messages/scheduled` |
+| POST | `/webhooks` |
+| GET | `/webhooks` |
+
+</details>
+
+**Missing** (8)
+
+- No canvas endpoints: /canvas/trigger/send, /canvas/list, /canvas/data_series
+- No campaign analytics: /campaigns/list, /campaigns/data_series, /campaigns/details
+- No /messages/schedule/update or delete; no /campaigns/trigger/schedule/create
+- No /users/export by segment; no /events/list or /purchases/product_list
+- No email endpoints: /email/status, /email/hard_bounces, /email/spam, /email/unsubscribes
+- No subscription groups: /subscription/status/set, /subscription/user/status, /get
+- No content blocks: /content_blocks list, info, create, update
+- No preference centers: /preference_center/v1 list and per-user URL endpoints
+
+**Deviations** (4)
+
 - POST /webhooks registration is a local extension; real Braze has no webhook REST API
 - message.sent webhook payloads use a synthetic shape; Braze has no documented scheme
 - scheduled sends flip to sent on first read past the time; message.sent fires once then
 - key store models expiry for app-group keys; real Braze keys do not expire
 
 ### chainlink-style
+
+**Covered** — 21 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/feeds` |
+| GET | `/feeds/{feedID}` |
+| GET | `/feeds/{feedID}/latestRoundData` |
+| GET | `/feeds/{feedID}/rounds` |
+| GET | `/feeds/{feedID}/rounds/{roundId}` |
+| POST | `/v2/functions/createSecrets` |
+| POST | `/v2/functions/encryptSecrets` |
+| POST | `/v2/functions/createRequest` |
+| GET | `/v2/functions/request/{requestID}` |
+| GET | `/v2/functions/secrets/{secretID}` |
+| POST | `/v2/automation/registerUpkeep` |
+| GET | `/v2/automation/upkeeps` |
+| GET | `/v2/automation/{id}` |
+| POST | `/v2/automation/{id}/fund` |
+| POST | `/v2/automation/{id}/cancel` |
+| POST | `/v2/automation/{id}/withdraw` |
+| GET | `/v2/automation/{id}/check` |
+| POST | `/v2/automation/{id}/perform` |
+| GET | `/v2/automation/{id}/performs` |
+| GET | `/v2/ccip/messages` |
+| GET | `/v2/ccip/lane/{src}/{dst}` |
+
+</details>
+
+**Missing** (6)
+
+- No Functions subscription management: create, fund, update, cancel subscription
+- No Functions requests listing or DON listing endpoints
+- No Automation update, pause, or resume endpoints for upkeeps
+- No CCIP message detail, executions, token-pool, or send endpoints
+- No Data Streams product: stream auth, WebSocket report feeds, report upload
+- No feed timeseries/chart history endpoint beyond /rounds paging
+
+**Deviations** (5)
 
 - feed rounds aggregate per 60s heartbeat vs real deviation/3600s; answers drift ±0.25%
 - DON secrets use a deterministic HMAC envelope, not real randomized ECIES encryption
@@ -377,6 +972,63 @@ observable over the wire.
 
 ### cloudflare-style
 
+**Covered** — 35 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/zones` |
+| POST | `/zones` |
+| GET | `/zones/{zone_id}` |
+| DELETE | `/zones/{zone_id}` |
+| GET | `/zones/{zone_id}/dns_records` |
+| POST | `/zones/{zone_id}/dns_records` |
+| GET | `/zones/{zone_id}/dns_records/{dns_record_id}` |
+| PUT | `/zones/{zone_id}/dns_records/{dns_record_id}` |
+| PATCH | `/zones/{zone_id}/dns_records/{dns_record_id}` |
+| DELETE | `/zones/{zone_id}/dns_records/{dns_record_id}` |
+| GET | `/zones/{zone_id}/firewall/rules` |
+| POST | `/zones/{zone_id}/firewall/rules` |
+| GET | `/zones/{zone_id}/firewall/rules/{rule_id}` |
+| PUT | `/zones/{zone_id}/firewall/rules/{rule_id}` |
+| PATCH | `/zones/{zone_id}/firewall/rules/{rule_id}` |
+| DELETE | `/zones/{zone_id}/firewall/rules/{rule_id}` |
+| GET | `/zones/{zone_id}/page_rules` |
+| POST | `/zones/{zone_id}/page_rules` |
+| GET | `/zones/{zone_id}/page_rules/{rule_id}` |
+| PUT | `/zones/{zone_id}/page_rules/{rule_id}` |
+| PATCH | `/zones/{zone_id}/page_rules/{rule_id}` |
+| DELETE | `/zones/{zone_id}/page_rules/{rule_id}` |
+| POST | `/zones/{zone_id}/purge_cache` |
+| GET | `/accounts/{account_id}/workers/scripts` |
+| PUT | `/accounts/{account_id}/workers/scripts/{script_name}` |
+| GET | `/accounts/{account_id}/workers/scripts/{script_name}` |
+| DELETE | `/accounts/{account_id}/workers/scripts/{script_name}` |
+| GET | `/accounts/{account_id}/workers/scripts/{script_name}/deployments` |
+| GET | `/accounts/{account_id}/r2/buckets` |
+| POST | `/accounts/{account_id}/r2/buckets` |
+| DELETE | `/accounts/{account_id}/r2/buckets/{bucket_name}` |
+| GET | `/accounts/{account_id}/d1/database` |
+| POST | `/accounts/{account_id}/d1/database` |
+| DELETE | `/accounts/{account_id}/d1/database/{database_id}` |
+| POST | `/accounts/{account_id}/d1/database/{database_id}/query` |
+
+</details>
+
+**Missing** (8)
+
+- No Workers KV: namespace or key-value endpoints (storage/kv/values)
+- No Workers routes, custom domains, cron triggers, secrets, or tail endpoints
+- No R2 object endpoints (listing, uploads, downloads) or S3 API surface
+- No D1 get/update/import/export or time-travel endpoints
+- No user, account, member, or role management endpoints (/user, /accounts)
+- No zone settings, SSL/certificates, or GraphQL analytics endpoints
+- No bulk DNS create/delete (dns_records/batch) or DNS import/export
+- No rate limiting rules or WAF custom rulesets beyond zone firewall rules
+
+**Deviations** (5)
+
 - any non-empty bearer token accepted; real token permission scoping not validated
 - zone status runs pending -> initializing -> active in ~4s; real waits on nameservers
 - deployments expose a status field; real Deployment objects carry rollout percentages
@@ -385,11 +1037,68 @@ observable over the wire.
 
 ### cloudkit-style
 
-- only the public database surface is modeled; private/shared databases are absent
+**Covered** — 5 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/database/1/{container}/{env}/public/users/current` |
+| GET | `/database/1/{container}/{env}/public/zones/list` |
+| GET | `/database/1/{container}/{env}/public/records/lookup` |
+| GET | `/database/1/{container}/{env}/public/records/query` |
+| POST | `/database/1/{container}/{env}/public/records/modify` |
+
+</details>
+
+**Missing** (6)
+
+- No private or shared database surfaces (/database/1/.../private|shared)
+- No assets: no /assets/upload endpoint or asset field handling
+- No /users/discover (find users by email or address)
+- No zone mutations (/zones/modify); zones cannot be created or deleted
+- No subscriptions: /subscriptions/list, /subscriptions/modify (push)
+- No web-user token auth; server-to-server key signatures only
+
+**Deviations** (2)
+
 - records/lookup and records/query are GET-with-body; real CloudKit specifies POST
 - query comparators are a limited subset; FULL_TEXT, LIKE, and list variants missing
 
 ### discord-style
+
+**Covered** — 10 routes (+1 ws)
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/oauth2/authorize` |
+| POST | `/oauth2/token` |
+| GET | `/oauth2/@me` |
+| GET | `/users/@me` |
+| GET | `/guilds/{guild_id}` |
+| GET | `/guilds/{guild_id}/channels` |
+| POST | `/channels/{channel_id}/messages` |
+| GET | `/channels/{channel_id}/messages` |
+| POST | `/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` |
+| POST | `/interactions` |
+| WS | `/gateway` |
+
+</details>
+
+**Missing** (8)
+
+- No message edit or delete: PATCH/DELETE /channels/{id}/messages/{msg_id}
+- No channel create/update/delete or channel webhooks endpoints
+- No reaction listing or removal endpoints (GET/DELETE /reactions/{emoji})
+- No application command registration (PUT /applications/{app_id}/commands)
+- No guild list or member endpoints: GET /users/@me/guilds, /guilds/{id}/members
+- No DM channels (POST /users/@me/channels) or invite endpoints
+- No OAuth token revoke (/oauth2/token/revoke) or /applications/@me
+- No pins, typing, threads, or audit log endpoints
+
+**Deviations** (4)
 
 - gateway is a fixed script: HELLO, lenient IDENTIFY, READY, one synthetic MESSAGE_CREATE
 - POST /interactions answers ping with type 1, everything else a type 5 deferred ack
@@ -398,18 +1107,107 @@ observable over the wire.
 
 ### drive-style
 
+**Covered** — 13 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/o/oauth2/auth` |
+| POST | `/o/oauth2/token` |
+| POST | `/upload/drive/v3/files` |
+| PUT | `/upload/drive/v3/files/{upload_id}` |
+| DELETE | `/upload/drive/v3/files/{upload_id}` |
+| GET | `/drive/v3/files` |
+| POST | `/drive/v3/files` |
+| GET | `/drive/v3/files/{id}` |
+| PATCH | `/drive/v3/files/{id}` |
+| DELETE | `/drive/v3/files/{id}` |
+| GET | `/drive/v3/about` |
+| GET | `/drive/v3/changes/startPageToken` |
+| GET | `/drive/v3/changes` |
+
+</details>
+
+**Missing** (7)
+
+- No permissions/sharing endpoints on files (GET/POST/DELETE permissions)
+- No comments or replies endpoints (/files/{id}/comments)
+- No file copy (POST /files/{id}/copy) or export (GET /files/{id}/export)
+- No revisions endpoints (/files/{id}/revisions)
+- No shared drives endpoints (/drives); no supportsAllDrives handling
+- No push notification channels (files.watch, changes.watch, channels/stop)
+- No generateIds, apps list, or batch (multipart/mixed) request support
+
+**Deviations** (3)
+
 - uploads take JSON {name, content, parents}; real Drive uses multipart/related bodies
 - list q is a limited field/op subset; queries outside it 400 rather than running
 - orderBy honors only the first recognized key; real Drive applies every key
 
 ### dropbox-style
 
+**Covered** — 8 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/2/files/upload` |
+| POST | `/2/files/download` |
+| POST | `/2/files/list_folder` |
+| POST | `/2/files/get_metadata` |
+| POST | `/2/files/create_folder` |
+| POST | `/2/files/delete` |
+| POST | `/2/files/get_temporary_link` |
+| POST | `/2/users/get_current_account` |
+
+</details>
+
+**Missing** (8)
+
+- No move or copy endpoints (/2/files/move_v2, /2/files/copy_v2)
+- No upload sessions for large files (/2/files/upload_session/*)
+- No file search (/2/files/search_v2)
+- No thumbnails or previews (get_thumbnail_b64, get_preview)
+- No shared links or sharing folder endpoints (/2/sharing/*)
+- No file history (list_revisions, restore, copy_reference)
+- No users/get_space_usage or users/get_account batch
+- No /2/files/list_folder/continue or list_folder/get_latest_cursor
+
+**Deviations** (4)
+
 - requests with no Authorization header are accepted; real Dropbox requires auth
 - upload takes JSON {path, content}; real /2/files/upload posts raw bytes + Dropbox-API-Arg
-- list_folder returns the whole path-prefix subtree; no has_more/cursor continue flow
+- list_folder returns the entire path-prefix subtree in one response
 - get_temporary_link mints a synthetic URL that does not serve the content
 
 ### dune-style
+
+**Covered** — 6 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/api/v1/query/{query_id}/execute` |
+| POST | `/api/v1/query/{query_id}/result` |
+| GET | `/api/v1/auth/validate` |
+| GET | `/api/v1/execution/{execution_id}/status` |
+| GET | `/api/v1/execution/{execution_id}/results/csv` |
+| GET | `/api/v1/execution/{execution_id}/results` |
+
+</details>
+
+**Missing** (5)
+
+- No query management: GET/POST/PATCH/DELETE /api/v1/query endpoints
+- No execution cancel (POST /api/v1/execution/{id}/cancel)
+- No stateless execution endpoint (DuneStateless /stateless/executions)
+- No CSV transfer to external storage (transfers endpoints)
+- No table metadata endpoints (GET /api/v1/table/{namespace}/{table})
+
+**Deviations** (3)
 
 - executions follow a fixed clock: EXECUTING at +1s, COMPLETED at +3s after execute
 - queries come from a static 3-entry catalog; no real SQL is executed
@@ -417,25 +1215,147 @@ observable over the wire.
 
 ### dynamodb-style
 
-- expression subset: OR/NOT/parens/IN/size()/doc paths/GSIs rejected as ValidationException
+**Covered** — 1 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/` |
+
+</details>
+
+**Missing** (8)
+
+- No secondary indexes: GSI/LSI creation and index-targeted queries
+- No transactions: TransactGetItems, TransactWriteItems
+- No PartiQL: ExecuteStatement, BatchExecuteStatement
+- No TTL: DescribeTimeToLive, UpdateTimeToLive
+- No backup or restore: CreateBackup, RestoreTableFromBackup
+- No UpdateTable, TagResource/UntagResource/ListTags, or DescribeLimits
+- No PITR or import/export: ExportTableToPointInTime, ImportTable
+- No global tables (CreateGlobalTable, ListGlobalTables)
+
+**Deviations** (5)
+
+- expression subset: OR/NOT/parens/IN/size()/doc paths rejected as ValidationException
 - tables are ACTIVE immediately and DeleteTable is synchronous; no CREATING/DELETING
 - UnprocessedKeys/UnprocessedItems always empty; no throttling, ConsumedCapacity fixed at 1
 - Query/Scan Limit caps returned post-filter items; real caps items evaluated
 - UpdateItem REMOVE on a key attribute silently no-ops instead of erroring
 
+### echo-style
+
+**Covered** — 0 routes (+1 ws) · gRPC `stunt.example.Echo`
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| WS | `/ws/echo` |
+
+</details>
+
 ### emailoctopus-style
+
+**Covered** — 21 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/lists` |
+| POST | `/lists` |
+| GET | `/lists/{list_id}` |
+| PUT | `/lists/{list_id}` |
+| DELETE | `/lists/{list_id}` |
+| POST | `/lists/{list_id}/fields` |
+| PUT | `/lists/{list_id}/fields/{tag}` |
+| DELETE | `/lists/{list_id}/fields/{tag}` |
+| GET | `/lists/{list_id}/contacts` |
+| POST | `/lists/{list_id}/contacts` |
+| PUT | `/lists/{list_id}/contacts` |
+| PUT | `/lists/{list_id}/contacts/batch` |
+| GET | `/lists/{list_id}/contacts/{contact_id}` |
+| PUT | `/lists/{list_id}/contacts/{contact_id}` |
+| DELETE | `/lists/{list_id}/contacts/{contact_id}` |
+| GET | `/campaigns` |
+| GET | `/campaigns/{campaign_id}` |
+| GET | `/campaigns/{campaign_id}/reports/summary` |
+| GET | `/campaigns/{campaign_id}/reports/links` |
+| GET | `/campaigns/{campaign_id}/reports` |
+| POST | `/automations/{automation_id}/queue` |
+
+</details>
+
+**Missing** (2)
+
+- No rate limiting: 429 too-many-requests responses and quotas not simulated
+- No 403 access-denied, 415 unsupported-media-type, or 405 method problem responses
+
+**Deviations** (3)
 
 - any non-empty bearer token is accepted; real keys are dashboard-issued API keys
 - contact ids use truncated SHA-256 of the email; the real API uses MD5
-- rate limiting (429) and the 403/415/405 problem types are not simulated
 - v2 has no webhooks; adapter emits unsigned lifecycle events as a local extension
 
 ### entra-id-style
 
-- directory listings honor only $top/$skipToken; no $filter/$search/$orderby
-- no user PATCH/DELETE; applications and servicePrincipals are list-only
+**Covered** — 9 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/common/oauth2/v2.0/authorize` |
+| POST | `/common/oauth2/v2.0/token` |
+| GET | `/common/discovery/v2.0/keys` |
+| GET | `/v1.0/me` |
+| GET | `/v1.0/users` |
+| POST | `/v1.0/users` |
+| GET | `/v1.0/users/{id}` |
+| GET | `/v1.0/applications` |
+| GET | `/v1.0/servicePrincipals` |
+
+</details>
+
+**Missing** (8)
+
+- No $filter, $search, $orderby, $select, or $expand on Graph queries
+- No user PATCH or DELETE (/v1.0/users/{id})
+- No application or servicePrincipal create, update, or delete operations
+- No groups, members, or memberOf endpoints (/v1.0/groups)
+- No directory roles, role assignments, or organization endpoints
+- No B2B invitations (POST /invitations) or guest users
+- No client-credentials or device-code token grant support
+- No signInLogs, audit logs, or user activities
+
+**Deviations** (1)
+
+- Authorize auto-approves with an instant 302; no consent screen
 
 ### erc4337-style
+
+**Covered** — 2 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/` |
+| POST | `/paymaster/sign` |
+
+</details>
+
+**Missing** (5)
+
+- No eth_chainId, eth_blockNumber, or eth_getBlockByNumber passthrough
+- No ERC-7677 paymaster RPC (pm_* methods); only local /paymaster/sign
+- No EntryPoint v0.6 support; v0.7 entrypoint only
+- No debug_bundler_* ops: sendBundleNow, clearState, dropUserOperation
+- No WebSocket transport or newHeads subscriptions
+
+**Deviations** (4)
 
 - gas estimates are deterministic fixed values; real bundlers differ per implementation
 - inclusion runs on a fixed clock: mempool 0-1s, bundled 1-3s, included at >=3s
@@ -444,12 +1364,56 @@ observable over the wire.
 
 ### escrow-style
 
+**Covered** — 9 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/2017-09-01/customer/me` |
+| GET | `/2017-09-01/transaction` |
+| POST | `/2017-09-01/transaction` |
+| GET | `/2017-09-01/transaction/reference/{reference}` |
+| GET | `/2017-09-01/transaction/{id}` |
+| PATCH | `/2017-09-01/transaction/{id}` |
+| POST | `/2017-09-01/customer/me/webhook` |
+| GET | `/2017-09-01/customer/me/webhook` |
+| POST | `/sim/transaction/{id}/fund` |
+
+</details>
+
+**Missing** (3)
+
+- No list filters on GET /2017-09-01/transaction (status, date, email)
+- No reject or return-item actions (agree/accept/ship/receive/cancel exist)
+- No fee calculation endpoint (/2017-09-01/transaction/fees)
+
+**Deviations** (1)
+
 - POST /sim/transaction/{id}/fund is a simulator-only affordance for hosted-page funding
-- PATCH exposes only action: agree; ship/receive/accept/cancel are not drivable
 
 ### eth-jsonrpc-style
 
-- No EVM execution: eth_getCode always returns 0x; contracts never run
+**Covered** — 1 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/` |
+
+</details>
+
+**Missing** (5)
+
+- No EVM execution — eth_getCode always 0x, contracts never run
+- No eth_getStorageAt, eth_getTransactionByBlock*, or uncle methods
+- No debug/trace namespaces (debug_traceTransaction, trace_transaction)
+- No eth_maxPriorityFeePerGas or eth_blobBaseFee methods
+- No WebSocket subscriptions (eth_subscribe); HTTP POST / only
+
+**Deviations** (4)
+
 - eth_estimateGas fixed at 0x5208 (21000); eth_gasPrice fixed at 1 Gwei
 - Tx hashes derive from a pseudo-keccak, not real keccak256
 - Mining delay fixed at 3s; blockNumber advances one block per sent tx
@@ -457,17 +1421,132 @@ observable over the wire.
 
 ### etherscan-style
 
+**Covered** — 1 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/api` |
+
+</details>
+
+**Missing** (3)
+
+- No txlistinternal, tokentx, or getLogs actions
+- No logs, proxy, or gastracker modules (gasoracle, eth_call passthrough)
+- No getminedblocks, getblocknobytime, or nodecount actions
+
+**Deviations** (1)
+
 - Auth accepts any non-empty apikey; only a missing key yields the error envelope
-- Surface is ~10 actions over 5 modules; no txlistinternal, tokentx, or getLogs
 
 ### fattureincloud-style
 
-- OAuth2 token dance not modeled — any non-empty bearer is accepted
-- E-invoice send/retrieve side effects and email dispatch not modeled
+**Covered** — 42 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/user/companies` |
+| GET | `/c/{company_id}/company/info` |
+| PUT | `/c/{company_id}/company/info` |
+| GET | `/c/{company_id}/received_documents` |
+| POST | `/c/{company_id}/received_documents` |
+| GET | `/c/{company_id}/received_documents/info` |
+| GET | `/c/{company_id}/received_documents/{id}` |
+| PUT | `/c/{company_id}/received_documents/{id}` |
+| DELETE | `/c/{company_id}/received_documents/{id}` |
+| GET | `/c/{company_id}/issued_documents` |
+| POST | `/c/{company_id}/issued_documents` |
+| GET | `/c/{company_id}/issued_documents/info` |
+| GET | `/c/{company_id}/issued_documents/{id}` |
+| PUT | `/c/{company_id}/issued_documents/{id}` |
+| DELETE | `/c/{company_id}/issued_documents/{id}` |
+| GET | `/c/{company_id}/suppliers` |
+| POST | `/c/{company_id}/suppliers` |
+| GET | `/c/{company_id}/suppliers/{id}` |
+| PUT | `/c/{company_id}/suppliers/{id}` |
+| DELETE | `/c/{company_id}/suppliers/{id}` |
+| GET | `/c/{company_id}/clients` |
+| POST | `/c/{company_id}/clients` |
+| GET | `/c/{company_id}/clients/{id}` |
+| PUT | `/c/{company_id}/clients/{id}` |
+| DELETE | `/c/{company_id}/clients/{id}` |
+| GET | `/c/{company_id}/products` |
+| POST | `/c/{company_id}/products` |
+| GET | `/c/{company_id}/products/{id}` |
+| PUT | `/c/{company_id}/products/{id}` |
+| DELETE | `/c/{company_id}/products/{id}` |
+| GET | `/c/{company_id}/taxes` |
+| POST | `/c/{company_id}/taxes` |
+| GET | `/c/{company_id}/taxes/{id}` |
+| PUT | `/c/{company_id}/taxes/{id}` |
+| DELETE | `/c/{company_id}/taxes/{id}` |
+| GET | `/c/{company_id}/cashbook/{year}/{month}` |
+| POST | `/c/{company_id}/archive` |
+| GET | `/c/{company_id}/subscriptions` |
+| POST | `/c/{company_id}/subscriptions` |
+| GET | `/c/{company_id}/subscriptions/{id}` |
+| PUT | `/c/{company_id}/subscriptions/{id}` |
+| DELETE | `/c/{company_id}/subscriptions/{id}` |
+
+</details>
+
+**Missing** (3)
+
+- OAuth2 token dance not implemented (no authorize or token endpoints)
+- No e-invoice send/retrieve side effects or email dispatch
+- No receipts, settings, or document attachment endpoints
+
+**Deviations** (3)
+
+- Any non-empty bearer accepted; missing/malformed header is a genuine 401
 - POST /entities/{c}/archive takes JSON; the real endpoint is multipart
 - Webhook HMAC uses fixed secret fic-stunt-webhook-signing-secret
 
 ### firebase-style
+
+**Covered** — 22 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v1/accounts:signInWithPassword` |
+| POST | `/v1/accounts:signUp` |
+| POST | `/v1/accounts:signInWithIdp` |
+| POST | `/v1/accounts:getAccountInfo` |
+| POST | `/v1/accounts:lookup` |
+| POST | `/identitytoolkit/v3/relyingparty/{action}` |
+| POST | `/v1/token` |
+| POST | `/v1/projects/{project}/databases/(default)/documents:runQuery` |
+| GET | `/v1/projects/{project}/databases/(default)/documents/{collection}` |
+| POST | `/v1/projects/{project}/databases/(default)/documents/{collection}` |
+| GET | `/v1/projects/{project}/databases/(default)/documents/{collection}/{id}` |
+| PATCH | `/v1/projects/{project}/databases/(default)/documents/{collection}/{id}` |
+| DELETE | `/v1/projects/{project}/databases/(default)/documents/{collection}/{id}` |
+| GET | `/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}` |
+| POST | `/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}` |
+| GET | `/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}/{id}` |
+| PATCH | `/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}/{id}` |
+| DELETE | `/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}/{id}` |
+| POST | `/v1/projects/{project}/messages:send` |
+| GET | `/v1/projects/{project}/messages` |
+| POST | `/v1/projects/{project}/topics/{topic}:subscribe` |
+| POST | `/v1/projects/{project}/topics/{topic}:unsubscribe` |
+
+</details>
+
+**Missing** (4)
+
+- No Realtime Database, Cloud Storage, or App Check surfaces
+- No password reset (sendOobCode), account update/delete, or phone auth
+- No Firestore index management, listCollectionIds, batchGet, or listen
+- runQuery lacks composite/unary filters, offset, and startAt/endAt cursors
+
+**Deviations** (5)
 
 - Firestore subcollections supported one level deep only
 - runQuery covers a structuredQuery subset: from/where/orderBy/limit, 8 filter ops
@@ -477,76 +1556,395 @@ observable over the wire.
 
 ### ga4-style
 
-- Dimensions limited to date/country/deviceCategory; metrics to sessions/activeUsers/screenPageViews
-- Reports accept only dims, metrics, dateRanges, limit, offset, filters, orderBys
+**Covered** — 4 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/v1admin/accounts` |
+| GET | `/v1admin/properties` |
+| GET | `/v1admin/properties/{property}/dataStreams` |
+| POST | `/v1beta/properties/{resource}` |
+
+</details>
+
+**Missing** (4)
+
+- No pivots, cohortSpec, metricAggregations, or keepEmptyRows in runReport
+- No runPivotReport, batchRunReports, getMetadata, or checkCompatibility
+- No Admin write ops: account/property/dataStream create, patch, delete
+- No googleAdsLinks, firebaseLinks, audiences, or conversionEvents
+
+**Deviations** (2)
+
+- Dimensions: date/country/deviceCategory only; metrics: sessions/activeUsers/screenPageViews
 - properties.list honors only the filter=parent:<account> form
 
 ### gcalendar-style
 
-- RRULE expansion supports DAILY and WEEKLY only (e.g. FREQ=DAILY;COUNT=3)
+**Covered** — 10 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/calendar/v3/users/me/calendarList` |
+| GET | `/calendar/v3/calendars/primary` |
+| POST | `/calendar/v3/calendars/{calendarId}/events/quickAdd` |
+| POST | `/calendar/v3/calendars/{calendarId}/events/import` |
+| GET | `/calendar/v3/calendars/{calendarId}/events` |
+| POST | `/calendar/v3/calendars/{calendarId}/events` |
+| GET | `/calendar/v3/calendars/{calendarId}/events/{eventId}/instances` |
+| GET | `/calendar/v3/calendars/{calendarId}/events/{eventId}` |
+| PATCH | `/calendar/v3/calendars/{calendarId}/events/{eventId}` |
+| DELETE | `/calendar/v3/calendars/{calendarId}/events/{eventId}` |
+
+</details>
+
+**Missing** (4)
+
+- No RRULE MONTHLY/YEARLY frequencies or BY* parts (BYDAY, BYSETPOS)
+- No calendars CRUD or calendarList/ACL write endpoints
+- No events watch, move, or freebusy.query endpoints
+- No colors or users.settings endpoints
+
+**Deviations** (1)
+
 - Event create without start/end defaults them (now+30m, +90m); real API requires both
 
 ### gdocs-style
 
+**Covered** — 4 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v1/documents` |
+| GET | `/v1/documents/{documentId}/revisions` |
+| POST | `/v1/documents/{documentId}/batchUpdate` |
+| GET | `/v1/documents/{documentId}` |
+
+</details>
+
+**Missing** (3)
+
 - Tables, headers/footers, suggestions, and writeControl not modeled
+- Most batchUpdate request types absent: replaceAllText, replaceImage, named ranges
+- No createTable or other table requests (insertTableRow, updateTableCellStyle)
+
+**Deviations** (3)
+
 - batchUpdate replies map 1:1 to requests; real API may return fewer
 - Inserted text adopts the style of the run it lands in
 - Inserting newline continues bullet/named style into the new paragraph
-- batchUpdate request vocabulary limited to 8 types (insertText, updateStyles, ...)
 
 ### github-style
 
+**Covered** — 26 routes · GraphQL schema
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/app` |
+| GET | `/app/installations` |
+| POST | `/app/installations/{installation_id}/access_tokens` |
+| GET | `/installation` |
+| GET | `/repos/{owner}/{repo}` |
+| GET | `/repos/{owner}/{repo}/issues` |
+| POST | `/repos/{owner}/{repo}/issues` |
+| GET | `/repos/{owner}/{repo}/issues/{issue_number}` |
+| PATCH | `/repos/{owner}/{repo}/issues/{issue_number}` |
+| GET | `/repos/{owner}/{repo}/issues/{issue_number}/comments` |
+| POST | `/repos/{owner}/{repo}/issues/{issue_number}/comments` |
+| POST | `/repos/{owner}/{repo}/issues/{issue_number}/labels/{name}` |
+| DELETE | `/repos/{owner}/{repo}/issues/{issue_number}/labels/{name}` |
+| GET | `/repos/{owner}/{repo}/issues/{issue_number}/events` |
+| GET | `/repos/{owner}/{repo}/pulls` |
+| POST | `/repos/{owner}/{repo}/pulls` |
+| GET | `/repos/{owner}/{repo}/pulls/{pull_number}` |
+| PATCH | `/repos/{owner}/{repo}/pulls/{pull_number}` |
+| PUT | `/repos/{owner}/{repo}/pulls/{pull_number}/merge` |
+| GET | `/repos/{owner}/{repo}/pulls/{pull_number}/reviews` |
+| POST | `/repos/{owner}/{repo}/pulls/{pull_number}/reviews` |
+| POST | `/repos/{owner}/{repo}/dispatches` |
+| GET | `/repos/{owner}/{repo}/actions/runs` |
+| GET | `/repos/{owner}/{repo}/actions/runs/{run_id}` |
+| POST | `/repos/{owner}/{repo}/hooks` |
+| POST | `/webhooks/receive` |
+
+</details>
+
+**Missing** (7)
+
+- No X-Hub-Signature (SHA-1) or X-GitHub-Delivery UUID webhook headers
+- No users, orgs, teams, or search endpoints
+- No git data, contents, branches, or releases endpoints
+- No PR review comments, files, or requested_reviewers endpoints
+- No actions workflows, jobs, artifacts, or logs endpoints
+- No webhook list/patch/delete or deliveries endpoints
+- No GraphQL nodes or mutations beyond viewer, repository, issues, pulls
+
+**Deviations** (4)
+
 - POST /graphql served without the REST Bearer/PAT check (transport lacks auth hook)
 - App JWT RS256 signature not verified; the credential store is the check
-- Webhooks emit only X-Hub-Signature-256 + X-GitHub-Event; no SHA-1 or Delivery UUID
 - Webhook body is a stunt {type, payload} envelope, not GitHub's bare event body
 - Runs advance on fixed clock (queued+1s, in_progress+3s); dispatch takes simulate_fail
 
 ### gmail-style
 
-- q is a substring match on snippet + Subject; no Gmail search operators (from:, after:)
+**Covered** — 16 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/gmail/v1/users/{userId}/labels` |
+| POST | `/gmail/v1/users/{userId}/labels` |
+| DELETE | `/gmail/v1/users/{userId}/labels/{id}` |
+| POST | `/gmail/v1/users/{userId}/messages/send` |
+| GET | `/gmail/v1/users/{userId}/messages` |
+| POST | `/gmail/v1/users/{userId}/messages` |
+| POST | `/gmail/v1/users/{userId}/messages/batchModify` |
+| POST | `/gmail/v1/users/{userId}/messages/{messageId}/trash` |
+| POST | `/gmail/v1/users/{userId}/messages/{messageId}/modify` |
+| GET | `/gmail/v1/users/{userId}/messages/{messageId}/attachments/{attachmentId}` |
+| GET | `/gmail/v1/users/{userId}/messages/{messageId}` |
+| DELETE | `/gmail/v1/users/{userId}/messages/{messageId}` |
+| GET | `/gmail/v1/users/{userId}/drafts` |
+| POST | `/gmail/v1/users/{userId}/drafts` |
+| DELETE | `/gmail/v1/users/{userId}/drafts/{id}` |
+| GET | `/gmail/v1/users/{userId}/threads/{threadId}` |
+
+</details>
+
+**Missing** (6)
+
+- No Gmail search operators (from:, to:, after:, has:attachment) in q
+- No threads.list, history.list, or watch/stop push endpoints
+- No drafts send/update/get or threads modify/trash endpoints
+- No messages.import, untrash, or batchDelete endpoints
+- No labels get/patch or users.getProfile endpoints
+- No settings surface: filters, sendAs, forwardingAddresses, vacation
+
+**Deviations** (3)
+
+- q is substring match on snippet + Subject header only
 - Omitted/0 maxResults returns everything; real API defaults to 100
 - Label create is idempotent on existing name; real Gmail returns 409
-- No threads.list, history, watch, or drafts send/update/get endpoints
 
 ### google-admin-style
 
-- Directory surface limited to users, groups, members, and tokens resources
+**Covered** — 13 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/admin/directory/v1/users` |
+| POST | `/admin/directory/v1/users` |
+| GET | `/admin/directory/v1/users/{userKey}` |
+| PUT | `/admin/directory/v1/users/{userKey}` |
+| DELETE | `/admin/directory/v1/users/{userKey}` |
+| GET | `/admin/directory/v1/users/{userKey}/tokens` |
+| GET | `/admin/directory/v1/groups` |
+| POST | `/admin/directory/v1/groups` |
+| GET | `/admin/directory/v1/groups/{groupKey}` |
+| DELETE | `/admin/directory/v1/groups/{groupKey}` |
+| GET | `/admin/directory/v1/groups/{groupKey}/members` |
+| POST | `/admin/directory/v1/groups/{groupKey}/members` |
+| DELETE | `/admin/directory/v1/groups/{groupKey}/members/{memberKey}` |
+
+</details>
+
+**Missing** (4)
+
+- No orgunits, roles, roleAssignments, or schemas resources
+- No asps, verificationCodes, mobileDevices, or chromeosDevices
+- No user/group aliases, user photos, domains, or customers endpoints
+- No users.patch/groups.patch, members.get, or members.update endpoints
+
+**Deviations** (3)
+
 - Users query supports bare terms plus email:/name:/orgUnitPath=/isSuspended= only
 - Groups query silently ignores unrecognized query forms
 - Static convenience token ya29.mock-admin-token seeded far-future
 
 ### google-iam-style
 
+**Covered** — 9 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/oauth2/v4/token` |
+| GET | `/oauth2/v3/certs` |
+| GET | `/v1/projects/{project}/serviceAccounts` |
+| POST | `/v1/projects/{project}/serviceAccounts` |
+| GET | `/v1/projects/{project}/serviceAccounts/{sa}` |
+| DELETE | `/v1/projects/{project}/serviceAccounts/{sa}` |
+| GET | `/v1/projects/{project}/serviceAccounts/{sa}/keys` |
+| POST | `/v1/projects/{project}/serviceAccounts/{sa_verb}` |
+| POST | `/v1/projects/{project}/roles:queryGrantableRoles` |
+
+</details>
+
+**Missing** (4)
+
+- No serviceAccountKeys create/delete, signJwt, or signBlob methods
+- No serviceAccount patch, disable/enable, undelete, or getIamPolicy
+- No generateIdToken method
+- No roles list, get, create, or custom-role CRUD endpoints
+
+**Deviations** (1)
+
 - JWKS serves one fixed synthetic RSA-2048 key (kid mock-google-key-1)
-- Service-account keys are list-only; no keys.create/delete or signJwt/signBlob
 
 ### google-style
 
-- /o/oauth2/auth auto-approves with an instant 302; no consent screen
+**Covered** — 4 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/o/oauth2/auth` |
+| POST | `/o/oauth2/token` |
+| GET | `/oauth2/v3/certs` |
+| GET | `/oauth2/v3/userinfo` |
+
+</details>
+
+**Missing** (2)
+
+- No revoke or tokeninfo endpoints
+- No device-code grant (/device.code) or OIDC discovery document
+
+**Deviations** (2)
+
+- Authorize auto-approves with an instant 302; no consent screen
 - id_tokens signed by a fixed synthetic RSA key (kid mock-google-key-1)
-- Only auth/token/certs/userinfo modeled; no revoke or tokeninfo endpoints
 
 ### gsearchconsole-style
 
+**Covered** — 11 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/webmasters/v3/sites` |
+| GET | `/webmasters/v3/sites/{siteUrl}` |
+| PUT | `/webmasters/v3/sites/{siteUrl}` |
+| DELETE | `/webmasters/v3/sites/{siteUrl}` |
+| POST | `/webmasters/v3/sites/{siteUrl}/searchAnalytics/query` |
+| GET | `/webmasters/v3/sites/{siteUrl}/sitemaps` |
+| GET | `/webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}` |
+| PUT | `/webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}` |
+| DELETE | `/webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}` |
+| POST | `/v1/urlInspection/index:inspect` |
+| POST | `/webmasters/v3/sites/{siteUrl}/inspect` |
+
+</details>
+
+**Missing** (2)
+
+- 16-month window not modeled; ranges derive at most 90 days / ~1800 cells
+- No country dimension in search analytics
+
+**Deviations** (4)
+
 - Regex filters (includingRegex/excludingRegex) degrade to equals/notEquals
-- Date ranges capped at 90 days / ~1800 cells; real 16-month window unmodeled
 - Site verification completes ~2s after sites.add via derive-on-read clock
 - Inspection verdicts keyed to magic path tokens (noindex, soft404, servererror)
 - URL-prefix sites/sitemaps addressed by single-segment paths (decoded routing)
 
 ### gsheets-style
 
-- A1 parsing covers cells/rects/column-only (A:C); no row-only (1:5) or quoted titles
-- batchUpdate models addSheet/deleteSheet/updateCells/repeatCell only
-- No copyTo, named ranges, developer metadata, or byDataFilter values endpoints
+**Covered** — 9 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v4/spreadsheets` |
+| POST | `/v4/spreadsheets/{spreadsheetId}/values:batchGet` |
+| POST | `/v4/spreadsheets/{spreadsheetId}/values:batchUpdate` |
+| POST | `/v4/spreadsheets/{spreadsheetId}/sheets` |
+| POST | `/v4/spreadsheets/{ss_id_or_verb}` |
+| GET | `/v4/spreadsheets/{spreadsheetId}` |
+| GET | `/v4/spreadsheets/{spreadsheetId}/values/{range}` |
+| PUT | `/v4/spreadsheets/{spreadsheetId}/values/{range}` |
+| POST | `/v4/spreadsheets/{spreadsheetId}/values/{range_verb}` |
+
+</details>
+
+**Missing** (4)
+
+- No row-only A1 ranges (1:5) or quoted sheet titles
+- No copyTo, named ranges, developer metadata, or byDataFilter endpoints
+- batchUpdate limited to 4 request types; no insertDimension, mergeCells, sortRange
+- No valueRenderOption or dateTimeRenderOption on values reads
 
 ### gtasks-style
 
-- Task-list surface is list/create only; no list update or delete
-- No clear-completed endpoint; showDeleted/showHidden list params unmodeled
+**Covered** — 9 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/tasks/v1/lists` |
+| POST | `/tasks/v1/lists` |
+| POST | `/tasks/v1/lists/{tasklistId}/tasks/{taskId}/move` |
+| GET | `/tasks/v1/lists/{tasklistId}/tasks` |
+| POST | `/tasks/v1/lists/{tasklistId}/tasks` |
+| GET | `/tasks/v1/lists/{tasklistId}/tasks/{taskId}` |
+| PUT | `/tasks/v1/lists/{tasklistId}/tasks/{taskId}` |
+| PATCH | `/tasks/v1/lists/{tasklistId}/tasks/{taskId}` |
+| DELETE | `/tasks/v1/lists/{tasklistId}/tasks/{taskId}` |
+
+</details>
+
+**Missing** (3)
+
+- No task-list get, patch, or delete endpoints
+- No tasks.clear endpoint
+- showDeleted/showHidden/showAssigned list params unmodeled
 
 ### helius-style
+
+**Covered** — 11 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/` |
+| POST | `/v0/transactions` |
+| GET | `/v0/addresses/{address}/transactions` |
+| GET | `/v0/addresses/{address}/balances` |
+| GET | `/v0/addresses/{address}/nfts` |
+| POST | `/v0/names` |
+| POST | `/v0/webhooks` |
+| GET | `/v0/webhooks` |
+| GET | `/v0/webhooks/{webhookId}` |
+| PUT | `/v0/webhooks/{webhookId}` |
+| DELETE | `/v0/webhooks/{webhookId}` |
+
+</details>
+
+**Missing** (3)
+
+- RPC covers 6 methods; no getAccountInfo, getSlot, getSignaturesForAddress
+- No DAS API (getAsset, searchAssets) or /v0/tokens metadata endpoints
+- No getPriorityFeeEstimate, requestAirdrop, or WebSocket subscriptions
+
+**Deviations** (4)
 
 - Webhook payloads carry one transaction each; real Helius batches an array
 - Confirmation milestones fixed by clock: processed 1-2s, confirmed 2-3s, final 3s+
@@ -555,19 +1953,159 @@ observable over the wire.
 
 ### hn-style
 
-- Write flow (/login, /submit) mirrors a reference HN client; official Firebase API is read-only
+**Covered** — 11 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/v0/topstories.json` |
+| GET | `/v0/newstories.json` |
+| GET | `/v0/beststories.json` |
+| GET | `/v0/askstories.json` |
+| GET | `/v0/showstories.json` |
+| GET | `/v0/jobstories.json` |
+| POST | `/login` |
+| GET | `/logout` |
+| POST | `/submit` |
+| GET | `/v0/item/{id}` |
+| GET | `/v0/user/{id}` |
+
+</details>
+
+**Missing** (3)
+
+- No GET /v0/maxitem.json or GET /v0/updates.json endpoints
+- No poll or pollopt item types; no deleted or dead item flags
+- No realtime updates (Firebase SSE watch) on item or list reads
+
+**Deviations** (2)
+
+- Write flow /login + /submit from a reference client; official Firebase API is read-only
 - Challenge injection after N submits (anti-abuse) mirrors mock_hn, configurable via KV
 
 ### hubspot-style
 
-- Webhook delivery verification (X-HubSpot-Signature-v3) not implemented; documented only
+**Covered** — 33 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/crm/v3/objects/contacts` |
+| POST | `/crm/v3/objects/contacts` |
+| GET | `/crm/v3/objects/contacts/{id}` |
+| PATCH | `/crm/v3/objects/contacts/{id}` |
+| DELETE | `/crm/v3/objects/contacts/{id}` |
+| POST | `/crm/v3/objects/contacts/{id}/associations/{toObjectType}/batch/create` |
+| POST | `/crm/v3/objects/contacts/{id}/associations/{toObjectType}/batch/archive` |
+| PUT | `/crm/v3/objects/contacts/{id}/associations/{toObjectType}/{toObjectId}/{associationType}` |
+| GET | `/crm/v3/objects/contacts/{id}/associations/{toObjectType}` |
+| GET | `/crm/v3/objects/companies` |
+| POST | `/crm/v3/objects/companies` |
+| GET | `/crm/v3/objects/companies/{id}` |
+| PATCH | `/crm/v3/objects/companies/{id}` |
+| DELETE | `/crm/v3/objects/companies/{id}` |
+| GET | `/crm/v3/objects/deals` |
+| POST | `/crm/v3/objects/deals` |
+| GET | `/crm/v3/objects/deals/{id}` |
+| PATCH | `/crm/v3/objects/deals/{id}` |
+| DELETE | `/crm/v3/objects/deals/{id}` |
+| GET | `/crm/v3/objects/tickets` |
+| POST | `/crm/v3/objects/tickets` |
+| GET | `/crm/v3/objects/tickets/{id}` |
+| PATCH | `/crm/v3/objects/tickets/{id}` |
+| DELETE | `/crm/v3/objects/tickets/{id}` |
+| POST | `/crm/v3/objects/{objectType}/search` |
+| POST | `/crm/v3/objects/{objectType}/batch/create` |
+| POST | `/crm/v3/objects/{objectType}/batch/read` |
+| POST | `/crm/v3/objects/{objectType}/batch/update` |
+| POST | `/crm/v3/objects/{objectType}/batch/archive` |
+| POST | `/crm/v3/objects/{objectType}/{id}/restore` |
+| POST | `/crm/v3/objects/{objectType}/{id}/associations/{toObjectType}/batch/create` |
+| POST | `/crm/v3/objects/{objectType}/{id}/associations/{toObjectType}/batch/archive` |
+| DELETE | `/crm/v3/objects/{objectType}/{id}/associations/{toObjectType}/{toObjectId}/{associationType}` |
+
+</details>
+
+**Missing** (4)
+
+- No webhook subscriptions or signed deliveries (X-HubSpot-Signature-v3 documented only)
+- No owners, line_items, products, quotes, or custom object types
+- No engagements (calls, emails, meetings, notes, tasks) endpoints
+- No properties, pipelines, or import/export endpoints
 
 ### instagram-style
+
+**Covered** — 10 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/oauth/authorize` |
+| POST | `/oauth/access_token` |
+| GET | `/v21.0/me` |
+| GET | `/v21.0/refresh_access_token` |
+| GET | `/v21.0/{container_id}` |
+| GET | `/v21.0/{media_id}/comments` |
+| GET | `/v21.0/{media_id}/insights` |
+| POST | `/v21.0/{ig_user_id}/media_publish` |
+| POST | `/v21.0/{ig_user_id}/media` |
+| GET | `/v21.0/{ig_user_id}/media` |
+
+</details>
+
+**Missing** (4)
+
+- No account-level insights (GET /{ig_user_id}/insights), per-media only
+- No stories publishing (media_type=STORIES) or story insights
+- No hashtag search (ig_hashtag_search, top_media, recent_media)
+- No comment replies, delete, hide, or moderation endpoints
+
+**Deviations** (2)
 
 - Container processing fixed at ~3s IN_PROGRESS before FINISHED or ERROR
 - simulate_fail=true create flag forces container ERROR; real API has no such switch
 
 ### jira-style
+
+**Covered** — 18 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/rest/api/3/myself` |
+| GET | `/rest/api/3/serverInfo` |
+| GET | `/rest/api/3/project` |
+| GET | `/rest/api/3/project/{key}` |
+| GET | `/rest/api/3/search` |
+| POST | `/rest/api/3/issue` |
+| GET | `/rest/api/3/issue/{key}` |
+| PUT | `/rest/api/3/issue/{key}` |
+| DELETE | `/rest/api/3/issue/{key}` |
+| GET | `/rest/api/3/issue/{key}/transitions` |
+| POST | `/rest/api/3/issue/{key}/transitions` |
+| GET | `/rest/api/3/issue/{key}/comment` |
+| POST | `/rest/api/3/issue/{key}/comment` |
+| PUT | `/rest/api/3/issue/{key}/comment/{id}` |
+| DELETE | `/rest/api/3/issue/{key}/comment/{id}` |
+| POST | `/rest/api/3/webhook` |
+| GET | `/rest/api/3/webhook` |
+| DELETE | `/rest/api/3/webhook` |
+
+</details>
+
+**Missing** (5)
+
+- No attachments, worklogs, watchers, or issue link endpoints
+- No project create/update, versions, or components endpoints
+- No agile boards, sprints, or backlog endpoints
+- No users search, avatars, or notification endpoints
+- No workflow or field configuration management endpoints
+
+**Deviations** (4)
 
 - JQL subset: parenthesised grouping unsupported; unknown fields 400
 - JQL dates compare as ISO-8601 strings, not parsed datetimes
@@ -576,6 +2114,28 @@ observable over the wire.
 
 ### jumio-style
 
+**Covered** — 5 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/netverify/v2/scans` |
+| GET | `/netverify/v2/scans/{scan_reference}` |
+| DELETE | `/netverify/v2/scans/{scan_reference}` |
+| GET | `/netverify/v2/scans/{scan_reference}/data` |
+| POST | `/netverify/v2/webhooks` |
+
+</details>
+
+**Missing** (3)
+
+- No document or selfie image upload/retrieval endpoints
+- No hosted redirect verification flow; API scan creation only
+- No Document Verification, Data Verification, or Transaction Screening APIs
+
+**Deviations** (4)
+
 - Scan lifecycle on a fixed clock: PENDING ~3s then DONE or FAILED at +3s
 - simulate_fail and simulate_reject_reason create fields are stunt-only hooks
 - Webhook HMAC secret is the public constant stunt_jumio_mock_signing_key
@@ -583,9 +2143,56 @@ observable over the wire.
 
 ### linkedin-style
 
+**Covered** — 8 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/oauth/v2/authorization` |
+| POST | `/oauth/v2/accessToken` |
+| GET | `/v2/userinfo` |
+| POST | `/v2/ugcPosts` |
+| GET | `/rest/comments` |
+| POST | `/rest/comments` |
+| GET | `/rest/posts/{urn}` |
+| GET | `/rest/memberCreatorPostAnalytics` |
+
+</details>
+
+**Missing** (4)
+
+- No ugcPosts delete or edit (DELETE /v2/ugcPosts/{id})
+- No organizations or company page API (GET /v2/organizations)
+- No reactions or likes endpoints (socialActions likes)
+- No video upload flow or multi-image carousel posts
+
+**Deviations** (1)
+
 - Rate-limit injection on POST /v2/ugcPosts publish is a simulator test hook
 
 ### llm-style
+
+**Covered** — 3 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v1/chat/completions` |
+| GET | `/v1/models` |
+| POST | `/v1/messages` |
+
+</details>
+
+**Missing** (4)
+
+- No embeddings (POST /v1/embeddings) or legacy completions endpoints
+- No Anthropic SSE streaming (stream:true only handled for OpenAI)
+- No tool use, function calling, or JSON mode
+- No image or multimodal content blocks
+
+**Deviations** (3)
 
 - Responses deterministic: echo of the last user message; no model or randomness
 - Reply derived solely from the last user message; earlier history ignored
@@ -593,28 +2200,219 @@ observable over the wire.
 
 ### marketo-style
 
+**Covered** — 21 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/identity/oauth/token` |
+| POST | `/rest/v1/leads.json` |
+| GET | `/rest/v1/leads` |
+| POST | `/rest/v1/leads` |
+| GET | `/rest/v1/leads/describe` |
+| GET | `/rest/v1/leads/{id}` |
+| GET | `/rest/v1/leads/{id}.json` |
+| POST | `/rest/v1/campaigns/{id}/trigger` |
+| GET | `/rest/v1/campaigns` |
+| GET | `/rest/v1/programs` |
+| GET | `/rest/v1/folders` |
+| GET | `/rest/v1/activities/pagingtoken` |
+| GET | `/rest/v1/activities` |
+| POST | `/bulk/v1/leads/export/create` |
+| POST | `/bulk/v1/leads/export/create.json` |
+| GET | `/bulk/v1/leads/export/{exportId}/status` |
+| GET | `/bulk/v1/leads/export/{exportId}/status.json` |
+| GET | `/bulk/v1/leads/export/{exportId}/file` |
+| GET | `/bulk/v1/leads/export/{exportId}/file.json` |
+| POST | `/bulk/v1/leads/export/{exportId}/cancel` |
+| POST | `/bulk/v1/leads/export/{exportId}/cancel.json` |
+
+</details>
+
+**Missing** (5)
+
+- No bulk lead import (enqueue, batch status, failures, warnings)
+- No bulk activity extract (POST /bulk/v1/activities/export/*)
+- No custom objects API (/rest/v1/customobjects)
+- No asset APIs (emails, forms, landing pages, files) under /rest/asset/v1
+- No lead delete (POST /rest/v1/leads/delete.json) or campaign schedule
+
+**Deviations** (3)
+
 - Export job timing fixed: Processing after ~1s, Completed after ~3s
 - Signed completion webhook (X-Stunt-Signature, fixed secret) is a simulator extension
 - Daily quota 602 modeled but threshold set to 100k so tests are unaffected
 
 ### microsoft-graph-style
 
+**Covered** — 55 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/v1.0/me` |
+| POST | `/v1.0/subscriptions` |
+| GET | `/v1.0/subscriptions` |
+| GET | `/v1.0/subscriptions/{id}` |
+| DELETE | `/v1.0/subscriptions/{id}` |
+| GET | `/v1.0/users` |
+| GET | `/v1.0/users/{id}` |
+| GET | `/v1.0/me/mailFolders` |
+| GET | `/v1.0/me/mailFolders/{id}/messages` |
+| GET | `/v1.0/me/messages` |
+| POST | `/v1.0/me/messages` |
+| POST | `/v1.0/me/messages/{id}/send` |
+| GET | `/v1.0/me/messages/{id}` |
+| PATCH | `/v1.0/me/messages/{id}` |
+| DELETE | `/v1.0/me/messages/{id}` |
+| POST | `/v1.0/me/sendMail` |
+| GET | `/v1.0/me/calendarView` |
+| GET | `/v1.0/me/calendar/calendarView` |
+| GET | `/v1.0/me/events` |
+| POST | `/v1.0/me/events` |
+| POST | `/v1.0/me/events/{id}/accept` |
+| POST | `/v1.0/me/events/{id}/decline` |
+| POST | `/v1.0/me/events/{id}/tentativelyAccept` |
+| GET | `/v1.0/me/events/{id}` |
+| DELETE | `/v1.0/me/events/{id}` |
+| PATCH | `/v1.0/me/events/{id}` |
+| GET | `/v1.0/me/drive` |
+| GET | `/v1.0/me/drive/root/children` |
+| POST | `/v1.0/me/drive/root/children` |
+| GET | `/v1.0/me/drive/items/{id}/children` |
+| POST | `/v1.0/me/drive/items/{id}/children` |
+| GET | `/v1.0/me/drive/items/{id}/content` |
+| POST | `/v1.0/me/drive/items/{id}/restore` |
+| GET | `/v1.0/me/drive/items/{id}` |
+| DELETE | `/v1.0/me/drive/items/{id}` |
+| PUT | `/v1.0/me/drive/root:/{item}/content` |
+| PUT | `/v1.0/me/drive/items/{parent}/{item}/content` |
+| POST | `/v1.0/me/drive/root:/{item}/createUploadSession` |
+| POST | `/v1.0/me/drive/items/{parent}/{item}/createUploadSession` |
+| PUT | `/v1.0/_upload/{session}` |
+| GET | `/v1.0/me/drive/root:/{item}` |
+| GET | `/v1.0/groups/{id}/sites` |
+| GET | `/v1.0/me/chats` |
+| POST | `/v1.0/me/chats` |
+| DELETE | `/v1.0/chats/{id}` |
+| GET | `/v1.0/chats/{id}/messages` |
+| POST | `/v1.0/chats/{id}/messages` |
+| DELETE | `/v1.0/chats/{id}/messages/{messageId}` |
+| GET | `/v1.0/me/drive/items/{id}/workbook/worksheets` |
+| POST | `/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/add` |
+| GET | `/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows` |
+| POST | `/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows` |
+| PATCH | `/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/{index}` |
+| DELETE | `/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/{index}` |
+| GET | `/v1.0/me/drive/items/{id}/workbook/tables/{name}/range` |
+
+</details>
+
+**Missing** (8)
+
+- No Excel workbook sessions (createSession, refreshSession, closeSession)
+- No mail reply/forward, attachments, or message move/copy endpoints
+- No calendar or mail folder create/update/delete, no event instances
+- No drive item copy, move, rename, permissions, or sharing invites
+- No drive search, delta, recent, or sharedWithMe endpoints
+- No teams or channels endpoints (chats and chat messages only)
+- No Excel worksheet or table create/update/delete, no workbook calculate
+- No todo, planner, contacts, presence, or /search surfaces
+
+**Deviations** (4)
+
 - Webhook validationToken handshake not enforced; subscription accepted immediately
 - Upload session ids are deterministic counters, not unguessable tokens
-- Excel workbook sessions not modeled; session-less writes persist immediately
 - OData $filter limited to the equality pattern (field eq value)
 - Static seeded mock-bearer-token bypasses the entra-id token flow
 
 ### netsuite-style
+
+**Covered** — 9 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/services/rest/query/v1/suiteql` |
+| POST | `/services/rest/v1/suiteql` |
+| GET | `/services/rest/record/v1/metadata-catalog` |
+| GET | `/services/rest/record/v1/{recordType}` |
+| POST | `/services/rest/record/v1/{recordType}` |
+| GET | `/services/rest/record/v1/{recordType}/{id}` |
+| PATCH | `/services/rest/record/v1/{recordType}/{id}` |
+| DELETE | `/services/rest/record/v1/{recordType}/{id}` |
+| POST | `/services/rest/record/v1/{recordType}/{id}/!transform/{target}` |
+
+</details>
+
+**Missing** (4)
+
+- No creditMemo, purchaseOrder, vendorBill, journalEntry, or cashSale records
+- No sublist child resources (e.g. salesOrder/{id}/item/{line})
+- No per-record-type metadata catalog (metadata-catalog/{recordType})
+- No file cabinet, blob upload, or REST analytics endpoints
+
+**Deviations** (2)
 
 - TBA/NLAuth/Bearer only structurally checked; OAuth 1.0a HMAC not validated
 - SuiteQL matches only the FROM table; WHERE and ORDER BY clauses are ignored
 
 ### oneinch-style
 
+**Covered** — 5 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/v6.0/1/approve/spender` |
+| GET | `/v6.0/1/approve/calldata` |
+| GET | `/v6.0/1/tokens` |
+| GET | `/v6.0/1/quote` |
+| GET | `/v6.0/1/swap` |
+
+</details>
+
+**Missing** (3)
+
+- No Fusion+ order flow (order quotes, submission, status, events)
+- No Limit Order Protocol endpoints (create, list, history)
+- No raw transaction broadcast, status check, or chains list endpoints
+
+**Deviations** (1)
+
 - Quotes deterministic from src/dst/amount; same input yields same toAmount and split
 
 ### onfido-style
+
+**Covered** — 7 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v3.6/applicants` |
+| POST | `/v3.6/documents` |
+| POST | `/v3.6/live_photos` |
+| POST | `/v3.6/checks` |
+| GET | `/v3.6/applicants/{applicant_id}` |
+| GET | `/v3.6/checks/{check_id}` |
+| POST | `/v3.6/webhooks` |
+
+</details>
+
+**Missing** (5)
+
+- No SDK token generation (POST /v3.6/sdk_token)
+- No applicant list, update, delete, or resume endpoints
+- No reports sub-resource (GET /v3.6/reports/{id}); results inline only
+- No motion capture or video uploads; no document/live photo list or delete
+- No webhook registration or listing (local receiver only)
+
+**Deviations** (4)
 
 - Check lifecycle fixed: in_progress ~3s then complete; awaiting_applicant skipped
 - simulate_fail yields result consider; real sandbox uses special sandbox documents
@@ -623,9 +2421,70 @@ observable over the wire.
 
 ### opensea-style
 
+**Covered** — 7 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/api/v2/assets` |
+| GET | `/api/v2/assets/{chain}/{address}/{identifier}` |
+| GET | `/api/v2/collections/{slug}` |
+| GET | `/api/v2/events` |
+| GET | `/api/v2/orders/{chain}/{protocol}/listings` |
+| GET | `/api/v2/orders/{chain}/{protocol}/offers` |
+| POST | `/api/v2/offers` |
+
+</details>
+
+**Missing** (4)
+
+- No collections list endpoint (GET /api/v2/collections), only get-by-slug
+- No listing creation or order cancellation (offer creation only)
+- No account lookup (GET /api/v2/accounts/{address})
+- No NFT transfer history endpoint (chain/{chain}/transfers)
+
+**Deviations** (1)
+
 - X-API-KEY accepted as any non-empty value; no real key validation
 
 ### paypal-style
+
+**Covered** — 17 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v1/oauth2/token` |
+| POST | `/v2/checkout/orders` |
+| GET | `/v2/checkout/orders/{id}` |
+| POST | `/v2/checkout/orders/{id}/approve` |
+| POST | `/v2/checkout/orders/{id}/capture` |
+| POST | `/v2/checkout/orders/{id}/authorize` |
+| GET | `/v2/payments/authorizations/{id}` |
+| POST | `/v2/payments/authorizations/{id}/reauthorize` |
+| POST | `/v2/payments/authorizations/{id}/void` |
+| POST | `/v2/payments/authorizations/{id}/capture` |
+| GET | `/v2/payments/captures/{id}` |
+| POST | `/v2/payments/captures/{capture_id}/refund` |
+| GET | `/v2/payments/refunds/{id}` |
+| POST | `/v1/notifications/webhooks` |
+| GET | `/v1/notifications/webhooks` |
+| DELETE | `/v1/notifications/webhooks/{id}` |
+| POST | `/v1/notifications/verify-webhook-signature` |
+
+</details>
+
+**Missing** (5)
+
+- No PATCH order update (PATCH /v2/checkout/orders/{id})
+- No payouts API (POST /v1/payments/payouts)
+- No disputes API (/v1/customer/disputes)
+- No subscriptions, billing plans, or catalog products APIs
+- No webhook event-types list or simulate-event endpoints
+
+**Deviations** (5)
 
 - Payer approval endpoint /approve is simulator-only; real flow is browser rel=approve
 - simulate_fail flags on approve and refund are stunt-only test hooks
@@ -635,6 +2494,30 @@ observable over the wire.
 
 ### persona-style
 
+**Covered** — 5 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/api/inquiry/v1/inquiries` |
+| GET | `/api/inquiry/v1/inquiries/{inquiry_id}` |
+| POST | `/api/inquiry/v1/inquiries/{inquiry_id}/resume` |
+| GET | `/api/inquiry/v1/inquiries/{inquiry_id}/verifications` |
+| POST | `/api/inquiry/v1/webhooks` |
+
+</details>
+
+**Missing** (5)
+
+- No inquiries list endpoint (GET /api/inquiry/v1/inquiries)
+- No inquiry templates or reports endpoints
+- No document or selfie upload endpoints (verifications auto-seeded)
+- No Transactions API (bank account linking and verification)
+- No inquiry cancel, expire, redact, or mark-under-review actions
+
+**Deviations** (4)
+
 - Fixed clock lifecycle: created (0-1s), pending (1-3s), completed or declined (+3s)
 - simulate_fail create flag yields declined instead of completed (stunt-only)
 - Webhook HMAC secret is the public constant stunt_persona_mock_signing_key
@@ -642,9 +2525,97 @@ observable over the wire.
 
 ### photos-style
 
-- Bare-id media download returns different derivative bytes; =d/=dv return the original upload
+**Covered** — 12 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/o/oauth2/auth` |
+| POST | `/o/oauth2/token` |
+| POST | `/v1/uploads` |
+| POST | `/v1/mediaItems:batchCreate` |
+| POST | `/v1/mediaItems:search` |
+| GET | `/v1/mediaItems` |
+| GET | `/v1/mediaItems/{id}` |
+| GET | `/v1/media-dl/{id}` |
+| GET | `/v1/albums` |
+| POST | `/v1/albums` |
+| GET | `/v1/albums/{id}` |
+| DELETE | `/v1/albums/{id}` |
+
+</details>
+
+**Missing** (5)
+
+- No album item management (addItems, removeItems, batchRemoveMediaItems)
+- No album title update (PATCH /v1/albums/{id})
+- No album enrichments (text, map) via addEnrichment
+- No shared albums (list, join, leave, unshare)
+- No favorites marking or favorite filtering in search
+
+**Deviations** (2)
+
+- Bare-id media download returns derivative bytes; =d/=dv return original upload
+- search honors mediaTypeFilter and dateFilter only (no contentFilter or album filters)
+
+### pinata-style
+
+**Covered** — 6 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/pinning/pinFileToIPFS` |
+| POST | `/pinning/pinJSONToIPFS` |
+| DELETE | `/pinning/unpin/{cid}` |
+| GET | `/data/pinList` |
+| GET | `/data/testAuthentication` |
+| GET | `/data/pinByHash` |
+
+</details>
+
+**Missing** (4)
+
+- No pin-by-CID endpoint (POST /pinning/addHashToPinQueue)
+- No pin-jobs listing (GET /pinning/pinJobs)
+- No metadata update or pin-policy change (POST /pinning/hashMetadata)
+- No pinned-data-usage endpoint (GET /data/userPinnedDataTotal)
 
 ### plaid-style
+
+**Covered** — 13 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/link/token/create` |
+| POST | `/item/public_token/exchange` |
+| POST | `/accounts/balance/get` |
+| POST | `/accounts/get` |
+| POST | `/transactions/sync` |
+| POST | `/identity/get` |
+| POST | `/item/get` |
+| POST | `/item/remove` |
+| POST | `/institutions/get` |
+| POST | `/institutions/get_by_id` |
+| POST | `/sandbox/public_token/create` |
+| POST | `/sandbox/item/reset_login` |
+| POST | `/sandbox/item/fire_webhook` |
+
+</details>
+
+**Missing** (5)
+
+- No /auth/get (account and routing numbers)
+- No legacy POST /transactions/get endpoint
+- No /institutions/search endpoint
+- No /item/webhook/update or /item/token/invalidate
+- No liabilities, assets, investments, or income products
+
+**Deviations** (3)
 
 - X-Plaid-Signature JWT-style webhook signature is documented but never enforced
 - fire_webhook SYNC_UPDATES_AVAILABLE doubles as transaction mutation (one posted, one removed)
@@ -652,26 +2623,167 @@ observable over the wire.
 
 ### powerplatform-style
 
-- Environments and connectors are static seeds; no environment lifecycle operations
+**Covered** — 9 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/v2/environments` |
+| GET | `/v2/environments/{env}/connectors` |
+| GET | `/v2/environments/{env}/api/data/v9.2/accounts` |
+| POST | `/v2/environments/{env}/api/data/v9.2/accounts` |
+| GET | `/v2/environments/{env}/api/data/v9.2/accounts({accountid})` |
+| PATCH | `/v2/environments/{env}/api/data/v9.2/accounts({accountid})` |
+| DELETE | `/v2/environments/{env}/api/data/v9.2/accounts({accountid})` |
+| GET | `/v2/environments/{env}/flows` |
+| POST | `/v2/environments/{env}/flows` |
+
+</details>
+
+**Missing** (4)
+
+- No environment lifecycle operations (create, update, delete)
+- Only the accounts table is served — no contacts, leads, or other tables
+- No flow update, delete, or run operations
+- No $expand, $apply, or $search query options
+
+**Deviations** (3)
+
 - No default page size: whole list returns unless $top is set; real Dataverse pages at 5000
 - Client-supplied accountid accepted on create; auto ids are acc-<n>, not GUIDs
 - Environments with no stored flows list a fallback seeded seeded-flow-001 entry
 
 ### printful-style
 
-- Only order_created, order_updated, order_canceled webhook events are ever emitted
+**Covered** — 13 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/v2/store/products` |
+| POST | `/v2/store/products` |
+| GET | `/v2/store/products/{product_id}` |
+| POST | `/orders` |
+| GET | `/orders/{order_id}` |
+| GET | `/v2/store/orders` |
+| POST | `/v2/store/orders` |
+| POST | `/v2/store/orders/{order_id}` |
+| POST | `/v2/shipping/rates` |
+| GET | `/webhooks` |
+| POST | `/webhooks` |
+| PUT | `/webhooks` |
+| DELETE | `/webhooks` |
+
+</details>
+
+**Missing** (5)
+
+- No package_shipped, package_returned, product_synced, or order_hold events
+- No product update or delete (PUT/DELETE /v2/store/products/{product_id})
+- No order confirm or cancel (POST /orders/{id}/confirm, DELETE /orders/{id})
+- No catalog endpoints (catalog variants, print files, mockup generator)
+- No reference endpoints (countries, taxes, store info)
+
+**Deviations** (1)
+
 - Webhook set without a secret signs with built-in mock secret stunt_mock_pful_webhook_secret
 
 ### printify-style
+
+**Covered** — 16 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/v1/catalog/blueprints.json` |
+| GET | `/v1/catalog/blueprints/{blueprint_id}/variants.json` |
+| GET | `/v1/shops/{shop_id}/products.json` |
+| POST | `/v1/shops/{shop_id}/products.json` |
+| GET | `/v1/shops/{shop_id}/products/{product_id}` |
+| PUT | `/v1/shops/{shop_id}/products/{product_id}` |
+| DELETE | `/v1/shops/{shop_id}/products/{product_id}` |
+| POST | `/v1/shops/{shop_id}/orders.json` |
+| GET | `/v1/shops/{shop_id}/orders/{order_id}` |
+| GET | `/v1/orders.json` |
+| POST | `/v1/orders.json` |
+| POST | `/v1/orders/{order_id}/send.json` |
+| GET | `/v1/shops/{shop_id}/webhooks.json` |
+| POST | `/v1/shops/{shop_id}/webhooks.json` |
+| GET | `/v1/shops/{shop_id}/webhooks/{webhook_id}` |
+| DELETE | `/v1/shops/{shop_id}/webhooks/{webhook_id}` |
+
+</details>
+
+**Missing** (5)
+
+- No shops endpoints (GET /v1/shops.json); shop_id is a path placeholder
+- No image uploads (POST /v1/uploads/images.json)
+- No order update route (PUT /v1/shops/{shop_id}/orders/{order_id}.json)
+- No product publish/unpublish (publish.json, unpublish.json)
+- No shipping calculation or shipping-methods endpoints
+
+**Deviations** (1)
 
 - Webhook without a secret signs with built-in mock secret stunt_mock_potify_webhook_secret
 
 ### producthunt-style
 
+**Covered** — 0 routes · GraphQL schema
+
+**Missing** (3)
+
+- Only postCreate mutation — no vote, comment, or post-update mutations
+- No users or topics queries (user, users, topic)
+- No comments or collections surfaces
+
+**Deviations** (2)
+
 - GraphQL served at /v2/api/graphql.json; real Product Hunt path is /v2/api/graphql
 - GraphQL endpoint is open — no OAuth developer-token check (transport has no auth hook)
 
 ### psd2-style
+
+**Covered** — 19 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v1/oauth/token` |
+| POST | `/v1/consents` |
+| GET | `/v1/consents/{consentId}` |
+| DELETE | `/v1/consents/{consentId}` |
+| POST | `/v1/consents/{consentId}/authorisations` |
+| GET | `/v1/consents/{consentId}/authorisations/{authorisationId}` |
+| PUT | `/v1/consents/{consentId}/authorisations/{authorisationId}` |
+| POST | `/v1/consents/{consentId}/authorisations/{authorisationId}` |
+| GET | `/v1/accounts` |
+| GET | `/v1/accounts/{resourceId}/balances` |
+| GET | `/v1/accounts/{resourceId}/transactions` |
+| POST | `/v1/payments/{product}` |
+| GET | `/v1/payments/{product}/{paymentId}/status` |
+| POST | `/v1/payments/{product}/{paymentId}/authorisations` |
+| GET | `/v1/payments/{product}/{paymentId}/authorisations/{authorisationId}` |
+| PUT | `/v1/payments/{product}/{paymentId}/authorisations/{authorisationId}` |
+| POST | `/v1/payments/{product}/{paymentId}/authorisations/{authorisationId}` |
+| GET | `/v1/payments/{product}/{paymentId}` |
+| DELETE | `/v1/payments/{product}/{paymentId}` |
+
+</details>
+
+**Missing** (6)
+
+- No Confirmation of Funds (POST /v1/funds-confirmations)
+- No card accounts (GET /v1/card-accounts and card transactions)
+- No periodic or bulk payments (standing orders)
+- No transaction detail (GET /v1/accounts/{id}/transactions/{resourceId})
+- No GET /v1/consents/{id}/status sub-resource
+- No payment cancellation-authorisations SCA sub-resource
+
+**Deviations** (5)
 
 - SCA finalisation is derive-on-read after a fixed 1s challenge window
 - Payment status derives on read: ACTC at 1s, ACSC at 3s — fixed, not bank async
@@ -681,22 +2793,123 @@ observable over the wire.
 
 ### qbo-style
 
-- QSQL subset only: WHERE comparators, IN, LIKE, ORDER BY, MAXRESULTS; no aggregates
+**Covered** — 11 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/oauth/v2/authorize` |
+| POST | `/oauth/v2/tokens/bearer` |
+| GET | `/v3/company/{realmId}/query` |
+| POST | `/v3/company/{realmId}/query` |
+| GET | `/v3/company/{realmId}/customer` |
+| POST | `/v3/company/{realmId}/customer` |
+| GET | `/v3/company/{realmId}/customer/{id}` |
+| DELETE | `/v3/company/{realmId}/customer/{id}` |
+| POST | `/v3/company/{realmId}/invoice` |
+| GET | `/v3/company/{realmId}/invoice/{id}` |
+| DELETE | `/v3/company/{realmId}/invoice/{id}` |
+
+</details>
+
+**Missing** (6)
+
+- Only Customer and Invoice — no Payment, Estimate, Item, Vendor, etc.
+- No QSQL aggregates (COUNT, SUM, MAX, MIN, AVG)
+- No batch endpoint (POST /v3/company/{realmId}/batch)
+- No CDC endpoint (GET /v3/company/{realmId}/cdc)
+- No reports endpoints (Profit and Loss, Balance Sheet, Trial Balance)
+- No Intuit webhooks (QBO event notifications)
+
+**Deviations** (1)
+
 - Malformed FROM tokens fall back to substring entity matching instead of erroring
-- Entity surface is Customer and Invoice; other QBO entities unimplemented
 
 ### reddit-style
 
-- Only the token endpoint and /api/submit implemented — no listings, votes, comments
+**Covered** — 2 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/api/v1/access_token` |
+| POST | `/api/submit` |
+
+</details>
+
+**Missing** (5)
+
+- No listing endpoints (subreddit hot/new/top, thread comment pages)
+- No votes or comments (/api/vote, /api/comment)
+- No identity endpoint (GET /api/v1/me)
+- No token revocation (POST /api/v1/revoke_token)
+- No subreddit, search, or inbox/messages endpoints
+
+**Deviations** (1)
+
 - User-Agent gate simplified: any UA containing / and ( passes, else 429
 
 ### resend-style
+
+**Covered** — 6 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/emails` |
+| GET | `/emails` |
+| GET | `/emails/{id}` |
+| POST | `/webhooks` |
+| GET | `/webhooks` |
+| DELETE | `/webhooks/{id}` |
+
+</details>
+
+**Missing** (6)
+
+- No domains surface (create, list, verify, delete)
+- No API keys management (/api-keys)
+- No batch send (POST /emails/batch)
+- No scheduled sends (schedule, cancel schedule)
+- No audiences or contacts
+- No broadcasts or tags
+
+**Deviations** (3)
 
 - Delivery derives on read: sent at +1s, delivered at +3s — fixed, not async
 - simulate_fail: true in POST /emails forces bounced terminal (simulator extension)
 - Webhook events fire exactly once on the first deriving read, not on real delivery
 
 ### revenuecat-style
+
+**Covered** — 7 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v1/receipts` |
+| POST | `/v1/webhooks` |
+| GET | `/v1/webhooks` |
+| POST | `/v1/subscribers/{app_user_id}/subscriptions/{product_id}/revoke` |
+| GET | `/v1/subscribers/{app_user_id}` |
+| POST | `/v1/subscribers/{app_user_id}` |
+| DELETE | `/v1/subscribers/{app_user_id}` |
+
+</details>
+
+**Missing** (5)
+
+- No attribution endpoint (POST /v1/subscribers/{id}/attribution)
+- No offers API (promotional offer creation)
+- No v2 webhooks — only unsigned v1 events
+- Only ios and android platforms — no amazon, stripe, or web billing
+- No v2 REST surface (customers, subscriptions, entitlements)
+
+**Deviations** (4)
 
 - Webhook registration endpoint is simulator-only; real RC v1 webhooks are dashboard-configured
 - fetch_token prefixed with invalid is the deterministic bad-receipt 400 path
@@ -705,13 +2918,87 @@ observable over the wire.
 
 ### salesforce-style
 
+**Covered** — 29 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/services/oauth2/token` |
+| GET | `/services/data/v60.0/sobjects` |
+| GET | `/services/data/v60.0/sobjects/Account` |
+| GET | `/services/data/v60.0/sobjects/Contact` |
+| GET | `/services/data/v60.0/sobjects/Opportunity` |
+| GET | `/services/data/v60.0/sobjects/Lead` |
+| GET | `/services/data/v60.0/sobjects/User` |
+| POST | `/services/data/v60.0/sobjects/Account` |
+| GET | `/services/data/v60.0/sobjects/Account/{id}` |
+| PATCH | `/services/data/v60.0/sobjects/Account/{id}` |
+| DELETE | `/services/data/v60.0/sobjects/Account/{id}` |
+| PATCH | `/services/data/v60.0/sobjects/Account/{extIdField}/{extIdValue}` |
+| POST | `/services/data/v60.0/sobjects/Contact` |
+| GET | `/services/data/v60.0/sobjects/Contact/{id}` |
+| PATCH | `/services/data/v60.0/sobjects/Contact/{id}` |
+| DELETE | `/services/data/v60.0/sobjects/Contact/{id}` |
+| PATCH | `/services/data/v60.0/sobjects/Contact/{extIdField}/{extIdValue}` |
+| POST | `/services/data/v60.0/sobjects/Opportunity` |
+| GET | `/services/data/v60.0/sobjects/Opportunity/{id}` |
+| PATCH | `/services/data/v60.0/sobjects/Opportunity/{id}` |
+| DELETE | `/services/data/v60.0/sobjects/Opportunity/{id}` |
+| PATCH | `/services/data/v60.0/sobjects/Opportunity/{extIdField}/{extIdValue}` |
+| GET | `/services/data/v60.0/query` |
+| GET | `/services/data/v60.0/queryAll` |
+| GET | `/services/data/v60.0/query/{queryLocator}` |
+| POST | `/services/data/v60.0/composite` |
+| POST | `/services/data/v60.0/composite/sobjects` |
+| PATCH | `/services/data/v60.0/composite/sobjects` |
+| DELETE | `/services/data/v60.0/composite/sobjects` |
+
+</details>
+
+**Missing** (7)
+
+- No Lead or User CRUD routes
+- No query or queryAll sub-requests in composite batches
+- No SOSL search (GET /search)
+- No composite tree upsert (POST /composite/tree)
+- No batch endpoint (GET /composite/batch/sobjects)
+- No Bulk API 2.0 (jobs/ingest, jobs/query)
+- No GET updated/deleted incremental-refresh endpoints
+
+**Deviations** (3)
+
 - Governor limits (100 SOQL/txn, 10k DML rows) documented but not enforced
 - SOQL WHERE subset: no parenthesized grouping; date literals compared lexically
 - Password grant accepted for convenience; real SF requires web-server or JWT flow
-- Lead and User are describe/SOQL-query only — no CRUD routes
-- Composite sub-requests support sobjects CRUD paths only, no query subrequests
 
 ### sendgrid-style
+
+**Covered** — 5 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v3/mail/send` |
+| GET | `/v3/messages` |
+| POST | `/v3/user/webhooks/event/settings` |
+| GET | `/v3/user/webhooks/event/settings` |
+| POST | `/v3/user/webhooks/event/test` |
+
+</details>
+
+**Missing** (7)
+
+- No single-message fetch (GET /v3/messages/{msg_id})
+- No GET of event-webhook settings (POST-only)
+- No suppression lists (bounces, blocks, invalid emails, spam reports)
+- No scheduled-send management (/v3/scheduled_sends)
+- No API keys management (/v3/api_keys)
+- No sender authentication or domains setup
+- No templates surface (/v3/templates)
+
+**Deviations** (5)
 
 - Webhook ECDSA signature is raw r||s (64 bytes), not Twilio ASN.1 DER encoding
 - simulate_fail: true in send body forces dropped terminal (simulator extension)
@@ -721,10 +3008,114 @@ observable over the wire.
 
 ### servicenow-style
 
+**Covered** — 44 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/api/now/table/incident` |
+| POST | `/api/now/table/incident` |
+| GET | `/api/now/table/incident/{sys_id}` |
+| PUT | `/api/now/table/incident/{sys_id}` |
+| PATCH | `/api/now/table/incident/{sys_id}` |
+| DELETE | `/api/now/table/incident/{sys_id}` |
+| GET | `/api/now/table/task` |
+| POST | `/api/now/table/task` |
+| GET | `/api/now/table/task/{sys_id}` |
+| PUT | `/api/now/table/task/{sys_id}` |
+| PATCH | `/api/now/table/task/{sys_id}` |
+| DELETE | `/api/now/table/task/{sys_id}` |
+| GET | `/api/now/table/change_request` |
+| POST | `/api/now/table/change_request` |
+| GET | `/api/now/table/change_request/{sys_id}` |
+| PUT | `/api/now/table/change_request/{sys_id}` |
+| PATCH | `/api/now/table/change_request/{sys_id}` |
+| DELETE | `/api/now/table/change_request/{sys_id}` |
+| GET | `/api/now/table/cmdb_ci` |
+| POST | `/api/now/table/cmdb_ci` |
+| GET | `/api/now/table/cmdb_ci/{sys_id}` |
+| PUT | `/api/now/table/cmdb_ci/{sys_id}` |
+| PATCH | `/api/now/table/cmdb_ci/{sys_id}` |
+| DELETE | `/api/now/table/cmdb_ci/{sys_id}` |
+| GET | `/api/now/table/sys_user` |
+| POST | `/api/now/table/sys_user` |
+| GET | `/api/now/table/sys_user/{sys_id}` |
+| PUT | `/api/now/table/sys_user/{sys_id}` |
+| PATCH | `/api/now/table/sys_user/{sys_id}` |
+| DELETE | `/api/now/table/sys_user/{sys_id}` |
+| GET | `/api/now/table/sys_user_group` |
+| POST | `/api/now/table/sys_user_group` |
+| GET | `/api/now/table/sys_user_group/{sys_id}` |
+| PUT | `/api/now/table/sys_user_group/{sys_id}` |
+| PATCH | `/api/now/table/sys_user_group/{sys_id}` |
+| DELETE | `/api/now/table/sys_user_group/{sys_id}` |
+| GET | `/api/now/table/sc_req_item` |
+| POST | `/api/now/table/sc_req_item` |
+| GET | `/api/now/table/sc_req_item/{sys_id}` |
+| PUT | `/api/now/table/sc_req_item/{sys_id}` |
+| PATCH | `/api/now/table/sc_req_item/{sys_id}` |
+| DELETE | `/api/now/table/sc_req_item/{sys_id}` |
+| GET | `/api/now/table/sys_metadata` |
+| POST | `/api/now/import/u_my_table` |
+
+</details>
+
+**Missing** (5)
+
+- Only a fixed table set (incident, task, change_request, cmdb_ci, ...) — no custom tables
+- No attachment API (/api/now/attachment)
+- No aggregate statistics API (/api/now/stats/{table})
+- No service catalog API (/api/sn_sc/servicecatalog)
+- No batch API (/api/now/v1/batch)
+
+**Deviations** (1)
+
 - sysparm_query supports an operator subset; NOT LIKE and similar 400-rejected
-- Only a fixed table set served (incident, task, change_request, cmdb_ci, ...)
 
 ### shopify-style
+
+**Covered** — 21 routes · GraphQL schema
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/admin/oauth/authorize` |
+| POST | `/admin/oauth/access_token` |
+| GET | `/admin/api/2024-10/products.json` |
+| POST | `/admin/api/2024-10/products.json` |
+| GET | `/admin/api/2024-10/products/{product_id}` |
+| PUT | `/admin/api/2024-10/products/{product_id}` |
+| DELETE | `/admin/api/2024-10/products/{product_id}` |
+| GET | `/admin/api/2024-10/orders.json` |
+| POST | `/admin/api/2024-10/orders.json` |
+| GET | `/admin/api/2024-10/orders/{order_id}` |
+| POST | `/admin/api/2024-10/orders/{order_id}/cancel.json` |
+| POST | `/admin/api/2024-10/orders/{order_id}/close.json` |
+| POST | `/admin/api/2024-10/orders/{order_id}/fulfillments.json` |
+| POST | `/admin/api/2024-10/orders/{order_id}/transactions.json` |
+| GET | `/admin/api/2024-10/customers.json` |
+| POST | `/admin/api/2024-10/customers.json` |
+| PUT | `/admin/api/2024-10/customers/{customer_id}` |
+| DELETE | `/admin/api/2024-10/customers/{customer_id}` |
+| GET | `/admin/api/2024-10/webhooks.json` |
+| POST | `/admin/api/2024-10/webhooks.json` |
+| DELETE | `/admin/api/2024-10/webhooks/{webhook_id}` |
+
+</details>
+
+**Missing** (7)
+
+- No fulfillment-orders or fulfillment-events endpoints (fulfillments POST only)
+- No transaction listing (GET /orders/{id}/transactions.json)
+- No refunds endpoint (POST /orders/{id}/refunds.json)
+- No Inventory API (inventory_items, inventory_levels)
+- No product image or standalone variant CRUD routes
+- GraphQL schema limited to shop, product, order, customer types
+- No price rules, discount codes, gift cards, or draft orders
+
+**Deviations** (4)
 
 - GraphQL endpoint skips the X-Shopify-Access-Token check the REST surface enforces
 - Webhook payloads ride stunt {type, payload} envelope, not raw Shopify event bodies
@@ -733,106 +3124,809 @@ observable over the wire.
 
 ### signin-with-apple-style
 
+**Covered** — 3 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/auth/authorize` |
+| POST | `/auth/token` |
+| GET | `/auth/keys` |
+
+</details>
+
+**Missing** (3)
+
+- No token revocation (POST /auth/revoke)
+- No user endpoint (GET /auth/user for name/email)
+- No server-to-server events (POST /api/v1/revoke)
+
+**Deviations** (2)
+
 - JWKS serves one fixed synthetic P-256 key (kid mock-siwa-key-1) — no rotation
 - client_secret checks alg, signature, aud, exp only — iss/sub claims not enforced
 
 ### slack-style
 
+**Covered** — 7 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/api/auth.test` |
+| POST | `/api/chat.postMessage` |
+| POST | `/api/conversations.create` |
+| GET | `/api/conversations.list` |
+| GET | `/api/conversations.history` |
+| POST | `/api/reactions.add` |
+| POST | `/api/apps.events.url` |
+
+</details>
+
+**Missing** (6)
+
+- Only 7 Web API methods; no chat.update, chat.delete, or chat.scheduleMessage
+- No conversations.members, join, leave, open, or rename; no users.list/users.info
+- No reactions.remove or reactions.list
+- No message threads: conversations.replies and chat.getPermalink absent
+- No files (files.upload/info/list), search, views, or dialogs surfaces
+- Only message, channel_created, reaction_added events; no app_mention or team_join
+
+**Deviations** (2)
+
 - apps.events.url config endpoint is simulator-only; real Slack sets it in the app dashboard
-- Events deliveries wrap the Slack event_callback payload in an extra stunt type/payload envelope
+- Events deliveries wrap Slack event_callback payloads in an extra stunt envelope
 
 ### smartbill-style
 
+**Covered** — 18 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/invoice` |
+| GET | `/invoice` |
+| PUT | `/invoice/cancel` |
+| PUT | `/invoice/restore` |
+| GET | `/invoice/paymentstatus` |
+| POST | `/estimate` |
+| GET | `/estimate` |
+| PUT | `/estimate/cancel` |
+| POST | `/purchase` |
+| GET | `/purchase` |
+| POST | `/payment` |
+| DELETE | `/payment/v2` |
+| GET | `/stocks` |
+| POST | `/document/send` |
+| GET | `/tax` |
+| GET | `/series` |
+| POST | `/sim/company` |
+| POST | `/sim/stocks/movement` |
+
+</details>
+
+**Missing** (2)
+
+- No PDF rendering, e-Factura (ANAF SPV) transmission, or email/SMS delivery
+- No GET /invoice/paymentstatus (paidAmount/unpaidAmount/paid reporting)
+
+**Deviations** (5)
+
 - Money and quantities are decimal strings; real SmartBill uses JSON numbers
-- Invoice/estimate/purchase list endpoints are sim-only; real API reads docs by cif+seriesname+number
-- Simplified shapes: series not seriesname, scalar buyer/supplier fields not client/supplier objects
-- paymentId on POST /invoice/payment is a simulator extension so the delete flow is driveable
-- PDF rendering, e-Factura (ANAF SPV) transmission, and email/SMS delivery are not modelled
+- Invoice/estimate/purchase list endpoints are sim-only; the real API has none
+- Simplified shapes: series not seriesname; keyed arrays, not the real {list:[...]}
+- paymentId on POST /invoice/payment is a simulator extension for the delete flow
+- Payment create skips the real {payment:{companyVatCode,value,type,isCash}} envelope
 
 ### sqs-style
 
+**Covered** — 2 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/` |
+| POST | `/{queueName}` |
+
+</details>
+
+**Missing** (4)
+
+- No ListQueues MaxResults/NextToken paging; no AttributeNames prefix wildcards (.*)
+- No AddPermission/RemovePermission, Tag/Untag/ListQueueTags, or ListDeadLetterSourceQueues
+- No presigned URL (query-parameter) auth; SigV4 Authorization header only
+- FIFO queues allowed by name only; no MessageGroupId or deduplication semantics
+
+**Deviations** (5)
+
 - QueueUrl omits the 12-digit account id; http://<host>/<queueName> instead of the AWS path
-- No long polling: WaitTimeSeconds is validated but never blocks; ReceiveMessage returns at once
-- MD5OfMessageAttributes omitted (compound encoding not reproduced); only the body MD5 is returned
+- No long polling: WaitTimeSeconds is validated but never blocks; receive returns at once
+- MD5OfMessageAttributes omitted (compound encoding not reproduced), only body MD5
 - PurgeQueue is immediate, not async; the one-purge-per-60s rule is still enforced
-- ListQueues has no paging (MaxResults/NextToken); AttributeNames lacks prefix wildcards
+- Message ids and receipt handles are synthetic deterministic strings, not real AWS ids
 
 ### square-style
 
-- DELETE /v2/payments/{id} and DELETE /v2/orders/{id} are stunt extensions; real Square has no DELETE
+**Covered** — 18 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/oauth2/token` |
+| GET | `/v2/payments` |
+| POST | `/v2/payments` |
+| GET | `/v2/payments/{id}` |
+| DELETE | `/v2/payments/{id}` |
+| POST | `/v2/payments/{id}/complete` |
+| POST | `/v2/payments/{id}/capture` |
+| GET | `/v2/refunds` |
+| POST | `/v2/refunds` |
+| GET | `/v2/locations` |
+| POST | `/v2/catalog/search` |
+| POST | `/v2/orders` |
+| POST | `/v2/orders/calculate` |
+| GET | `/v2/orders/{id}` |
+| PUT | `/v2/orders/{id}` |
+| DELETE | `/v2/orders/{id}` |
+| POST | `/v2/orders/{id}/pay` |
+| POST | `/v2/orders/{id}/complete` |
+
+</details>
+
+**Missing** (7)
+
+- No Customers API at all (create/list/retrieve customers)
+- Catalog is search-only; no upsert, batch-retrieve, list, or info endpoints
+- No Invoices, Terminal, Loyalty, Gift Cards, Bookings, or Team APIs
+- No POST /v2/payments/{id}/cancel for authorized payments
+- No /oauth2/revoke or token access-check; only the exchange exists
+- No webhook subscription endpoints; the delivery sink is stunt config
+- No orders list (GET /v2/orders) or POST /v2/orders/search
+
+**Deviations** (2)
+
+- DELETE /v2/payments/{id} and DELETE /v2/orders/{id} are stunt extensions, not real Square
+- Square-Version header is required (400 when absent); real Square defaults it
 
 ### stripe-style
 
+**Covered** — 158 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v1/tokens` |
+| GET | `/v1/events` |
+| GET | `/v1/events/{id}` |
+| POST | `/v1/test_clocks` |
+| GET | `/v1/test_clocks` |
+| POST | `/v1/test_clocks/{id}/advance` |
+| GET | `/v1/test_clocks/{id}` |
+| DELETE | `/v1/test_clocks/{id}` |
+| POST | `/v1/test_helpers/test_clocks` |
+| GET | `/v1/test_helpers/test_clocks` |
+| POST | `/v1/test_helpers/test_clocks/{id}/advance` |
+| GET | `/v1/test_helpers/test_clocks/{id}` |
+| DELETE | `/v1/test_helpers/test_clocks/{id}` |
+| POST | `/v1/charges` |
+| GET | `/v1/charges/{id}` |
+| GET | `/v1/charges` |
+| POST | `/v1/charges/{id}/capture` |
+| POST | `/v1/charges/{id}/refund` |
+| POST | `/v1/payment_intents` |
+| POST | `/v1/payment_intents/{id}/confirm` |
+| POST | `/v1/payment_intents/{id}/capture` |
+| GET | `/v1/payment_intents/{id}` |
+| GET | `/v1/payment_intents` |
+| POST | `/v1/payment_methods` |
+| POST | `/v1/payment_methods/{id}/attach` |
+| POST | `/v1/payment_methods/{id}/detach` |
+| GET | `/v1/payment_methods/{id}` |
+| GET | `/v1/payment_methods` |
+| POST | `/v1/refunds` |
+| GET | `/v1/refunds/{id}` |
+| GET | `/v1/refunds` |
+| POST | `/v1/refunds/{id}/cancel` |
+| POST | `/v1/customers` |
+| GET | `/v1/customers/{id}` |
+| GET | `/v1/customers` |
+| POST | `/v1/customers/{id}` |
+| DELETE | `/v1/customers/{id}` |
+| POST | `/v1/products` |
+| GET | `/v1/products` |
+| GET | `/v1/products/{id}` |
+| POST | `/v1/products/{id}` |
+| DELETE | `/v1/products/{id}` |
+| POST | `/v1/prices` |
+| GET | `/v1/prices` |
+| GET | `/v1/prices/{id}` |
+| POST | `/v1/prices/{id}` |
+| POST | `/v1/subscriptions` |
+| GET | `/v1/subscriptions` |
+| GET | `/v1/subscriptions/{id}` |
+| POST | `/v1/subscriptions/{id}` |
+| POST | `/v1/subscriptions/{id}/cancel` |
+| GET | `/v1/subscription_items` |
+| POST | `/v1/subscription_items` |
+| POST | `/v1/subscription_items/{id}` |
+| DELETE | `/v1/subscription_items/{id}` |
+| POST | `/v1/subscription_items/{id}/usage_records` |
+| GET | `/v1/subscription_items/{id}/usage_records` |
+| POST | `/v1/invoices` |
+| GET | `/v1/invoices` |
+| GET | `/v1/invoices/upcoming` |
+| GET | `/v1/invoices/{id}` |
+| POST | `/v1/invoices/{id}` |
+| DELETE | `/v1/invoices/{id}` |
+| POST | `/v1/invoices/{id}/finalize` |
+| POST | `/v1/invoices/{id}/pay` |
+| POST | `/v1/invoices/{id}/send` |
+| POST | `/v1/invoices/{id}/void` |
+| POST | `/v1/invoices/{id}/mark_uncollectible` |
+| GET | `/v1/invoices/{id}/lines` |
+| POST | `/v1/invoice_items` |
+| GET | `/v1/invoice_items` |
+| GET | `/v1/invoice_items/{id}` |
+| POST | `/v1/invoice_items/{id}` |
+| DELETE | `/v1/invoice_items/{id}` |
+| POST | `/v1/credit_notes` |
+| GET | `/v1/credit_notes` |
+| GET | `/v1/credit_notes/preview` |
+| GET | `/v1/credit_notes/{id}` |
+| POST | `/v1/credit_notes/{id}` |
+| POST | `/v1/credit_notes/{id}/void` |
+| POST | `/v1/coupons` |
+| GET | `/v1/coupons` |
+| GET | `/v1/coupons/{id}` |
+| POST | `/v1/coupons/{id}` |
+| DELETE | `/v1/coupons/{id}` |
+| POST | `/v1/promotion_codes` |
+| GET | `/v1/promotion_codes` |
+| GET | `/v1/promotion_codes/{id}` |
+| POST | `/v1/promotion_codes/{id}` |
+| POST | `/v1/tax_rates` |
+| GET | `/v1/tax_rates` |
+| GET | `/v1/tax_rates/{id}` |
+| POST | `/v1/tax_rates/{id}` |
+| DELETE | `/v1/tax_rates/{id}` |
+| GET | `/v1/balance` |
+| GET | `/v1/balance_transactions` |
+| GET | `/v1/balance_transactions/{id}` |
+| GET | `/v1/disputes` |
+| GET | `/v1/disputes/{id}` |
+| POST | `/v1/disputes/{id}` |
+| POST | `/v1/disputes/{id}/close` |
+| GET | `/v1/application_fees` |
+| GET | `/v1/application_fees/{id}` |
+| GET | `/v1/application_fees/{id}/refunds` |
+| POST | `/v1/application_fees/{id}/refunds` |
+| POST | `/v1/application_fees/{id}/refund` |
+| POST | `/v1/checkout/sessions` |
+| GET | `/v1/checkout/sessions` |
+| GET | `/v1/checkout/sessions/{id}/line_items` |
+| POST | `/v1/checkout/sessions/{id}/expire` |
+| GET | `/v1/checkout/sessions/{id}` |
+| GET | `/c/pay/{id}` |
+| POST | `/v1/setup_intents` |
+| GET | `/v1/setup_intents` |
+| POST | `/v1/setup_intents/{id}/confirm` |
+| POST | `/v1/setup_intents/{id}/cancel` |
+| GET | `/v1/setup_intents/{id}` |
+| POST | `/v1/setup_intents/{id}` |
+| POST | `/v1/webhook_endpoints` |
+| GET | `/v1/webhook_endpoints` |
+| GET | `/v1/webhook_endpoints/{id}` |
+| POST | `/v1/webhook_endpoints/{id}` |
+| DELETE | `/v1/webhook_endpoints/{id}` |
+| POST | `/v1/files` |
+| GET | `/v1/files` |
+| GET | `/v1/files/{id}` |
+| POST | `/v1/file_links` |
+| GET | `/v1/file_links` |
+| GET | `/v1/file_links/{id}` |
+| POST | `/v1/file_links/{id}` |
+| POST | `/v1/accounts` |
+| GET | `/v1/accounts/{id}` |
+| POST | `/v1/accounts/{id}` |
+| GET | `/v1/accounts` |
+| POST | `/v1/accounts/{id}/persons` |
+| GET | `/v1/accounts/{id}/persons` |
+| GET | `/v1/accounts/{id}/persons/{person_id}` |
+| POST | `/v1/accounts/{id}/persons/{person_id}` |
+| DELETE | `/v1/accounts/{id}/persons/{person_id}` |
+| GET | `/v1/persons/{id}` |
+| POST | `/v1/persons/{id}` |
+| POST | `/v1/accounts/{id}/external_accounts` |
+| GET | `/v1/accounts/{id}/external_accounts` |
+| GET | `/v1/accounts/{id}/external_accounts/{ea_id}` |
+| DELETE | `/v1/accounts/{id}/external_accounts/{ea_id}` |
+| POST | `/v1/accounts/{id}/login_links` |
+| POST | `/v1/account_links` |
+| POST | `/v1/transfers` |
+| GET | `/v1/transfers/{id}` |
+| GET | `/v1/transfers` |
+| POST | `/v1/transfers/{id}/reversals` |
+| GET | `/v1/transfers/{id}/reversals` |
+| GET | `/v1/transfers/{id}/reversals/{tr_id}` |
+| POST | `/v1/payouts` |
+| GET | `/v1/payouts` |
+| GET | `/v1/payouts/{id}` |
+| POST | `/v1/payouts/{id}` |
+| POST | `/v1/payouts/{id}/cancel` |
+
+</details>
+
+**Missing** (7)
+
+- No POST /v1/payment_intents/{id}/cancel
+- No Payment Links API (/v1/payment_links)
+- No Stripe Tax calculation, settings, or registration endpoints
+- No Quotes, Identity, Radar, or Issuing APIs
+- No Terminal, Financial Connections, Reporting, or Sigma surfaces
+- No /v1/billing/meters or meter event stream endpoints
+- No ephemeral keys or Apple Pay domain endpoints
+
+**Deviations** (5)
+
 - Test clocks are one global time offset shared by all objects, not per-object clocks
-- No proration lines on subscription item changes; proration_behavior accepted but treated as none
+- No proration lines on item changes; proration_behavior accepted but treated as none
 - Checkout hosted page auto-completes 3DS/SCA cards instead of issuing a challenge
 - Webhooks go to one sink; registered endpoints gate event types, not per-endpoint URLs
-- Lifecycles clock-compressed: refunds succeed at +3s, payouts pay at +60s, disputes in 1 day
+- Lifecycles compressed: refunds settle at +3s, payouts at +60s, disputes in 1 day
 
 ### tenderly-style
+
+**Covered** — 5 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/api/v1/account/{account}/project/{project}/simulate` |
+| POST | `/api/v1/account/{account}/project/{project}/simulate-bundle` |
+| GET | `/api/v1/account/{account}/project/{project}/simulations` |
+| GET | `/api/v1/account/{account}/project/{project}/simulations/{id}` |
+| GET | `/api/v1/networks` |
+
+</details>
+
+**Missing** (3)
+
+- No contracts endpoints (import/verify/update contracts per project)
+- No alerts or notification-rules API
+- No transaction lookup/list endpoints (transactions by hash)
+
+**Deviations** (2)
 
 - gas_used is derived from input length, not real EVM execution; status defaults to true
 - An explicit revert:true body flag forces the revert path; real API has no such switch
 
 ### thegraph-style
 
-- One merged schema serves both Uniswap and ENS entities; real Graph serves one schema per deployment
+**Covered** — 1 routes · GraphQL schema
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/subgraphs/id/{subgraphId}/graphql` |
+
+</details>
+
+**Missing** (3)
+
+- No subgraph deployment/management surface; the two seeded ids are fixed
+- No indexing-status queries beyond _meta (no /status endpoint)
+- No GraphQL subscriptions over websockets; HTTP queries only
+
+**Deviations** (1)
+
+- One merged schema serves Uniswap and ENS entities; real Graph serves one per deployment
 
 ### threads-style
 
-- Container processing is a fixed ~3s clock-derived window; text containers need no real poll
+**Covered** — 8 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/oauth/authorize` |
+| POST | `/oauth/access_token` |
+| GET | `/v1.0/me` |
+| GET | `/v1.0/{container_id}` |
+| GET | `/v1.0/{id}/insights` |
+| POST | `/v1.0/{id}/threads_publish` |
+| POST | `/v1.0/{id}/threads` |
+| GET | `/v1.0/{id}/threads` |
+
+</details>
+
+**Missing** (3)
+
+- Only TEXT media containers; no image or video media types or uploads
+- No reply or quote-post creation; inbox replies are synthetic
+- No user-level insights; only 4 per-media metrics
+
+**Deviations** (3)
+
+- Container processing is a fixed ~3s clock-derived window; text needs no real poll
 - simulate_fail=true on container create is a simulator-only failure switch
 - Refresh-grant response omits the rotated refresh_token; only the code exchange returns one
 
 ### twilio-style
 
+**Covered** — 6 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/2010-04-01/Accounts/{account_sid}/Messages.json` |
+| GET | `/2010-04-01/Accounts/{account_sid}/Messages.json` |
+| GET | `/2010-04-01/Accounts/{account_sid}/Messages/{sid}` |
+| POST | `/2010-04-01/Accounts/{account_sid}/Calls.json` |
+| POST | `/v2/Services/{service_sid}/Verification` |
+| POST | `/v2/Services/{service_sid}/VerificationCheck` |
+
+</details>
+
+**Missing** (6)
+
+- No message redact/cancel or scheduled-send endpoints
+- Calls are create-only: no GET /Calls list, GET /Calls/{Sid}, or recordings
+- No Messaging Services, Phone Numbers, or Addresses management
+- No Verify services CRUD, verification listing, or attempts endpoints
+- No Media resource for MMS attachments (list/content fetch)
+- Call Url is never fetched; no TwiML execution is modeled
+
+**Deviations** (4)
+
 - Message status derives from the clock on read: sent at +1s, delivered at +3s after send
 - Verify codes are deterministic: last 6 digits of the To number, not a random SMS code
 - simulate_fail:true in the POST body is a simulator extension forcing undelivered (30007)
+- PageSize omitted returns all messages in one page; real Twilio defaults to 50
 
 ### twitter-style
 
+**Covered** — 9 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/2/oauth2/token` |
+| GET | `/2/users/me` |
+| GET | `/2/users/by/username/{username}` |
+| GET | `/2/users/{id}` |
+| POST | `/2/tweets` |
+| GET | `/2/tweets/{id}` |
+| GET | `/2/tweets` |
+| DELETE | `/2/tweets/{id}` |
+| GET | `/2/users/{id}/timelines/reverse_chronological` |
+
+</details>
+
+**Missing** (7)
+
+- No tweet search (/2/tweets/search/recent or /all) endpoints
+- No likes, reposts, bookmarks, or quote/reply tweet operations
+- No follows, blocks, mutes, or follower-list endpoints
+- No media upload, polls, or long-form (note) tweet support
+- No spaces, lists, DMs, or compliance surfaces
+- No filtered or sample stream endpoints
+- No pagination tokens (max_results/pagination_token) on list or timeline
+
+**Deviations** (3)
+
 - Auth is mock and not enforced; any or no Authorization header is accepted everywhere
-- POST /2/oauth2/token always succeeds and mints a fake token (no PKCE or client credentials)
+- POST /2/oauth2/token always succeeds, minting a fake token (no PKCE or client creds)
+- GET /2/tweets list-all is a simulator extension; the real API has no such list endpoint
 
 ### walletconnect-style
 
-- Pairing, session approve, and JSON-RPC requests are auto-approved; no wallet device or QR scan
-- personal_sign and eth_sendTransaction return synthetic signature/tx hashes; nothing is signed
+**Covered** — 7 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v1/pairings` |
+| POST | `/v1/sessions` |
+| GET | `/v1/sessions` |
+| POST | `/v1/sessions/{topic}/approve` |
+| POST | `/v1/sessions/{topic}/request` |
+| POST | `/v1/sessions/{topic}/extend` |
+| DELETE | `/v1/sessions/{topic}` |
+
+</details>
+
+**Missing** (3)
+
+- No WebSocket relay; the real IRN protocol is WSS JSON-RPC pub/sub, not HTTP REST
+- No session update, ping, or event emission (chainChanged/accountsChanged)
+- No pairing list, expire, or ping operations
+
+**Deviations** (2)
+
+- Pairing, session approve, and JSON-RPC requests are auto-approved (no wallet device)
+- personal_sign and eth_sendTransaction return synthetic hashes; nothing is signed
 
 ### whatsapp-style
 
-- 24-hour customer service window is not enforced; free-form sends outside it never fail with 470
+**Covered** — 8 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| POST | `/v21.0/{phone_number_id}/messages` |
+| POST | `/v21.0/{phone_number_id}/register` |
+| POST | `/v21.0/{phone_number_id}/media` |
+| GET | `/v21.0/{media_id}/content` |
+| GET | `/v21.0/{waba_id}/message_templates` |
+| POST | `/v21.0/{waba_id}/message_templates` |
+| GET | `/v21.0/{resource_id}` |
+| POST | `/v21.0/{template_id}` |
+
+</details>
+
+**Missing** (5)
+
+- Only text and template message types; no image, video, document, or interactive
+- No mark-as-read (status=read) or message reaction sends
+- No business profile, flows, or commerce surfaces
+- No template delete or conversation analytics endpoints
+- No inbound customer-message webhook simulation
+
+**Deviations** (4)
+
+- 24-hour customer service window not enforced; free-form sends never fail with 470
 - delivered is clock-derived at a fixed +3s after send, not real carrier delivery
 - simulate_fail:true on send is a simulator extension forcing terminal failed status
 - Template review is client-driven: POST {template_id} flips PENDING to APPROVED/REJECTED
 
 ### workday-style
 
-- SOAP, Workday's primary interface, is not implemented; REST-equivalent endpoints only
+**Covered** — 8 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/wbs/v40.0/staffing/workers` |
+| GET | `/wbs/v40.0/staffing/workers/{id}` |
+| GET | `/wbs/v40.0/compensation/workers/{id}/compensation` |
+| GET | `/wbs/v40.0/payroll/pay_components` |
+| GET | `/wbs/v40.0/human_resources/positions` |
+| GET | `/wbs/v40.0/financials/accounts` |
+| GET | `/ccx/v1/{tenant}/RaaS/Custom_Report` |
+| POST | `/ccx/v1/{tenant}/staffing/Create_Worker` |
+
+</details>
+
+**Missing** (4)
+
+- SOAP interface not implemented (REST-equivalent endpoints only)
+- No worker update, delete, or other writes; only Create_Worker exists
+- RaaS serves only the seeded Custom_Report, not arbitrary named reports
+- No absence, talent, recruiting, or benefits service domains
+
+**Deviations** (1)
+
 - Auth validates only Authorization header presence; any bearer/basic value passes
 
 ### x-articles-style
+
+**Covered** — 8 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/2/oauth2/authorize` |
+| POST | `/2/oauth2/token` |
+| POST | `/2/articles/draft` |
+| POST | `/2/articles/{id}/publish` |
+| GET | `/2/articles/{id}` |
+| POST | `/2/media/upload` |
+| POST | `/2/tweets` |
+| GET | `/2/tweets/{id}` |
+
+</details>
+
+**Missing** (4)
+
+- No article update, delete, or unpublish endpoints
+- No article list or search; only single-article GET
+- No chunked media upload (INIT/APPEND/FINALIZE) or processing status
+- Tweet surface is create/get only; no delete, likes, or timeline
+
+**Deviations** (1)
 
 - PKCE is relaxed: code_verifier must be non-empty but the S256 hash match is not verified
 
 ### xero-style
 
-- No tax-rate registry is simulated; line tax is the given TaxAmount, not computed from TaxType
+**Covered** — 15 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/connections` |
+| GET | `/api.xro/2.0/Contacts` |
+| PUT | `/api.xro/2.0/Contacts` |
+| GET | `/api.xro/2.0/Contacts/{id}` |
+| PUT | `/api.xro/2.0/Contacts/{id}` |
+| GET | `/api.xro/2.0/Invoices` |
+| PUT | `/api.xro/2.0/Invoices` |
+| GET | `/api.xro/2.0/Invoices/{id}` |
+| DELETE | `/api.xro/2.0/Invoices/{id}` |
+| POST | `/api.xro/2.0/Invoices/{id}/Payments` |
+| GET | `/api.xro/2.0/Accounts` |
+| GET | `/api.xro/2.0/BankTransactions` |
+| GET | `/api.xro/2.0/Items` |
+| GET | `/api.xro/2.0/TrackingCategories` |
+| POST | `/webhooks` |
+
+</details>
+
+**Missing** (6)
+
+- No Credit Notes, Quotes, or standalone Payments endpoints
+- No Journals, Bank Transfers, Employees, or Expense Claims
+- No Organisations, Currencies, or TaxRates endpoints
+- Accounts, Items, TrackingCategories, BankTransactions are read-only (GET only)
+- No attachments or history/notes endpoints
+- No invoice update, email, or repeating-invoice endpoints
+
+**Deviations** (2)
+
+- No tax-rate registry; line tax is the given TaxAmount, not computed from TaxType
+- Responses carry a sim-only nextPage field; real Xero signals the last page by item count
+
+### youtube-style
+
+**Covered** — 13 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/o/oauth2/auth` |
+| POST | `/o/oauth2/token` |
+| POST | `/upload/youtube/v3/videos` |
+| PUT | `/upload/youtube/v3/videos/{upload_id}` |
+| DELETE | `/upload/youtube/v3/videos/{upload_id}` |
+| GET | `/youtube/v3/videos` |
+| DELETE | `/youtube/v3/videos` |
+| GET | `/youtube/v3/channels` |
+| POST | `/youtube/v3/playlists` |
+| GET | `/youtube/v3/playlists` |
+| DELETE | `/youtube/v3/playlists` |
+| POST | `/youtube/v3/playlistItems` |
+| DELETE | `/youtube/v3/playlistItems` |
+
+</details>
+
+**Missing** (7)
+
+- No search endpoint (/youtube/v3/search)
+- No comments or commentThreads endpoints
+- No video update (PUT), rate, or reportAbuse endpoints
+- Channels supports mine=true only; no list by id/forUsername or update
+- No playlist update or playlistItems list endpoints
+- No captions, thumbnails set, videoCategories, or i18n endpoints
+- No subscriptions, activities, or live streaming surfaces
+
+**Deviations** (2)
+
+- GET /youtube/v3/videos without id lists all user videos; real API requires id or chart
+- maxResults omitted returns everything; real API defaults to 5 per page
 
 ### zendesk-style
 
+**Covered** — 19 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/api/v2/tickets` |
+| POST | `/api/v2/tickets` |
+| POST | `/api/v2/tickets/{id}/comments` |
+| GET | `/api/v2/tickets/{id}/comments` |
+| POST | `/api/v2/tickets/{id}/tags` |
+| GET | `/api/v2/tickets/{id}` |
+| PUT | `/api/v2/tickets/{id}` |
+| DELETE | `/api/v2/tickets/{id}` |
+| GET | `/api/v2/users` |
+| GET | `/api/v2/organizations` |
+| GET | `/api/v2/groups` |
+| GET | `/api/v2/search.json` |
+| GET | `/api/v2/requests` |
+| GET | `/api/v2/views` |
+| GET | `/api/v2/triggers` |
+| GET | `/api/v2/webhooks` |
+| POST | `/api/v2/webhooks` |
+| DELETE | `/api/v2/webhooks/{id}` |
+| GET | `/api/v2/suspended_tickets` |
+
+</details>
+
+**Missing** (8)
+
+- No ticket metrics, audits, fields, or forms endpoints
+- No ticket create_many/update_many or import endpoints
+- No macros, SLA policies, or satisfaction ratings endpoints
+- No incremental exports (incremental/tickets, incremental/users)
+- No attachments/uploads API
+- Users, orgs, groups, views, triggers list-only; no create/update/delete
+- No request create/update endpoints (GET /api/v2/requests is list-only)
+- No webhook update (PUT/PATCH) or /webhooks/{id}/test endpoint
+
+**Deviations** (5)
+
 - Search is substring-only over ticket subject/description; empty query returns all tickets
 - GET /api/v2/suspended_tickets always returns an empty list
-- Webhook deliveries use the {type, payload} envelope, not Zendesk placeholder-substitution bodies
+- Webhook deliveries use the {type, payload} envelope, not Zendesk placeholder bodies
 - Webhook signing_secret is caller-supplied (omitted falls back to a public mock secret)
 - per_page <= 0 disables cursor paging: all records returned, links.next null
 
 ### zuora-style
 
+**Covered** — 20 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/v1/accounts` |
+| POST | `/v1/accounts` |
+| GET | `/v1/accounts/{accountKey}` |
+| POST | `/v1/subscriptions` |
+| POST | `/v1/subscriptions/{subscriptionKey}/cancel` |
+| PUT | `/v1/subscriptions/{subscriptionKey}` |
+| GET | `/v1/subscriptions/{subscriptionKey}` |
+| POST | `/v1/usage` |
+| GET | `/v1/usage` |
+| GET | `/v1/invoices/{invoiceId}` |
+| GET | `/v1/payments` |
+| POST | `/v1/payments` |
+| POST | `/v1/payments/{paymentId}/unapply` |
+| GET | `/v1/payments/{paymentId}` |
+| POST | `/v1/payment-methods/credit-cards` |
+| POST | `/v1/transactions/billing/preview` |
+| POST | `/v1/action/query` |
+| POST | `/v1/webhooks` |
+| GET | `/v1/webhooks` |
+| DELETE | `/v1/webhooks/{id}` |
+
+</details>
+
+**Missing** (8)
+
+- No Orders API (POST /v1/orders, /v1/orders/preview)
+- No product catalog endpoints (/v1/catalog/products, rate plans)
+- No credit or debit memo endpoints (/v1/creditmemos, /v1/debitmemos)
+- No refunds endpoints (POST /v1/refunds, GET /v1/refunds/{id})
+- No bill runs or payment runs (/v1/bill-runs, /v1/payment_runs)
+- No subscription list by account (GET /v1/subscriptions/account/{key})
+- No invoice list endpoint (GET /v1/transactions/invoices)
+- No other /v1/action endpoints (queryMore, create, update, delete)
+
+**Deviations** (5)
+
 - ZOQL is pattern-matched: only SELECT fields FROM Object [WHERE Id = value] is supported
-- Synthetic calendar anchored at 2024-01-01; term and due dates advance with real elapsed time
-- Webhook reg via /v1/webhooks (real: Notifications UI only); deliveries JSON, not form-encoded
+- Synthetic calendar anchored at 2024-01-01; term and due dates track real time
+- Webhook reg via /v1/webhooks (real: Notifications UI only); deliveries JSON not form-encoded
 - List filter[] applies a single condition per request; multiple filters cannot be ANDed
 - Subscriptions become Active immediately on create; no Pending Activation state
 

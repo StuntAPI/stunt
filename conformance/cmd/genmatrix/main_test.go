@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"stuntapi.com/stunt/internal/adapter"
 )
 
 func TestParseGoRecords(t *testing.T) {
@@ -231,7 +233,7 @@ func TestResolveVersions(t *testing.T) {
 
 func TestLoadSidecarRejectsGapsAndStaleEntries(t *testing.T) {
 	dir := t.TempDir()
-	sc := "adapters:\n  stripe-style:\n    deviations:\n      - \"no X\"\n  ghost-style:\n    deviations: []\n"
+	sc := "adapters:\n  stripe-style:\n    deviations:\n      - \"no X\"\n    missing:\n      - \"threads.list\"\n  ghost-style:\n    deviations: []\n    missing: []\n"
 	if err := os.WriteFile(filepath.Join(dir, "matrix.yaml"), []byte(sc), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -241,12 +243,62 @@ func TestLoadSidecarRejectsGapsAndStaleEntries(t *testing.T) {
 		!strings.Contains(err.Error(), "ghost-style") {
 		t.Fatalf("stale entry not rejected: %v", err)
 	}
-	sc = "adapters:\n  stripe-style:\n    deviations: []\n"
+	sc = "adapters:\n  stripe-style:\n    deviations: []\n    missing: []\n"
 	if err := os.WriteFile(filepath.Join(dir, "matrix.yaml"), []byte(sc), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadSidecar(filepath.Join(dir, "matrix.yaml"), ids); err == nil ||
-		!strings.Contains(err.Error(), "a-style") {
+	got, err := loadSidecar(filepath.Join(dir, "matrix.yaml"), ids)
+	if err == nil || !strings.Contains(err.Error(), "a-style") {
 		t.Fatalf("missing adapter entry not rejected: %v", err)
+	}
+	// Full-coverage sidecar round-trips both lists.
+	sc = "adapters:\n  a-style:\n    deviations: []\n    missing: []\n  stripe-style:\n    deviations:\n      - \"d\"\n    missing:\n      - \"m1\"\n      - \"m2\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "matrix.yaml"), []byte(sc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, err = loadSidecar(filepath.Join(dir, "matrix.yaml"), ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got["stripe-style"].Missing) != 2 || got["stripe-style"].Missing[0] != "m1" {
+		t.Fatalf("missing list not round-tripped: %+v", got["stripe-style"])
+	}
+	_ = got
+}
+
+func TestRenderSurfaceDetailBlock(t *testing.T) {
+	adapters := []*adapter.Adapter{
+		{
+			ID:      "demo-style",
+			API:     &adapter.APISpec{Name: "Demo API", Version: "v9"},
+			Graphql: &adapter.GraphqlSpec{Schema: "schema.graphql"},
+			Endpoints: []adapter.Endpoint{
+				{Method: "GET", Route: "/v9/things"},
+				{Method: "POST", Route: "/v9/things|weird"},
+			},
+		},
+	}
+	gaps := map[string]gapEntry{"demo-style": {Deviations: []string{"covered but different"}, Missing: []string{"no DELETE /v9/things"}}}
+	doc, err := render(adapters, nil, map[string]string{}, gaps, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"### demo-style",
+		"**Covered** — 2 routes · GraphQL schema",
+		"<details><summary>Routes</summary>",
+		"| GET | `/v9/things` |",
+		"| POST | `/v9/things\\|weird` |", // pipe escaped, row stays intact
+		"**Missing** (1)",
+		"- no DELETE /v9/things",
+		"**Deviations** (1)",
+		"- covered but different",
+	} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("render output missing %q", want)
+		}
+	}
+	if strings.Contains(doc, "| 1 | `2017") {
+		t.Error("unexpected cell content")
 	}
 }

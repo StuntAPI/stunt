@@ -136,8 +136,9 @@ dispatch (`just fuzz`), and conformance suites that drive **real provider SDKs**
 aws-sdk-go-v2, go-github, twilio-go, go-shopify, google-api-go-client — end-to-end against
 the adapters (`just conformance`), plus Node suites driving **stripe-node, octokit, and
 twilio-node** through the real `stunt` binary (`just conformance-node`). The full
-per-adapter scorecard — which SDK at which version, covered behaviors, documented
-deviations, verification tier — is generated into
+per-adapter scorecard — which SDK at which version, covered behaviors, the exact
+route surface covered, what's missing from the real API, documented deviations,
+verification tier — is generated into
 **[`CONFORMANCE.md`](CONFORMANCE.md)** (`just conformance-matrix`; CI fails on drift).
 Highlights:
 
