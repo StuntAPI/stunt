@@ -2,6 +2,7 @@ package conformance
 
 import (
 	"context"
+	"errors"
 	"net/url"
 	"testing"
 	"time"
@@ -17,10 +18,11 @@ import (
 
 // TestSQSSDKConformance drives aws-sdk-go-v2's sqs client against the
 // sqs-style adapter with the adapter's documented synthetic credentials.
-// The SDK signs every request with REAL SigV4 and — critically — resolves
-// each queue's URL as the request endpoint, so the receive/visibility/
-// delete lifecycle below runs over the adapter's queue-URL-addressed
-// transport, exactly like production consumers.
+// The SDK signs every request with REAL SigV4 and validates message
+// checksums client-side. NOTE: aws-sdk-go-v2 serializes every SQS
+// operation to POST / with the QueueUrl in the BODY (endpoint transport);
+// it is boto3/botocore that resolves the queue URL as the request
+// endpoint — that path is covered by the adapter's VM tests (qCall).
 func TestSQSSDKConformance(t *testing.T) {
 	ctx := context.Background()
 	base := Boot(t, "sqs-style")
@@ -36,9 +38,8 @@ func TestSQSSDKConformance(t *testing.T) {
 	}
 	client := sqs.NewFromConfig(cfg, func(o *sqs.Options) {
 		o.BaseEndpoint = &base
-		// The queue-URL-addressed transport asserts every request went to
-		// a queue URL served by THIS adapter instance, not the SDK's
-		// default regional endpoint.
+		// Asserts every request targets THIS adapter instance, not the
+		// SDK's default regional endpoint.
 		o.APIOptions = append(o.APIOptions, func(stack *middleware.Stack) error {
 			return stack.Finalize.Add(
 				middleware.FinalizeMiddlewareFunc("stunt-endpoint-check", func(
@@ -87,9 +88,6 @@ func TestSQSSDKConformance(t *testing.T) {
 	msg := recv.Messages[0]
 	if msg.ReceiptHandle == nil || *msg.ReceiptHandle == "" {
 		t.Fatal("no receipt handle")
-	}
-	for _, a := range msg.MessageAttributes {
-		_ = a
 	}
 	sentMS := queueAttribute(msg.Attributes, "SentTimestamp")
 	if sentMS < 1_000_000_000_000 {
@@ -170,7 +168,11 @@ func TestSQSSDKConformance(t *testing.T) {
 	if err == nil {
 		t.Fatal("GetQueueUrl on missing queue should fail")
 	}
-	Record(t, "aws-sdk-go-v2", "sqs-style", "missing-queue error surface over queue-URL transport")
+	var qdne *sqstypes.QueueDoesNotExist
+	if !errors.As(err, &qdne) {
+		t.Fatalf("missing-queue error = %v, want typed QueueDoesNotExist", err)
+	}
+	Record(t, "aws-sdk-go-v2", "sqs-style", "missing-queue typed error surface")
 }
 
 func baseHost(t *testing.T, base string) string {

@@ -76,6 +76,12 @@ func TestDynamoDBSDKConformance(t *testing.T) {
 	if v, ok := got.Item["live"].(*types.AttributeValueMemberBOOL); !ok || !v.Value {
 		t.Fatalf("GetItem live = %#v, want BOOL:true", got.Item["live"])
 	}
+	if v, ok := got.Item["label"].(*types.AttributeValueMemberS); !ok || v.Value != "widget" {
+		t.Fatalf("GetItem label = %#v, want S:\"widget\"", got.Item["label"])
+	}
+	if v, ok := got.Item["tags"].(*types.AttributeValueMemberSS); !ok || len(v.Value) != 2 || v.Value[0] != "alpha" || v.Value[1] != "beta" {
+		t.Fatalf("GetItem tags = %#v, want SS:[alpha beta]", got.Item["tags"])
+	}
 	Record(t, "aws-sdk-go-v2", "dynamodb-style", "typed item Put/Get round-trip (S/N/BOOL/SS)")
 
 	// ===== UpdateItem: SET + exact-decimal ADD =====

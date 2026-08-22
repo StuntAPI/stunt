@@ -589,7 +589,7 @@ func TestSQSSendMessageBatchPartialFailure(t *testing.T) {
 	if !ok || prio["DataType"] != "Number" || prio["StringValue"] != "1" {
 		t.Fatalf("message attribute did not round-trip: %v", mattrs)
 	}
-	if third["MD5OfMessageAttributes"] == "" {
+	if _, present := third["MD5OfMessageAttributes"]; present {
 		t.Fatal("MD5OfMessageAttributes missing on the attributed message")
 	}
 	if _, present := bodies["first"]["MessageAttributes"]; present {

@@ -7,8 +7,8 @@
 #
 # All 14 operations live here (_op_*) because both transports dispatch to the
 # same code: POST / reads the queue from the QueueUrl body field, POST
-# /{queueName} from the path param (SDKs resolve a queue URL to host/<name>
-# and re-send there).
+# /{queueName} from the path param (boto3/botocore resolves a queue URL to
+# host/<name> and re-sends there; the aws Go SDK always targets POST /).
 
 # ====================================================================
 # Constants (limits documented in the README)
@@ -651,7 +651,7 @@ def _message_id(seq):
 def _receipt_handle(seq, now):
     return "AQEB" + _hex_str(seq, 16) + _hex_str(now, 12)
 
-# MD5* digests are SHA-256 based (the crypto module has no MD5) — a
+# MD5OfMessageBody is the REAL MD5 — provider SDKs validate it client-side.
 # documented divergence; the field names stay the real ones.
 def _body_digest(msg_body):
     # Real SQS returns the MD5 of the body and SDKs VALIDATE it client-side
@@ -660,13 +660,6 @@ def _body_digest(msg_body):
     if msg_body == None:
         msg_body = ""
     return crypto.md5(msg_body)
-
-def _attr_value_text(v):
-    for k in ["StringValue", "BinaryValue", "NumberValue", "StringListValues"]:
-        got = v.get(k, None)
-        if got != None:
-            return str(got)
-    return ""
 
 def _new_message(queue, msg_body, mattrs, now, delay):
     seq = store_kv_incr("sqs", "msg_seq")

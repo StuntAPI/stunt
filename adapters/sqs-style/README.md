@@ -45,7 +45,7 @@ routes serve the same dispatcher:
 | Method | Route | Queue comes from |
 |--------|-------|------------------|
 | POST | `/` | the `QueueUrl` field of the JSON body |
-| POST | `/{queueName}` | the path segment — SDKs resolve the queue URL (`http://<host>/<queueName>`) to the service host and re-send operations there |
+| POST | `/{queueName}` | the path segment — boto3/botocore resolves the queue URL (`http://<host>/<queueName>`) to the service host and re-sends operations there (the aws Go SDK always targets `POST /` with `QueueUrl` in the body) |
 
 The `/{queueName}` route carries `concurrency_key: queueName`, serializing
 send/receive/delete (read-modify-write on the queue's message list) per queue.
@@ -60,7 +60,7 @@ send/receive/delete (read-modify-write on the queue's message list) per queue.
 | `DeleteQueue` | `QueueUrl` | `{}` — removes the queue and its messages |
 | `GetQueueAttributes` | `QueueUrl`, `AttributeNames?` (`All` default) | `Attributes` (string map incl. `ApproximateNumberOfMessages*`, timestamps, `QueueArn`) |
 | `SetQueueAttributes` | `QueueUrl`, `Attributes` | `{}` |
-| `SendMessage` | `QueueUrl`, `MessageBody`, `DelaySeconds?`, `MessageAttributes?` | `MessageId`, `MD5OfMessageBody`, `MD5OfMessageAttributes?` |
+| `SendMessage` | `QueueUrl`, `MessageBody`, `DelaySeconds?`, `MessageAttributes?` | `MessageId`, `MD5OfMessageBody` (real MD5), `MD5OfMessageAttributes?` |
 | `SendMessageBatch` | `QueueUrl`, `Entries[{Id, MessageBody, ...}]` (max 10) | `Successful[{Id, MessageId, MD5OfMessageBody}]`, `Failed[{Id, SenderFault, Code, Message}]` |
 | `ReceiveMessage` | `QueueUrl`, `MaxNumberOfMessages?` (1–10), `VisibilityTimeout?`, `WaitTimeSeconds?`, `AttributeNames?`, `MessageAttributeNames?` | `Messages[]` (omitted when nothing is visible) |
 | `DeleteMessage` | `QueueUrl`, `ReceiptHandle` | `{}` |
@@ -174,7 +174,7 @@ fresh sequence with the mode still active.
 | Collection | Purpose |
 |------------|---------|
 | `queues` | `{name, attributes, created_unix, last_modified_unix, purged_at_unix}` |
-| `messages` | `{queue, message_id, body, message_attrs, in_flight, receipt_handle, visible_at_unix, sent_at_unix, receive_count, first_receive_unix, seq, body_digest, attrs_digest}` |
+| `messages` | `{queue, message_id, body, message_attrs, in_flight, receipt_handle, visible_at_unix, sent_at_unix, receive_count, first_receive_unix, seq, body_digest}` |
 
 A message is receivable iff `now >= visible_at_unix` — the same field covers
 send delays and the post-receive in-flight timeout, and the
