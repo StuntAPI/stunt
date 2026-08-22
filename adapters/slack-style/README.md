@@ -16,8 +16,10 @@ local integration testing without a real Slack workspace:
 - **auth.test:** `POST /api/auth.test` → `{ok:true, url, team, user, team_id, user_id}`.
 - **Post message:** `POST /api/chat.postMessage` (`{channel, text}`) → `{ok:true, channel, ts, message:{...}}`.
 - **Create channel:** `POST /api/conversations.create` (`{name}`).
-- **List channels:** `GET /api/conversations.list` → `{ok:true, channels:[...]}`.
-- **Channel history:** `GET /api/conversations.history?channel=C...` → `{ok:true, messages:[...]}`.
+- **List channels:** `POST /api/conversations.list` (form-encoded; `GET` with
+  query params also accepted) → `{ok:true, channels:[...]}`.
+- **Channel history:** `POST /api/conversations.history` (form field `channel`;
+  `GET ?channel=C...` also accepted) → `{ok:true, messages:[...]}`.
 - **Add reaction:** `POST /api/reactions.add` (`{channel, timestamp, name}`).
 - **Events API config:** `POST /api/apps.events.url` (`{url, signing_secret?, events?}`) —
   sets the Request URL and immediately delivers the `url_verification`
@@ -127,8 +129,8 @@ if expected != r.Header.Get("X-Slack-Signature") { return 401 }
 | POST | `/api/auth.test` | `auth.star#on_auth_test` | Authenticate and get workspace info |
 | POST | `/api/chat.postMessage` | `chat.star#on_post_message` | Post a message (stateful) |
 | POST | `/api/conversations.create` | `conversations.star#on_create_conversation` | Create a channel |
-| GET | `/api/conversations.list` | `conversations.star#on_list_conversations` | List all channels |
-| GET | `/api/conversations.history` | `conversations.star#on_conversation_history` | Channel message history (stateful) |
+| any | `/api/conversations.list` | `conversations.star#on_list_conversations` | List all channels (SDK POST form or GET query) |
+| any | `/api/conversations.history` | `conversations.star#on_conversation_history` | Channel message history (stateful; SDK POST form or GET query) |
 | POST | `/api/reactions.add` | `reactions.star#on_add_reaction` | Add a reaction to a message |
 | POST | `/api/apps.events.url` | `events.star#on_set_events_url` | Set the Events API Request URL (local analog of the dashboard setting) |
 

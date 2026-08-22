@@ -138,7 +138,7 @@ def _seed():
         "extraData": "0x",
         "sha3Uncles": _deterministic_hash("uncles-genesis"),
         "stateRoot": _deterministic_hash("state-genesis"),
-        "logsBloom": "0x" + _hex64(),
+        "logsBloom": "0x" + _bloom_hex(),
     })
 
     # Seed well-known accounts with deterministic balances.
@@ -153,9 +153,14 @@ def _seed():
         store_kv_set("eth", "balance_" + addr.lower(), balances[addr])
         store_kv_set("eth", "nonce_" + addr.lower(), "0")
 
-# _hex64 returns a 64-char zero string (for logsBloom placeholder).
+# _hex64 returns a 64-char zero string (32-byte hashes).
 def _hex64():
     return "0" * 64
+
+# _bloom_hex returns the 512-char zero string of a real logsBloom field —
+# 2048 bits. go-ethereum's header decoder hard-fails on any other length.
+def _bloom_hex():
+    return "0" * 512
 
 # --- account helpers ---
 

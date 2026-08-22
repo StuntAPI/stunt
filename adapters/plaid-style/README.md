@@ -54,8 +54,10 @@ the last seq served, so a truncated batch resumes on the next call.
 
 ## Auth
 
-Plaid takes credentials **in the request body** (`{client_id, secret}`) or as
-`Authorization: Bearer <client_id>_<secret>`. Presence is checked, not validated.
+Plaid takes credentials **in the request body** (`{client_id, secret}`), as the
+`PLAID-CLIENT-ID` / `PLAID-SECRET` headers (the form every official SDK sends),
+or as `Authorization: Bearer <client_id>_<secret>`. Presence is checked, not
+validated.
 
 ## Webhooks
 

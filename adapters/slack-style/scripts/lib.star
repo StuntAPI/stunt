@@ -144,11 +144,16 @@ def _to_int(s):
 # None or <= 0, paging is disabled: the full list is returned with a None
 # next_cursor, preserving the pre-pagination behavior.
 def _list_page(req, docs):
+    # Official SDKs POST form-encoded (limit/cursor in the body); curl
+    # examples use query params. Query wins, body is the fallback.
     q = req.get("query")
     if q == None:
         q = {}
-    limit = _to_int(q.get("limit", ""))
-    cursor = q.get("cursor", "")
+    b = req.get("body")
+    if b == None:
+        b = {}
+    limit = _to_int(q.get("limit", "") or b.get("limit", ""))
+    cursor = q.get("cursor", "") or b.get("cursor", "")
     if cursor == None:
         cursor = ""
     return paginate(docs, limit, cursor)

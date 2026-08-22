@@ -157,9 +157,13 @@ func parseGoRecords(dir string) ([]check, error) {
 // nodeSuiteSDK maps a node test file to the SDK label its sections are
 // attributed to.
 var nodeSuiteSDK = map[string]string{
-	"github.test.ts": "octokit",
-	"stripe.test.ts": "stripe-node",
-	"twilio.test.ts": "twilio-node",
+	"github.test.ts":  "octokit",
+	"hubspot.test.ts": "hubspot-node",
+	"plaid.test.ts":   "plaid-node",
+	"slack.test.ts":   "slack-node",
+	"square.test.ts":  "square-node",
+	"stripe.test.ts":  "stripe-node",
+	"twilio.test.ts":  "twilio-node",
 }
 
 var (
@@ -323,12 +327,19 @@ var goModuleBases = map[string]string{
 	"x/oauth2":      "golang.org/x/oauth2",
 	// The google suite labels the subpackage, not the umbrella module.
 	"google-api-go-client/idtoken": "google.golang.org/api",
+	// go-ethereum is the canonical Go client for JSON-RPC chains (there is
+	// no single "provider" — the client library is the standard surface).
+	"go-ethereum": "github.com/ethereum/go-ethereum",
 }
 
 var nodePackages = map[string]string{
-	"octokit":     "octokit",
-	"stripe-node": "stripe",
-	"twilio-node": "twilio",
+	"hubspot-node": "@hubspot/api-client",
+	"octokit":      "octokit",
+	"plaid-node":   "plaid",
+	"slack-node":   "@slack/web-api",
+	"square-node":  "square",
+	"stripe-node":  "stripe",
+	"twilio-node":  "twilio",
 }
 
 // resolveVersions resolves the display version for every SDK label in the

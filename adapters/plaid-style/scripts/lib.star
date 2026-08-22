@@ -5,9 +5,10 @@
 # they were builtins — without Starlark's load() (which stunt does not
 # support). See internal/starlark/vm.go LoadWithLib.
 
-# Plaid takes credentials EITHER in the request body (client_id + secret) OR
-# as "Authorization: Bearer <client_id>_<secret>". We check presence only —
-# the values are not validated against real Plaid credentials.
+# Plaid takes credentials in the request body (client_id + secret), as the
+# PLAID-CLIENT-ID / PLAID-SECRET headers (what every official SDK sends),
+# or as "Authorization: Bearer <client_id>_<secret>". We check presence
+# only — the values are not validated against real Plaid credentials.
 
 # _check_auth validates that Plaid credentials are present. Returns None if
 # authorized, or an error-response dict if not.
@@ -19,17 +20,22 @@ def _check_auth(req):
         if cid != "" and secret != "":
             return None
 
-    # Fall back to bearer "client_id_secret".
-    auth = ""
     headers = req.get("headers")
     if headers != None:
+        # Header form — what the official SDKs send.
+        hcid = headers.get("Plaid-Client-Id", "") or ""
+        hsecret = headers.get("Plaid-Secret", "") or ""
+        if hcid != "" and hsecret != "":
+            return None
+
+        # Fall back to bearer "client_id_secret".
         auth = headers.get("Authorization", "")
         if auth == None:
             auth = ""
-    if auth.startswith("Bearer "):
-        token = auth[7:]
-        if "_" in token:
-            return None
+        if auth.startswith("Bearer "):
+            token = auth[7:]
+            if "_" in token:
+                return None
 
     return respond(401, {
         "display_message": None,
