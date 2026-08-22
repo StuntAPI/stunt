@@ -36,20 +36,20 @@ def on_token(req):
         username = _claim_str(claims.get("sub", None))
         if username == "":
             username = _claim_str(claims.get("prn", None))  # legacy claim
-        return _issue_token(username, _claim_str(claims.get("iss", None)), None, False)
+        return _issue_token(username, _claim_str(claims.get("iss", None)), None, False, req)
 
     if grant_type == "password":
         username = body.get("username") or ""
         password = body.get("password") or ""
         if username == "" or password == "" or client_id == "":
             return _oauth_error("invalid_request", "missing required parameters")
-        return _issue_token(username, client_id)
+        return _issue_token(username, client_id, req=req)
 
     if grant_type == "authorization_code":
         code = body.get("code") or ""
         if code == "":
             return _oauth_error("invalid_grant", "invalid or expired code")
-        return _issue_token("user@mock.org", client_id)
+        return _issue_token("user@mock.org", client_id, req=req)
 
     if grant_type == "refresh_token":
         refresh_token = body.get("refresh_token") or ""
@@ -58,7 +58,7 @@ def on_token(req):
             return _oauth_error("invalid_grant", "invalid refresh_token")
         # Reuse-safe: the refresh token stays valid for the next redemption;
         # only the access token rotates.
-        return _issue_token(username, client_id, refresh_token)
+        return _issue_token(username, client_id, refresh_token, req=req)
 
     return _oauth_error("unsupported_grant_type", "grant_type not supported")
 
@@ -66,7 +66,7 @@ def on_token(req):
 # existing refresh token on a refresh grant (reused, not echoed) or None to
 # mint a fresh one (password/code grants). `with_refresh=False` (JWT bearer
 # grant) skips refresh tokens entirely.
-def _issue_token(username, client_id, refresh=None, with_refresh=True):
+def _issue_token(username, client_id, refresh=None, with_refresh=True, req=None):
     seq = store_kv_incr("salesforce", "token_seq")
     # Session IDs are 00D-prefixed (org key prefix).
     access = "00D" + _pad_b62(seq, 15)
@@ -84,10 +84,19 @@ def _issue_token(username, client_id, refresh=None, with_refresh=True):
 
     issued_at = _epoch_ms()
 
+    # Real Salesforce returns the caller's own instance URL here and SDKs
+    # (jsforce, ...) direct every API call at it — echo the request host.
+    host = "localhost"
+    if req != None:
+        h = req.get("host")
+        if h != None and h != "":
+            host = h
+    instance_url = "http://" + host
+
     result = {
         "access_token": access,
-        "instance_url": "https://mock-instance.my.salesforce.com",
-        "id": "https://mock-instance.my.salesforce.com/id/00D" + ("0" * 12) + "EAA/" + user_id,
+        "instance_url": instance_url,
+        "id": instance_url + "/id/00D" + ("0" * 12) + "EAA/" + user_id,
         "token_type": "Bearer",
         "issued_at": issued_at,
         "signature": "mock-signature-base64",

@@ -178,6 +178,13 @@ Zendesk's error envelope:
 | `tags` | Ticket tags |
 | `webhooks` | Webhook configurations (endpoint, per-hook signing secret, subscriptions) |
 
+## Canonical `.json` paths
+
+Real Zendesk serves every resource at both `/api/v2/tickets` and
+`/api/v2/tickets.json` — official clients (node-zendesk) request the `.json`
+form. Both are served; point node-zendesk at `endpointUri:
+<base>/api/v2` with `username`/`token` (the client appends `/token:` itself).
+
 ## Usage
 
 ```yaml

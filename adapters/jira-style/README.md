@@ -16,7 +16,8 @@ tracking and project management integrations during local development:
 - **Auth:** Basic (`email:api_token`) or Bearer (PAT). Both accepted.
 - **Myself:** `GET /rest/api/3/myself` → `{accountId, displayName, emailAddress, active}`.
 - **Server info:** `GET /rest/api/3/serverInfo` → `{version, deploymentType, ...}`.
-- **Projects:** `GET /rest/api/3/project` → list; `GET /rest/api/3/project/{key}` → detail.
+- **Projects:** `GET /rest/api/3/project` → list; `GET /rest/api/3/project/search` →
+  the modern paginated form (`{isLast, values}`) real clients call; `GET /rest/api/3/project/{key}` → detail.
 - **JQL Search:** `GET /rest/api/3/search?jql=...` → `{startAt, maxResults, total,
   issues:[...]}` with a real JQL subset — `=`/`!=`/`~`/`!~`/`>`/`>=`/`<`/`<=`, `IN`,
   `NOT IN`, `IS [NOT] EMPTY`, `AND`/`OR` with JQL precedence, `ORDER BY ... ASC|DESC`
@@ -181,6 +182,12 @@ for webhook deliveries — Atlassian relies on secret tokens in the URL, basic
 auth on the target, or fetch-back verification via the REST API. stunt mirrors
 that: deliveries carry the real envelope and no signature headers. Do not
 invent a signature check client-side; use a secret path segment instead.
+
+## Versioned and v2 routes
+
+The full issue + comment surface (create/read/update/delete, transitions,
+comments) is **also served under `/rest/api/2`** — the version jira.js and
+several clients actually use — alongside the v3 paths above.
 
 ## Usage
 

@@ -244,6 +244,25 @@ def on_do_transition(req):
 
     return respond(204)
 
+# on_get_comment serves GET /rest/api/3/issue/{key}/comment/{id} — the
+# single-comment fetch (jira.js reads back every comment it creates).
+def on_get_comment(req):
+    _, err = _require_auth(req)
+    if err != None:
+        return err
+
+    key = req["params"].get("key", "")
+    if _find_issue(key) == None:
+        return _not_found()
+
+    comment = store_collection("comments").get(req["params"].get("id", ""))
+    if comment == None or comment.get("_issue", "") != key:
+        return respond(404, {
+            "errorMessages": ["Comment Does Not Exist"],
+            "errors": {},
+        })
+    return respond(200, _comment_view(comment))
+
 def on_list_comments(req):
     _, err = _require_auth(req)
     if err != None:

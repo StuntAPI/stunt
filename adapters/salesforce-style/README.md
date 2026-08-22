@@ -14,7 +14,9 @@ A faithful behavioral mock of the Salesforce REST API surface, designed to unblo
 CRM integrations during local development:
 
 - **OAuth2:** `POST /services/oauth2/token` (password, authorization_code,
-  refresh_token, or JWT bearer grants) → `{access_token:"00D...", instance_url,
+  refresh_token, or JWT bearer grants) → `{access_token:"00D...", instance_url`
+  (the adapter echoes the request host — like real Salesforce, so SDKs such as
+  jsforce direct their API calls back at it),
   token_type:"Bearer", id, issued_at, signature, refresh_token}`. Refresh tokens
   are long-lived and **reusable**, exactly as in real Salesforce: redeeming one
   never invalidates it, and the refresh grant response omits `refresh_token`
