@@ -47,7 +47,7 @@ Verification tiers:
 | [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | boot | — | — | [6](#chainlink-style) | [5](#chainlink-style) |
 | [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | boot | — | — | [8](#cloudflare-style) | [5](#cloudflare-style) |
 | [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | boot | — | — | [6](#cloudkit-style) | [2](#cloudkit-style) |
-| [discord-style](adapters/discord-style/) | Discord API `v10` | 24 (+1 ws) | SDK | discord-node @ 2.6.3 (floor) | 5 | [8](#discord-style) | [5](#discord-style) |
+| [discord-style](adapters/discord-style/) | Discord API `v10` | 26 (+1 ws) | SDK | discord-node @ 2.6.3 (floor) | 5 | [8](#discord-style) | [5](#discord-style) |
 | [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | boot | — | — | [7](#drive-style) | [3](#drive-style) |
 | [dropbox-style](adapters/dropbox-style/) | Dropbox API `2` | 8 | boot | — | — | [8](#dropbox-style) | [4](#dropbox-style) |
 | [dune-style](adapters/dune-style/) | Dune Analytics API `v1` | 6 | boot | — | — | [5](#dune-style) | [3](#dune-style) |
@@ -1140,7 +1140,7 @@ behavior notes live in each adapter's README.
 
 ### discord-style
 
-**Covered** — 24 routes (+1 ws)
+**Covered** — 26 routes (+1 ws)
 
 <details><summary>Routes</summary>
 
@@ -1157,7 +1157,8 @@ behavior notes live in each adapter's README.
 | GET | `/channels/{channel_id}/messages` |
 | GET | `/channels/{channel_id}/messages/{message_id}` |
 | GET | `/v10/channels/{channel_id}/messages/{message_id}` |
-|  | `/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` |
+| PUT | `/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` |
+| POST | `/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` |
 | POST | `/interactions` |
 | GET | `/v10/oauth2/authorize` |
 | POST | `/v10/oauth2/token` |
@@ -1168,7 +1169,8 @@ behavior notes live in each adapter's README.
 | GET | `/v10/guilds/{guild_id}/channels` |
 | POST | `/v10/channels/{channel_id}/messages` |
 | GET | `/v10/channels/{channel_id}/messages` |
-|  | `/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` |
+| PUT | `/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` |
+| POST | `/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` |
 | POST | `/v10/interactions` |
 | WS | `/gateway` |
 
@@ -1180,7 +1182,7 @@ behavior notes live in each adapter's README.
 - No channel create/update/delete or channel webhooks endpoints
 - No reaction listing or removal endpoints (GET/DELETE /reactions/{emoji})
 - No application command registration (PUT /applications/{app_id}/commands)
-- No guild list or member endpoints: GET /users/@me/guilds, /guilds/{id}/members
+- No guild member endpoints (/guilds/{id}/members)
 - No DM channels (POST /users/@me/channels) or invite endpoints
 - No OAuth token revoke (/oauth2/token/revoke) or /applications/@me
 - No pins, typing, threads, or audit log endpoints

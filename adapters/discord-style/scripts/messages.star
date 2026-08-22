@@ -84,7 +84,8 @@ def on_get_message(req):
     mc = store_collection("messages")
     msg = mc.get(req["params"]["message_id"])
     if msg == None or msg.get("channel_id", "") != req["params"]["channel_id"]:
-        return respond(404, {"code": 0, "message": "Unknown Message"})
+        # 10008 is the real Discord Unknown Message error code.
+        return respond(404, {"code": 10008, "message": "Unknown Message"})
 
     out = {}
     for k in msg:

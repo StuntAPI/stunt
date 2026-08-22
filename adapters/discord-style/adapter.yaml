@@ -60,7 +60,10 @@ endpoints:
 
   # --- Bot REST: reactions (real API is PUT; POST kept for curl users) ---
   - route: /channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me
-    method: ""
+    method: PUT
+    handler: scripts/messages.star#on_react
+  - route: /channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me
+    method: POST
     handler: scripts/messages.star#on_react
 
   # --- Interactions (slash-command webhook; inbound, signature-verified) ---
@@ -99,12 +102,16 @@ endpoints:
     method: GET
     handler: scripts/messages.star#on_list_messages
   - route: /v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me
-    method: ""
+    method: PUT
+    handler: scripts/messages.star#on_react
+  - route: /v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me
+    method: POST
     handler: scripts/messages.star#on_react
   - route: /v10/interactions
     method: POST
     handler: scripts/interactions.star#on_interactions
 
+  # --- WebSocket Gateway ---
 ws:
   - route: /gateway
     handler: scripts/gateway.star#on_connect
