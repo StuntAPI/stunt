@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"stuntapi.com/stunt/internal/adapter"
 )
 
 func TestParseGoRecords(t *testing.T) {
@@ -262,4 +264,41 @@ func TestLoadSidecarRejectsGapsAndStaleEntries(t *testing.T) {
 		t.Fatalf("missing list not round-tripped: %+v", got["stripe-style"])
 	}
 	_ = got
+}
+
+func TestRenderSurfaceDetailBlock(t *testing.T) {
+	adapters := []*adapter.Adapter{
+		{
+			ID:      "demo-style",
+			API:     &adapter.APISpec{Name: "Demo API", Version: "v9"},
+			Graphql: &adapter.GraphqlSpec{Schema: "schema.graphql"},
+			Endpoints: []adapter.Endpoint{
+				{Method: "GET", Route: "/v9/things"},
+				{Method: "POST", Route: "/v9/things|weird"},
+			},
+		},
+	}
+	gaps := map[string]gapEntry{"demo-style": {Deviations: []string{"covered but different"}, Missing: []string{"no DELETE /v9/things"}}}
+	doc, err := render(adapters, nil, map[string]string{}, gaps, ".")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		"### demo-style",
+		"**Covered** — 2 routes · GraphQL schema",
+		"<details><summary>Routes</summary>",
+		"| GET | `/v9/things` |",
+		"| POST | `/v9/things\\|weird` |", // pipe escaped, row stays intact
+		"**Missing** (1)",
+		"- no DELETE /v9/things",
+		"**Deviations** (1)",
+		"- covered but different",
+	} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("render output missing %q", want)
+		}
+	}
+	if strings.Contains(doc, "| 1 | `2017") {
+		t.Error("unexpected cell content")
+	}
 }

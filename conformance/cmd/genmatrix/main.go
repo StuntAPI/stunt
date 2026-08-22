@@ -542,10 +542,10 @@ sections in ` + "`conformance/node/tests/*.test.ts`" + `).
 			fmt.Fprintf(&b, "| Method | Route |\n")
 			fmt.Fprintf(&b, "|---|---|\n")
 			for _, ep := range a.Endpoints {
-				fmt.Fprintf(&b, "| %s | `%s` |\n", ep.Method, ep.Route)
+				fmt.Fprintf(&b, "| %s | `%s` |\n", escapeCell(ep.Method), escapeCell(ep.Route))
 			}
 			for _, ws := range a.Websockets {
-				fmt.Fprintf(&b, "| WS | `%s` |\n", ws.Route)
+				fmt.Fprintf(&b, "| WS | `%s` |\n", escapeCell(ws.Route))
 			}
 			fmt.Fprintf(&b, "\n</details>\n\n")
 		}
@@ -579,6 +579,12 @@ uncurated.
 // collapse normalizes a section marker's captured text: continuation
 // lines of a wrapped // comment keep their own "// " prefix, which is not
 // part of the section name.
+// escapeCell keeps a route or method containing a pipe from splitting
+// the markdown row.
+func escapeCell(s string) string {
+	return strings.ReplaceAll(s, "|", "\\|")
+}
+
 func collapse(s string) string {
 	var parts []string
 	for _, line := range strings.Split(s, "\n") {
