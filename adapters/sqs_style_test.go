@@ -275,6 +275,7 @@ func TestSQSSigV4Verification(t *testing.T) {
 	base := time.Date(2026, 1, 20, 12, 0, 0, 0, time.UTC)
 	f := newSQSFixture(t, base)
 
+	// ===== signed calls pass on both transports with the real MD5 =====
 	// Positive path over POST /: CreateQueue returns the documented URL shape.
 	resp := f.svcCall("CreateQueue", map[string]any{"QueueName": "sig-demo"})
 	if resp.Status != 200 {
@@ -296,6 +297,7 @@ func TestSQSSigV4Verification(t *testing.T) {
 		t.Fatalf("MD5OfMessageBody = %q, want the real MD5 of the body (%q)", got, sqsMD5Hex([]byte("sigv4-body")))
 	}
 
+	// ===== missing and garbage auth are 403 =====
 	// No Authorization header -> 403 MissingAuthenticationToken.
 	resp = f.rawSvcCall("ListQueues", map[string]any{}, map[string]string{})
 	if resp.Status != 403 || sqsErrType(t, resp) != "MissingAuthenticationToken" {
@@ -308,6 +310,7 @@ func TestSQSSigV4Verification(t *testing.T) {
 		t.Fatalf("garbage auth -> %d %q, want 403 InvalidSignatureException", resp.Status, sqsErrType(t, resp))
 	}
 
+	// ===== tampered signatures and wrong or unknown keys are 403 =====
 	// Tampered signature (well-formed header, flipped hex digit) -> 403.
 	raw, _ := json.Marshal(map[string]any{})
 	at := f.vc.Now()
@@ -332,6 +335,7 @@ func TestSQSSigV4Verification(t *testing.T) {
 		t.Fatalf("unknown AKID -> %d %q, want 403 InvalidClientTokenId", resp.Status, sqsErrType(t, resp))
 	}
 
+	// ===== a stale x-amz-date is RequestTimeTooSkewed; a fresh signature passes =====
 	// Signed at the fixture start, clock advanced past the skew window ->
 	// 403 RequestTimeTooSkewed; a fresh signature at the new time works.
 	f.vc.Advance(20 * time.Minute)
@@ -359,6 +363,7 @@ func TestSQSVisibilityTimeoutLifecycle(t *testing.T) {
 		t.Fatalf("CreateQueue -> %d: %v", resp.Status, resp.Body)
 	}
 
+	// ===== a delayed send is not receivable until the delay lapses =====
 	// DelaySeconds on send: not receivable until the delay lapses.
 	if resp := f.svcCall("SendMessage", map[string]any{
 		"QueueUrl": "http://" + f.host + "/delayed", "MessageBody": "never",
@@ -379,6 +384,7 @@ func TestSQSVisibilityTimeoutLifecycle(t *testing.T) {
 	}
 	f.vc.Advance(10 * time.Second)
 
+	// ===== MaxNumberOfMessages bounds are enforced =====
 	// MaxNumberOfMessages bounds: 0 and 11 are rejected.
 	for _, bad := range []int{0, 11} {
 		resp := f.svcCall("ReceiveMessage", map[string]any{
@@ -391,6 +397,7 @@ func TestSQSVisibilityTimeoutLifecycle(t *testing.T) {
 		}
 	}
 
+	// ===== receive hides the message until the timeout lapses, counted NotVisible =====
 	// First receive: per-receive VisibilityTimeout override of 5s.
 	first := f.svcCall("ReceiveMessage", map[string]any{
 		"QueueUrl":            "http://" + f.host + "/jobs",
@@ -446,6 +453,7 @@ func TestSQSVisibilityTimeoutLifecycle(t *testing.T) {
 		t.Fatalf("VisibilityTimeout = %v, want the 30s default", ca["VisibilityTimeout"])
 	}
 
+	// ===== redelivery mints a fresh receipt handle and bumps the receive count =====
 	// After the timeout lapses the message is redeliverable with a FRESH
 	// receipt handle and ApproximateReceiveCount 2.
 	f.vc.Advance(5 * time.Second)
@@ -469,6 +477,7 @@ func TestSQSVisibilityTimeoutLifecycle(t *testing.T) {
 		t.Fatalf("ApproximateReceiveCount = %v, want 2", msg2["Attributes"])
 	}
 
+	// ===== ChangeMessageVisibility extends the in-flight window =====
 	// ChangeMessageVisibility extends the in-flight window: +100s keeps the
 	// message hidden past the original timeout, then it lapses.
 	extend := f.svcCall("ChangeMessageVisibility", map[string]any{
@@ -493,6 +502,7 @@ func TestSQSVisibilityTimeoutLifecycle(t *testing.T) {
 	}
 	handle3, _ := msgs[0].(map[string]any)["ReceiptHandle"].(string)
 
+	// ===== delete removes the message; stale handles are ReceiptHandleIsInvalid =====
 	// DeleteMessage removes the message for good.
 	if resp := f.svcCall("DeleteMessage", map[string]any{
 		"QueueUrl": "http://" + f.host + "/jobs", "ReceiptHandle": handle3,
@@ -528,6 +538,7 @@ func TestSQSSendMessageBatchPartialFailure(t *testing.T) {
 		t.Fatalf("CreateQueue -> %d: %v", resp.Status, resp.Body)
 	}
 
+	// ===== one bad entry fails alone; the rest of the batch still sends =====
 	entries := []map[string]any{
 		{"Id": "id-1", "MessageBody": "first"},
 		{"Id": "id-2", "MessageBody": ""}, // fails alone
@@ -560,6 +571,7 @@ func TestSQSSendMessageBatchPartialFailure(t *testing.T) {
 		t.Fatalf("Failed entry = %v, want id-2 sender-fault InvalidParameterValue", fail)
 	}
 
+	// ===== delivered entries round-trip their message attributes =====
 	// Both good entries are receivable; the failed one never landed. The
 	// attribute-bearing entry round-trips its MessageAttributes.
 	recv := f.svcCall("ReceiveMessage", map[string]any{
@@ -596,6 +608,7 @@ func TestSQSSendMessageBatchPartialFailure(t *testing.T) {
 		t.Fatal("MessageAttributes returned for a message that sent none")
 	}
 
+	// ===== oversize and duplicate-id batches are rejected =====
 	// Batch guards: more than the max entries, and duplicate entry ids.
 	tooMany := []map[string]any{}
 	for i := 0; i < 11; i++ {
@@ -629,6 +642,7 @@ func TestSQSPurgeQueueWindow(t *testing.T) {
 		}
 	}
 
+	// ===== purge empties the queue immediately over the queue-URL transport =====
 	// Purge over the queue-URL transport (path-addressed).
 	if resp := f.qCall("purge-q", "PurgeQueue", map[string]any{"QueueUrl": queueURL}); resp.Status != 200 {
 		t.Fatalf("PurgeQueue -> %d: %v", resp.Status, resp.Body)
@@ -639,6 +653,7 @@ func TestSQSPurgeQueueWindow(t *testing.T) {
 		t.Fatalf("messages survived the purge: %v", resp.Body)
 	}
 
+	// ===== a second purge inside 60s is 403, then works again after the window =====
 	// Immediate second purge inside the window -> 403 PurgeQueueInProgress.
 	resp := f.svcCall("PurgeQueue", map[string]any{"QueueUrl": queueURL})
 	if resp.Status != 403 || sqsErrType(t, resp) != "PurgeQueueInProgress" {
@@ -659,6 +674,7 @@ func TestSQSPurgeQueueWindow(t *testing.T) {
 func TestSQSQueueLifecycle(t *testing.T) {
 	f := newSQSFixture(t, time.Date(2026, 1, 20, 12, 0, 0, 0, time.UTC))
 
+	// ===== create, GetQueueUrl, and prefix-filtered ListQueues round-trip =====
 	created := f.svcCall("CreateQueue", map[string]any{"QueueName": "alpha"})
 	if created.Status != 200 || sqsBodyStr(created, "QueueUrl") != "http://sqs.stunt.test/alpha" {
 		t.Fatalf("CreateQueue -> %d: %v", created.Status, created.Body)
@@ -691,6 +707,7 @@ func TestSQSQueueLifecycle(t *testing.T) {
 		t.Fatalf("ListQueues empty prefix returned urls: %v", resp.Body)
 	}
 
+	// ===== identical re-create is idempotent; conflicting attributes are QueueAlreadyExists =====
 	// Re-create with identical attributes is idempotent; a conflicting
 	// VisibilityTimeout is QueueAlreadyExists.
 	if resp := f.svcCall("CreateQueue", map[string]any{"QueueName": "alpha"}); resp.Status != 200 || sqsBodyStr(resp, "QueueUrl") != "http://sqs.stunt.test/alpha" {
@@ -704,6 +721,7 @@ func TestSQSQueueLifecycle(t *testing.T) {
 		t.Fatalf("conflicting CreateQueue -> %d %q, want 400 QueueAlreadyExists", resp.Status, sqsErrType(t, resp))
 	}
 
+	// ===== SetQueueAttributes persists; unknown names are InvalidAttributeName =====
 	// SetQueueAttributes persists and shows up in GetQueueAttributes;
 	// unknown names are rejected.
 	if resp := f.svcCall("SetQueueAttributes", map[string]any{
@@ -725,6 +743,7 @@ func TestSQSQueueLifecycle(t *testing.T) {
 		t.Fatalf("unknown attribute -> %d %q, want 400 InvalidAttributeName", resp.Status, sqsErrType(t, resp))
 	}
 
+	// ===== DeleteQueue tears the queue down for its messages too =====
 	// DeleteQueue removes the queue; later sends hit QueueDoesNotExist.
 	if resp := f.svcCall("DeleteQueue", map[string]any{"QueueUrl": "http://sqs.stunt.test/alphabet"}); resp.Status != 200 {
 		t.Fatalf("DeleteQueue -> %d: %v", resp.Status, resp.Body)
@@ -768,6 +787,7 @@ func TestSQSThrottledProfile(t *testing.T) {
 		return msgs
 	}
 
+	// ===== the throttled profile alternates empty receives deterministically =====
 	// Baseline: without the profile every receive sees the message.
 	if m := recv(); len(m) != 1 {
 		t.Fatalf("baseline receive = %v, want the message", m)

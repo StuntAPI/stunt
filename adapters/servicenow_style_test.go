@@ -122,12 +122,14 @@ func TestServiceNowTableLifecycle(t *testing.T) {
 	base := time.Date(2026, 2, 3, 9, 0, 0, 0, time.UTC)
 	f := newSnowFixture(t, base)
 
+	// ===== unknown credentials are 401 at the gate =====
 	// Unknown credential -> 401 with the ServiceNow envelope.
 	bad := f.call("on_create", "POST", "incident", "", nil, map[string]any{"short_description": "x"}, "Bearer wrong-token")
 	if bad.Status != 401 {
 		t.Fatalf("unknown credential -> %d, want 401", bad.Status)
 	}
 
+	// ===== create assigns a sys_id and INC number =====
 	// Create assigns sys_id + INC number.
 	created := f.call("on_create", "POST", "incident", "", nil, map[string]any{
 		"short_description": "vm suite incident",
@@ -145,6 +147,7 @@ func TestServiceNowTableLifecycle(t *testing.T) {
 	// A second incident so lists/pagination have substance.
 	f.call("on_create", "POST", "incident", "", nil, map[string]any{"short_description": "another incident"}, snowToken)
 
+	// ===== get round-trips the fields =====
 	// Get round-trips the fields.
 	got := f.call("on_get", "GET", "incident", sysID, nil, nil, snowToken)
 	if got.Status != 200 {
@@ -154,6 +157,7 @@ func TestServiceNowTableLifecycle(t *testing.T) {
 		t.Fatalf("get: fields not round-tripped: %v", got.Body)
 	}
 
+	// ===== update persists the new state =====
 	// Update persists and bumps sys_updated_on.
 	upd := f.call("on_update", "PUT", "incident", sysID, nil, map[string]any{"state": 2}, snowToken)
 	if upd.Status != 200 {
@@ -165,6 +169,7 @@ func TestServiceNowTableLifecycle(t *testing.T) {
 		t.Fatalf("state after update = %v, want 2", got)
 	}
 
+	// ===== sysparm_query narrows the list with a total count =====
 	// sysparm_query equality filter narrows the list.
 	filtered := f.call("on_list", "GET", "incident", "", map[string]string{
 		"sysparm_query": "short_description=vm suite incident",
@@ -173,6 +178,7 @@ func TestServiceNowTableLifecycle(t *testing.T) {
 		t.Fatalf("filtered list -> %d total=%q, want total 1", filtered.Status, filtered.Headers["X-Total-Count"])
 	}
 
+	// ===== offset/limit pagination pages via the Link header without repeats =====
 	// Offset/limit pagination: page of one carries a Link header.
 	page1 := f.call("on_list", "GET", "incident", "", map[string]string{
 		"sysparm_limit": "1", "sysparm_offset": "0",
@@ -189,6 +195,7 @@ func TestServiceNowTableLifecycle(t *testing.T) {
 		t.Fatalf("offset pagination returned the same row twice (%q)", p1)
 	}
 
+	// ===== tables are isolated from each other =====
 	// Tables are isolated: task rows never appear in incident lists.
 	f.call("on_create", "POST", "task", "", nil, map[string]any{"short_description": "a task"}, snowToken)
 	incidents := f.call("on_list", "GET", "incident", "", nil, nil, snowToken)
@@ -196,6 +203,7 @@ func TestServiceNowTableLifecycle(t *testing.T) {
 		t.Fatalf("incident list leaked task rows: %d rows", len(n))
 	}
 
+	// ===== unknown sys_id and unknown table are 404 =====
 	// Unknown sys_id -> 404; unknown table -> 404.
 	if r := f.call("on_get", "GET", "incident", "deadbeef", nil, nil, snowToken); r.Status != 404 {
 		t.Fatalf("get unknown sys_id -> %d, want 404", r.Status)
@@ -204,6 +212,7 @@ func TestServiceNowTableLifecycle(t *testing.T) {
 		t.Fatalf("unknown table -> %d, want 404", r.Status)
 	}
 
+	// ===== delete removes the record for good =====
 	// Delete removes the record.
 	del := f.call("on_delete", "DELETE", "incident", sysID, nil, nil, snowToken)
 	if del.Status != 204 && del.Status != 200 {

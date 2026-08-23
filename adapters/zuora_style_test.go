@@ -84,11 +84,13 @@ func TestZuoraAccountSubscriptionLifecycle(t *testing.T) {
 	base := time.Date(2026, 2, 3, 12, 0, 0, 0, time.UTC)
 	f := newZuoraFixture(t, base)
 
+	// ===== an unknown bearer is 401 =====
 	// Unknown bearer -> 401.
 	if r := f.call("accounts", "on_list_accounts", "GET", "/v1/accounts", nil, nil, nil, "Bearer nope"); r.Status != 401 {
 		t.Fatalf("unknown bearer -> %d, want 401", r.Status)
 	}
 
+	// ===== account create assigns an id and reads back =====
 	// Create an account; number is assigned and the read round-trips.
 	acct := f.call("accounts", "on_create_account", "POST", "/v1/accounts", nil, nil, map[string]any{
 		"name": "VM Suite Co", "currency": "USD",
@@ -106,6 +108,7 @@ func TestZuoraAccountSubscriptionLifecycle(t *testing.T) {
 		t.Fatalf("get account -> %d %v", got.Status, got.Body)
 	}
 
+	// ===== subscribing to a catalog plan prices the subscription =====
 	// Subscribing to a catalog plan prices the subscription.
 	sub := f.call("subs", "on_create_subscription", "POST", "/v1/subscriptions", nil, nil, map[string]any{
 		"accountKey": accountID,
@@ -121,6 +124,7 @@ func TestZuoraAccountSubscriptionLifecycle(t *testing.T) {
 		t.Fatalf("create subscription: no subscriptionId: %v", sub.Body)
 	}
 
+	// ===== unknown accounts and empty plan lists are 400s =====
 	// Unknown account or empty plans are Zuora-coded 400s.
 	if r := f.call("subs", "on_create_subscription", "POST", "/v1/subscriptions", nil, nil, map[string]any{
 		"accountKey": "nope", "subscribeToRatePlans": []any{map[string]any{"productRatePlanId": "rateplan-standard"}},
@@ -133,6 +137,7 @@ func TestZuoraAccountSubscriptionLifecycle(t *testing.T) {
 		t.Fatalf("empty plans subscribe -> %d, want 400", r.Status)
 	}
 
+	// ===== EndOfTerm cancel stays Active and a second cancel is rejected =====
 	// EndOfTerm stays Active with the cancellation recorded (the flip is
 	// derived on read at term end, like real Zuora); Immediate cancels now.
 	eot := f.call("subs", "on_cancel_subscription", "PUT", "/v1/subscriptions/"+subID+"/cancel",
@@ -149,6 +154,7 @@ func TestZuoraAccountSubscriptionLifecycle(t *testing.T) {
 		t.Fatalf("second cancel -> %d, want 400 (not active / already cancelling)", r.Status)
 	}
 
+	// ===== ZOQL finds the account by name =====
 	// ZOQL finds the account by its assigned number.
 	q := f.call("query", "on_query", "POST", "/v1/action/query", nil, nil, map[string]any{
 		"queryString": "select id, name from Account where name = 'VM Suite Co'",
@@ -156,6 +162,7 @@ func TestZuoraAccountSubscriptionLifecycle(t *testing.T) {
 	if q.Status != 200 {
 		t.Fatalf("query -> %d: %v", q.Status, q.Body)
 	}
+	// ===== webhook registration round-trips through the list =====
 	// Webhook registration round-trips.
 	hook := f.call("hooks", "on_create_webhook", "POST", "/v1/webhooks", nil, nil, map[string]any{
 		"url": "https://sink.example.test/hook", "eventTypes": []any{"subscription.cancelled"},

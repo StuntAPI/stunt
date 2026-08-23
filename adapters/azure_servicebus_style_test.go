@@ -114,6 +114,7 @@ func TestServiceBusSASPositive(t *testing.T) {
 	fixed := time.Unix(1_750_000_000, 0).UTC()
 	vm := sbVM(t, filepath.Join("scripts", "servicebus.star"), fixed)
 
+	// ===== a correctly signed SAS token sends the message =====
 	sr := "https://stunt.servicebus.windows.net/queue1"
 	se := fixed.Add(time.Hour).Unix()
 	auth := sbToken(sr, se, sbKeyName, sbSign(sr, se))
@@ -138,6 +139,7 @@ func TestServiceBusSASTampered(t *testing.T) {
 	fixed := time.Unix(1_750_000_000, 0).UTC()
 	vm := sbVM(t, filepath.Join("scripts", "servicebus.star"), fixed)
 
+	// ===== a tampered signature is 401 InvalidSignature =====
 	sr := "https://stunt.servicebus.windows.net/queue1"
 	se := fixed.Add(time.Hour).Unix()
 	sig := sbSign(sr, se)
@@ -165,6 +167,7 @@ func TestServiceBusSASExpired(t *testing.T) {
 	fixed := time.Unix(1_750_000_000, 0).UTC()
 	vm := sbVM(t, filepath.Join("scripts", "servicebus.star"), fixed)
 
+	// ===== an expired se is 401 ExpiredToken =====
 	sr := "https://stunt.servicebus.windows.net/queue1"
 	se := fixed.Add(-time.Minute).Unix() // signed correctly, but in the past
 
@@ -191,6 +194,7 @@ func TestServiceBusSASMalformed(t *testing.T) {
 	se := fixed.Add(time.Hour).Unix()
 	sig := sbSign(sr, se)
 
+	// ===== structurally broken tokens map to MalformedToken or InvalidSignature =====
 	cases := []struct {
 		name string
 		auth string
@@ -222,6 +226,7 @@ func TestServiceBusBearerAccepted(t *testing.T) {
 	fixed := time.Unix(1_750_000_000, 0).UTC()
 	vm := sbVM(t, filepath.Join("scripts", "servicebus.star"), fixed)
 
+	// ===== Entra Bearer tokens are accepted alongside SAS =====
 	resp, err := vm.Call("on_queue_messages", sbReq("Bearer some-entra-token",
 		map[string]any{"Body": "hi"}, map[string]string{"queue": "queue1"}))
 	if err != nil {
@@ -242,6 +247,7 @@ func TestServiceBusSASOnStorageQueue(t *testing.T) {
 	se := fixed.Add(time.Hour).Unix()
 	auth := sbToken(sr, se, sbKeyName, sbSign(sr, se))
 
+	// ===== the storage-queue endpoint accepts the same SAS verifier =====
 	resp, err := vm.Call("on_send_storage_message", starlark.Request{
 		Method:  "POST",
 		Path:    "/stuntaccount/q9/messages",
@@ -256,6 +262,7 @@ func TestServiceBusSASOnStorageQueue(t *testing.T) {
 		t.Fatalf("send status = %d, want 201 (body %q)", resp.Status, resp.RawBody)
 	}
 
+	// ===== a tampered storage-queue signature is 401 InvalidSignature =====
 	// Tamper the signature: 401 InvalidSignature.
 	tampered := sbToken(sr, se, sbKeyName, "AAAA"+sbSign(sr, se)[4:])
 	resp, err = vm.Call("on_send_storage_message", starlark.Request{

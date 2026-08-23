@@ -141,6 +141,7 @@ func TestCognitoForgotPasswordExpiry(t *testing.T) {
 	const user = "forgot-exp-8"
 	const code = "000008" // digits of "forgot-exp-8", zero-padded to 6
 
+	// ===== a reset code older than one hour answers ExpiredCodeException =====
 	if resp := f.svcCall("AWSCognitoIdentityProviderService.SignUp", map[string]any{
 		"ClientId": "vm-client", "Username": user, "Password": "OldPass123!",
 	}); resp.Status != 200 {
@@ -174,6 +175,7 @@ func TestCognitoForgotPasswordExpiry(t *testing.T) {
 func TestCognitoChallengeSessionExpiry(t *testing.T) {
 	f := newCognitoFixture(t, time.Unix(1_750_000_000, 0).UTC())
 
+	// ===== a NEW_PASSWORD_REQUIRED session works until AuthSessionValidity lapses =====
 	resp := f.svcCall("AWSCognitoIdentityProviderService.AdminInitiateAuth", map[string]any{
 		"UserPoolId": "us-east-1_mock",
 		"AuthFlow":   "ADMIN_USER_PASSWORD_AUTH",
@@ -204,6 +206,7 @@ func TestCognitoChallengeSessionExpiry(t *testing.T) {
 		t.Fatalf("weak password before expiry -> __type %q, want InvalidPasswordException (body %v)", errType(t, ok), ok.Body)
 	}
 
+	// ===== past the session window the challenge answer is NotAuthorizedException =====
 	f.vc.Advance(4 * time.Minute)
 
 	expired := f.svcCall("AWSCognitoIdentityProviderService.AdminRespondToAuthChallenge", map[string]any{
@@ -228,6 +231,7 @@ func TestCognitoChallengeSessionExpiry(t *testing.T) {
 func TestCognitoRefreshTokenExpiry(t *testing.T) {
 	f := newCognitoFixture(t, time.Unix(1_750_000_000, 0).UTC())
 
+	// ===== refresh tokens are reusable without rotation; access tokens rotate =====
 	auth := f.svcCall("AWSCognitoIdentityProviderService.InitiateAuth", map[string]any{
 		"AuthFlow": "USER_PASSWORD_AUTH",
 		"AuthParameters": map[string]any{
@@ -264,6 +268,7 @@ func TestCognitoRefreshTokenExpiry(t *testing.T) {
 		t.Fatal("access token did not rotate between refresh grants")
 	}
 
+	// ===== the refresh token dies at its 30-day expiry with invalid_grant =====
 	f.vc.Advance(31 * 24 * time.Hour)
 
 	third := grant()
@@ -325,6 +330,7 @@ func TestCognitoAuthorizeBindsExistingUsers(t *testing.T) {
 		return uiResp.Body["sub"].(string), uiResp.Body["username"].(string)
 	}
 
+	// ===== two authorize flows bind the same seeded demo-user =====
 	sub1, user1 := userInfo()
 	sub2, user2 := userInfo()
 	if sub1 != sub2 || user1 != user2 {
@@ -334,6 +340,7 @@ func TestCognitoAuthorizeBindsExistingUsers(t *testing.T) {
 		t.Fatalf("default authorize bound %q, want the seeded demo-user", user1)
 	}
 
+	// ===== authorize never mints new users into the collection =====
 	users, err := f.store.Collection("users")
 	if err != nil {
 		t.Fatal(err)

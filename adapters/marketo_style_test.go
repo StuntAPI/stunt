@@ -91,6 +91,7 @@ func TestMarketoLeadsLifecycle(t *testing.T) {
 	base := time.Date(2026, 2, 3, 10, 0, 0, 0, time.UTC)
 	f := newMarketoFixture(t, base)
 
+	// ===== only client_credentials mints a token =====
 	// Only client_credentials mints; missing params are a 400.
 	if r := f.token(map[string]string{"grant_type": "authorization_code", "client_id": "x", "client_secret": "y"}); r.Status != 400 {
 		t.Fatalf("authorization_code grant -> %d, want 400", r.Status)
@@ -101,12 +102,14 @@ func TestMarketoLeadsLifecycle(t *testing.T) {
 	}
 	bearer := "Bearer " + tok.Body["access_token"].(string)
 
+	// ===== an invalid token gets the 403 success=false envelope =====
 	// Invalid access token -> the Marketo 403 envelope, success=false.
 	bad := f.le("on_list_leads", "GET", "/rest/v1/leads", nil, nil, nil, "Bearer nope")
 	if bad.Status != 403 || bad.Body["success"] != false {
 		t.Fatalf("bad token -> %d %v", bad.Status, bad.Body)
 	}
 
+	// ===== create assigns ids through the input array =====
 	// Create via the input array; ids are assigned.
 	created := f.le("on_create_lead", "POST", "/rest/v1/leads", nil, nil, map[string]any{
 		"action": "createOnly",
@@ -121,6 +124,7 @@ func TestMarketoLeadsLifecycle(t *testing.T) {
 	}
 	leadID, _ := res[0].(map[string]any)["id"].(string)
 
+	// ===== get by id round-trips the fields =====
 	// Get by id round-trips the fields.
 	got := f.le("on_get_lead", "GET", "/rest/v1/leads/"+leadID, map[string]string{"id": leadID}, nil, nil, bearer)
 	if got.Status != 200 {
@@ -131,6 +135,7 @@ func TestMarketoLeadsLifecycle(t *testing.T) {
 		t.Fatalf("get lead result = %v", gres)
 	}
 
+	// ===== createOrUpdate dedupes by email in place =====
 	// createOrUpdate dedupes by email: same email -> updated, no new row.
 	f.le("on_create_lead", "POST", "/rest/v1/leads", nil, nil, map[string]any{
 		"action": "createOrUpdate",
@@ -141,6 +146,7 @@ func TestMarketoLeadsLifecycle(t *testing.T) {
 		t.Fatalf("upsert did not update in place: %v", ures)
 	}
 
+	// ===== batchSize/nextPageToken paging walks leads without overlap =====
 	// A second lead, then batchSize paging walks both without overlap.
 	f.le("on_create_lead", "POST", "/rest/v1/leads", nil, nil, map[string]any{
 		"action": "createOnly",

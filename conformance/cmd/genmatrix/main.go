@@ -200,11 +200,35 @@ var nodeSuiteSDK = map[string]string{
 var (
 	nodeBootRe = regexp.MustCompile(`bootAdapter\("([^"]+)"\)`)
 	nodeSectRe = regexp.MustCompile(`(?s)//\s*=====\s*(.*?)\s*=====`)
+	// VM suites share the node marker convention: // ===== name =====
+	// blocks in adapters/<name>_style_test.go name the behaviors the
+	// engine-level suite verifies (no SDK involved).
+	vmSectRe   = regexp.MustCompile(`(?m)^\s*//\s*=====\s*(.*?)\s*=====\s*$`)
 	nodeTestRe = regexp.MustCompile(`test\(\s*"([^"]+)"`)
 )
 
-func parseNodeTests(dir string) ([]check, error) {
-	// An unmapped *.test.ts in the dir would silently vanish from the
+// loadVMBehaviors reads the // ===== name ===== section markers from each
+// adapter's engine-level suite (adapters/<name>_style_test.go). A suite
+// with no markers yields no entries — the convention is additive.
+func loadVMBehaviors(root string, adapters []*adapter.Adapter) (map[string][]string, error) {
+	out := map[string][]string{}
+	for _, a := range adapters {
+		name := strings.ReplaceAll(a.ID, "-", "_") + "_test.go"
+		data, err := os.ReadFile(filepath.Join(root, "adapters", name))
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return nil, err
+		}
+		for _, m := range vmSectRe.FindAllStringSubmatch(string(data), -1) {
+			out[a.ID] = append(out[a.ID], collapse(m[1]))
+		}
+	}
+	return out, nil
+}
+
+func parseNodeTests(dir string) ([]check, error) { // An unmapped *.test.ts in the dir would silently vanish from the
 	// matrix — fail instead, mirroring the sidecar stale-entry check.
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -617,6 +641,15 @@ type sdkGroup struct {
 
 func render(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, surfaces map[string]*surfaceOut, derived map[string][]astscan.EndpointTags, root string) (string, error) {
 	byAdapterChecks := map[string][]check{}
+	vmBehav, err := loadVMBehaviors(root, adapters)
+	if err != nil {
+		return "", err
+	}
+	vmNames := make([]string, 0, len(vmBehav))
+	for id := range vmBehav {
+		vmNames = append(vmNames, id)
+	}
+	sort.Strings(vmNames)
 	groups := map[string]*sdkGroup{}
 	var groupOrder []string
 	for _, c := range checks {
@@ -763,6 +796,24 @@ sections in ` + "`conformance/node/tests/*.test.ts`" + `).
 		}
 	}
 
+	if len(vmNames) > 0 {
+		b.WriteString(`
+### vm (handler-level Go suites)
+
+What the engine-level suites in ` + "`adapters/<name>_style_test.go`" + ` assert — the
+adapter's real handlers execute against the real engine; no SDK is involved.
+Named by their ` + "`// =====`" + ` section markers.
+
+`)
+		for _, id := range vmNames {
+			fmt.Fprintf(&b, "**%s**\n\n", id)
+			for _, n := range vmBehav[id] {
+				fmt.Fprintf(&b, "- %s\n", n)
+			}
+			b.WriteString("\n")
+		}
+	}
+
 	fmt.Fprintf(&b, "## Adapter surface detail\n\n")
 	fmt.Fprintf(&b, "Per adapter: the **covered surface** — the exact routes served, read\n")
 	fmt.Fprintf(&b, "straight from `adapter.yaml` — and the curated gaps from\n")
@@ -900,8 +951,11 @@ type adapterJSON struct {
 	Verification string    `json:"verification"`
 	SDKs         []sdkJSON `json:"sdks"`
 	Behaviors    []string  `json:"behaviors"`
-	Missing      []string  `json:"missing"`
-	Deviations   []string  `json:"deviations"`
+	// VMBehaviors are verified by the engine-level Go suite (markers in
+	// adapters/<name>_style_test.go) — real handler execution, no SDK.
+	VMBehaviors []string `json:"vm_behaviors,omitempty"`
+	Missing     []string `json:"missing"`
+	Deviations  []string `json:"deviations"`
 	// Covered is the adapter's exposed API surface, straight from its
 	// manifest — the programmatic half of "what stunt provides".
 	Covered []routeJSON `json:"covered"`
@@ -952,6 +1006,11 @@ func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]s
 			vm[a.ID] = true
 		}
 	}
+	// VM suite markers name the behaviors each engine-level test verifies.
+	vmBehav, err := loadVMBehaviors(root, adapters)
+	if err != nil {
+		return nil, err
+	}
 	var m matrixJSON
 	m.Generated.Adapters = len(adapters)
 	m.Generated.Checks = len(checks)
@@ -977,6 +1036,7 @@ func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]s
 			WSRoutes:     len(a.Websockets),
 			Verification: tier,
 			Behaviors:    []string{},
+			VMBehaviors:  vmBehav[a.ID],
 			Missing:      gaps[a.ID].Missing,
 			Deviations:   gaps[a.ID].Deviations,
 		}
