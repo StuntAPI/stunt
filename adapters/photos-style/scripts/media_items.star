@@ -85,6 +85,9 @@ def on_batch_create(req):
             }
             mc.insert(media_item)
 
+            # Upload tokens are single-use (real API): burn on success.
+            utc.delete(upload_token)
+
             status = {"mediaItem": _public_media_item(media_item, req["host"])}
         else:
             status = {"status": {"code": 3, "message": "Invalid upload token"}}

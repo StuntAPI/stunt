@@ -126,12 +126,14 @@ def on_token(req):
     if code_doc == None:
         return respond(400, {"error": "invalid_grant", "error_description": "invalid/used code"})
 
-    cc.delete(code)
-
     want_cid = code_doc.get("client_id", "")
     want_uri = code_doc.get("redirect_uri", "")
     if client_id != want_cid or redirect_uri != want_uri or client_secret == "":
         return respond(400, {"error": "invalid_client", "error_description": "client mismatch"})
+
+    # Burn the code only on a successful exchange: a client mismatch must
+    # leave it usable (real OAuth2).
+    cc.delete(code)
 
     return respond(200, _issue_tokens(_mint_user()))
 
@@ -146,6 +148,9 @@ def _issue_tokens_keep_refresh(user, refresh):
     for k in user:
         u[k] = user[k]
     u["id"] = access
+    # Refresh-issued access tokens expire too — the advertised expires_in
+    # must be enforced, not just returned.
+    u["expires_at"] = clock.now_unix() + 3599
     tc.insert(u)
 
     return {

@@ -47,4 +47,20 @@ def on_insights(req):
         {"name": "replies", "title": "Replies", "values": [{"value": replies}]},
         {"name": "reposts", "title": "Reposts", "values": [{"value": reposts}]},
     ]
-    return respond(200, {"data": data})
+
+    # ?metric= projects the series to the requested names (Graph edge
+    # semantics); absent returns all four. Unknown names are dropped.
+    wanted = None
+    metric = req.get("query").get("metric", "")
+    if metric != None and metric != "":
+        wanted = {}
+        for part in metric.split(","):
+            name = part.strip()
+            if name != "":
+                wanted[name] = True
+
+    out = []
+    for row in data:
+        if wanted == None or row["name"] in wanted:
+            out.append(row)
+    return respond(200, {"data": out})

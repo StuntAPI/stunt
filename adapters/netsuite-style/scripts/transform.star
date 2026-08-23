@@ -31,6 +31,13 @@ def on_transform(req):
         return err
 
     record_type = _record_type_from_path(req)
+    # Unknown record types 404 before chain validation, matching the record
+    # routes (NetSuite rejects the type, not the transform, first).
+    col = _collection(record_type)
+    if col == None:
+        return _netsuite_error(404, "Not Found", "RCRD_TYPE_DSNT_EXIST",
+            "Record type '" + record_type + "' does not exist.")
+
     allowed = _TRANSFORMS.get(record_type, [])
     target = req["params"].get("target", "")
     if target == None:
@@ -38,16 +45,11 @@ def on_transform(req):
 
     # A target outside the record type's transform chain is USER_ERROR (the
     # real service refuses impossible transforms, e.g. customer -> invoice).
-    if record_type == "" or target == "" or target not in allowed:
+    if target == "" or target not in allowed:
         return _netsuite_error(400,
             "An error occurred while updating records. Please try again.",
             "USER_ERROR",
             "You can not transform a record of type " + record_type + " to " + target + ".")
-
-    col = _collection(record_type)
-    if col == None:
-        return _netsuite_error(404, "Not Found", "RCRD_TYPE_DSNT_EXIST",
-            "Record type '" + record_type + "' does not exist.")
 
     record_id = req["params"].get("id", "")
     src = col.get(record_id)

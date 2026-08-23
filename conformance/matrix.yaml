@@ -89,6 +89,8 @@ adapters:
       - "ES256 client-secret JWT is not signature-verified — structural checks only"
       - "Reports group by campaign only; any other groupBy key returns 400"
       - "Selector conditions cover a fixed field set per resource (id, name, budget, status, times)"
+      - "Bulk keyword update is non-atomic: rows before an unknown id persist though the batch 404s"
+      - "Unknown selector condition fields are silently ignored; real find/report 400s"
     missing:
       - "No ad group find or update — only POST campaigns/{id}/ads create"
       - "No negative keywords endpoints (keywords/negative find/create/update)"
@@ -237,6 +239,8 @@ adapters:
       - "message.sent webhook payloads use a synthetic shape; Braze has no documented scheme"
       - "scheduled sends flip to sent on first read past the time; message.sent fires once then"
       - "key store models expiry for app-group keys; real Braze keys do not expire"
+      - "/users/track echoes *_processed counts the real API does not return"
+      - "Segments list pages by a cursor; the real endpoint pages by 100s of page param"
     missing:
       - "No canvas endpoints: /canvas/trigger/send, /canvas/list, /canvas/data_series"
       - "No campaign analytics: /campaigns/list, /campaigns/data_series, /campaigns/details"
@@ -572,6 +576,8 @@ adapters:
       - "Confirmation milestones fixed by clock: processed 1-2s, confirmed 2-3s, final 3s+"
       - "sendTransaction config takes simulate_fail/simulate_type/simulate_address"
       - "Enhanced transactions limit capped at 100 (real API max 1000)"
+      - "A crossed before/until cursor pair silently ignores the until signature"
+      - "The confirmation webhook fires only when a read lands inside the 2-3s confirmed window"
     missing:
       - "RPC covers 6 methods; no getAccountInfo, getSlot, getSignaturesForAddress"
       - "No DAS API (getAsset, searchAssets) or /v0/tokens metadata endpoints"
@@ -679,6 +685,7 @@ adapters:
     deviations:
       - "TBA/NLAuth/Bearer only structurally checked; OAuth 1.0a HMAC not validated"
       - "SuiteQL matches only the FROM table; WHERE and ORDER BY clauses are ignored"
+      - "Duplicate-externalId create returns the stored record without updating it"
     missing:
       - "No creditMemo, purchaseOrder, vendorBill, journalEntry, or cashSale records"
       - "No sublist child resources (e.g. salesOrder/{id}/item/{line})"
@@ -744,6 +751,9 @@ adapters:
     deviations:
       - "Bare-id media download returns derivative bytes; =d/=dv return original upload"
       - "search honors mediaTypeFilter and dateFilter only (no contentFilter or album filters)"
+      - "Naming both PHOTO and VIDEO in mediaTypeFilter silently keeps only the last; real API 400s"
+      - "albumId in batchCreate is not validated; mediaItemsCount stays 0 and description is dropped"
+      - "Deleting an album leaves its items findable via search {albumId}"
     missing:
       - "No album item management (addItems, removeItems, batchRemoveMediaItems)"
       - "No album title update (PATCH /v1/albums/{id})"
@@ -784,6 +794,8 @@ adapters:
   printful-style:
     deviations:
       - "Webhook set without a secret signs with built-in mock secret stunt_mock_pful_webhook_secret"
+      - "v2 responses are bare data/resources; real Printful wraps every response in {code, result}"
+      - "Timestamps are sequence-derived synthetic values, never wall-clock"
     missing:
       - "No package_shipped, package_returned, product_synced, or order_hold events"
       - "No product update or delete (PUT/DELETE /v2/store/products/{product_id})"
@@ -1012,6 +1024,9 @@ adapters:
       - "Container processing is a fixed ~3s clock-derived window; text needs no real poll"
       - "simulate_fail=true on container create is a simulator-only failure switch"
       - "Refresh-grant response omits the rotated refresh_token; only the code exchange returns one"
+      - "/me is a static profile shared by every token; the path user is never validated against the bearer"
+      - "The refresh response omits the rotated refresh_token, so each token refreshes only once"
+      - "Republishing a container mints duplicate media"
     missing:
       - "Only TEXT media containers; no image or video media types or uploads"
       - "No reply or quote-post creation; inbox replies are synthetic"
@@ -1057,6 +1072,9 @@ adapters:
       - "delivered is clock-derived at a fixed +3s after send, not real carrier delivery"
       - "simulate_fail:true on send is a simulator extension forcing terminal failed status"
       - "Template review is client-driven: POST {template_id} flips PENDING to APPROVED/REJECTED"
+      - "mark-as-read is unmodeled: a status=read body falls into the send path"
+      - "register on an unknown phone id still answers success"
+      - "created_at is a fixed constant, not clock-derived"
     missing:
       - "Only text and template message types; no image, video, document, or interactive"
       - "No mark-as-read (status=read) or message reaction sends"
@@ -1066,6 +1084,8 @@ adapters:
   workday-style:
     deviations:
       - "Auth validates only Authorization header presence; any bearer/basic value passes"
+      - "Compensation is a static shelf keyed to seeded worker ids — runtime workers read empty, unknown ids 200"
+      - "RaaS custom reports return static rows that never reflect created workers"
     missing:
       - "SOAP interface not implemented (REST-equivalent endpoints only)"
       - "No worker update, delete, or other writes; only Create_Worker exists"
@@ -1074,6 +1094,9 @@ adapters:
   x-articles-style:
     deviations:
       - "PKCE is relaxed: code_verifier must be non-empty but the S256 hash match is not verified"
+      - "No v2 errors[] envelope — articles/media use flat {error: ...} shapes a reference client is built against"
+      - "PKCE S256 is presence-checked only; a wrong-but-present verifier passes"
+      - "Republishing mints a fresh post_id with no already-published guard"
     missing:
       - "No article update, delete, or unpublish endpoints"
       - "No article list or search; only single-article GET"

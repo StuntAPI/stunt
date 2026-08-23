@@ -38,6 +38,7 @@ endpoints:
   - route: /2/articles/{id}/publish
     method: POST
     handler: scripts/articles.star#on_publish
+    concurrency_key: id # get→mutate→update on the article doc
   # --- Articles: metadata lookup (parameterized) ---
   - route: /2/articles/{id}
     method: GET

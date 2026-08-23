@@ -46,7 +46,10 @@ def on_report_campaigns(req):
             "impressions": 10000 + c.get("campaignId", 0) % 50000,
             "taps": 500 + c.get("campaignId", 0) % 1000,
             "installs": 100 + c.get("campaignId", 0) % 500,
-            "spend": {"amount": str(100 + c.get("campaignId", 0) % 500), "currency": "USD"},
+            # campaignId round-trips through the store as a float, so the
+            # sum is a float too; _asa_num_str keeps whole-dollar "101",
+            # not str(101.0) = "101.0" (and matches grandTotals below).
+            "spend": {"amount": _asa_num_str(100 + c.get("campaignId", 0) % 500), "currency": "USD"},
             "avgCPT": {"amount": "0.85", "currency": "USD"},
             "avgCPA": {"amount": "5.20", "currency": "USD"},
             "conversionRate": 0.25,

@@ -80,7 +80,9 @@ def on_get_album(req):
     album_id = req["params"]["id"]
     ac = store_collection("albums")
     doc = ac.get(album_id)
-    if doc == None:
+    # Albums are private (no sharing modeled): another user's id is a 404,
+    # like the media-item handlers.
+    if doc == None or doc.get("user", "") != user["sub"]:
         return respond(404, {"error": {"code": 404, "message": "Album not found: " + album_id, "status": "NOT_FOUND"}})
 
     return respond(200, _public_album(doc))
@@ -96,7 +98,8 @@ def on_delete_album(req):
     album_id = req["params"]["id"]
     ac = store_collection("albums")
     doc = ac.get(album_id)
-    if doc == None:
+    # Ownership gate mirrors on_get_album: only the owner may delete.
+    if doc == None or doc.get("user", "") != user["sub"]:
         return respond(404, {"error": {"code": 404, "message": "Album not found: " + album_id, "status": "NOT_FOUND"}})
 
     ac.delete(album_id)

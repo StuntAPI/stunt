@@ -9,7 +9,10 @@ def on_list_segments(req):
 
     page, next_cursor = _list_page(req, _SEGMENTS)
     if page == None:
-        return respond(400, {"errors": [{"message": "Invalid cursor parameter."}]})
+        # Fatal envelope via _fatal: Braze errors are {message, errors}, not
+        # a bare errors array.
+        return _fatal("Invalid cursor parameter.",
+            "The cursor query parameter is not a valid page token.")
     body = {
         "message": "success",
         "segments": page,

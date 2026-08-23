@@ -76,13 +76,15 @@ def on_access_token(req):
     if code_doc == None:
         return respond(400, {"error": "invalid_grant", "error_description": "invalid/used code"})
 
-    # Single-use: delete the code immediately.
-    cc.delete(code)
-
     want_cid = code_doc.get("client_id", "")
     want_uri = code_doc.get("redirect_uri", "")
     if client_id != want_cid or redirect_uri != want_uri or client_secret == "":
+        # House rule (instagram/photos): a failed attempt must not consume
+        # the code — only a successful exchange burns it.
         return respond(400, {"error": "invalid_client", "error_description": "client mismatch"})
+
+    # Single-use: burn only when the exchange succeeds.
+    cc.delete(code)
 
     user = _mint_user()
     token = _mint_token(user)

@@ -21,7 +21,7 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**98 adapters** — 2 SDK+VM, 34 SDK-only, 28 VM-only, 34 boot-tier.
+**98 adapters** — 2 SDK+VM, 34 SDK-only, 38 VM-only, 24 boot-tier.
 
 **45 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.
 
@@ -34,7 +34,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [apple-apns-style](adapters/apple-apns-style/) | Apple Push Notification service (APNs) `v2` | 2 | boot | — | — | [4](#apple-apns-style) | [2](#apple-apns-style) |
 | [apple-appstoreconnect-style](adapters/apple-appstoreconnect-style/) | App Store Connect API `v3` | 15 | VM | — | — | [7](#apple-appstoreconnect-style) | [7](#apple-appstoreconnect-style) |
 | [apple-music-style](adapters/apple-music-style/) | Apple Music API `1.0` | 18 | VM | — | — | [5](#apple-music-style) | [5](#apple-music-style) |
-| [apple-searchads-style](adapters/apple-searchads-style/) | Apple Search Ads API `v4` | 12 | boot | — | — | [4](#apple-searchads-style) | [3](#apple-searchads-style) |
+| [apple-searchads-style](adapters/apple-searchads-style/) | Apple Search Ads API `v4` | 12 | VM | — | — | [4](#apple-searchads-style) | [5](#apple-searchads-style) |
 | [apps-script-style](adapters/apps-script-style/) | Google Apps Script API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 6 | [2](#apps-script-style) | [3](#apps-script-style) |
 | [auth0-style](adapters/auth0-style/) | Auth0 Authentication & Management API `v2` | 17 | VM | — | — | [3](#auth0-style) | [4](#auth0-style) |
 | [avalara-style](adapters/avalara-style/) | Avalara AvaTax REST API `2` | 8 | boot | — | — | [5](#avalara-style) | [1](#avalara-style) |
@@ -47,7 +47,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [blog-style](adapters/blog-style/) | GraphQL demo `1.0` | 0 +GQL | boot | — | — | — | — |
 | [bluesky-style](adapters/bluesky-style/) | Bluesky AT Protocol `com.atproto (2024-Q4)` | 7 | SDK | atproto @ 0.20.41 (floor) | 8 | [7](#bluesky-style) | [4](#bluesky-style) |
 | [braintree-style](adapters/braintree-style/) | Braintree GraphQL + REST API `2024-09-01` | 15 +GQL | VM | — | — | [8](#braintree-style) | [7](#braintree-style) |
-| [braze-style](adapters/braze-style/) | Braze REST API `2.0` | 12 | boot | — | — | [8](#braze-style) | [4](#braze-style) |
+| [braze-style](adapters/braze-style/) | Braze REST API `2.0` | 12 | VM | — | — | [8](#braze-style) | [6](#braze-style) |
 | [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | VM | — | — | [6](#chainlink-style) | [7](#chainlink-style) |
 | [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | SDK | cloudflare-go @ v0.117.0 | 7 | [8](#cloudflare-style) | [6](#cloudflare-style) |
 | [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | boot | — | — | [6](#cloudkit-style) | [2](#cloudkit-style) |
@@ -76,7 +76,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [gsearchconsole-style](adapters/gsearchconsole-style/) | Google Search Console API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 7 | [2](#gsearchconsole-style) | [4](#gsearchconsole-style) |
 | [gsheets-style](adapters/gsheets-style/) | Google Sheets API `v4` | 10 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#gsheets-style) | [3](#gsheets-style) |
 | [gtasks-style](adapters/gtasks-style/) | Google Tasks API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 8 | [3](#gtasks-style) | [2](#gtasks-style) |
-| [helius-style](adapters/helius-style/) | Helius Solana RPC + Enhanced API `v0` | 11 | boot | — | — | [3](#helius-style) | [4](#helius-style) |
+| [helius-style](adapters/helius-style/) | Helius Solana RPC + Enhanced API `v0` | 11 | VM | — | — | [3](#helius-style) | [6](#helius-style) |
 | [hn-style](adapters/hn-style/) | Hacker News Firebase API `v0` | 11 | VM | — | — | [3](#hn-style) | [4](#hn-style) |
 | [hubspot-style](adapters/hubspot-style/) | HubSpot CRM API `v3` | 33 | SDK | hubspot-node @ 14.0.1 (floor) | 5 | [4](#hubspot-style) | — |
 | [instagram-style](adapters/instagram-style/) | Instagram Graph API `v21.0` | 10 | VM | — | — | [4](#instagram-style) | [5](#instagram-style) |
@@ -86,17 +86,17 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | SDK | openai-node @ 7.5.0 (floor) | 2 | [4](#llm-style) | [3](#llm-style) |
 | [marketo-style](adapters/marketo-style/) | Marketo Engage REST API `1.0` | 21 | VM | — | — | [5](#marketo-style) | [3](#marketo-style) |
 | [microsoft-graph-style](adapters/microsoft-graph-style/) | Microsoft Graph API `v1.0` | 55 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 10 | [8](#microsoft-graph-style) | [6](#microsoft-graph-style) |
-| [netsuite-style](adapters/netsuite-style/) | NetSuite SuiteTalk REST API `1.0` | 9 | boot | — | — | [4](#netsuite-style) | [2](#netsuite-style) |
+| [netsuite-style](adapters/netsuite-style/) | NetSuite SuiteTalk REST API `1.0` | 9 | VM | — | — | [4](#netsuite-style) | [3](#netsuite-style) |
 | [oneinch-style](adapters/oneinch-style/) | 1inch Aggregation Protocol API `v6.0` | 5 | boot | — | — | [3](#oneinch-style) | [1](#oneinch-style) |
 | [onfido-style](adapters/onfido-style/) | Onfido API `v3.6` | 7 | boot | — | — | [5](#onfido-style) | [4](#onfido-style) |
 | [opensea-style](adapters/opensea-style/) | OpenSea API `2.0.0` | 7 | boot | — | — | [4](#opensea-style) | [1](#opensea-style) |
 | [paypal-style](adapters/paypal-style/) | PayPal Orders API `v2` | 17 | VM | — | — | [6](#paypal-style) | [8](#paypal-style) |
 | [persona-style](adapters/persona-style/) | Persona Inquiry API `2023-01-05` | 5 | boot | — | — | [5](#persona-style) | [4](#persona-style) |
-| [photos-style](adapters/photos-style/) | Google Photos Library API `v1` | 12 | boot | — | — | [5](#photos-style) | [2](#photos-style) |
+| [photos-style](adapters/photos-style/) | Google Photos Library API `v1` | 12 | VM | — | — | [5](#photos-style) | [5](#photos-style) |
 | [pinata-style](adapters/pinata-style/) | Pinata API `1.0` | 6 | boot | — | — | [4](#pinata-style) | — |
 | [plaid-style](adapters/plaid-style/) | Plaid API `2020-09-14` | 13 | SDK | plaid-node @ 32.0.0 (floor) | 4 | [5](#plaid-style) | [3](#plaid-style) |
 | [powerplatform-style](adapters/powerplatform-style/) | Microsoft Power Platform API `2` | 9 | VM | — | — | [4](#powerplatform-style) | [6](#powerplatform-style) |
-| [printful-style](adapters/printful-style/) | Printful API `v2` | 13 | boot | — | — | [5](#printful-style) | [1](#printful-style) |
+| [printful-style](adapters/printful-style/) | Printful API `v2` | 13 | VM | — | — | [5](#printful-style) | [3](#printful-style) |
 | [printify-style](adapters/printify-style/) | Printify API `v1` | 16 | VM | — | — | [5](#printify-style) | [4](#printify-style) |
 | [producthunt-style](adapters/producthunt-style/) | Product Hunt GraphQL API `2` | 0 +GQL | boot | — | — | [3](#producthunt-style) | [2](#producthunt-style) |
 | [psd2-style](adapters/psd2-style/) | Open Banking / PSD2 (Berlin Group NextGenPSD2) `1.3.6` | 19 | VM | — | — | [6](#psd2-style) | [7](#psd2-style) |
@@ -116,13 +116,13 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.3.0<br>stripe-node @ 22.5.0 (floor) | 9 | [7](#stripe-style) | [5](#stripe-style) |
 | [tenderly-style](adapters/tenderly-style/) | Tenderly Simulation API `v1` | 5 | boot | — | — | [3](#tenderly-style) | [2](#tenderly-style) |
 | [thegraph-style](adapters/thegraph-style/) | The Graph (GraphQL over subgraphs) `1.0` | 1 +GQL | boot | — | — | [3](#thegraph-style) | [1](#thegraph-style) |
-| [threads-style](adapters/threads-style/) | Threads API (Meta) `v1.0` | 8 | boot | — | — | [3](#threads-style) | [3](#threads-style) |
+| [threads-style](adapters/threads-style/) | Threads API (Meta) `v1.0` | 8 | VM | — | — | [3](#threads-style) | [6](#threads-style) |
 | [twilio-style](adapters/twilio-style/) | Twilio API `2010-04-01` | 6 | SDK | twilio-go @ v1.30.9<br>twilio-node @ 6.1.0 (floor) | 8 | [6](#twilio-style) | [4](#twilio-style) |
 | [twitter-style](adapters/twitter-style/) | Twitter/X API `v2` | 9 | VM | — | — | [6](#twitter-style) | [5](#twitter-style) |
 | [walletconnect-style](adapters/walletconnect-style/) | WalletConnect (Relay Protocol v2) `2.0` | 7 | boot | — | — | [3](#walletconnect-style) | [2](#walletconnect-style) |
-| [whatsapp-style](adapters/whatsapp-style/) | WhatsApp Business Cloud API (Meta) `v21.0` | 8 | boot | — | — | [5](#whatsapp-style) | [4](#whatsapp-style) |
-| [workday-style](adapters/workday-style/) | Workday REST API `v40.0` | 8 | boot | — | — | [4](#workday-style) | [1](#workday-style) |
-| [x-articles-style](adapters/x-articles-style/) | X (Twitter) Articles API `v2` | 8 | boot | — | — | [4](#x-articles-style) | [1](#x-articles-style) |
+| [whatsapp-style](adapters/whatsapp-style/) | WhatsApp Business Cloud API (Meta) `v21.0` | 8 | VM | — | — | [5](#whatsapp-style) | [7](#whatsapp-style) |
+| [workday-style](adapters/workday-style/) | Workday REST API `v40.0` | 8 | VM | — | — | [4](#workday-style) | [3](#workday-style) |
+| [x-articles-style](adapters/x-articles-style/) | X (Twitter) Articles API `v2` | 8 | VM | — | — | [4](#x-articles-style) | [4](#x-articles-style) |
 | [xero-style](adapters/xero-style/) | Xero Accounting API `2.0` | 15 | VM | — | — | [6](#xero-style) | [5](#xero-style) |
 | [youtube-style](adapters/youtube-style/) | YouTube Data API `v3` | 14 | SDK | google-api-go-client @ v0.293.0 | 8 | [7](#youtube-style) | [2](#youtube-style) |
 | [zendesk-style](adapters/zendesk-style/) | Zendesk REST API `2` | 37 | SDK | node-zendesk @ 6.0.1 (floor) | 6 | [8](#zendesk-style) | [5](#zendesk-style) |
@@ -652,6 +652,32 @@ Named by their `// =====` section markers.
 - an unrated resource reads 0; love/dislike/clear round-trip
 - invalid values and unknown targets keep the documented shapes
 
+**apple-searchads-style**
+
+- a missing, malformed or unknown bearer is a 401 in the Search Ads envelope
+- the seeded static test token passes the gate
+- a client_credentials exchange mints a bearer valid for exactly one hour
+- malformed grants and client secrets are oauth-shaped 400s
+- campaign create assigns a numeric id and fills the v4 defaults
+- create without a name is a 400
+- the campaign reads back by numeric id; unknown ids are 404s
+- update merges fields, maps status onto servingStatus, and bumps only modificationTime
+- an invalid status is a 400 that writes nothing
+- ad groups create under a campaign; unknown campaigns are 404s
+- find lists the seed with default pagination and clock-derived stamps
+- conditions filter with EQUALS, CONTAINS and amount ranges
+- values within one condition are OR'd; multi-value NOT_EQUALS excludes all
+- orderBy sorts and pagination slices with totalResults before the slice
+- first touch seeds three keywords scoped to the campaign
+- keyword find speaks the same selector (conditions, orderBy, pagination)
+- create takes a single keyword or a batch body
+- single update merges partial fields and validates them
+- bulk update takes id-addressed rows; an unknown id 404s the batch
+- delete removes the keyword and find no longer sees it
+- startTime, endTime and groupBy are validated
+- one row per campaign with deterministic metrics and summed grandTotals
+- the report selector filters rows and grandTotals follow
+
 **auth0-style**
 
 - discovery and JWKS are self-consistent for the host
@@ -757,6 +783,32 @@ Named by their `// =====` section markers.
 - settled transactions fire one signed notification per new state, filtered by kind
 - subscriptions bill per cycle, expire at the last, and cancel only while Active
 - inbound verification splits 200/400
+
+**braze-style**
+
+- a missing credential is the 401 message envelope
+- an unknown app-group key is rejected
+- x-authorization carries the raw app-group key
+- track ingests attributes, events, and purchases
+- re-tracking the same external_id updates one profile
+- export aggregates custom events and purchases, dedups ids
+- fields_to_export projects the profile
+- per-record errors keep partial success
+- _update_existing_only never creates
+- fatal envelopes: the 75-id cap and undecodable JSON
+- alias/new creates an alias-only profile track can target
+- identify re-keys an alias-only profile when the external_id is new
+- identify merges an alias-only profile into an existing one
+- send fatals: message, variant, and recipient rules
+- send succeeds with a 32-hex dispatch id and emits message.sent
+- campaigns/trigger/send validates the campaign id
+- schedule/create mints a UUID-shaped schedule id
+- end_time is required
+- upcoming broadcasts list both schedules
+- the send transition derives on read, exactly once
+- segments list seeds and pages by cursor
+- one identifier type per delete
+- delete removes the profile and its dependent records
 
 **chainlink-style**
 
@@ -895,6 +947,19 @@ Named by their `// =====` section markers.
 - unsubscribing shrinks the fanout and a bare subscribe is a 400
 - the stored message list is project-scoped
 
+**helius-style**
+
+- the api-key query gate rejects both surfaces
+- the JSON-RPC reads answer deterministic values; an unknown method is a -32601 envelope
+- sendTransaction walks null → processed → confirmed → finalized, firing the enhanced webhook exactly once at first confirmation
+- simulate_fail lands an on-chain InstructionError while confirmation still proceeds
+- the enhanced history seeds once per address, newest first, in the Helius parsed shape
+- type/source filters and before/until/limit paging narrow the history
+- a sent transaction joins its address's history; other addresses do not see it
+- the parse-transactions contract holds and the balances/nfts/names lookups are deterministic
+- webhook registration round-trips the Helius config shape with 404s for unknown ids
+- deliveries are unsigned, carry authHeader as Authorization, honor transactionTypes and fire exactly once
+
 **hn-style**
 
 - item reads resolve the .json route capture into the full Firebase story shape
@@ -964,6 +1029,47 @@ Named by their `// =====` section markers.
 - createOrUpdate dedupes by email in place
 - batchSize/nextPageToken paging walks leads without overlap
 
+**netsuite-style**
+
+- a request without Authorization is 401 INVALID_LOGIN in the o: envelope
+- TBA without oauth_signature is rejected: the signature's presence is the gate
+- TBA, NLAuth and Bearer all pass the structural gate
+- every route family sits behind the gate
+- create answers 204 No Content with the record's URL in Location
+- internal ids are numeric strings minted past the seed range
+- the created record reads back verbatim under its id
+- POST with a seen externalId is an upsert: the existing record's Location, no duplicate
+- DELETE answers 204 and the record is gone afterwards
+- unknown ids and unknown record types are distinct 404 codes
+- a transaction record without entity is 400 USER_ERROR naming the field
+- entity references resolve by id or refName against stored customers
+- a dangling entity reference is 400 INVALID_KEY_OR_REF
+- customerPayment demands both customer and payment
+- a body that is not a JSON object is 400 INVALID_REQUEST
+- PATCH merges the sent fields into the stored record and answers 204
+- numeric patches round-trip through the collection as floats
+- an id in the PATCH body cannot move the record
+- PATCH on an unknown record id or type is a 404
+- a malformed PATCH body is 400 INVALID_REQUEST
+- the list envelope is items/count/hasMore/links with a self link
+- limit windows the page and hasMore adds a next link with the following offset
+- following the next link returns the tail and clears hasMore
+- an offset past the end is an empty page, not an error
+- q filters and orderBy sorts before paging
+- an unparseable q is 400 INVALID_SEARCH_PARAMETER, not silent unfiltered rows
+- the metadata catalog lists the record types the parameterized routes serve
+- SuiteQL returns the FROM table's live rows in the query envelope
+- created records are visible to SuiteQL
+- SQL LIMIT/OFFSET window the page and mint a next link
+- limit/offset query params page when the SQL has no clauses
+- unknown tables, FROM-less and missing statements are 400 INVALID_REQUEST
+- the /services/rest/v1/suiteql alias runs the same handler
+- a salesOrder bills into an invoice dated today, due in 30 days
+- the invoice settles into a customerPayment and flips its source to Paid in Full
+- the clock drives trandate
+- request-body fields override the mapped defaults
+- impossible chains, unknown sources and dangling overrides use NetSuite's real codes
+
 **paypal-style**
 
 - client_credentials over Basic auth mints a distinct Bearer with PayPal's token envelope
@@ -1004,6 +1110,59 @@ Named by their `// =====` section markers.
 - signature verification answers SUCCESS only for known webhook ids
 - deletion is 204, and repeats are 404
 
+**photos-style**
+
+- authorize without redirect_uri, state or client_id is 400 invalid_request
+- authorize redirects with a fresh code and echoes the state
+- a redirect_uri that already carries a query joins with &
+- exchanging an unknown code is 400 invalid_grant
+- a client mismatch answers invalid_client but leaves the code usable
+- the happy exchange mints the bearer pair
+- the minted bearer reads the data plane
+- authorization codes are single-use
+- unknown grant types are unsupported_grant_type
+- refresh without client credentials is 400 invalid_client
+- refresh with an unknown refresh token is 400 invalid_grant
+- refresh mints a new access token but keeps the refresh token
+- the refreshed token serves the same user's library
+- refresh-issued access tokens expire like any other
+- every data surface answers 401 UNAUTHENTICATED without a bearer
+- non-Bearer schemes and unknown or empty tokens are equally 401
+- the minted bearer passes the gate on every surface
+- the access token dies at its expiry on the virtual clock
+- /v1/uploads answers a plain-text uploadToken
+- batchCreate links the token to a media item
+- mime types follow the file extension
+- an unknown upload token answers the per-item status error
+- mixed batches keep request order
+- upload tokens are single-use
+- an albumId is accepted without validation (as-is)
+- an empty batch answers an empty result list
+- =d serves the original bytes with the recorded content type
+- =dv serves the same original bytes
+- a bare baseUrl serves the derivative payload instead
+- baseUrl is computed from the request host at read time
+- unknown ids answer the 404 envelope
+- pages walk by pageToken and the last partial page has no next
+- the default page holds 25 items
+- pageSize clamps at 100
+- a single item fetch and the 404 envelope
+- items are private to their user
+- an unfiltered search returns everything in creation order
+- mediaTypeFilter selects PHOTO or VIDEO by mime prefix
+- dateFilter ranges and exact dates bound creationTime
+- partial dates span their whole period
+- multiple ranges are OR'd and keep upload order
+- media type and date filters compose
+- albumId scopes the search
+- search paginates from the JSON body
+- create returns the album shape
+- a missing album title defaults to Untitled Album
+- unknown albums answer the 404 envelope
+- list walks pages with the 20 default and the 50 clamp
+- albums are private to their user
+- delete removes the album but leaves its media
+
 **powerplatform-style**
 
 - every route sits behind the entra bearer gate: a missing, non-bearer, or empty token answers 401 in the microsoft error envelope
@@ -1025,6 +1184,31 @@ Named by their `// =====` section markers.
 - an environment with no flows falls back to the seeded welcome flow
 - creating a flow persists it per environment behind arm flow ids; other environments keep the seeded fallback
 - connectors are static arm api resources with tiers
+
+**printful-style**
+
+- a missing or non-Bearer Authorization is the 401 error envelope
+- any non-empty bearer key is accepted — the dev-key model
+- a sync product mints a sequential id; variants read back verbatim
+- unknown products get the 404 error envelope
+- an unpaged list is a bare data array with no paging object
+- limit/offset pages walk the paging envelope without repeats
+- a malformed offset cursor is the 400 error envelope
+- v1 create is result-wrapped with an integer id and draft status
+- v1 GET round-trips the result; unknown ids are 404
+- the v2 list serves one canonical order doc per order, from both create surfaces
+- the status csv filter applies before paging
+- a status update flips the canonical doc both surfaces read
+- order timestamps are sequence-derived, not wall-clock (documented mock choice)
+- STANDARD and EXPRESS quotes scale with the item count
+- an unset configuration reads as an empty result
+- POST sets and PUT replaces the single config; the secret stays masked
+- DELETE returns success, empties the read, and silences delivery
+- a config without a url is the 400 error envelope
+- deliveries are HMAC-SHA256-signed over the exact delivered bytes
+- the types filter delivers only subscribed topics
+- an empty types list subscribes to every event type
+- a v1-created order emits the v1 result shape as the event data
 
 **printify-style**
 
@@ -1155,6 +1339,48 @@ Named by their `// =====` section markers.
 - DeleteQueue tears the queue down for its messages too
 - the throttled profile alternates empty receives deterministically
 
+**threads-style**
+
+- authorize without redirect_uri, state or client_id is invalid_request
+- authorize redirects back with a fresh code and the state echoed
+- a redirect_uri that already carries a query is joined with &
+- the exchange demands grant_type=authorization_code
+- an unknown code is 400 invalid_grant
+- a good exchange mints a token, user and refresh token
+- the code is single-use: a replay is invalid_grant
+- client mismatches are 400 invalid_client
+- a mismatched attempt leaves the code redeemable (house rule)
+- a second flow mints a distinct user
+- a missing bearer is 401 in the Graph error envelope
+- wrong schemes and unknown bearers answer the same 190
+- every API route enforces the same gate
+- a bearer dies at its clock-derived 60-day expiry
+- me returns the static mock profile
+- every user's token sees the same static profile (deviation, as-is)
+- ?fields= is ignored: the full profile always comes back
+- a container without media_type=TEXT and text is a code-100 400
+- create assigns a c_* container id
+- a TEXT container polls finished immediately (no processing window)
+- back-to-back publish assigns an m_* media id
+- republishing the same container mints a second media (deviation, as-is)
+- simulate_fail ends in error and never publishes
+- unknown container ids answer the catch-all 404
+- the inbox lists the user's media newest first
+- each post carries one synthetic reply child
+- the inbox is scoped to the path user
+- ?fields= projection is ignored (deviation, as-is)
+- all four manifest metrics return in canonical order
+- values are deterministic across reads
+- ?metric= projects to the requested names in canonical order
+- an unknown metric name empties the data set (deviation, as-is)
+- insights for an unknown media id are the catch-all 404
+- refresh demands a known refresh_token
+- a refresh mints a fresh 60-day token bound to the same user
+- the response omits the rotated refresh_token (deviation, as-is)
+- the used refresh token is single-use: a replay is invalid_grant
+- the original access token keeps its own 60-day life
+- the refreshed token outlives the original's expiry
+
 **twitter-style**
 
 - the mock oauth2 endpoint mints a bearer and the bearer gate is never enforced
@@ -1169,6 +1395,74 @@ Named by their `// =====` section markers.
 - start_time/end_time bound created_at and exclude=replies drops threads
 - max_results pages via meta.next_token; an invalid pagination_token is a 400
 - the tweet list shares the same v2 paging and stays unpaged without max_results
+
+**whatsapp-style**
+
+- a missing bearer is 401 in the Meta error envelope
+- wrong schemes, bare tokens and unknown bearers answer the same 190
+- every route enforces the same gate
+- the seeded test token dies at its clock-derived 10-year expiry
+- a text send answers Meta's contacts + messages envelope
+- message ids are a zero-padded monotonic sequence
+- a template send is accepted and reads back as type template
+- a send without a usable recipient is a code-131026 400
+- mark-as-read is unmodeled: a status=read body falls into the send path
+- a fresh message reads back sent
+- the status stays sent through the in-flight window
+- delivered is derived at +3s and stays delivered
+- simulate_fail ends at failed (simulator extension, as-is)
+- unknown wamids are a code-803 404
+- each send emits exactly one signed messages webhook
+- no status webhook fires before the terminal window
+- the terminal transition emits the statuses webhook exactly once
+- a multipart upload stores real bytes and reports their digest
+- the content download returns the exact bytes at the stored mime
+- a specific part content-type outranks the filename extension
+- a metadata-only JSON upload has no bytes to download
+- uploads demand messaging_product=whatsapp (code 100)
+- a multipart body without a file part is a 1304 400
+- the seeded phone reads back its registration profile
+- register answers success true and the phone stays readable
+- register on an unknown phone id still succeeds (as-is)
+- an unknown resource id is a code-803 404
+- the seeded welcome_message template lists APPROVED
+- a created template starts PENDING and echoes its payload
+- the approval lifecycle moves PENDING to APPROVED and REJECTED
+- an invalid status target leaves the template unchanged (as-is)
+- unknown template ids are a code-803 404
+- templates page by limit + after cursors
+- a malformed after cursor is a code-100 400
+
+**workday-style**
+
+- requests without a Bearer or Basic scheme are 401 at the gate
+- both Bearer and Basic credentials clear the gate
+- Create_Worker mints an id that reads back through staffing
+- the RaaS custom report wraps rows in Report_Entry
+- search narrows the worker list before paging
+- limit/offset pages tile the list without repeats
+- compensation serves the seed shelf and empty for created workers
+- payroll, positions, and financials share the list envelope
+- an unknown worker is a 404 with the Workday error envelope
+
+**x-articles-style**
+
+- authorize 302s to the redirect_uri carrying a fresh code and the echoed state
+- authorize demands redirect_uri, the S256 method and a non-empty challenge
+- the token endpoint demands HTTP Basic client creds and a known grant type
+- a valid code exchange mints a bearer+refresh pair and the code is single-use
+- a mismatched redirect_uri or a missing verifier fails without burning the code
+- refresh grants rotate the pair and retire the presented token
+- the bearer gate is never enforced
+- media upload mints media_id_strings that attach as cover_media_id
+- draft create validates title and content_state.blocks
+- a draft reads back with its full metadata
+- publish flips the draft and attaches the minted post_id
+- republishing mints a fresh post_id
+- unknown article ids are 404s on get and publish
+- create enforces required text and the inclusive 280-char limit
+- replies must target a known tweet
+- tweets read back whole and unknown ids are 404s
 
 **xero-style**
 
@@ -1641,11 +1935,13 @@ behavior notes live in each adapter's README.
 - No search-terms, keyword, or ads reports — only /reports/campaigns
 - No audience targeting, geo/demographic dimensions, or bid adjustments
 
-**Deviations** (3)
+**Deviations** (5)
 
 - ES256 client-secret JWT is not signature-verified — structural checks only
 - Reports group by campaign only; any other groupBy key returns 400
 - Selector conditions cover a fixed field set per resource (id, name, budget, status, times)
+- Bulk keyword update is non-atomic: rows before an unknown id persist though the batch 404s
+- Unknown selector condition fields are silently ignored; real find/report 400s
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -2486,12 +2782,14 @@ behavior notes live in each adapter's README.
 - No content blocks: /content_blocks list, info, create, update
 - No preference centers: /preference_center/v1 list and per-user URL endpoints
 
-**Deviations** (4)
+**Deviations** (6)
 
 - POST /webhooks registration is a local extension; real Braze has no webhook REST API
 - message.sent webhook payloads use a synthetic shape; Braze has no documented scheme
 - scheduled sends flip to sent on first read past the time; message.sent fires once then
 - key store models expiry for app-group keys; real Braze keys do not expire
+- /users/track echoes *_processed counts the real API does not return
+- Segments list pages by a cursor; the real endpoint pages by 100s of page param
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -4792,12 +5090,14 @@ behavior notes live in each adapter's README.
 - No DAS API (getAsset, searchAssets) or /v0/tokens metadata endpoints
 - No getPriorityFeeEstimate, requestAirdrop, or WebSocket subscriptions
 
-**Deviations** (4)
+**Deviations** (6)
 
 - Webhook payloads carry one transaction each; real Helius batches an array
 - Confirmation milestones fixed by clock: processed 1-2s, confirmed 2-3s, final 3s+
 - sendTransaction config takes simulate_fail/simulate_type/simulate_address
 - Enhanced transactions limit capped at 100 (real API max 1000)
+- A crossed before/until cursor pair silently ignores the until signature
+- The confirmation webhook fires only when a read lands inside the 2-3s confirmed window
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -5701,10 +6001,11 @@ behavior notes live in each adapter's README.
 - No per-record-type metadata catalog (metadata-catalog/{recordType})
 - No file cabinet, blob upload, or REST analytics endpoints
 
-**Deviations** (2)
+**Deviations** (3)
 
 - TBA/NLAuth/Bearer only structurally checked; OAuth 1.0a HMAC not validated
 - SuiteQL matches only the FROM table; WHERE and ORDER BY clauses are ignored
+- Duplicate-externalId create returns the stored record without updating it
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -6174,10 +6475,13 @@ behavior notes live in each adapter's README.
 - No shared albums (list, join, leave, unshare)
 - No favorites marking or favorite filtering in search
 
-**Deviations** (2)
+**Deviations** (5)
 
 - Bare-id media download returns derivative bytes; =d/=dv return original upload
 - search honors mediaTypeFilter and dateFilter only (no contentFilter or album filters)
+- Naming both PHOTO and VIDEO in mediaTypeFilter silently keeps only the last; real API 400s
+- albumId in batchCreate is not validated; mediaItemsCount stays 0 and description is dropped
+- Deleting an album leaves its items findable via search {albumId}
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -6485,9 +6789,11 @@ behavior notes live in each adapter's README.
 - No catalog endpoints (catalog variants, print files, mockup generator)
 - No reference endpoints (countries, taxes, store info)
 
-**Deviations** (1)
+**Deviations** (3)
 
 - Webhook set without a secret signs with built-in mock secret stunt_mock_pful_webhook_secret
+- v2 responses are bare data/resources; real Printful wraps every response in {code, result}
+- Timestamps are sequence-derived synthetic values, never wall-clock
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -8127,11 +8433,14 @@ behavior notes live in each adapter's README.
 - No reply or quote-post creation; inbox replies are synthetic
 - No user-level insights; only 4 per-media metrics
 
-**Deviations** (3)
+**Deviations** (6)
 
 - Container processing is a fixed ~3s clock-derived window; text needs no real poll
 - simulate_fail=true on container create is a simulator-only failure switch
 - Refresh-grant response omits the rotated refresh_token; only the code exchange returns one
+- /me is a static profile shared by every token; the path user is never validated against the bearer
+- The refresh response omits the rotated refresh_token, so each token refreshes only once
+- Republishing a container mints duplicate media
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -8139,10 +8448,10 @@ behavior notes live in each adapter's README.
 - `POST` `/oauth/access_token` — body, stateful, errors, clock
 - `GET` `/v1.0/me` — auth, stateful, clock
 - `GET` `/v1.0/{container_id}` — query, params, auth, stateful, errors, clock
-- `GET` `/v1.0/{id}/insights` — params, auth, stateful, errors, clock
+- `GET` `/v1.0/{id}/insights` — query, params, auth, stateful, errors, clock
 - `POST` `/v1.0/{id}/threads_publish` — query, params, auth, stateful, errors, clock
 - `POST` `/v1.0/{id}/threads` — body, params, auth, stateful, errors, clock
-- `GET` `/v1.0/{id}/threads` — params, auth, stateful, clock
+- `GET` `/v1.0/{id}/threads` — params, auth, stateful, filter, clock
 
 </details>
 
@@ -8427,12 +8736,15 @@ behavior notes live in each adapter's README.
 - No template delete or conversation analytics endpoints
 - No inbound customer-message webhook simulation
 
-**Deviations** (4)
+**Deviations** (7)
 
 - 24-hour customer service window not enforced; free-form sends never fail with 470
 - delivered is clock-derived at a fixed +3s after send, not real carrier delivery
 - simulate_fail:true on send is a simulator extension forcing terminal failed status
 - Template review is client-driven: POST {template_id} flips PENDING to APPROVED/REJECTED
+- mark-as-read is unmodeled: a status=read body falls into the send path
+- register on an unknown phone id still answers success
+- created_at is a fixed constant, not clock-derived
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -8473,9 +8785,11 @@ behavior notes live in each adapter's README.
 - RaaS serves only the seeded Custom_Report, not arbitrary named reports
 - No absence, talent, recruiting, or benefits service domains
 
-**Deviations** (1)
+**Deviations** (3)
 
 - Auth validates only Authorization header presence; any bearer/basic value passes
+- Compensation is a static shelf keyed to seeded worker ids — runtime workers read empty, unknown ids 200
+- RaaS custom reports return static rows that never reflect created workers
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -8575,9 +8889,12 @@ behavior notes live in each adapter's README.
 - No chunked media upload (INIT/APPEND/FINALIZE) or processing status
 - Tweet surface is create/get only; no delete, likes, or timeline
 
-**Deviations** (1)
+**Deviations** (4)
 
 - PKCE is relaxed: code_verifier must be non-empty but the S256 hash match is not verified
+- No v2 errors[] envelope — articles/media use flat {error: ...} shapes a reference client is built against
+- PKCE S256 is presence-checked only; a wrong-but-present verifier passes
+- Republishing mints a fresh post_id with no already-published guard
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 

@@ -45,6 +45,10 @@ endpoints:
   - route: /v2/store/orders/{order_id}
     method: POST
     handler: scripts/orders.star#on_update_order
+    # update is a read-modify-write on the order doc; serialize per order
+    # (the emit inside is fine unless the webhook target loops back into
+    # this same key).
+    concurrency_key: order_id
 
   # --- Shipping rates ---
   - route: /v2/shipping/rates

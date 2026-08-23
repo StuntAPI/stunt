@@ -3,7 +3,7 @@
 # POST /services/rest/query/v1/suiteql
 # POST /services/rest/v1/suiteql
 #   body: {"q": "SELECT * FROM customer"}
-# -> {items:[...], count, links:[{rel, href}]}
+# -> {items:[...], count, hasMore, offset, totalResults, links:[{rel, href}]}
 #
 # SuiteQL parsing: we pattern-match the FROM <table> token. No full SQL
 # engine — just extract the table name and return the seeded rows for that
@@ -56,9 +56,14 @@ def on_suiteql(req):
             "href": "/services/rest/query/v1/suiteql?offset=" + _int_to_str(next_offset) + "&limit=" + _int_to_str(next_limit),
         })
 
+    # hasMore/offset/totalResults mirror the real SuiteQL envelope — REST
+    # clients page off links.next and report progress off totalResults.
     return respond(200, {
         "items": page,
         "count": len(page),
+        "hasMore": has_more,
+        "offset": offset,
+        "totalResults": total,
         "links": links,
     })
 
