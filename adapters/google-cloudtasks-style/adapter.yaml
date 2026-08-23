@@ -1,0 +1,140 @@
+# stunt adapter manifest — Google Cloud Tasks API simulator (unofficial)
+# Docs: https://stuntapi.com/stunt
+#
+# This adapter mimics the Google Cloud Tasks API (v2, REST surface at
+# cloudtasks.googleapis.com) for LOCAL TESTING ONLY. It does not call the
+# real Google API. All data is synthetic. See DISCLAIMER.
+id: google-cloudtasks-style
+name: "Google Cloud Tasks API simulator (unofficial)"
+version: "0.1.0"
+
+api:
+  name: "Google Cloud Tasks API"
+  version: "v2"
+
+# Endpoints — each maps a route + method to a Starlark handler, in
+# declaration order (literals before parameterized routes where they could
+# shadow). Colon verbs (:pause, :run, ...) ride the last path segment, so
+# they are captured in a {name_verb} param and split in the handler.
+endpoints:
+  # --- projects.locations ---
+  - route: /v2/projects/{project}/locations
+    method: GET
+    handler: scripts/locations.star#on_list_locations
+  - route: /v2/projects/{project}/locations/{location}
+    method: GET
+    handler: scripts/locations.star#on_get_location
+  - route: /v2/projects/{project}/locations/{location}/cmekConfig
+    method: GET
+    handler: scripts/locations.star#on_get_cmek
+  - route: /v2/projects/{project}/locations/{location}/cmekConfig
+    method: PATCH
+    handler: scripts/locations.star#on_update_cmek
+    concurrency_key: location
+
+  # --- projects.locations.queues ---
+  - route: /v2/projects/{project}/locations/{location}/queues
+    method: POST
+    handler: scripts/queues.star#on_create_queue
+    concurrency_key: location
+  - route: /v2/projects/{project}/locations/{location}/queues
+    method: GET
+    handler: scripts/queues.star#on_list_queues
+  - route: /v2/projects/{project}/locations/{location}/queues/{queue}
+    method: GET
+    handler: scripts/queues.star#on_get_queue
+  - route: /v2/projects/{project}/locations/{location}/queues/{queue}
+    method: PATCH
+    handler: scripts/queues.star#on_patch_queue
+    concurrency_key: queue
+  - route: /v2/projects/{project}/locations/{location}/queues/{queue}
+    method: DELETE
+    handler: scripts/queues.star#on_delete_queue
+    concurrency_key: queue
+  # :pause :resume :purge :getIamPolicy :setIamPolicy :testIamPermissions
+  # NOTE: the concurrency key is the raw "<queueId>:<verb>" param — the
+  # engine keys on the route param value, so these verbs serialize among
+  # themselves but not with the sibling {queue} routes.
+  - route: /v2/projects/{project}/locations/{location}/queues/{queue_verb}
+    method: POST
+    handler: scripts/queues.star#on_queue_verb
+    concurrency_key: queue_verb
+
+  # --- projects.locations.queues.tasks ---
+  - route: /v2/projects/{project}/locations/{location}/queues/{queue}/tasks
+    method: POST
+    handler: scripts/tasks.star#on_create_task
+    concurrency_key: queue
+  - route: /v2/projects/{project}/locations/{location}/queues/{queue}/tasks
+    method: GET
+    handler: scripts/tasks.star#on_list_tasks
+  # tasks:buffer — generated-ID form (taskId in the body only).
+  - route: /v2/projects/{project}/locations/{location}/queues/{queue}/tasks:buffer
+    method: POST
+    handler: scripts/tasks.star#on_buffer_task
+    concurrency_key: queue
+  # {task}:run and {taskId}:buffer — verb rides the last segment. The
+  # concurrency key is the raw "<taskId>:<verb>" param (same caveat as the
+  # queue verbs above).
+  - route: /v2/projects/{project}/locations/{location}/queues/{queue}/tasks/{task_verb}
+    method: POST
+    handler: scripts/tasks.star#on_task_verb
+    concurrency_key: task_verb
+  - route: /v2/projects/{project}/locations/{location}/queues/{queue}/tasks/{task}
+    method: GET
+    handler: scripts/tasks.star#on_get_task
+  - route: /v2/projects/{project}/locations/{location}/queues/{queue}/tasks/{task}
+    method: DELETE
+    handler: scripts/tasks.star#on_delete_task
+    concurrency_key: task
+
+# Backing stores — collections for stateful data (no seeds: like the real
+# service, a fresh project has no queues until you create them).
+resources:
+  - name: queues
+    kind: collection
+  - name: tasks
+    kind: collection
+  # Deleted/executed task names are not immediately reusable (the real
+  # service holds them for up to 24h) — see tasks.create de-duplication.
+  - name: tombstones
+    kind: collection
+  - name: iam_policies
+    kind: collection
+
+# Adapter-authored behavior modes. Handlers read the active one via the
+# profile_active() builtin; activation is runtime-only (see the stunt
+# profile command / dashboard profiles panel).
+profiles:
+  failing-worker: "tasks.run simulates a worker answering HTTP 500 — the task stays queued and reschedules per the queue's retryConfig, exercising client retry/backoff paths"
+
+# Auth scheme metadata (mock: any OAuth2 bearer token is accepted, matching
+# the cloud-platform / cloud-tasks scopes the real API requires).
+identity:
+  token_scheme: bearer
+
+# Catch-all: any unmatched route returns a 404 in the Google error shape.
+rules:
+  - name: catchall-404
+    match: { path: "/**" }
+    respond:
+      status: 404
+      body:
+        inline:
+          error:
+            code: 404
+            message: "Method not found."
+            status: "NOT_FOUND"
+
+# Resources notes:
+# - queues collection: {id: full queue name, project, location, queue_id,
+#                       state, rate_limits, retry_config,
+#                       http_target?, app_engine_routing_override?,
+#                       stackdriver_logging_config?, purge_time_unix?}
+# - tasks collection:  {id: full task name, queue, task_id, seq,
+#                       create_unix, create_time, schedule_time,
+#                       dispatch_deadline?, dispatch_count, response_count,
+#                       first_attempt?, last_attempt?, message_type,
+#                       http_request? | app_engine_http_request?}
+# - tombstones:       {id: task name, until_unix}
+# - iam_policies:     {id: queue name, bindings, version, etag}

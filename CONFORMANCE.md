@@ -21,7 +21,7 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**98 adapters** — 2 SDK+VM, 34 SDK-only, 59 VM-only, 3 boot-tier.
+**99 adapters** — 2 SDK+VM, 34 SDK-only, 60 VM-only, 3 boot-tier.
 
 **45 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.
 
@@ -71,6 +71,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [github-style](adapters/github-style/) | GitHub REST + GraphQL API `2022-11-28` | 26 +GQL | SDK | go-github/v89 @ v89.0.0<br>octokit @ 5.0.5 (floor) | 6 | [7](#github-style) | [4](#github-style) |
 | [gmail-style](adapters/gmail-style/) | Gmail API `v1` | 16 | SDK | google-api-go-client @ v0.293.0 | 9 | [6](#gmail-style) | [3](#gmail-style) |
 | [google-admin-style](adapters/google-admin-style/) | Google Admin SDK Directory API `directory_v1` | 13 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#google-admin-style) | [4](#google-admin-style) |
+| [google-cloudtasks-style](adapters/google-cloudtasks-style/) | Google Cloud Tasks API `v2` | 16 | VM | — | — | [7](#google-cloudtasks-style) | [7](#google-cloudtasks-style) |
 | [google-iam-style](adapters/google-iam-style/) | Google Cloud IAM API + Service Accounts `v1` | 10 | SDK | google-api-go-client @ v0.293.0 | 7 | [4](#google-iam-style) | [2](#google-iam-style) |
 | [google-style](adapters/google-style/) | Google OAuth2 API `v2` | 4 | SDK | x/oauth2 @ v0.36.0<br>google-api-go-client/idtoken @ v0.293.0 | 7 | [2](#google-style) | [2](#google-style) |
 | [gsearchconsole-style](adapters/gsearchconsole-style/) | Google Search Console API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 7 | [2](#gsearchconsole-style) | [4](#gsearchconsole-style) |
@@ -5042,6 +5043,74 @@ behavior notes live in each adapter's README.
 - `GET` `/admin/directory/v1/groups/{groupKey}/members` — query, params, auth, stateful, paginate, filter, errors, clock
 - `POST` `/admin/directory/v1/groups/{groupKey}/members` — body, params, auth, stateful, errors, clock
 - `DELETE` `/admin/directory/v1/groups/{groupKey}/members/{memberKey}` — params, auth, stateful, errors, clock
+
+</details>
+
+### google-cloudtasks-style
+
+**Covered** — 16 routes
+
+<details><summary>Routes</summary>
+
+| Method | Route |
+|---|---|
+| GET | `/v2/projects/{project}/locations` |
+| GET | `/v2/projects/{project}/locations/{location}` |
+| GET | `/v2/projects/{project}/locations/{location}/cmekConfig` |
+| PATCH | `/v2/projects/{project}/locations/{location}/cmekConfig` |
+| POST | `/v2/projects/{project}/locations/{location}/queues` |
+| GET | `/v2/projects/{project}/locations/{location}/queues` |
+| GET | `/v2/projects/{project}/locations/{location}/queues/{queue}` |
+| PATCH | `/v2/projects/{project}/locations/{location}/queues/{queue}` |
+| DELETE | `/v2/projects/{project}/locations/{location}/queues/{queue}` |
+| POST | `/v2/projects/{project}/locations/{location}/queues/{queue_verb}` |
+| POST | `/v2/projects/{project}/locations/{location}/queues/{queue}/tasks` |
+| GET | `/v2/projects/{project}/locations/{location}/queues/{queue}/tasks` |
+| POST | `/v2/projects/{project}/locations/{location}/queues/{queue}/tasks:buffer` |
+| POST | `/v2/projects/{project}/locations/{location}/queues/{queue}/tasks/{task_verb}` |
+| GET | `/v2/projects/{project}/locations/{location}/queues/{queue}/tasks/{task}` |
+| DELETE | `/v2/projects/{project}/locations/{location}/queues/{queue}/tasks/{task}` |
+
+</details>
+
+**Missing** (7)
+
+- No background dispatch loop — tasks are never auto-delivered at scheduleTime; only tasks.run drives attempts
+- No gRPC transport (REST only); google-cloud-* client libraries default to gRPC
+- oauthToken/oidcToken are stored verbatim — no token minting at dispatch time
+- stackdriverLoggingConfig is stored but no logs are written
+- IAM policies are stored but not enforced — testIamPermissions always grants
+- No App Engine queue.yaml/xml semantics (DISABLED state, queue-file overrides)
+- CMEK config is metadata-only; nothing is encrypted
+
+**Deviations** (7)
+
+- Any OAuth2 bearer token is accepted; real Google validates tokens and IAM permissions
+- tasks.run models the worker instead of calling it — success completes and deletes the task; the failing-worker profile simulates a 500 with retryConfig backoff
+- queues.list filter supports only name/state with =, !=, and : containment (subset of the real filter grammar)
+- tasks.list returns creation order; the real service defines no order
+- Generated task IDs are counter-based 19-digit decimals, not random
+- Purge is synchronous; real purge can take up to 60s to complete
+- Deleted-task tombstones hold names exactly 24h (real retention is up to 24h, 9 days for queue.yaml queues)
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/v2/projects/{project}/locations` — query, params, paginate
+- `GET` `/v2/projects/{project}/locations/{location}` — params
+- `GET` `/v2/projects/{project}/locations/{location}/cmekConfig` — params, stateful
+- `PATCH` `/v2/projects/{project}/locations/{location}/cmekConfig` — body, params, stateful
+- `POST` `/v2/projects/{project}/locations/{location}/queues` — body, query, params, stateful
+- `GET` `/v2/projects/{project}/locations/{location}/queues` — query, params, stateful, paginate
+- `GET` `/v2/projects/{project}/locations/{location}/queues/{queue}` — params, stateful
+- `PATCH` `/v2/projects/{project}/locations/{location}/queues/{queue}` — body, query, params, stateful
+- `DELETE` `/v2/projects/{project}/locations/{location}/queues/{queue}` — params, stateful
+- `POST` `/v2/projects/{project}/locations/{location}/queues/{queue_verb}` — body, params, stateful, clock
+- `POST` `/v2/projects/{project}/locations/{location}/queues/{queue}/tasks` — body, query, params, stateful, clock
+- `GET` `/v2/projects/{project}/locations/{location}/queues/{queue}/tasks` — query, params, stateful, paginate
+- `POST` `/v2/projects/{project}/locations/{location}/queues/{queue}/tasks:buffer` — body, params, stateful, clock
+- `POST` `/v2/projects/{project}/locations/{location}/queues/{queue}/tasks/{task_verb}` — body, query, params, stateful, clock
+- `GET` `/v2/projects/{project}/locations/{location}/queues/{queue}/tasks/{task}` — query, params, stateful
+- `DELETE` `/v2/projects/{project}/locations/{location}/queues/{queue}/tasks/{task}` — params, stateful, clock
 
 </details>
 
