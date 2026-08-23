@@ -534,6 +534,23 @@ adapters:
       - "No asps, verificationCodes, mobileDevices, or chromeosDevices"
       - "No user/group aliases, user photos, domains, or customers endpoints"
       - "No users.patch/groups.patch, members.get, or members.update endpoints"
+  google-cloudtasks-style:
+    deviations:
+      - "Any OAuth2 bearer token is accepted; real Google validates tokens and IAM permissions"
+      - "tasks.run models the worker instead of calling it — success completes and deletes the task; the failing-worker profile simulates a 500 with retryConfig backoff"
+      - "queues.list filter supports only name/state with =, !=, and : containment (subset of the real filter grammar)"
+      - "tasks.list returns creation order; the real service defines no order"
+      - "Generated task IDs are counter-based 19-digit decimals, not random"
+      - "Purge is synchronous; real purge can take up to 60s to complete"
+      - "Deleted-task tombstones hold names exactly 24h (real retention is up to 24h, 9 days for queue.yaml queues)"
+    missing:
+      - "No background dispatch loop — tasks are never auto-delivered at scheduleTime; only tasks.run drives attempts"
+      - "No gRPC transport (REST only); google-cloud-* client libraries default to gRPC"
+      - "oauthToken/oidcToken are stored verbatim — no token minting at dispatch time"
+      - "stackdriverLoggingConfig is stored but no logs are written"
+      - "IAM policies are stored but not enforced — testIamPermissions always grants"
+      - "No App Engine queue.yaml/xml semantics (DISABLED state, queue-file overrides)"
+      - "CMEK config is metadata-only; nothing is encrypted"
   google-iam-style:
     deviations:
       - "JWKS serves one fixed synthetic RSA-2048 key (kid mock-google-key-1)"
