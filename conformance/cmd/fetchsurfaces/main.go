@@ -89,10 +89,11 @@ var providers = []provider{
 	{
 		Adapters: []string{"adyen-style"},
 		Name:     "adyen-openapi CheckoutService-v68 + PaymentService-v68",
-		// v68 matches the adapter's pinned API version.
+		// v68 matches the adapter's pinned API version; the version lives
+		// in the server URL, not the paths.
 		Sources: []source{
-			{URL: "https://raw.githubusercontent.com/Adyen/adyen-openapi/main/yaml/CheckoutService-v68.yaml"},
-			{URL: "https://raw.githubusercontent.com/Adyen/adyen-openapi/main/yaml/PaymentService-v68.yaml"},
+			{URL: "https://raw.githubusercontent.com/Adyen/adyen-openapi/main/yaml/CheckoutService-v68.yaml", AddPrefix: "/v68"},
+			{URL: "https://raw.githubusercontent.com/Adyen/adyen-openapi/main/yaml/PaymentService-v68.yaml", AddPrefix: "/v68"},
 		},
 		License: "MIT",
 	},
@@ -116,9 +117,13 @@ var providers = []provider{
 	},
 	{
 		Adapters: []string{"sendgrid-style"},
-		Name:     "sendgrid-oai tsg_mail_v3",
-		Sources:  []source{{URL: "https://raw.githubusercontent.com/twilio/sendgrid-oai/main/spec/yaml/tsg_mail_v3.yaml"}},
-		License:  "MIT",
+		Name:     "sendgrid-oai tsg_mail_v3 + tsg_email_activity_v3 + tsg_webhooks_v3",
+		Sources: []source{
+			{URL: "https://raw.githubusercontent.com/twilio/sendgrid-oai/main/spec/yaml/tsg_mail_v3.yaml"},
+			{URL: "https://raw.githubusercontent.com/twilio/sendgrid-oai/main/spec/yaml/tsg_email_activity_v3.yaml"},
+			{URL: "https://raw.githubusercontent.com/twilio/sendgrid-oai/main/spec/yaml/tsg_webhooks_v3.yaml"},
+		},
+		License: "MIT",
 	},
 	{
 		Adapters: []string{"paypal-style"},

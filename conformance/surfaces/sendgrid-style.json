@@ -1,7 +1,7 @@
 {
-  "source": "spec sendgrid-oai tsg_mail_v3 @ 1.0.0",
-  "url": "https://raw.githubusercontent.com/twilio/sendgrid-oai/main/spec/yaml/tsg_mail_v3.yaml",
-  "fetched": "2026-08-22",
+  "source": "spec sendgrid-oai tsg_mail_v3 + tsg_email_activity_v3 + tsg_webhooks_v3 @ 1.0.0, 1.0.0, 1.0.0",
+  "url": "https://raw.githubusercontent.com/twilio/sendgrid-oai/main/spec/yaml/tsg_mail_v3.yaml https://raw.githubusercontent.com/twilio/sendgrid-oai/main/spec/yaml/tsg_email_activity_v3.yaml https://raw.githubusercontent.com/twilio/sendgrid-oai/main/spec/yaml/tsg_webhooks_v3.yaml",
+  "fetched": "2026-08-23",
   "license": "MIT",
   "routes": [
     {
@@ -15,6 +15,98 @@
     {
       "method": "POST",
       "route": "/v3/mail/send"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/messages"
+    },
+    {
+      "method": "POST",
+      "route": "/v3/messages/download"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/messages/download/{download_uuid}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/messages/{msg_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v3/user/webhooks/event/settings"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/user/webhooks/event/settings/all"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/user/webhooks/event/settings/signed/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v3/user/webhooks/event/settings/signed/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v3/user/webhooks/event/settings/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/user/webhooks/event/settings/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v3/user/webhooks/event/settings/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v3/user/webhooks/event/test"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/user/webhooks/parse/settings"
+    },
+    {
+      "method": "POST",
+      "route": "/v3/user/webhooks/parse/settings"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v3/user/webhooks/parse/settings/{hostname}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/user/webhooks/parse/settings/{hostname}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v3/user/webhooks/parse/settings/{hostname}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/user/webhooks/parse/stats"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/user/webhooks/security/policies"
+    },
+    {
+      "method": "POST",
+      "route": "/v3/user/webhooks/security/policies"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v3/user/webhooks/security/policies/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/user/webhooks/security/policies/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v3/user/webhooks/security/policies/{id}"
     }
   ]
 }

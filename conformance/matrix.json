@@ -87,7 +87,136 @@
           "method": "DELETE",
           "route": "/v68/webhooks/{webhookId}"
         }
-      ]
+      ],
+      "surface": {
+        "source": "spec adyen-openapi CheckoutService-v68 + PaymentService-v68 @ 68, 68",
+        "provider_routes": 39,
+        "covered_routes": 9,
+        "coverage_pct": 23,
+        "missing_routes": [
+          {
+            "method": "POST",
+            "route": "/v68/adjustAuthorisation"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/applePay/sessions"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/authorise"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/authorise3d"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/authorise3ds2"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/cancel"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/cancelOrRefund"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/cancels"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/capture"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/cardDetails"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/donate"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/donationCampaigns"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/donations"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/forward"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/getAuthenticationResult"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/orders"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/orders/cancel"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/originKeys"
+          },
+          {
+            "method": "PATCH",
+            "route": "/v68/paymentLinks/{linkId}"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/paymentMethods/balance"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/payments/{paymentPspReference}/amountUpdates"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/paypal/updateOrder"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/refund"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/retrieve3ds2Result"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/sessions"
+          },
+          {
+            "method": "GET",
+            "route": "/v68/sessions/{sessionId}"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/storedPaymentMethods"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/technicalCancel"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/validateShopperId"
+          },
+          {
+            "method": "POST",
+            "route": "/v68/voidPendingRefund"
+          }
+        ],
+        "derived": true
+      }
     },
     {
       "id": "anaplan-style",
@@ -183206,10 +183335,10 @@
         }
       ],
       "surface": {
-        "source": "spec sendgrid-oai tsg_mail_v3 @ 1.0.0",
-        "provider_routes": 3,
-        "covered_routes": 1,
-        "coverage_pct": 33,
+        "source": "spec sendgrid-oai tsg_mail_v3 + tsg_email_activity_v3 + tsg_webhooks_v3 @ 1.0.0, 1.0.0, 1.0.0",
+        "provider_routes": 26,
+        "covered_routes": 4,
+        "coverage_pct": 15,
         "missing_routes": [
           {
             "method": "POST",
@@ -183218,6 +183347,86 @@
           {
             "method": "GET",
             "route": "/v3/mail/batch/{batch_id}"
+          },
+          {
+            "method": "POST",
+            "route": "/v3/messages/download"
+          },
+          {
+            "method": "GET",
+            "route": "/v3/messages/download/{download_uuid}"
+          },
+          {
+            "method": "GET",
+            "route": "/v3/messages/{msg_id}"
+          },
+          {
+            "method": "GET",
+            "route": "/v3/user/webhooks/event/settings/all"
+          },
+          {
+            "method": "GET",
+            "route": "/v3/user/webhooks/event/settings/signed/{id}"
+          },
+          {
+            "method": "PATCH",
+            "route": "/v3/user/webhooks/event/settings/signed/{id}"
+          },
+          {
+            "method": "DELETE",
+            "route": "/v3/user/webhooks/event/settings/{id}"
+          },
+          {
+            "method": "GET",
+            "route": "/v3/user/webhooks/event/settings/{id}"
+          },
+          {
+            "method": "PATCH",
+            "route": "/v3/user/webhooks/event/settings/{id}"
+          },
+          {
+            "method": "GET",
+            "route": "/v3/user/webhooks/parse/settings"
+          },
+          {
+            "method": "POST",
+            "route": "/v3/user/webhooks/parse/settings"
+          },
+          {
+            "method": "DELETE",
+            "route": "/v3/user/webhooks/parse/settings/{hostname}"
+          },
+          {
+            "method": "GET",
+            "route": "/v3/user/webhooks/parse/settings/{hostname}"
+          },
+          {
+            "method": "PATCH",
+            "route": "/v3/user/webhooks/parse/settings/{hostname}"
+          },
+          {
+            "method": "GET",
+            "route": "/v3/user/webhooks/parse/stats"
+          },
+          {
+            "method": "GET",
+            "route": "/v3/user/webhooks/security/policies"
+          },
+          {
+            "method": "POST",
+            "route": "/v3/user/webhooks/security/policies"
+          },
+          {
+            "method": "DELETE",
+            "route": "/v3/user/webhooks/security/policies/{id}"
+          },
+          {
+            "method": "GET",
+            "route": "/v3/user/webhooks/security/policies/{id}"
+          },
+          {
+            "method": "PATCH",
+            "route": "/v3/user/webhooks/security/policies/{id}"
           }
         ],
         "derived": true

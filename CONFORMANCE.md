@@ -23,7 +23,7 @@ Verification tiers:
 
 **98 adapters** — 2 SDK+VM, 33 SDK-only, 4 VM-only, 59 boot-tier.
 
-**42 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.
+**43 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.
 
 | Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |
 |---|---|---|---|---|---|---|---|
@@ -550,6 +550,43 @@ behavior notes live in each adapter's README.
 | POST | `/v68/webhooks` |
 | GET | `/v68/webhooks` |
 | DELETE | `/v68/webhooks/{webhookId}` |
+
+</details>
+
+**Provider surface** — derived from spec adyen-openapi CheckoutService-v68 + PaymentService-v68 @ 68, 68: 39 real routes · 9 covered · 23% · 30 not implemented
+
+<details><summary>not implemented (30)</summary>
+
+- `POST` `/v68/adjustAuthorisation`
+- `POST` `/v68/applePay/sessions`
+- `POST` `/v68/authorise`
+- `POST` `/v68/authorise3d`
+- `POST` `/v68/authorise3ds2`
+- `POST` `/v68/cancel`
+- `POST` `/v68/cancelOrRefund`
+- `POST` `/v68/cancels`
+- `POST` `/v68/capture`
+- `POST` `/v68/cardDetails`
+- `POST` `/v68/donate`
+- `POST` `/v68/donationCampaigns`
+- `POST` `/v68/donations`
+- `POST` `/v68/forward`
+- `POST` `/v68/getAuthenticationResult`
+- `POST` `/v68/orders`
+- `POST` `/v68/orders/cancel`
+- `POST` `/v68/originKeys`
+- `PATCH` `/v68/paymentLinks/{linkId}`
+- `POST` `/v68/paymentMethods/balance`
+- `POST` `/v68/payments/{paymentPspReference}/amountUpdates`
+- `POST` `/v68/paypal/updateOrder`
+- `POST` `/v68/refund`
+- `POST` `/v68/retrieve3ds2Result`
+- `POST` `/v68/sessions`
+- `GET` `/v68/sessions/{sessionId}`
+- `POST` `/v68/storedPaymentMethods`
+- `POST` `/v68/technicalCancel`
+- `POST` `/v68/validateShopperId`
+- `POST` `/v68/voidPendingRefund`
 
 </details>
 
@@ -4820,12 +4857,32 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from spec sendgrid-oai tsg_mail_v3 @ 1.0.0: 3 real routes · 1 covered · 33% · 2 not implemented
+**Provider surface** — derived from spec sendgrid-oai tsg_mail_v3 + tsg_email_activity_v3 + tsg_webhooks_v3 @ 1.0.0, 1.0.0, 1.0.0: 26 real routes · 4 covered · 15% · 22 not implemented
 
-<details><summary>not implemented (2)</summary>
+<details><summary>not implemented (22)</summary>
 
 - `POST` `/v3/mail/batch`
 - `GET` `/v3/mail/batch/{batch_id}`
+- `POST` `/v3/messages/download`
+- `GET` `/v3/messages/download/{download_uuid}`
+- `GET` `/v3/messages/{msg_id}`
+- `GET` `/v3/user/webhooks/event/settings/all`
+- `GET` `/v3/user/webhooks/event/settings/signed/{id}`
+- `PATCH` `/v3/user/webhooks/event/settings/signed/{id}`
+- `DELETE` `/v3/user/webhooks/event/settings/{id}`
+- `GET` `/v3/user/webhooks/event/settings/{id}`
+- `PATCH` `/v3/user/webhooks/event/settings/{id}`
+- `GET` `/v3/user/webhooks/parse/settings`
+- `POST` `/v3/user/webhooks/parse/settings`
+- `DELETE` `/v3/user/webhooks/parse/settings/{hostname}`
+- `GET` `/v3/user/webhooks/parse/settings/{hostname}`
+- `PATCH` `/v3/user/webhooks/parse/settings/{hostname}`
+- `GET` `/v3/user/webhooks/parse/stats`
+- `GET` `/v3/user/webhooks/security/policies`
+- `POST` `/v3/user/webhooks/security/policies`
+- `DELETE` `/v3/user/webhooks/security/policies/{id}`
+- `GET` `/v3/user/webhooks/security/policies/{id}`
+- `PATCH` `/v3/user/webhooks/security/policies/{id}`
 
 </details>
 

@@ -481,6 +481,7 @@ var surfaceSource = map[string]surfaceSpec{
 	"printify-style":              {Kind: "spec", Ref: "printify-style.json"},
 	"revenuecat-style":            {Kind: "spec", Ref: "revenuecat-style.json"},
 	"sendgrid-style":              {Kind: "spec", Ref: "sendgrid-style.json"},
+	"adyen-style":                 {Kind: "spec", Ref: "adyen-style.json"},
 	"twitter-style":               {Kind: "spec", Ref: "twitter-style.json"},
 	"x-articles-style":            {Kind: "spec", Ref: "x-articles-style.json"},
 	"xero-style":                  {Kind: "spec", Ref: "xero-style.json"},
@@ -559,6 +560,24 @@ func deriveSurfaces(adapters []*adapter.Adapter, sdkVer map[string]string, confD
 			Pct:      pct,
 			Missing:  diff.Missing,
 		}
+	}
+	// An artifact on disk that no registry entry consumes would silently
+	// rot — fail instead, mirroring the sidecar and suite guards.
+	referenced := map[string]bool{}
+	for _, spec := range surfaceSource {
+		if spec.Kind == "spec" {
+			referenced[spec.Ref] = true
+		}
+	}
+	entries, err := os.ReadDir(filepath.Join(confDir, "surfaces"))
+	if err != nil {
+		return nil, fmt.Errorf("reading surfaces dir: %w — run `just surfaces-fetch`", err)
+	}
+	for _, e := range entries {
+		if !strings.HasSuffix(e.Name(), ".json") || referenced[e.Name()] {
+			continue
+		}
+		return nil, fmt.Errorf("surfaces/%s has no surfaceSource registry entry — register it or delete the artifact", e.Name())
 	}
 	return out, nil
 }
