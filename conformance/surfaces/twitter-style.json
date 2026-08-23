@@ -1,0 +1,720 @@
+{
+  "source": "spec X API v2 openapi (published at the API origin) @ 2.167",
+  "url": "https://api.x.com/2/openapi.json",
+  "fetched": "2026-08-22",
+  "license": "X Developer Agreement (route-table facts)",
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/2/account_activity/subscriptions/count"
+    },
+    {
+      "method": "GET",
+      "route": "/2/account_activity/webhooks/{webhook_id}/subscriptions/all"
+    },
+    {
+      "method": "POST",
+      "route": "/2/account_activity/webhooks/{webhook_id}/subscriptions/all"
+    },
+    {
+      "method": "GET",
+      "route": "/2/account_activity/webhooks/{webhook_id}/subscriptions/all/list"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/account_activity/webhooks/{webhook_id}/subscriptions/{user_id}/all"
+    },
+    {
+      "method": "GET",
+      "route": "/2/activity/stream"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/activity/subscriptions"
+    },
+    {
+      "method": "GET",
+      "route": "/2/activity/subscriptions"
+    },
+    {
+      "method": "POST",
+      "route": "/2/activity/subscriptions"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/activity/subscriptions/{subscription_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/2/activity/subscriptions/{subscription_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/2/articles/draft"
+    },
+    {
+      "method": "POST",
+      "route": "/2/articles/{article_id}/publish"
+    },
+    {
+      "method": "GET",
+      "route": "/2/broadcasts"
+    },
+    {
+      "method": "GET",
+      "route": "/2/broadcasts/scheduled"
+    },
+    {
+      "method": "POST",
+      "route": "/2/broadcasts/scheduled"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/broadcasts/scheduled/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/broadcasts/scheduled/{id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/2/broadcasts/scheduled/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/2/broadcasts/scheduled/{id}/live"
+    },
+    {
+      "method": "GET",
+      "route": "/2/broadcasts/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/broadcasts/{id}/chat"
+    },
+    {
+      "method": "POST",
+      "route": "/2/broadcasts/{id}/chat"
+    },
+    {
+      "method": "POST",
+      "route": "/2/broadcasts/{id}/chat/mutes"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/broadcasts/{id}/chat/mutes/{user_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/broadcasts/{id}/chat/{message_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/chat/conversations"
+    },
+    {
+      "method": "POST",
+      "route": "/2/chat/conversations/group"
+    },
+    {
+      "method": "POST",
+      "route": "/2/chat/conversations/group/initialize"
+    },
+    {
+      "method": "GET",
+      "route": "/2/chat/conversations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/chat/conversations/{id}/events"
+    },
+    {
+      "method": "POST",
+      "route": "/2/chat/conversations/{id}/keys"
+    },
+    {
+      "method": "POST",
+      "route": "/2/chat/conversations/{id}/members"
+    },
+    {
+      "method": "POST",
+      "route": "/2/chat/conversations/{id}/messages"
+    },
+    {
+      "method": "POST",
+      "route": "/2/chat/conversations/{id}/messages/delete"
+    },
+    {
+      "method": "POST",
+      "route": "/2/chat/conversations/{id}/read"
+    },
+    {
+      "method": "POST",
+      "route": "/2/chat/conversations/{id}/typing"
+    },
+    {
+      "method": "POST",
+      "route": "/2/chat/media/upload/initialize"
+    },
+    {
+      "method": "POST",
+      "route": "/2/chat/media/upload/{id}/append"
+    },
+    {
+      "method": "POST",
+      "route": "/2/chat/media/upload/{id}/finalize"
+    },
+    {
+      "method": "GET",
+      "route": "/2/chat/media/{id}/{media_hash_key}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/communities/search"
+    },
+    {
+      "method": "GET",
+      "route": "/2/communities/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/compliance/jobs"
+    },
+    {
+      "method": "POST",
+      "route": "/2/compliance/jobs"
+    },
+    {
+      "method": "GET",
+      "route": "/2/compliance/jobs/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/connections"
+    },
+    {
+      "method": "GET",
+      "route": "/2/connections"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/connections/all"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/connections/{endpoint_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/2/dm_conversations"
+    },
+    {
+      "method": "GET",
+      "route": "/2/dm_conversations/media/{dm_id}/{media_id}/{resource_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/dm_conversations/with/{participant_id}/dm_events"
+    },
+    {
+      "method": "POST",
+      "route": "/2/dm_conversations/with/{participant_id}/messages"
+    },
+    {
+      "method": "POST",
+      "route": "/2/dm_conversations/{dm_conversation_id}/messages"
+    },
+    {
+      "method": "GET",
+      "route": "/2/dm_conversations/{id}/dm_events"
+    },
+    {
+      "method": "GET",
+      "route": "/2/dm_events"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/dm_events/{event_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/dm_events/{event_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/likes/compliance/stream"
+    },
+    {
+      "method": "GET",
+      "route": "/2/likes/firehose/stream"
+    },
+    {
+      "method": "GET",
+      "route": "/2/likes/sample10/stream"
+    },
+    {
+      "method": "POST",
+      "route": "/2/lists"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/lists/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/lists/{id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/2/lists/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/lists/{id}/followers"
+    },
+    {
+      "method": "GET",
+      "route": "/2/lists/{id}/members"
+    },
+    {
+      "method": "POST",
+      "route": "/2/lists/{id}/members"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/lists/{id}/members/{user_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/lists/{id}/tweets"
+    },
+    {
+      "method": "GET",
+      "route": "/2/media"
+    },
+    {
+      "method": "GET",
+      "route": "/2/media/analytics"
+    },
+    {
+      "method": "POST",
+      "route": "/2/media/metadata"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/media/subtitles"
+    },
+    {
+      "method": "POST",
+      "route": "/2/media/subtitles"
+    },
+    {
+      "method": "GET",
+      "route": "/2/media/upload"
+    },
+    {
+      "method": "POST",
+      "route": "/2/media/upload"
+    },
+    {
+      "method": "POST",
+      "route": "/2/media/upload/initialize"
+    },
+    {
+      "method": "POST",
+      "route": "/2/media/upload/{id}/append"
+    },
+    {
+      "method": "POST",
+      "route": "/2/media/upload/{id}/finalize"
+    },
+    {
+      "method": "GET",
+      "route": "/2/media/{media_key}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/news/search"
+    },
+    {
+      "method": "GET",
+      "route": "/2/news/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/2/notes"
+    },
+    {
+      "method": "POST",
+      "route": "/2/notes/evaluate"
+    },
+    {
+      "method": "GET",
+      "route": "/2/notes/search/notes_written"
+    },
+    {
+      "method": "GET",
+      "route": "/2/notes/search/posts_eligible_for_notes"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/notes/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/openapi.json"
+    },
+    {
+      "method": "GET",
+      "route": "/2/spaces"
+    },
+    {
+      "method": "GET",
+      "route": "/2/spaces/by/creator_ids"
+    },
+    {
+      "method": "GET",
+      "route": "/2/spaces/search"
+    },
+    {
+      "method": "GET",
+      "route": "/2/spaces/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/spaces/{id}/buyers"
+    },
+    {
+      "method": "GET",
+      "route": "/2/spaces/{id}/tweets"
+    },
+    {
+      "method": "GET",
+      "route": "/2/trends/by/woeid/{woeid}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets"
+    },
+    {
+      "method": "POST",
+      "route": "/2/tweets"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/analytics"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/compliance/stream"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/counts/all"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/counts/recent"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/firehose/stream"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/firehose/stream/lang/en"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/firehose/stream/lang/ja"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/firehose/stream/lang/ko"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/firehose/stream/lang/pt"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/label/stream"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/sample/stream"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/sample10/stream"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/search/all"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/search/recent"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/search/stream"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/search/stream/rules"
+    },
+    {
+      "method": "POST",
+      "route": "/2/tweets/search/stream/rules"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/search/stream/rules/counts"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/search/webhooks"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/tweets/search/webhooks/{webhook_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/2/tweets/search/webhooks/{webhook_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/tweets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/{id}/liking_users"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/{id}/quote_tweets"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/{id}/retweeted_by"
+    },
+    {
+      "method": "GET",
+      "route": "/2/tweets/{id}/retweets"
+    },
+    {
+      "method": "PUT",
+      "route": "/2/tweets/{tweet_id}/hidden"
+    },
+    {
+      "method": "GET",
+      "route": "/2/usage/tweets"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/by"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/by/username/{username}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/compliance/stream"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/me"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/personalized_trends"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/public_keys"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/reposts_of_me"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/search"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/affiliates"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/blocking"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/bookmarks"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/{id}/bookmarks"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/bookmarks/folders"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/{id}/bookmarks/folders"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/bookmarks/folders/{folder_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/users/{id}/bookmarks/{tweet_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/{id}/dm/block"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/{id}/dm/unblock"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/followed_lists"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/{id}/followed_lists"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/users/{id}/followed_lists/{list_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/followers"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/following"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/{id}/following"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/liked_tweets"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/{id}/likes"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/users/{id}/likes/{tweet_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/list_memberships"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/mentions"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/muting"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/{id}/muting"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/owned_lists"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/pinned_lists"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/{id}/pinned_lists"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/users/{id}/pinned_lists/{list_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/public_keys"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/{id}/public_keys"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/{id}/retweets"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/users/{id}/retweets/{source_tweet_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/timelines/reverse_chronological"
+    },
+    {
+      "method": "GET",
+      "route": "/2/users/{id}/tweets"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/users/{source_user_id}/following/{target_user_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/users/{source_user_id}/muting/{target_user_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/2/webhooks"
+    },
+    {
+      "method": "POST",
+      "route": "/2/webhooks"
+    },
+    {
+      "method": "POST",
+      "route": "/2/webhooks/replay"
+    },
+    {
+      "method": "DELETE",
+      "route": "/2/webhooks/{webhook_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/2/webhooks/{webhook_id}"
+    }
+  ]
+}

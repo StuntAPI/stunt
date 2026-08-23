@@ -361,10 +361,18 @@ def on_list(req):
 - **SDK conformance + the matrix:** real provider SDKs are driven against booted adapters
   (`just conformance` Go suites, `just conformance-node` Node suites via bun). Coverage is
   published in the generated **`CONFORMANCE.md`** (one row per adapter: SDKs + versions,
-  covered behaviors, documented deviations, verification tier, and — where the pinned SDK
-  embeds a route table — derived real-API coverage). It regenerates from
+  covered behaviors, documented deviations, verification tier, and — where a trustworthy
+  provider route table exists — derived real-API coverage). It regenerates from
   `conformance/cmd/genmatrix` — rerun `just conformance-matrix` (CI fails on drift) after
   touching adapters, `Record(...)` calls, node test sections, SDK versions, or
   `conformance/matrix.yaml` (the hand-curated deviations sidecar; every adapter must have
   an entry, empty list allowed). `just ci-full` runs the exact GitHub CI job locally,
   including the matrix freshness gate.
+- Derived coverage comes from two sources: route tables embedded in the pinned SDKs
+  (auto-refreshing with SDK bumps), and **vendored official specs** under
+  `conformance/surfaces/` (one JSON per adapter: provenance + pre-normalized routes).
+  The only way to produce/refresh those artifacts is `just surfaces-fetch [adapter-id]`
+  (`conformance/cmd/fetchsurfaces`, needs network — CI never fetches). An adapter
+  registered in the fetcher but missing its artifact fails genmatrix loudly. Do not
+  vendor specs under restrictive terms (proprietary, CC BY-ND — see the fetcher's
+  header comment for the excluded list).

@@ -1,0 +1,1228 @@
+{
+  "source": "spec vsts-rest-api-specs core 7.2 + pipelines/git/wit/hooks/work 7.1 @ 7.2-preview, 7.1, 7.1, 7.1, 7.1, 7.1",
+  "url": "https://raw.githubusercontent.com/MicrosoftDocs/vsts-rest-api-specs/master/specification/core/7.2/core.json https://raw.githubusercontent.com/MicrosoftDocs/vsts-rest-api-specs/master/specification/pipelines/azure-devops-server-7.1/pipelines-onprem.json https://raw.githubusercontent.com/MicrosoftDocs/vsts-rest-api-specs/master/specification/git/azure-devops-server-7.1/git-onprem.json https://raw.githubusercontent.com/MicrosoftDocs/vsts-rest-api-specs/master/specification/wit/azure-devops-server-7.1/workItemTracking-onprem.json https://raw.githubusercontent.com/MicrosoftDocs/vsts-rest-api-specs/master/specification/hooks/azure-devops-server-7.1/serviceHooks-onprem.json https://raw.githubusercontent.com/MicrosoftDocs/vsts-rest-api-specs/master/specification/work/azure-devops-server-7.1/work-onprem.json",
+  "fetched": "2026-08-22",
+  "license": "MIT",
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/consumers"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/consumers/{consumerId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/consumers/{consumerId}/actions"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/consumers/{consumerId}/actions/{consumerActionId}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/_apis/hooks/notificationsquery"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/publishers"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/publishers/{publisherId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/publishers/{publisherId}/eventtypes"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/publishers/{publisherId}/eventtypes/{eventTypeId}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/_apis/hooks/publishers/{publisherId}/inputValuesQuery"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/_apis/hooks/publishersquery"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/subscriptions"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/_apis/hooks/subscriptions"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/_apis/hooks/subscriptions/{subscriptionId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/subscriptions/{subscriptionId}"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/_apis/hooks/subscriptions/{subscriptionId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/subscriptions/{subscriptionId}/diagnostics"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/_apis/hooks/subscriptions/{subscriptionId}/diagnostics"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/subscriptions/{subscriptionId}/notifications"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/hooks/subscriptions/{subscriptionId}/notifications/{notificationId}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/_apis/hooks/subscriptionsquery"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/_apis/hooks/testnotifications"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/wit/artifactlinktypes"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/wit/workitemicons"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/wit/workitemicons/{icon}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/wit/workitemrelationtypes"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/wit/workitemrelationtypes/{relation}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/wit/workitemtransitions"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/_apis/work/accountmyworkrecentactivity"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/deletedrepositories"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/favorites/refs"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/favorites/refs"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/git/favorites/refs/{favoriteId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/favorites/refs/{favoriteId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/policy/configurations"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/pullrequests"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/pullrequests/{pullRequestId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/recycleBin/repositories"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/git/recycleBin/repositories/{repositoryId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/git/recycleBin/repositories/{repositoryId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/annotatedtags"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/annotatedtags/{objectId}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/blobs"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/blobs/{sha1}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/cherryPicks"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/cherryPicks"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/cherryPicks/{cherryPickId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/commits"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/commits/{commitId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/commits/{commitId}/changes"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/commits/{commitId}/statuses"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/commits/{commitId}/statuses"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/commits?"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/commitsbatch"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/diffs/commits"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/importRequests"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/importRequests"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/importRequests/{importRequestId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/importRequests/{importRequestId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/items"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/items?path={path}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/itemsbatch"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/attachments"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/attachments/{fileName}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/attachments/{fileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/attachments/{fileName}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/commits"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations/{iterationId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations/{iterationId}/changes"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations/{iterationId}/commits"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations/{iterationId}/statuses"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations/{iterationId}/statuses"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations/{iterationId}/statuses"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations/{iterationId}/statuses/{statusId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/iterations/{iterationId}/statuses/{statusId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/labels"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/labels"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/labels/{labelIdOrName}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/labels/{labelIdOrName}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/properties"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/properties"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/reviewers"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/reviewers"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/reviewers"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/reviewers"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/reviewers/{reviewerId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/reviewers/{reviewerId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/reviewers/{reviewerId}"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/reviewers/{reviewerId}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/share"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/statuses"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/statuses"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/statuses"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/statuses/{statusId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/statuses/{statusId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads/{threadId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads/{threadId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads/{threadId}/comments"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads/{threadId}/comments"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads/{threadId}/comments/{commentId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads/{threadId}/comments/{commentId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads/{threadId}/comments/{commentId}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads/{threadId}/comments/{commentId}/likes"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads/{threadId}/comments/{commentId}/likes"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/threads/{threadId}/comments/{commentId}/likes"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullRequests/{pullRequestId}/workitems"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullrequestquery"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullrequests"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullrequests"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullrequests/{pullRequestId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pullrequests/{pullRequestId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pushes"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pushes"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/pushes/{pushId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/refs"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/refs"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/refs"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/reverts"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/reverts"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/reverts/{revertId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/stats/branches"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/stats/branches?name={name}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/suggestions"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}/trees/{sha1}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryId}?includeParent={includeParent}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryNameOrId}/commits/{commitId}/mergebases"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryNameOrId}/forkSyncRequests"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryNameOrId}/forkSyncRequests"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryNameOrId}/forkSyncRequests/{forkSyncOperationId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryNameOrId}/forks/{collectionId}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryNameOrId}/merges"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/git/repositories/{repositoryNameOrId}/merges/{mergeOperationId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/pipelines"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/pipelines"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/pipelines/{pipelineId}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/pipelines/{pipelineId}/preview"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/pipelines/{pipelineId}/runs"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/pipelines/{pipelineId}/runs"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}/artifacts"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}/logs"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}/logs/{logId}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/artifacturiquery"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/attachments"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/attachments/{id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/_apis/wit/attachments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/classificationnodes"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/wit/classificationnodes/{structureGroup}/{path}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/classificationnodes/{structureGroup}/{path}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/wit/classificationnodes/{structureGroup}/{path}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/classificationnodes/{structureGroup}/{path}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/classificationnodes?ids={ids}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/fields"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/fields"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/wit/fields/{fieldNameOrRefName}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/fields/{fieldNameOrRefName}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/wit/fields/{fieldNameOrRefName}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/projectprocessmigration"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/queries"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/wit/queries/{query}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/queries/{query}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/wit/queries/{query}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/queries/{query}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/queries?$filter={$filter}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/queriesbatch"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/recyclebin"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/wit/recyclebin/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/recyclebin/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/wit/recyclebin/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/recyclebin?ids={ids}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/reporting/workItemRevisions/discussions"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/reporting/workitemlinks"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/reporting/workitemrevisions"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/reporting/workitemrevisions"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/sendmail"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/tags"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/wit/tags/{tagIdOrName}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/tags/{tagIdOrName}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/wit/tags/{tagIdOrName}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/tempqueries"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{id}/revisions"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{id}/revisions/{revisionNumber}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{id}/updates"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{id}/updates/{updateNumber}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}/reactions"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}/reactions/{reactionType}"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}/reactions/{reactionType}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}/reactions/{reactionType}/users"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}/versions/{version}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments/{commentId}?format={format}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments?"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/workItems/{workItemId}/comments?format={format}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workitems"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workitems/${type}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/workitems/${type}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/wit/workitems/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workitems/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/_apis/wit/workitems/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/workitemsbatch"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/wit/workitemsdelete"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workitemtypecategories"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workitemtypecategories/{category}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workitemtypes"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workitemtypes/{type}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workitemtypes/{type}/fields"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workitemtypes/{type}/fields/{field}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/wit/workitemtypes/{type}/states"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/work/boardcolumns"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/work/boardrows"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/work/iterations/{iterationId}/iterationcapacities"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/work/plans"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/_apis/work/plans"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/_apis/work/plans/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/work/plans/{id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/_apis/work/plans/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/work/plans/{id}/deliverytimeline"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/_apis/work/processconfiguration"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/wit/templates"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/{team}/_apis/wit/templates"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/{team}/_apis/wit/templates/{templateId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/wit/templates/{templateId}"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/{team}/_apis/wit/templates/{templateId}"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/{team}/_apis/wit/wiql"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/wit/wiql/{id}"
+    },
+    {
+      "method": "HEAD",
+      "route": "/{collection}/{project}/{team}/_apis/wit/wiql/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/backlogconfiguration"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/backlogs"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/backlogs/{backlogId}/workItems"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/backlogs/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/boardparents"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/boardusersettings"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/boardusersettings"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/cardrulesettings"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/cardrulesettings"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/cardsettings"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/cardsettings"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/chartimages/{name}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/charts"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/charts/{name}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/charts/{name}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/columns"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/columns"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/rows"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{board}/rows"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/{team}/_apis/work/boards/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/iterations/chartimages/{name}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/iterations/{iterationId}/chartimages/{name}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/{team}/_apis/work/iterations/{iterationId}/workitemsorder"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/{team}/_apis/work/taskboard/cardrulesettings"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/{team}/_apis/work/taskboard/cardsettings"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/taskboardcolumns"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/{team}/_apis/work/taskboardcolumns"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/taskboardworkitems/{iterationId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/{team}/_apis/work/taskboardworkitems/{iterationId}/{workItemId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/iterations"
+    },
+    {
+      "method": "POST",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/iterations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/iterations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/iterations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/iterations/{iterationId}/capacities"
+    },
+    {
+      "method": "PUT",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/iterations/{iterationId}/capacities"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/iterations/{iterationId}/capacities/{teamMemberId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/iterations/{iterationId}/capacities/{teamMemberId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/iterations/{iterationId}/teamdaysoff"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/iterations/{iterationId}/teamdaysoff"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/iterations/{iterationId}/workitems"
+    },
+    {
+      "method": "GET",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/teamfieldvalues"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/{team}/_apis/work/teamsettings/teamfieldvalues"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{collection}/{project}/{team}/_apis/work/workitemsorder"
+    },
+    {
+      "method": "GET",
+      "route": "/{organization}/_apis/process/processes"
+    },
+    {
+      "method": "GET",
+      "route": "/{organization}/_apis/process/processes/{processId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{organization}/_apis/projects"
+    },
+    {
+      "method": "POST",
+      "route": "/{organization}/_apis/projects"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{organization}/_apis/projects/{projectId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{organization}/_apis/projects/{projectId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{organization}/_apis/projects/{projectId}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{organization}/_apis/projects/{projectId}/avatar"
+    },
+    {
+      "method": "PUT",
+      "route": "/{organization}/_apis/projects/{projectId}/avatar"
+    },
+    {
+      "method": "GET",
+      "route": "/{organization}/_apis/projects/{projectId}/categorizedteams/"
+    },
+    {
+      "method": "GET",
+      "route": "/{organization}/_apis/projects/{projectId}/properties"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{organization}/_apis/projects/{projectId}/properties"
+    },
+    {
+      "method": "GET",
+      "route": "/{organization}/_apis/projects/{projectId}/teams"
+    },
+    {
+      "method": "POST",
+      "route": "/{organization}/_apis/projects/{projectId}/teams"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{organization}/_apis/projects/{projectId}/teams/{teamId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{organization}/_apis/projects/{projectId}/teams/{teamId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/{organization}/_apis/projects/{projectId}/teams/{teamId}"
+    },
+    {
+      "method": "GET",
+      "route": "/{organization}/_apis/projects/{projectId}/teams/{teamId}/members"
+    },
+    {
+      "method": "GET",
+      "route": "/{organization}/_apis/teams"
+    }
+  ]
+}

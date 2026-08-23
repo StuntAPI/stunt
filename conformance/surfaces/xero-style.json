@@ -1,0 +1,948 @@
+{
+  "source": "spec Xero-OpenAPI xero_accounting @ 17.0.0",
+  "url": "https://raw.githubusercontent.com/XeroAPI/Xero-OpenAPI/master/xero_accounting.yaml",
+  "fetched": "2026-08-22",
+  "license": "MIT",
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Accounts"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Accounts"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api.xro/2.0/Accounts/{AccountID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Accounts/{AccountID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Accounts/{AccountID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Accounts/{AccountID}/Attachments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Accounts/{AccountID}/Attachments/{AttachmentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Accounts/{AccountID}/Attachments/{FileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Accounts/{AccountID}/Attachments/{FileName}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Accounts/{AccountID}/Attachments/{FileName}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BankTransactions"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/BankTransactions"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/BankTransactions"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BankTransactions/{BankTransactionID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/BankTransactions/{BankTransactionID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BankTransactions/{BankTransactionID}/Attachments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BankTransactions/{BankTransactionID}/Attachments/{AttachmentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BankTransactions/{BankTransactionID}/Attachments/{FileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/BankTransactions/{BankTransactionID}/Attachments/{FileName}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/BankTransactions/{BankTransactionID}/Attachments/{FileName}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BankTransactions/{BankTransactionID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/BankTransactions/{BankTransactionID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BankTransfers"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/BankTransfers"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/BankTransfers"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BankTransfers/{BankTransferID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/BankTransfers/{BankTransferID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BankTransfers/{BankTransferID}/Attachments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BankTransfers/{BankTransferID}/Attachments/{AttachmentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BankTransfers/{BankTransferID}/Attachments/{FileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/BankTransfers/{BankTransferID}/Attachments/{FileName}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/BankTransfers/{BankTransferID}/Attachments/{FileName}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BankTransfers/{BankTransferID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/BankTransfers/{BankTransferID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BatchPayments"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/BatchPayments"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/BatchPayments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BatchPayments/{BatchPaymentID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/BatchPayments/{BatchPaymentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BatchPayments/{BatchPaymentID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/BatchPayments/{BatchPaymentID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BrandingThemes"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BrandingThemes/{BrandingThemeID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/BrandingThemes/{BrandingThemeID}/PaymentServices"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/BrandingThemes/{BrandingThemeID}/PaymentServices"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Budgets"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Budgets/{BudgetID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/ContactGroups"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/ContactGroups"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/ContactGroups/{ContactGroupID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/ContactGroups/{ContactGroupID}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api.xro/2.0/ContactGroups/{ContactGroupID}/Contacts"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/ContactGroups/{ContactGroupID}/Contacts"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api.xro/2.0/ContactGroups/{ContactGroupID}/Contacts/{ContactID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Contacts"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Contacts"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Contacts"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Contacts/{ContactID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Contacts/{ContactID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Contacts/{ContactID}/Attachments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Contacts/{ContactID}/Attachments/{AttachmentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Contacts/{ContactID}/Attachments/{FileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Contacts/{ContactID}/Attachments/{FileName}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Contacts/{ContactID}/Attachments/{FileName}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Contacts/{ContactID}/CISSettings"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Contacts/{ContactID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Contacts/{ContactID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Contacts/{ContactNumber}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/CreditNotes"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/CreditNotes"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/CreditNotes"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/CreditNotes/{CreditNoteID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/CreditNotes/{CreditNoteID}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/CreditNotes/{CreditNoteID}/Allocations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api.xro/2.0/CreditNotes/{CreditNoteID}/Allocations/{AllocationID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/CreditNotes/{CreditNoteID}/Attachments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/CreditNotes/{CreditNoteID}/Attachments/{AttachmentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/CreditNotes/{CreditNoteID}/Attachments/{FileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/CreditNotes/{CreditNoteID}/Attachments/{FileName}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/CreditNotes/{CreditNoteID}/Attachments/{FileName}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/CreditNotes/{CreditNoteID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/CreditNotes/{CreditNoteID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/CreditNotes/{CreditNoteID}/pdf"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Currencies"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Currencies"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/ExpenseClaims"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/ExpenseClaims"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/ExpenseClaims/{ExpenseClaimID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/ExpenseClaims/{ExpenseClaimID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/ExpenseClaims/{ExpenseClaimID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/ExpenseClaims/{ExpenseClaimID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/InvoiceReminders/Settings"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Invoices"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Invoices"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Invoices"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Invoices/{InvoiceID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Invoices/{InvoiceID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Invoices/{InvoiceID}/Attachments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Invoices/{InvoiceID}/Attachments/{AttachmentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Invoices/{InvoiceID}/Attachments/{FileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Invoices/{InvoiceID}/Attachments/{FileName}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Invoices/{InvoiceID}/Attachments/{FileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Invoices/{InvoiceID}/Email"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Invoices/{InvoiceID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Invoices/{InvoiceID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Invoices/{InvoiceID}/OnlineInvoice"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Invoices/{InvoiceID}/pdf"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Items"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Items"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Items"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api.xro/2.0/Items/{ItemID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Items/{ItemID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Items/{ItemID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Items/{ItemID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Items/{ItemID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Journals"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Journals/{JournalID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Journals/{JournalNumber}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/LinkedTransactions"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/LinkedTransactions"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api.xro/2.0/LinkedTransactions/{LinkedTransactionID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/LinkedTransactions/{LinkedTransactionID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/LinkedTransactions/{LinkedTransactionID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/ManualJournals"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/ManualJournals"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/ManualJournals"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/ManualJournals/{ManualJournalID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/ManualJournals/{ManualJournalID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/ManualJournals/{ManualJournalID}/Attachments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/ManualJournals/{ManualJournalID}/Attachments/{AttachmentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/ManualJournals/{ManualJournalID}/Attachments/{FileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/ManualJournals/{ManualJournalID}/Attachments/{FileName}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/ManualJournals/{ManualJournalID}/Attachments/{FileName}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/ManualJournals/{ManualJournalID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/ManualJournals/{ManualJournalID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Organisation"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Organisation/Actions"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Organisation/{OrganisationID}/CISSettings"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Overpayments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Overpayments/{OverpaymentID}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Overpayments/{OverpaymentID}/Allocations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api.xro/2.0/Overpayments/{OverpaymentID}/Allocations/{AllocationID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Overpayments/{OverpaymentID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Overpayments/{OverpaymentID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/PaymentServices"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/PaymentServices"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Payments"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Payments"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Payments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Payments/{PaymentID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Payments/{PaymentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Payments/{PaymentID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Payments/{PaymentID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Prepayments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Prepayments/{PrepaymentID}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Prepayments/{PrepaymentID}/Allocations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api.xro/2.0/Prepayments/{PrepaymentID}/Allocations/{AllocationID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Prepayments/{PrepaymentID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Prepayments/{PrepaymentID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/PurchaseOrders"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/PurchaseOrders"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/PurchaseOrders"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/PurchaseOrders/{PurchaseOrderID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/PurchaseOrders/{PurchaseOrderID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/PurchaseOrders/{PurchaseOrderID}/Attachments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/PurchaseOrders/{PurchaseOrderID}/Attachments/{AttachmentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/PurchaseOrders/{PurchaseOrderID}/Attachments/{FileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/PurchaseOrders/{PurchaseOrderID}/Attachments/{FileName}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/PurchaseOrders/{PurchaseOrderID}/Attachments/{FileName}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/PurchaseOrders/{PurchaseOrderID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/PurchaseOrders/{PurchaseOrderID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/PurchaseOrders/{PurchaseOrderID}/pdf"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/PurchaseOrders/{PurchaseOrderNumber}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Quotes"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Quotes"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Quotes"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Quotes/{QuoteID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Quotes/{QuoteID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Quotes/{QuoteID}/Attachments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Quotes/{QuoteID}/Attachments/{AttachmentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Quotes/{QuoteID}/Attachments/{FileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Quotes/{QuoteID}/Attachments/{FileName}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Quotes/{QuoteID}/Attachments/{FileName}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Quotes/{QuoteID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Quotes/{QuoteID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Quotes/{QuoteID}/pdf"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Receipts"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Receipts"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Receipts/{ReceiptID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Receipts/{ReceiptID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Receipts/{ReceiptID}/Attachments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Receipts/{ReceiptID}/Attachments/{AttachmentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Receipts/{ReceiptID}/Attachments/{FileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Receipts/{ReceiptID}/Attachments/{FileName}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Receipts/{ReceiptID}/Attachments/{FileName}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Receipts/{ReceiptID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/Receipts/{ReceiptID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/RepeatingInvoices"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/RepeatingInvoices"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/RepeatingInvoices"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/RepeatingInvoices/{RepeatingInvoiceID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/RepeatingInvoices/{RepeatingInvoiceID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/RepeatingInvoices/{RepeatingInvoiceID}/Attachments"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/RepeatingInvoices/{RepeatingInvoiceID}/Attachments/{AttachmentID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/RepeatingInvoices/{RepeatingInvoiceID}/Attachments/{FileName}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/RepeatingInvoices/{RepeatingInvoiceID}/Attachments/{FileName}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/RepeatingInvoices/{RepeatingInvoiceID}/Attachments/{FileName}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/RepeatingInvoices/{RepeatingInvoiceID}/History"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/RepeatingInvoices/{RepeatingInvoiceID}/History"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Reports"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Reports/AgedPayablesByContact"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Reports/AgedReceivablesByContact"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Reports/BalanceSheet"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Reports/BankSummary"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Reports/BudgetSummary"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Reports/ExecutiveSummary"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Reports/ProfitAndLoss"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Reports/TenNinetyNine"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Reports/TrialBalance"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Reports/{ReportID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/Setup"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/TaxRates"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/TaxRates"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/TaxRates"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/TaxRates/{TaxType}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/TrackingCategories"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/TrackingCategories"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api.xro/2.0/TrackingCategories/{TrackingCategoryID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/TrackingCategories/{TrackingCategoryID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/TrackingCategories/{TrackingCategoryID}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api.xro/2.0/TrackingCategories/{TrackingCategoryID}/Options"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api.xro/2.0/TrackingCategories/{TrackingCategoryID}/Options/{TrackingOptionID}"
+    },
+    {
+      "method": "POST",
+      "route": "/api.xro/2.0/TrackingCategories/{TrackingCategoryID}/Options/{TrackingOptionID}"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Users"
+    },
+    {
+      "method": "GET",
+      "route": "/api.xro/2.0/Users/{UserID}"
+    }
+  ]
+}

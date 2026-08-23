@@ -1,0 +1,344 @@
+{
+  "source": "spec onfido-openapi-spec @ v3.6",
+  "url": "https://raw.githubusercontent.com/onfido/onfido-openapi-spec/master/generated/artifacts/openapi/openapi.json",
+  "fetched": "2026-08-22",
+  "license": "MIT (declared in spec)",
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/v3.6/addresses/pick"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/advanced_electronic_signature/documents"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/applicants"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/applicants"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v3.6/applicants/{applicant_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/applicants/{applicant_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/v3.6/applicants/{applicant_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/applicants/{applicant_id}/consents"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/applicants/{applicant_id}/restore"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v3.6/biometric_tokens/{user_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/biometric_tokens/{user_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v3.6/biometric_tokens/{user_id}/{token_uuid}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/biometric_tokens/{user_id}/{token_uuid}"
+    },
+    {
+      "method": "PUT",
+      "route": "/v3.6/biometric_tokens/{user_id}/{token_uuid}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/checks"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/checks"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/checks/{check_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/checks/{check_id}/download"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/checks/{check_id}/resume"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/documents"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/documents"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/documents/{document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/documents/{document_id}/download"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/documents/{document_id}/nfc_face"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/documents/{document_id}/video/download"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/extractions"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/id_photos"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/id_photos"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/id_photos/{id_photo_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/id_photos/{id_photo_id}/download"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/live_photos"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/live_photos"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/live_photos/{live_photo_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/live_photos/{live_photo_id}/download"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/live_videos"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/live_videos/{live_video_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/live_videos/{live_video_id}/download"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/live_videos/{live_video_id}/frame"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/motion_captures"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/motion_captures/{motion_capture_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/motion_captures/{motion_capture_id}/download"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/motion_captures/{motion_capture_id}/frame"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v3.6/passkeys/{username}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/passkeys/{username}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v3.6/passkeys/{username}/{passkey_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/passkeys/{username}/{passkey_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/v3.6/passkeys/{username}/{passkey_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/ping"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/qualified_electronic_signature/documents"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/repeat_attempts/{report_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/reports"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/reports/{report_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/reports/{report_id}/cancel"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/reports/{report_id}/resume"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/results_feedback"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/sdk_token"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/signing_documents"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/signing_documents"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/signing_documents/{signing_document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/signing_documents/{signing_document_id}/download"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/simple_electronic_signature/documents"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/watchlist_monitors"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/watchlist_monitors"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v3.6/watchlist_monitors/{monitor_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/watchlist_monitors/{monitor_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/watchlist_monitors/{monitor_id}/matches"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v3.6/watchlist_monitors/{monitor_id}/matches"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/watchlist_monitors/{monitor_id}/new_report"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/webhooks"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/webhooks"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/webhooks/resend"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v3.6/webhooks/{webhook_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/webhooks/{webhook_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/v3.6/webhooks/{webhook_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/workflow_runs"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/workflow_runs"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/workflow_runs/{workflow_run_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/workflow_runs/{workflow_run_id}/evidence_folder"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/workflow_runs/{workflow_run_id}/signed_evidence_file"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/workflow_runs/{workflow_run_id}/tasks"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/workflow_runs/{workflow_run_id}/tasks/{task_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/workflow_runs/{workflow_run_id}/tasks/{task_id}/complete"
+    },
+    {
+      "method": "POST",
+      "route": "/v3.6/workflow_runs/{workflow_run_id}/timeline_file"
+    },
+    {
+      "method": "GET",
+      "route": "/v3.6/workflow_runs/{workflow_run_id}/timeline_file/{timeline_file_id}"
+    }
+  ]
+}

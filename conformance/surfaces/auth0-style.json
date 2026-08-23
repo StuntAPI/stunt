@@ -1,0 +1,1884 @@
+{
+  "source": "spec Auth0 Management API OAS @ 2.0",
+  "url": "https://auth0.com/docs/oas/management/v2/management-api-oas.json",
+  "fetched": "2026-08-22",
+  "license": "none stated",
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/api/v2/actions/actions"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/actions/actions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/actions/actions/{actionId}/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/actions/actions/{actionId}/versions/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/actions/actions/{actionId}/versions/{id}/deploy"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/actions/actions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/actions/actions/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/actions/actions/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/actions/actions/{id}/deploy"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/actions/actions/{id}/test"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/actions/executions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/actions/modules"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/actions/modules"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/actions/modules/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/actions/modules/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/actions/modules/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/actions/modules/{id}/actions"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/actions/modules/{id}/rollback"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/actions/modules/{id}/versions"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/actions/modules/{id}/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/actions/modules/{id}/versions/{versionId}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/actions/triggers"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/actions/triggers/{triggerId}/bindings"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/actions/triggers/{triggerId}/bindings"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/agents"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/agents"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/agents/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/agents/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/agents/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/anomaly/blocks/ips/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/anomaly/blocks/ips/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/attack-protection/bot-detection"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/attack-protection/bot-detection"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/attack-protection/breached-password-detection"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/attack-protection/breached-password-detection"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/attack-protection/brute-force-protection"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/attack-protection/brute-force-protection"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/attack-protection/captcha"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/attack-protection/captcha"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/attack-protection/phone-provider-protection"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/attack-protection/phone-provider-protection"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/attack-protection/suspicious-ip-throttling"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/attack-protection/suspicious-ip-throttling"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/branding"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/branding"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/branding/phone/providers"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/branding/phone/providers"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/branding/phone/providers/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/branding/phone/providers/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/branding/phone/providers/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/branding/phone/providers/{id}/try"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/branding/phone/templates"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/branding/phone/templates"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/branding/phone/templates/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/branding/phone/templates/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/branding/phone/templates/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/branding/phone/templates/{id}/reset"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/branding/phone/templates/{id}/try"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/branding/templates/universal-login"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/branding/templates/universal-login"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/branding/templates/universal-login"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/branding/themes"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/branding/themes/default"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/branding/themes/{themeId}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/branding/themes/{themeId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/branding/themes/{themeId}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/client-grants"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/client-grants"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/client-grants/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/client-grants/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/client-grants/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/client-grants/{id}/organizations"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/clients"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/clients"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/clients/cimd/preview"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/clients/cimd/register"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/clients/search"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/clients/{client_id}/credentials"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/clients/{client_id}/credentials"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/clients/{client_id}/credentials/{credential_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/clients/{client_id}/credentials/{credential_id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/clients/{client_id}/credentials/{credential_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/clients/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/clients/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/clients/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/clients/{id}/connections"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/clients/{id}/rotate-secret"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connection-profiles"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/connection-profiles"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connection-profiles/templates"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connection-profiles/templates/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/connection-profiles/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connection-profiles/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/connection-profiles/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/connections"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections-directory-provisionings"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections-scim-configurations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/connections/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/connections/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections/{id}/clients"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/connections/{id}/clients"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/connections/{id}/directory-provisioning"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections/{id}/directory-provisioning"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/connections/{id}/directory-provisioning"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/connections/{id}/directory-provisioning"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections/{id}/directory-provisioning/default-mapping"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/connections/{id}/directory-provisioning/synchronizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/connections/{id}/directory-provisioning/synchronized-groups"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections/{id}/directory-provisioning/synchronized-groups"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/connections/{id}/directory-provisioning/synchronized-groups"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/connections/{id}/directory-provisioning/synchronized-groups"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections/{id}/keys"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/connections/{id}/keys"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/connections/{id}/keys/rotate"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/connections/{id}/scim-configuration"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections/{id}/scim-configuration"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/connections/{id}/scim-configuration"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/connections/{id}/scim-configuration"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections/{id}/scim-configuration/default-mapping"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections/{id}/scim-configuration/tokens"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/connections/{id}/scim-configuration/tokens"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/connections/{id}/scim-configuration/tokens/{tokenId}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/connections/{id}/status"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/connections/{id}/users"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/custom-domains"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/custom-domains"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/custom-domains/default"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/custom-domains/default"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/custom-domains/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/custom-domains/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/custom-domains/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/custom-domains/{id}/test"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/custom-domains/{id}/verify"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/device-credentials"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/device-credentials"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/device-credentials/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/email-templates"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/email-templates/{templateName}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/email-templates/{templateName}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/email-templates/{templateName}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/emails/provider"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/emails/provider"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/emails/provider"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/emails/provider"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/event-streams"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/event-streams"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/event-streams/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/event-streams/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/event-streams/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/event-streams/{id}/deliveries"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/event-streams/{id}/deliveries/{event_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/event-streams/{id}/redeliver"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/event-streams/{id}/redeliver/{event_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/event-streams/{id}/test"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/events"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/experimentation/experiments"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/experimentation/experiments"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/experimentation/experiments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/experimentation/experiments/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/experimentation/experiments/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/experimentation/experiments/{id}/status"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/experimentation/experiments/{id}/validate"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/experimentation/feature-flags"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/experimentation/feature-flags"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/experimentation/feature-flags/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/experimentation/feature-flags/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/experimentation/feature-flags/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/experimentation/feature-flags/{id}/status"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/experimentation/feature-flags/{id}/variations"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/experimentation/feature-flags/{id}/variations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/experimentation/feature-flags/{id}/variations/{vid}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/experimentation/feature-flags/{id}/variations/{vid}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/experimentation/feature-flags/{id}/variations/{vid}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/experimentation/segments"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/experimentation/segments"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/experimentation/segments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/experimentation/segments/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/experimentation/segments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/flows"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/flows"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/flows/vault/connections"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/flows/vault/connections"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/flows/vault/connections/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/flows/vault/connections/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/flows/vault/connections/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/flows/{flow_id}/executions"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/flows/{flow_id}/executions/{execution_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/flows/{flow_id}/executions/{execution_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/flows/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/flows/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/flows/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/forms"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/forms"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/forms/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/forms/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/forms/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/grants"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/grants"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/grants/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/groups"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/groups/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/groups/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/groups/{id}/members"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/groups/{id}/roles"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/groups/{id}/roles"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/groups/{id}/roles"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/guardian/enrollments/ticket"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/guardian/enrollments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/enrollments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/factors"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/factors/duo/settings"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/guardian/factors/duo/settings"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/duo/settings"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/factors/phone/message-types"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/phone/message-types"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/factors/phone/providers/twilio"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/phone/providers/twilio"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/factors/phone/selected-provider"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/phone/selected-provider"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/factors/phone/templates"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/phone/templates"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/factors/push-notification/providers/apns"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/guardian/factors/push-notification/providers/apns"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/push-notification/providers/apns"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/guardian/factors/push-notification/providers/fcm"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/push-notification/providers/fcm"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/guardian/factors/push-notification/providers/fcmv1"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/push-notification/providers/fcmv1"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/factors/push-notification/providers/sns"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/guardian/factors/push-notification/providers/sns"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/push-notification/providers/sns"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/factors/push-notification/selected-provider"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/push-notification/selected-provider"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/factors/sms/providers/twilio"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/sms/providers/twilio"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/factors/sms/selected-provider"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/sms/selected-provider"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/factors/sms/templates"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/sms/templates"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/factors/{name}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/guardian/policies"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/guardian/policies"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/hooks"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/hooks"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/hooks/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/hooks/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/hooks/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/hooks/{id}/secrets"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/hooks/{id}/secrets"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/hooks/{id}/secrets"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/hooks/{id}/secrets"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/jobs/users-exports"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/jobs/users-imports"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/jobs/verification-email"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/jobs/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/jobs/{id}/errors"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/keys/custom-signing"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/keys/custom-signing"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/keys/custom-signing"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/keys/encryption"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/keys/encryption"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/keys/encryption/rekey"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/keys/encryption/{kid}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/keys/encryption/{kid}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/keys/encryption/{kid}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/keys/encryption/{kid}/wrapping-key"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/keys/network-acls"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/keys/network-acls"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/keys/network-acls/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/keys/network-acls/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/keys/signing"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/keys/signing/rotate"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/keys/signing/{kid}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/keys/signing/{kid}/revoke"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/log-streams"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/log-streams"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/log-streams/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/log-streams/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/log-streams/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/logs"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/logs/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/network-acls"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/network-acls"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/network-acls/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/network-acls/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/network-acls/{id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/network-acls/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/organizations"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/name/{name}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/organizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/organizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/client-grants"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/organizations/{id}/client-grants"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/organizations/{id}/client-grants/{grant_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/organizations/{id}/clients"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/clients"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/organizations/{id}/clients"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/clients/{client_id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/organizations/{id}/clients/{client_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/connections"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/organizations/{id}/connections"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/organizations/{id}/connections/{connection_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/connections/{connection_id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/organizations/{id}/connections/{connection_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/discovery-domains"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/organizations/{id}/discovery-domains"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/discovery-domains/name/{discovery_domain}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/organizations/{id}/discovery-domains/{discovery_domain_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/discovery-domains/{discovery_domain_id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/organizations/{id}/discovery-domains/{discovery_domain_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/enabled_connections"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/organizations/{id}/enabled_connections"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/organizations/{id}/enabled_connections/{connectionId}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/enabled_connections/{connectionId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/organizations/{id}/enabled_connections/{connectionId}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/invitations"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/organizations/{id}/invitations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/organizations/{id}/invitations/{invitation_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/invitations/{invitation_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/organizations/{id}/members"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/members"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/organizations/{id}/members"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/members/{user_id}/effective-roles"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/members/{user_id}/effective-roles/sources/groups"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/organizations/{id}/members/{user_id}/roles"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/members/{user_id}/roles"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/organizations/{id}/members/{user_id}/roles"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{id}/roles/{role_id}/members"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{organization_id}/groups"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/organizations/{organization_id}/groups/{group_id}/roles"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{organization_id}/groups/{group_id}/roles"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/organizations/{organization_id}/groups/{group_id}/roles"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/organizations/{organization_id}/roles/{role_id}/groups"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/prompts"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/prompts"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/prompts/rendering"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/prompts/rendering"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/prompts/{prompt}/custom-text/{language}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/prompts/{prompt}/custom-text/{language}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/prompts/{prompt}/partials"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/prompts/{prompt}/partials"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/prompts/{prompt}/screen/{screen}/rendering"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/prompts/{prompt}/screen/{screen}/rendering"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/rate-limit-policies"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/rate-limit-policies"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/rate-limit-policies/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/rate-limit-policies/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/rate-limit-policies/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/refresh-tokens"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/refresh-tokens/revoke"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/refresh-tokens/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/refresh-tokens/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/refresh-tokens/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/resource-servers"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/resource-servers"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/resource-servers/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/resource-servers/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/resource-servers/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/risk-assessments/settings"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/risk-assessments/settings"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/risk-assessments/settings/new-device"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/risk-assessments/settings/new-device"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/roles"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/roles"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/roles/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/roles/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/roles/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/roles/{id}/groups"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/roles/{id}/groups"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/roles/{id}/groups"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/roles/{id}/permissions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/roles/{id}/permissions"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/roles/{id}/permissions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/roles/{id}/users"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/roles/{id}/users"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/rules"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/rules"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/rules-configs"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/rules-configs/{key}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/rules-configs/{key}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/rules/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/rules/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/rules/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/self-service-profiles"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/self-service-profiles"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/self-service-profiles/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/self-service-profiles/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/self-service-profiles/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/self-service-profiles/{id}/custom-text/{language}/{page}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/self-service-profiles/{id}/custom-text/{language}/{page}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/self-service-profiles/{id}/sso-ticket"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/self-service-profiles/{profileId}/sso-ticket/{id}/revoke"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/sessions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/sessions/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/sessions/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/sessions/{id}/revoke"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/stats/active-users"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/stats/daily"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/supplemental-signals"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/supplemental-signals"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/tenants/settings"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/tenants/settings"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/tickets/email-verification"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/tickets/password-change"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/token-exchange-profiles"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/token-exchange-profiles"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/token-exchange-profiles/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/token-exchange-profiles/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/token-exchange-profiles/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/user-attribute-profiles"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/user-attribute-profiles"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/user-attribute-profiles/templates"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/user-attribute-profiles/templates/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/user-attribute-profiles/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/user-attribute-profiles/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/user-attribute-profiles/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/user-blocks"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/user-blocks"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/user-blocks/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/user-blocks/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/users"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users-by-email"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/users/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/users/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/users/{id}/authentication-methods"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/authentication-methods"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/users/{id}/authentication-methods"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/users/{id}/authentication-methods"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/users/{id}/authentication-methods/{authentication_method_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/authentication-methods/{authentication_method_id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/users/{id}/authentication-methods/{authentication_method_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/users/{id}/authenticators"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/connected-accounts"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/effective-permissions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/effective-permissions/sources/effective-roles"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/effective-roles"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/effective-roles/sources/groups"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/enrollments"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/groups"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/users/{id}/identities"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/users/{id}/identities/{provider}/{user_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/logs"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/users/{id}/multifactor/actions/invalidate-remember-browser"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/users/{id}/multifactor/{provider}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/organizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/users/{id}/permissions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/permissions"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/users/{id}/permissions"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/users/{id}/recovery-code-regeneration"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/users/{id}/revoke-access"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/users/{id}/risk-assessments/clear"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/users/{id}/roles"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{id}/roles"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/users/{id}/roles"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/users/{user_id}/refresh-tokens"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{user_id}/refresh-tokens"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/users/{user_id}/sessions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/users/{user_id}/sessions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/verifiable-credentials/verification/templates"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/verifiable-credentials/verification/templates"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/verifiable-credentials/verification/templates/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/verifiable-credentials/verification/templates/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/verifiable-credentials/verification/templates/{id}"
+    }
+  ]
+}

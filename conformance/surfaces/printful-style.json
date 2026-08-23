@@ -1,0 +1,228 @@
+{
+  "source": "spec Printful OpenAPI @ 1.0",
+  "url": "https://developers.printful.com/docs/openapi.json",
+  "fetched": "2026-08-22",
+  "license": "none stated",
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/approval-sheets"
+    },
+    {
+      "method": "POST",
+      "route": "/approval-sheets"
+    },
+    {
+      "method": "POST",
+      "route": "/approval-sheets/changes"
+    },
+    {
+      "method": "GET",
+      "route": "/categories"
+    },
+    {
+      "method": "GET",
+      "route": "/categories/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/countries"
+    },
+    {
+      "method": "POST",
+      "route": "/files"
+    },
+    {
+      "method": "POST",
+      "route": "/files/thread-colors"
+    },
+    {
+      "method": "GET",
+      "route": "/files/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/mockup-generator/create-task/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/mockup-generator/printfiles/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/mockup-generator/task"
+    },
+    {
+      "method": "GET",
+      "route": "/mockup-generator/templates/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/oauth/scopes"
+    },
+    {
+      "method": "GET",
+      "route": "/orders"
+    },
+    {
+      "method": "POST",
+      "route": "/orders"
+    },
+    {
+      "method": "POST",
+      "route": "/orders/estimate-costs"
+    },
+    {
+      "method": "DELETE",
+      "route": "/orders/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/orders/{id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/orders/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/orders/{id}/confirm"
+    },
+    {
+      "method": "GET",
+      "route": "/product-templates"
+    },
+    {
+      "method": "DELETE",
+      "route": "/product-templates/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/product-templates/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/products"
+    },
+    {
+      "method": "GET",
+      "route": "/products/variant/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/products/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/products/{id}/sizes"
+    },
+    {
+      "method": "GET",
+      "route": "/reports/statistics"
+    },
+    {
+      "method": "POST",
+      "route": "/shipping/rates"
+    },
+    {
+      "method": "POST",
+      "route": "/store/packing-slip"
+    },
+    {
+      "method": "GET",
+      "route": "/store/products"
+    },
+    {
+      "method": "POST",
+      "route": "/store/products"
+    },
+    {
+      "method": "DELETE",
+      "route": "/store/products/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/store/products/{id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/store/products/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/store/products/{id}/variants"
+    },
+    {
+      "method": "DELETE",
+      "route": "/store/variants/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/store/variants/{id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/store/variants/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/stores"
+    },
+    {
+      "method": "GET",
+      "route": "/stores/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/sync/products"
+    },
+    {
+      "method": "DELETE",
+      "route": "/sync/products/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/sync/products/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/sync/variant/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/sync/variant/{id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/sync/variant/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/tax/countries"
+    },
+    {
+      "method": "POST",
+      "route": "/tax/rates"
+    },
+    {
+      "method": "GET",
+      "route": "/warehouse/products"
+    },
+    {
+      "method": "GET",
+      "route": "/warehouse/products/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/webhooks"
+    },
+    {
+      "method": "GET",
+      "route": "/webhooks"
+    },
+    {
+      "method": "POST",
+      "route": "/webhooks"
+    }
+  ]
+}

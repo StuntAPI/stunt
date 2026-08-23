@@ -1,0 +1,164 @@
+{
+  "source": "spec adyen-openapi CheckoutService-v68 + PaymentService-v68 @ 68, 68",
+  "url": "https://raw.githubusercontent.com/Adyen/adyen-openapi/main/yaml/CheckoutService-v68.yaml https://raw.githubusercontent.com/Adyen/adyen-openapi/main/yaml/PaymentService-v68.yaml",
+  "fetched": "2026-08-23",
+  "license": "MIT",
+  "routes": [
+    {
+      "method": "POST",
+      "route": "/v68/adjustAuthorisation"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/applePay/sessions"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/authorise"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/authorise3d"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/authorise3ds2"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/cancel"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/cancelOrRefund"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/cancels"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/capture"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/cardDetails"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/donate"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/donationCampaigns"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/donations"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/forward"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/getAuthenticationResult"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/orders"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/orders/cancel"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/originKeys"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/paymentLinks"
+    },
+    {
+      "method": "GET",
+      "route": "/v68/paymentLinks/{linkId}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v68/paymentLinks/{linkId}"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/paymentMethods"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/paymentMethods/balance"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/payments"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/payments/details"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/payments/{paymentPspReference}/amountUpdates"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/payments/{paymentPspReference}/cancels"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/payments/{paymentPspReference}/captures"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/payments/{paymentPspReference}/refunds"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/payments/{paymentPspReference}/reversals"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/paypal/updateOrder"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/refund"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/retrieve3ds2Result"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/sessions"
+    },
+    {
+      "method": "GET",
+      "route": "/v68/sessions/{sessionId}"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/storedPaymentMethods"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/technicalCancel"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/validateShopperId"
+    },
+    {
+      "method": "POST",
+      "route": "/v68/voidPendingRefund"
+    }
+  ]
+}
