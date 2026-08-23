@@ -38,7 +38,8 @@ This guide is use-cases. For the field-by-field reference see the
    its handlers read `profile_active()` (see use case 5).
 
 3. **A global preset** — one activation assigns profiles across services, so a whole
-   scenario flips at once:
+   scenario flips at once (every name in `set:` must be a service this manifest
+   declares — `sqs` below is the service from use case 5):
 
    ```yaml
    profiles:
@@ -100,7 +101,7 @@ services:
 
 ```bash
 $ curl -s -o /dev/null -w '%{http_code}\n' .../v1/charges -H "Authorization: Bearer sk_test_demo"
-201                                        # healthy: the key is fine
+200                                        # healthy: the key is fine
 $ stunt profile activate revoked-keys
 $ curl -s .../v1/charges -H "Authorization: Bearer sk_test_demo"
 {"error":"invalid_api_key"}                # same key, same YAML — now rejected
@@ -128,9 +129,10 @@ big-charges-fail:
 
 ```bash
 $ stunt profile activate big-charges-fail
-$ curl -s -o /dev/null -w '%{http_code}\n' .../v1/charges -d '{"amount":500,...}'
+$ curl -s -o /dev/null -w '%{http_code}\n' .../v1/charges \
+    -H "Authorization: Bearer sk_test_demo" -d '{"amount":500,...}'
 201                                        # small charge: untouched
-$ curl -s .../v1/charges -d '{"amount":2000,...}'
+$ curl -s .../v1/charges -H "Authorization: Bearer sk_test_demo" -d '{"amount":2000,...}'
 {"error":"card_declined"}                  # 402 — only the targeted shape
 ```
 
