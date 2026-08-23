@@ -3,7 +3,7 @@
 # The current user (usr_me) is seeded in the users collection and also
 # hardcoded here as a fallback for the /me endpoint.
 
-# _now is preloaded from scripts/lib.star.
+# _now, _user_view, _fields and _not_found are preloaded from scripts/lib.star.
 
 # _CURRENT_USER is the synthetic "current user" for this local session.
 # The same user is seeded in fixtures/users.jsonl so that /2/users/{id}
@@ -20,14 +20,15 @@ _CURRENT_USER = {
     "created_at": _now(),
 }
 
-# GET /2/users/me — return the current synthetic user.
+# GET /2/users/me — return the current synthetic user. user.fields expands
+# the response; the default set is v2's id, name, username.
 def on_me(req):
     # Try the collection first (seeded data), fall back to hardcoded.
     c = store_collection("users")
     doc = c.get("usr_me")
-    if doc != None:
-        return respond(200, {"data": doc})
-    return respond(200, {"data": _CURRENT_USER})
+    if doc == None:
+        doc = _CURRENT_USER
+    return respond(200, {"data": _user_view(doc, _fields(req, "user.fields"))})
 
 # GET /2/users/{id} — show a user by ID.
 def on_show(req):
@@ -35,8 +36,8 @@ def on_show(req):
     c = store_collection("users")
     doc = c.get(id)
     if doc == None:
-        return respond(404, {"error": {"detail": "User not found: " + id, "title": "Not Found", "type": "about:blank"}})
-    return respond(200, {"data": doc})
+        return respond(404, _not_found("user", "id", id))
+    return respond(200, {"data": _user_view(doc, _fields(req, "user.fields"))})
 
 # GET /2/users/by/username/{username} — lookup by username.
 def on_lookup(req):
@@ -45,5 +46,5 @@ def on_lookup(req):
     docs = c.list()
     for doc in docs:
         if doc.get("username", None) == username:
-            return respond(200, {"data": doc})
-    return respond(404, {"error": {"detail": "User not found: " + username, "title": "Not Found", "type": "about:blank"}})
+            return respond(200, {"data": _user_view(doc, _fields(req, "user.fields"))})
+    return respond(404, _not_found("user", "username", username))

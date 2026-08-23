@@ -9,7 +9,8 @@ def _next_id(prefix):
     # Atomic increment via store_kv_incr (race-free under concurrent requests).
     return prefix + "_" + str(store_kv_incr("twitter", prefix + "_seq"))
 
-# _now and _reverse are preloaded from scripts/lib.star.
+# _now, _paged_tweets, _tweet_view, _user_view, _fields, _not_found and
+# _bad_request are preloaded from scripts/lib.star.
 
 # _current_user_id returns the synthetic author ID for this local session.
 def _current_user_id():
@@ -26,10 +27,12 @@ def on_create(req):
         body = {}
 
     text = body.get("text", "")
-    if text == None or text.strip() == "":
-        return respond(400, {"title": "Invalid Request", "detail": "text is required", "type": "about:blank"})
+    if text == None:
+        text = ""
+    if text.strip() == "":
+        return respond(400, _bad_request("text", text, "text is required"))
     if len(text) > 280:
-        return respond(400, {"title": "Invalid Request", "detail": "text is " + str(len(text)) + " chars (max 280)", "type": "about:blank"})
+        return respond(400, _bad_request("text", text, "text is " + str(len(text)) + " chars (max 280)"))
 
     c = store_collection("tweets")
 
@@ -39,7 +42,7 @@ def on_create(req):
     if reply != None:
         in_reply_to = reply.get("in_reply_to_tweet_id", None)
         if in_reply_to != None and c.get(in_reply_to) == None:
-            return respond(400, {"title": "Invalid Request", "detail": "in_reply_to_tweet_id " + in_reply_to + " not found", "type": "about:blank"})
+            return respond(400, _bad_request("reply.in_reply_to_tweet_id", in_reply_to, "in_reply_to_tweet_id " + in_reply_to + " not found"))
 
     tweet_id = _next_id("twt")
     c.insert({
@@ -52,27 +55,26 @@ def on_create(req):
 
     return respond(201, {"data": {"id": tweet_id, "text": text}})
 
-# GET /2/tweets/{id} — retrieve a single tweet.
+# GET /2/tweets/{id} — retrieve a single tweet. tweet.fields projects the
+# response; expansions=author_id attaches the author under includes.users,
+# projected by user.fields (default v2 set: id, name, username).
 def on_retrieve(req):
     id = req["params"]["id"]
     c = store_collection("tweets")
     doc = c.get(id)
     if doc == None:
-        return respond(404, {"error": {"detail": "Tweet not found: " + id, "title": "Not Found", "type": "about:blank"}})
-    return respond(200, {"data": doc})
+        return respond(404, _not_found("tweet", "id", id))
+    body = {"data": _tweet_view(doc, _fields(req, "tweet.fields"))}
+    if "author_id" in _fields(req, "expansions"):
+        author = store_collection("users").get(doc.get("author_id", ""))
+        if author != None:
+            body["includes"] = {"users": [_user_view(author, _fields(req, "user.fields"))]}
+    return respond(200, body)
 
 # GET /2/tweets — list all tweets (reverse-chronological: newest first).
 def on_list(req):
     c = store_collection("tweets")
-    docs = c.list()
-    tweets = _reverse(docs)
-    page, next_cursor = _list_page(req, tweets)
-    if page == None:
-        return respond(400, {"title": "Invalid Request", "detail": "Invalid pagination_token.", "type": "about:blank"})
-    meta = {"result_count": len(page)}
-    if next_cursor != None:
-        meta["next_token"] = next_cursor
-    return respond(200, {"data": page, "meta": meta})
+    return _paged_tweets(req, _reverse(c.list()))
 
 # DELETE /2/tweets/{id} — delete a tweet.
 def on_delete(req):
@@ -80,7 +82,7 @@ def on_delete(req):
     c = store_collection("tweets")
     doc = c.get(id)
     if doc == None:
-        return respond(404, {"error": {"detail": "Tweet not found: " + id, "title": "Not Found", "type": "about:blank"}})
+        return respond(404, _not_found("tweet", "id", id))
 
     c.delete(id)
     return respond(200, {"data": {"deleted": True}})

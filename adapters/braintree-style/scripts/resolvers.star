@@ -50,8 +50,12 @@ def _txn_body(input_txn, immediate_submit):
     txnb = {
         "amount": input_txn.get("amount", None),
         "orderId": input_txn.get("orderId", None),
-        "currency": input_txn.get("currencyISOCode", None),
     }
+    # Omit an absent currency so _new_transaction applies its USD default
+    # (a None key would shadow it).
+    cur = input_txn.get("currencyISOCode", None)
+    if cur != None:
+        txnb["currency"] = cur
     if not immediate_submit:
         txnb["type"] = "authorization"
     opts = input_txn.get("options", None)

@@ -45,6 +45,7 @@ endpoints:
   - route: /2/tweets/{id}
     method: DELETE
     handler: scripts/tweets.star#on_delete
+    concurrency_key: id # get-then-delete read-modify-write
 
   # --- Timeline (reverse-chronological feed) ---
   - route: /2/users/{id}/timelines/reverse_chronological

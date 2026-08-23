@@ -56,3 +56,31 @@ func TestCommittedSurfacesLoad(t *testing.T) {
 		}
 	}
 }
+
+// The IDL-derived artifacts (Stone, lexicon) must keep their parsers
+// honest: flagship routes of each flavor — versioned stone name, plain
+// stone namespace, lexicon procedure, lexicon query — must be present.
+func TestCommittedIDLSurfaces(t *testing.T) {
+	cases := []struct{ file, route string }{
+		{"dropbox-style.json", "POST /2/files/upload"},
+		{"dropbox-style.json", "POST /2/users/get_current_account"},
+		{"bluesky-style.json", "POST /xrpc/com.atproto.server.createSession"},
+		{"bluesky-style.json", "GET /xrpc/app.bsky.feed.searchPosts"},
+	}
+	for _, c := range cases {
+		f, err := LoadSurface(filepath.Join("..", "surfaces", c.file))
+		if err != nil {
+			if os.IsNotExist(err) {
+				t.Skipf("%s not vendored in this checkout", c.file)
+			}
+			t.Fatal(err)
+		}
+		have := map[string]bool{}
+		for _, r := range f.Routes {
+			have[r.Method+" "+r.Path] = true
+		}
+		if !have[c.route] {
+			t.Errorf("%s: missing known route %q", c.file, c.route)
+		}
+	}
+}

@@ -89,7 +89,11 @@ def on_notification(req):
             event_code = nri.get("eventCode", "")
             success = nri.get("success", "false")
 
-            # Store the notification for test verification.
+            # Store the notification for test verification. Adyen redelivers
+            # notifications; a replayed item stays 202 instead of colliding
+            # on the pspReference-eventCode id.
+            if mc.get(psp_ref + "-" + event_code) != None:
+                continue
             mc.insert({
                 "id": psp_ref + "-" + event_code,
                 "type": "notification",

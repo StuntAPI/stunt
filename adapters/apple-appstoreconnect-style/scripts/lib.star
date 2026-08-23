@@ -216,25 +216,6 @@ def _b64url_encode(text):
 
 # --- JSON:API response helpers ---
 
-# _ok wraps data in a JSON:API top-level object.
-def _ok(data):
-    return respond(200, {"data": data})
-
-# _ok_list wraps a list in a JSON:API top-level object with meta.
-def _ok_list(data, limit):
-    return respond(200, {
-        "data": data,
-        "links": {
-            "self": "/v1/apps",
-        },
-        "meta": {
-            "paging": {
-                "total": len(data),
-                "limit": limit,
-            },
-        },
-    })
-
 # _err returns a JSON:API error response.
 def _err(status, code, title, detail):
     return respond(status, {
@@ -349,10 +330,10 @@ def _reverse(lst):
 # --- pagination (App Store Connect JSON:API shape) ---
 #
 # App Store Connect list endpoints page via a `limit` page-size query param
-# (default 50, max 200) and an opaque `cursor` query param returned by a prior
-# call. The next cursor is surfaced in meta.paging.next_cursor and mirrored as
-# a links.next URL carrying the cursor (per ASC convention). A `limit` <= 0
-# disables paging and returns the whole list.
+# and an opaque `cursor` query param returned by a prior call. The next cursor
+# is surfaced in meta.paging.next_cursor and mirrored as a links.next URL
+# carrying the cursor (per ASC convention). An absent or non-numeric limit
+# falls back to the default (50); a limit above the max clamps to 200.
 _ASC_DEFAULT_LIMIT = 50
 _ASC_MAX_LIMIT = 200
 
@@ -388,10 +369,12 @@ def _page_meta(total, limit, next_cursor):
 
 # _page_links builds the JSON:API links block, appending a `next` URL carrying
 # the cursor when another page remains (per App Store Connect convention).
-def _page_links(self_path, next_cursor):
+def _page_links(self_path, next_cursor, limit):
     links = {"self": self_path}
     if next_cursor != None:
-        links["next"] = self_path + "?cursor=" + next_cursor
+        # Apple clients follow next as-is; dropping the caller's limit
+        # here reset page size mid-walk (same class of bug as psd2).
+        links["next"] = self_path + "?cursor=" + next_cursor + "&limit=" + str(limit)
     return links
 
 # --- shared list query helpers ---

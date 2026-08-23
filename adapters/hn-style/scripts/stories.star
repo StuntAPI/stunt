@@ -1,58 +1,99 @@
 # Story list handlers — Firebase-style story endpoints.
 #
 # GET /v0/<topstories|newstories|beststories|askstories|showstories|jobstories>.json
-#   -> [id, id, ...] (descending by id)
+#   -> [id, id, ...]
 #
-# Returns all item IDs in the items store of the matching type, as a JSON
-# array of integers.
+# Firebase items carry no rank, so each list derives its order from what the
+# item shape does carry: top/best rank by score (closest derivable proxy for
+# the front page), new/orders by newest id, ask/show partition stories by
+# their "Ask HN"/"Show HN" title prefixes, jobs by item type.
 
 # Shared helpers (_to_int) are preloaded from scripts/lib.star.
 
 def on_topstories(req):
-    return _story_list(req, "story")
+    return _story_list(req, _is_story, _by_score_desc)
 
 def on_newstories(req):
-    return _story_list(req, "story")
+    return _story_list(req, _is_story, _by_id_desc)
 
 def on_beststories(req):
-    return _story_list(req, "story")
+    return _story_list(req, _is_story, _by_score_desc)
 
 def on_askstories(req):
-    return _story_list(req, "story")
+    return _story_list(req, _is_ask, _by_id_desc)
 
 def on_showstories(req):
-    return _story_list(req, "story")
+    return _story_list(req, _is_show, _by_id_desc)
 
 def on_jobstories(req):
-    return _story_list(req, "job")
+    return _story_list(req, _is_job, _by_id_desc)
 
-def _story_list(req, want_type):
+# _story_list ids the docs the matcher accepts, orders them, and renders the
+# bare Firebase JSON array of integers (respond has no list body).
+def _story_list(req, matcher, order):
     c = store_collection("items")
     docs = c.list()
-    ids = []
+    pairs = []
     for doc in docs:
-        item_type = doc.get("type", "story")
-        if item_type == want_type:
-            ids.append(_to_int(doc.get("id", "0")))
-    # Descending order (newest first).
-    ids = _sort_desc(ids)
-    # Build JSON array string manually (respond only accepts dict or string body).
+        if matcher(doc):
+            # [id, score] so every order key travels with the doc.
+            pairs.append([_to_int(doc.get("id", "0")), _to_int(doc.get("score", "0"))])
+    ids = order(pairs)
     body = "[" + _join_ints(ids) + "]"
     return respond(200, body, headers={"content-type": "application/json; charset=utf-8"})
 
-def _sort_desc(lst):
-    # Simple insertion sort (Starlark has no sort builtin).
+def _is_story(doc):
+    return doc.get("type", "story") == "story"
+
+def _is_job(doc):
+    return doc.get("type", "story") == "job"
+
+# Ask/Show posts are plain stories whose title carries the prefix — the only
+# marker the Firebase item shape has.
+def _is_ask(doc):
+    return _is_story(doc) and _has_prefix(doc.get("title", ""), "Ask HN")
+
+def _is_show(doc):
+    return _is_story(doc) and _has_prefix(doc.get("title", ""), "Show HN")
+
+def _has_prefix(s, prefix):
+    if len(s) < len(prefix):
+        return False
+    return s[:len(prefix)] == prefix
+
+def _by_score_desc(pairs):
+    # Score first, newest id first on ties.
     out = []
-    for v in lst:
-        inserted = False
+    for p in pairs:
+        placed = False
         for i in range(len(out)):
-            if v > out[i]:
-                out.insert(i, v)
-                inserted = True
+            if p[1] > out[i][1] or (p[1] == out[i][1] and p[0] > out[i][0]):
+                out.insert(i, p)
+                placed = True
                 break
-        if not inserted:
-            out.append(v)
-    return out
+        if not placed:
+            out.append(p)
+    return _ids_of(out)
+
+def _by_id_desc(pairs):
+    # Newest first.
+    out = []
+    for p in pairs:
+        placed = False
+        for i in range(len(out)):
+            if p[0] > out[i][0]:
+                out.insert(i, p)
+                placed = True
+                break
+        if not placed:
+            out.append(p)
+    return _ids_of(out)
+
+def _ids_of(pairs):
+    ids = []
+    for p in pairs:
+        ids.append(p[0])
+    return ids
 
 def _join_ints(lst):
     parts = []

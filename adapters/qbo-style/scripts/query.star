@@ -8,7 +8,7 @@
 # map onto query_select:
 #   WHERE <field> <op> <value> [AND ...]   (ops = != > >= < <= LIKE IN)
 #   ORDER BY <field> [ASC|DESC]            (QBO accepts ORDERBY too)
-#   MAXRESULTS <n>
+#   STARTPOSITION <n> MAXRESULTS <n>       (QBO's paging pair; 1-based)
 # OR expressions and other advanced SQL are ignored (unfiltered superset),
 # preserving the prior behavior.
 
@@ -58,7 +58,7 @@ def _q_default_active(parsed):
         for t in parsed["filter"]:
             if _lower(t[0]) == "active":
                 return parsed
-    amended = {"filter": [["Active", "=", True]], "order_by": parsed["order_by"], "order_dir": parsed["order_dir"], "limit": parsed["limit"]}
+    amended = {"filter": [["Active", "=", True]], "order_by": parsed["order_by"], "order_dir": parsed["order_dir"], "limit": parsed["limit"], "start": parsed["start"]}
     if parsed["filter"] != None:
         clauses = [["Active", "=", True]]
         for t in parsed["filter"]:
@@ -69,24 +69,27 @@ def _q_default_active(parsed):
 # --- SQL clause parsing (QBO v3 query grammar subset) ---
 
 # _q_parse splits the query into filter/order/limit pieces. It returns a
-# dict with keys "filter" (list of triples or None), "order_by", "order_dir"
-# and "limit" (int or None).
+# dict with keys "filter" (list of triples or None), "order_by", "order_dir",
+# "limit" (int or None) and "start" (0-based offset int or None).
 def _q_parse(query_str):
-    parsed = {"filter": None, "order_by": "", "order_dir": "", "limit": None}
+    parsed = {"filter": None, "order_by": "", "order_dir": "", "limit": None, "start": None}
     if query_str == "":
         return parsed
     low = _lower(query_str)
 
     where_i = _index(low, " where ")
     order_i = _q_clause_index(low, [" order by ", " orderby "])
+    start_i = _index(low, " startposition ")
     max_i = _index(low, " maxresults ")
 
     # WHERE body spans from after " where " to the next clause keyword.
     if where_i >= 0:
         start = where_i + 7
         end = len(query_str)
-        if order_i > where_i:
+        if order_i > where_i and order_i < end:
             end = order_i
+        if start_i > where_i and start_i < end:
+            end = start_i
         if max_i > where_i and max_i < end:
             end = max_i
         parsed["filter"] = _q_where(_trim(query_str[start:end]))
@@ -100,7 +103,9 @@ def _q_parse(query_str):
         else:
             ostart = ostart + 9
         oend = len(query_str)
-        if max_i > order_i:
+        if start_i > order_i and start_i < oend:
+            oend = start_i
+        if max_i > order_i and max_i < oend:
             oend = max_i
         obody = _trim(query_str[ostart:oend])
         parts = _split(obody, " ")
@@ -123,6 +128,16 @@ def _q_parse(query_str):
             n = _q_int(mparts[0])
             if n > 0:
                 parsed["limit"] = n
+
+    # STARTPOSITION body (a bare 1-based integer; query_select takes 0-based).
+    if start_i >= 0:
+        sstart = start_i + 15
+        sbody = _trim(query_str[sstart:])
+        sparts = _split(sbody, " ")
+        if len(sparts) >= 1 and _q_is_int(sparts[0]):
+            n = _q_int(sparts[0])
+            if n > 1:
+                parsed["start"] = n - 1
 
     return parsed
 
@@ -355,7 +370,7 @@ def _q_apply(parsed, docs):
     filt = parsed["filter"]
     if filt != None:
         filt = _q_coerce(filt, docs)
-    return query_select(docs, filt, parsed["order_by"], parsed["order_dir"], parsed["limit"], None, None)
+    return query_select(docs, filt, parsed["order_by"], parsed["order_dir"], parsed["limit"], parsed["start"], None)
 
 # _q_coerce retypes filter values against the stored field type so bare
 # numerics match string-typed ids (stored as strings) and quoted numerics

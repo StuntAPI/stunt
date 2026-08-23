@@ -36,9 +36,12 @@ endpoints:
     handler: scripts/oauth.star#on_refresh_token
 
   # --- Container processing status (poll until FINISHED, then publish) ---
+  # concurrency_key: the poll derives status from the clock and persists the
+  # transition back to the container (read-modify-write).
   - route: /v21.0/{container_id}
     method: GET
     handler: scripts/publish.star#on_container_status
+    concurrency_key: container_id
 
   # --- Comments (per-media) ---
   - route: /v21.0/{media_id}/comments
@@ -51,9 +54,12 @@ endpoints:
     handler: scripts/insights.star#on_insights
 
   # --- Publish step 2: media_publish BEFORE media (route ordering) ---
+  # concurrency_key: the gate-then-insert (read container FINISHED, insert
+  # media) must be atomic per user or a retry double-publishes.
   - route: /v21.0/{ig_user_id}/media_publish
     method: POST
     handler: scripts/publish.star#on_publish
+    concurrency_key: ig_user_id
 
   # --- Publish step 1: create media container ---
   - route: /v21.0/{ig_user_id}/media

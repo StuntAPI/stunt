@@ -52,7 +52,8 @@ def on_create_flow(req):
     if display_name == None:
         display_name = "New Flow"
 
-    seq = store_kv_incr("powerplatform", "flow_seq") + 1
+    # incr returns the new value, so the sequence starts at flow-1.
+    seq = store_kv_incr("powerplatform", "flow_seq")
     flow_id = "flow-" + str(seq)
 
     flow = {

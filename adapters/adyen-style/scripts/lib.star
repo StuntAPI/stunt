@@ -302,8 +302,8 @@ def _adyen_escape(s):
     return s.replace("\\", "\\\\").replace(":", "\\:")
 
 # _signing_string builds the data-to-sign from a NotificationRequestItem's
-# fields. Returns the escaped colon-joined string (NOT base64 — the HMAC is
-# taken over these plain bytes).
+# fields. Returns the escaped colon-joined string; the base64 + HMAC layers
+# are applied at delivery time (see _deliver_notification).
 def _signing_string(nri):
     amount = nri.get("amount", {})
     if amount == None:
@@ -358,7 +358,15 @@ def _signed_emit(event_code, nri):
 def _deliver_notification(event_code, nri, hmac_key):
     if hmac_key == None or hmac_key == "":
         hmac_key = _WEBHOOK_HMAC_KEY
-    sig = crypto.hmac_sha256(hmac_key, _signing_string(nri), "base64")
+    # Adyen's scheme HMACs the BASE64-encoded signing string, not the raw
+    # string (README "Signature computation"; real Adyen's HMAC util).
+    # AUTHORISATION items are built without eventCode (the emit call carries
+    # it); sign the code the delivered item will carry, never "".
+    signing_nri = dict(nri)
+    if signing_nri.get("eventCode", "") == "":
+        signing_nri["eventCode"] = event_code
+    data_to_sign = crypto.base64_encode(_signing_string(signing_nri))
+    sig = crypto.hmac_sha256(hmac_key, data_to_sign, "base64")
 
     additional = nri.get("additionalData", {})
     if additional == None:

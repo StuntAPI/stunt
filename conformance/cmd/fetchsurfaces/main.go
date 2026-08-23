@@ -30,9 +30,13 @@ import (
 
 type source struct {
 	URL         string
-	Format      string // "oas" (default) | "zip"
+	Format      string // "oas" (default) | "zip" | "stone" | "lexicon"
 	StripPrefix string // provider path prefix the adapter does not serve
 	AddPrefix   string // version prefix the spec keeps in its server URL
+	// Prefixes narrows a "lexicon" source to NSID subtrees ("app/bsky/"
+	// matches lexicons/app/bsky/**); URL is the git-trees API endpoint that
+	// enumerates them.
+	Prefixes []string
 }
 
 type provider struct {
@@ -171,6 +175,31 @@ var providers = []provider{
 		License:  "MIT",
 	},
 	{
+		Adapters: []string{"dropbox-style"},
+		Name:     "dropbox-api-spec files.stone + users.stone (every route POST — API v2 is RPC-style, Stone declares no verb)",
+		// The adapter spans the files and users namespaces; path is
+		// /2/<namespace>/<route name> with Stone's :N version suffix
+		// rendered as the _vN Dropbox serves.
+		Sources: []source{
+			{URL: "https://raw.githubusercontent.com/dropbox/dropbox-api-spec/main/files.stone", Format: "stone"},
+			{URL: "https://raw.githubusercontent.com/dropbox/dropbox-api-spec/main/users.stone", Format: "stone"},
+		},
+		License: "MIT",
+	},
+	{
+		Adapters: []string{"bluesky-style"},
+		Name:     "atproto lexicons app.bsky.* + com.atproto.* (XRPC: query=GET, procedure=POST; records/objects/subscriptions skipped)",
+		// The adapter serves /xrpc/<nsid> for both namespaces it simulates;
+		// the git-trees API enumerates every lexicon under the two subtrees
+		// in one request.
+		Sources: []source{{
+			URL:      "https://api.github.com/repos/bluesky-social/atproto/git/trees/main?recursive=1",
+			Format:   "lexicon",
+			Prefixes: []string{"app/bsky/", "com/atproto/"},
+		}},
+		License: "mixed MIT/Apache-2.0",
+	},
+	{
 		Adapters: []string{"azure-devops-style"},
 		// The adapter spans five areas; the spec repo publishes one file
 		// per area (core is version-foldered differently from the rest).
@@ -237,15 +266,24 @@ func fetchProvider(p provider, outDir string) error {
 		if err != nil {
 			return fmt.Errorf("%s: %w", p.Name, err)
 		}
-		if s.Format == "zip" {
-			data, err = unzipJSON(data)
-			if err != nil {
-				return fmt.Errorf("%s: %w", p.Name, err)
+		var parsed []sdkmap.Route
+		var version string
+		switch s.Format {
+		case "stone":
+			parsed, err = sdkmap.ParseStone(data)
+		case "lexicon":
+			parsed, err = fetchLexicons(client, data, s.Prefixes)
+		default:
+			if s.Format == "zip" {
+				data, err = unzipJSON(data)
+				if err != nil {
+					return fmt.Errorf("%s: %w", p.Name, err)
+				}
 			}
+			// Azure specs ship a UTF-8 BOM.
+			data = bytes.TrimPrefix(data, []byte("\xEF\xBB\xBF"))
+			parsed, version, err = sdkmap.ParseOpenAPI(data)
 		}
-		// Azure specs ship a UTF-8 BOM.
-		data = bytes.TrimPrefix(data, []byte("\xEF\xBB\xBF"))
-		parsed, version, err := sdkmap.ParseOpenAPI(data)
 		if err != nil {
 			return fmt.Errorf("%s: %w", p.Name, err)
 		}
@@ -274,6 +312,11 @@ func fetchProvider(p provider, outDir string) error {
 		}
 		return routes[i].Method < routes[j].Method
 	})
+	// House rule: an extractor that loses contact with the source layout
+	// must fail, not vendor an empty (covers-everything) table.
+	if len(routes) == 0 {
+		return fmt.Errorf("%s: 0 routes — upstream layout changed?", p.Name)
+	}
 
 	src := p.Name
 	if len(versions) > 0 {
@@ -317,6 +360,62 @@ func fetch(client *http.Client, url string) ([]byte, error) {
 		return nil, fmt.Errorf("%s: HTTP %d", url, resp.StatusCode)
 	}
 	return io.ReadAll(io.LimitReader(resp.Body, 200<<20))
+}
+
+// githubTree is the slice of the GitHub git-trees API response fetchLexicons
+// needs: the file list plus the truncation flag (recursive listings of very
+// large repos come back incomplete — vendoring half a namespace silently is
+// worse than failing).
+type githubTree struct {
+	Truncated bool `json:"truncated"`
+	Tree      []struct {
+		Path string `json:"path"`
+		Type string `json:"type"` // "blob" | "tree"
+	} `json:"tree"`
+}
+
+// fetchLexicons takes an already-fetched git-trees document (from the
+// source URL) and fetches every lexicon under the given NSID subtrees,
+// returning the union of their routes. The repo layout (lexicons/<domain
+// path>/<name>.json) is atproto's own, so the raw-URL base is pinned here.
+func fetchLexicons(client *http.Client, treeJSON []byte, prefixes []string) ([]sdkmap.Route, error) {
+	var tree githubTree
+	if err := json.Unmarshal(treeJSON, &tree); err != nil {
+		return nil, fmt.Errorf("git trees: %w", err)
+	}
+	if tree.Truncated {
+		return nil, fmt.Errorf("git trees: listing truncated — repo too large to enumerate reliably")
+	}
+	var paths []string
+	for _, e := range tree.Tree {
+		if e.Type != "blob" || !strings.HasSuffix(e.Path, ".json") {
+			continue
+		}
+		rel := strings.TrimPrefix(e.Path, "lexicons/")
+		for _, p := range prefixes {
+			if strings.HasPrefix(rel, p) {
+				paths = append(paths, e.Path)
+				break
+			}
+		}
+	}
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("git trees: 0 lexicons under %v — upstream layout changed?", prefixes)
+	}
+	sort.Strings(paths)
+	var routes []sdkmap.Route
+	for _, path := range paths {
+		data, err := fetch(client, "https://raw.githubusercontent.com/bluesky-social/atproto/main/"+path)
+		if err != nil {
+			return nil, err
+		}
+		parsed, err := sdkmap.ParseLexicon(data)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		routes = append(routes, parsed...)
+	}
+	return routes, nil
 }
 
 // unzipJSON picks the first .json member (Apple ships the spec as a zip of

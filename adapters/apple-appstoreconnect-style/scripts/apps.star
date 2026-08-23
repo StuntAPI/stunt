@@ -132,7 +132,7 @@ def on_list_apps(req):
 
     return respond(200, {
         "data": page,
-        "links": _page_links("/v1/apps", next_cursor),
+        "links": _page_links("/v1/apps", next_cursor, limit),
         "meta": _page_meta(len(data), limit, next_cursor),
     })
 

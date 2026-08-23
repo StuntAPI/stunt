@@ -96,7 +96,9 @@ def on_publish(req):
         "container_id": creation_id,
         "caption": container.get("caption", ""),
         "media_type": container.get("media_type", "IMAGE"),
-        "media_url": container.get("image_url", container.get("video_url", "")),
+        # image_url is stored as "" for video containers, so fall through
+        # to the video url (get's default only fires on a MISSING key).
+        "media_url": container.get("image_url", "") or container.get("video_url", ""),
         "timestamp": _ig_now(),
     })
 
@@ -117,16 +119,29 @@ def on_list_media(req):
         if doc.get("user_id") == user_id:
             user_media.append(doc)
 
+    # Graph serves the media edge newest-first (reverse chronological);
+    # Graph stamps sort lexicographically (fixed-width, zero-padded).
+    user_media = query_select(user_media, None, "timestamp", "desc")
+
     user_media = _apply_media_fields(req, user_media)
+    limit = _to_int(_get_query(req, "limit", ""))
     page, next_cursor = _list_page(req, user_media)
     if page == None:
         return respond(400, {"error": {"message": "Invalid after cursor", "type": "OAuthException", "code": 100, "fbtrace_id": ""}})
 
     result = {"data": page}
     if next_cursor != None and next_cursor != "":
+        # next re-issues the client's query (limit, fields) with the new
+        # cursor, so following it keeps the page shape like real Graph.
+        nxt = "/v21.0/" + user_id + "/media?after=" + next_cursor
+        if limit > 0:
+            nxt = nxt + "&limit=" + str(limit)
+        fields = _get_query(req, "fields", "")
+        if fields != "":
+            nxt = nxt + "&fields=" + fields
         result["paging"] = {
             "cursors": {"after": next_cursor},
-            "next": "v21.0/" + user_id + "/media?after=" + next_cursor,
+            "next": nxt,
         }
 
     return respond(200, result)
