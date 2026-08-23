@@ -276,6 +276,7 @@ func wcPost(t *testing.T, base, path string, bodyObj map[string]any) (string, in
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer wc-engine-test-project")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -288,6 +289,7 @@ func wcPost(t *testing.T, base, path string, bodyObj map[string]any) (string, in
 func wcGet(t *testing.T, base, path string) (string, int) {
 	t.Helper()
 	req, err := http.NewRequest("GET", base+path, nil)
+	req.Header.Set("Authorization", "Bearer wc-engine-test-project")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,6 +305,7 @@ func wcGet(t *testing.T, base, path string) (string, int) {
 func wcDelete(t *testing.T, base, path string) (string, int) {
 	t.Helper()
 	req, err := http.NewRequest("DELETE", base+path, nil)
+	req.Header.Set("Authorization", "Bearer wc-engine-test-project")
 	if err != nil {
 		t.Fatal(err)
 	}

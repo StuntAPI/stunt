@@ -206096,7 +206096,7 @@
       "sdks": [],
       "behaviors": [],
       "vm_behaviors": [
-        "every route answers without a projectId (the gate is not wired)",
+        "every route demands a projectId — body, query, or bearer all pass",
         "a wc: URI pairing round-trips its topic, relay protocol, and symKey",
         "an auto pairing mints a fresh topic and a 64-hex symKey",
         "proposing requires pairingTopic — and accepts one never paired",
@@ -206116,7 +206116,7 @@
       "deviations": [
         "Pairing, session approve, and JSON-RPC requests are auto-approved (no wallet device)",
         "personal_sign and eth_sendTransaction return synthetic hashes; nothing is signed",
-        "The projectId gate ships but is never wired — every route answers without a credential",
+        "Any non-empty projectId passes the gate — no validation against a project registry",
         "Expiry fields are TTL constants, not absolute unix timestamps; extend persists nothing",
         "Unacknowledged sessions serve JSON-RPC requests immediately (no approval gate)"
       ],
@@ -206156,6 +206156,8 @@
           "route": "/v1/pairings",
           "tags": [
             "body",
+            "query",
+            "auth",
             "stateful",
             "errors"
           ]
@@ -206165,6 +206167,8 @@
           "route": "/v1/sessions",
           "tags": [
             "body",
+            "query",
+            "auth",
             "stateful",
             "errors"
           ]
@@ -206173,7 +206177,9 @@
           "method": "GET",
           "route": "/v1/sessions",
           "tags": [
+            "body",
             "query",
+            "auth",
             "stateful",
             "paginate",
             "errors"
@@ -206183,7 +206189,10 @@
           "method": "POST",
           "route": "/v1/sessions/{topic}/approve",
           "tags": [
+            "body",
+            "query",
             "params",
+            "auth",
             "stateful",
             "errors"
           ]
@@ -206193,7 +206202,9 @@
           "route": "/v1/sessions/{topic}/request",
           "tags": [
             "body",
+            "query",
             "params",
+            "auth",
             "stateful",
             "errors"
           ]
@@ -206202,7 +206213,10 @@
           "method": "POST",
           "route": "/v1/sessions/{topic}/extend",
           "tags": [
+            "body",
+            "query",
             "params",
+            "auth",
             "stateful",
             "errors"
           ]
@@ -206211,7 +206225,10 @@
           "method": "DELETE",
           "route": "/v1/sessions/{topic}",
           "tags": [
+            "body",
+            "query",
             "params",
+            "auth",
             "stateful",
             "errors"
           ]

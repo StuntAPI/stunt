@@ -76,6 +76,9 @@ func newWalletconnectFixture(t *testing.T, start time.Time) *walletconnectFixtur
 }
 
 func (f *walletconnectFixture) call(handler, method, path string, params, query map[string]string, body map[string]any, auth string) starlark.Response {
+	if auth == "" {
+		auth = "Bearer wc-vm-test-project"
+	}
 	f.t.Helper()
 	headers := map[string]string{}
 	if auth != "" {
@@ -156,18 +159,17 @@ func wcHash(s string) bool {
 func TestWalletconnectPairingAndSessionLifecycle(t *testing.T) {
 	f := newWalletconnectFixture(t, wcBase())
 
-	// ===== every route answers without a projectId (the gate is not wired) =====
-	// The manifest declares identity.token_scheme: bearer and lib.star ships
-	// _require_project_id, but no handler calls the helper — the relay answers
-	// with no credential at all. Asserted as-is; see the deviation report.
-	if r := f.call("on_create_pairing", "POST", "/v1/pairings", nil, nil, map[string]any{}, ""); r.Status != 200 {
-		t.Fatalf("pairing with no projectId -> %d, want 200 (gate unenforced): %v", r.Status, r.Body)
+	// ===== every route demands a projectId — body, query, or bearer all pass =====
+	// The relay gates like the real WC service: a projectId must ride the
+	// body (most SDKs), the query, or the Authorization bearer.
+	if r := f.call("on_create_pairing", "POST", "/v1/pairings", nil, nil, map[string]any{}, "none"); r.Status != 401 {
+		t.Fatalf("pairing with no projectId -> %d, want 401: %v", r.Status, r.Body)
 	}
 	if r := f.call("on_create_pairing", "POST", "/v1/pairings", nil, nil, map[string]any{}, "Bearer not-a-project-id"); r.Status != 200 {
-		t.Fatalf("pairing with a bogus bearer -> %d, want 200 (gate unenforced): %v", r.Status, r.Body)
+		t.Fatalf("pairing with a bearer projectId -> %d, want 200: %v", r.Status, r.Body)
 	}
-	if r := f.call("on_list_sessions", "GET", "/v1/sessions", nil, nil, nil, ""); r.Status != 200 {
-		t.Fatalf("list with no projectId -> %d, want 200 (gate unenforced)", r.Status)
+	if r := f.call("on_list_sessions", "GET", "/v1/sessions", nil, nil, nil, "none"); r.Status != 401 {
+		t.Fatalf("list with no projectId -> %d, want 401", r.Status)
 	}
 
 	// ===== a wc: URI pairing round-trips its topic, relay protocol, and symKey =====
