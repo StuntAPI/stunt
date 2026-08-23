@@ -341,7 +341,6 @@ func TestXArticlesStyleAdapter(t *testing.T) {
 		t.Fatalf("missing verifier error = %v, want invalid_grant", noVerifierResp["error"])
 	}
 
-	// The missing-verifier test above consumed authCode (single-use; the
 	// mock pops the code before checking the verifier, matching the Python
 	// source). Get a fresh code for the valid exchange.
 	freshCode := xOAuthAuthorize(t, base+"/2/oauth2/authorize", redirectURI, "my-state-456", codeChallenge)

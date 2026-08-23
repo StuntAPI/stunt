@@ -16,11 +16,11 @@ def on_engagement(req):
     user_id = req["params"].get("id", "")
 
     mc = store_collection("media")
-    all_media = mc.list()
+    # Graph edges list newest first; ts (publish time + media seq) is unique
+    # per media, so the ordering is total.
+    media_rows = query_select(mc.list(), filter=[["user_id", "=", user_id]], order_by="ts", order_dir="desc")
     data = []
-    for media in all_media:
-        if media.get("user_id", "") != user_id:
-            continue
+    for media in media_rows:
         ts = media.get("ts", 0)
         ts_iso = _format_ts(ts)
         media_id = media.get("id", "")
@@ -38,6 +38,10 @@ def on_engagement(req):
 # matching the Threads format: YYYY-MM-DDTHH:MM:SS+0000. A deterministic
 # fixed-format conversion (no leap-second or timezone edge cases needed).
 def _format_ts(ts):
+    # Collection docs round-trip numbers as floats (JSON decode); coerce the
+    # epoch back to int or every component formats as "6.0".
+    if type(ts) == "float":
+        ts = int(ts)
     # Deterministic epoch decomposition (UTC). The mock uses fixed synthetic
     # timestamps so this simple arithmetic suffices.
     days = ts // 86400

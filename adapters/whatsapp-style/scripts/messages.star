@@ -50,8 +50,14 @@ def on_send_message(req):
     if sf != None and sf:
         fail_mode = "failed"
 
-    msg_id = _next_msg_id()
     wa_id = _normalize_phone(to)
+
+    # Real Cloud API rejects a send without a digit-normalizable recipient
+    # (code 131026); check before minting an id so nothing is stored.
+    if wa_id == "":
+        return _wa_err(400, "(#131026) Recipient phone number is required in the request", "OAuthException", 131026)
+
+    msg_id = _next_msg_id()
 
     # Store the message record.
     msg = {

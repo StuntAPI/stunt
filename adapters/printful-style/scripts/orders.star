@@ -2,17 +2,48 @@
 #
 # GET  /v2/store/orders          (Bearer) -> {data: [...]}
 # POST /v2/store/orders          (Bearer; JSON {recipient, items, shipping})
-#      -> {id, external_id, status, shipping, recipient, items}
+#      -> {id, external_id, status, shipping, recipient, items, created_at}
 #      emits signed "order_created" webhook (X-Pful-Signature)
 # POST /v2/store/orders/{id}     (Bearer; JSON {status})
 #      -> {id, status}
 #      emits signed "order_updated" webhook (or "order_canceled" if
 #      status=canceled)
 #
+# One canonical order document backs BOTH the v1 and the v2 surface (the
+# orders collection): the v1 result view is derived on read, so a v2 status
+# update is what a v1 GET returns, and the v2 list/status filter serves
+# v1-created orders as order resources, not as internal wrappers.
+#
 # Shared helpers (_bearer, _require_auth, _to_int, _next_order_id)
 # are preloaded from scripts/lib.star.
 
 # --- helpers ---
+
+# _new_order builds the canonical order document for the next sequence id.
+def _new_order(oid_seq, body):
+    oid = str(oid_seq)
+    return {
+        "id": oid,
+        "external_id": body.get("external_id", "ext_order_" + oid),
+        "status": body.get("status", "draft"),
+        "shipping": body.get("shipping", "STANDARD"),
+        "recipient": body.get("recipient", {}),
+        "items": body.get("items", []),
+        "created_at": 1700000000 + oid_seq,
+    }
+
+# _v1_view renders the canonical order in the v1 result shape: integer id
+# and the `created` field name (the v2 doc says created_at).
+def _v1_view(doc):
+    return {
+        "id": _to_int(doc.get("id", "")),
+        "external_id": doc.get("external_id", ""),
+        "status": doc.get("status", "draft"),
+        "shipping": doc.get("shipping", "STANDARD"),
+        "recipient": doc.get("recipient", {}),
+        "items": doc.get("items", []),
+        "created": doc.get("created_at", 0),
+    }
 
 # _apply_order_filters maps the real Printful v2 GET /v2/store/orders
 # status csv filter to a query_select "in" clause, applied before paging.
@@ -44,23 +75,15 @@ def on_create_v1_order(req):
     if body == None:
         body = {}
 
-    oid = _next_order_id()
-    external_id = body.get("external_id", "ext_order_" + str(oid))
-    result = {
-        "id": oid,
-        "external_id": external_id,
-        "status": "draft",
-        "shipping": body.get("shipping", "STANDARD"),
-        "recipient": body.get("recipient", {}),
-        "items": body.get("items", []),
-        "created": 1700000000 + oid,
-    }
-
-    # Persist under a string id so GET /orders/{id} can retrieve it.
-    store_collection("orders").insert({"id": str(oid), "result": result})
+    # Store the canonical doc (shared with the v2 surface); v1 creates always
+    # start draft — status moves only via update.
+    order = _new_order(_next_order_id(), body)
+    order["status"] = "draft"
+    store_collection("orders").insert(order)
 
     # Emit signed webhook (fire-and-forget; only when the store's webhook
     # subscribes to the type). Payload uses Printful's envelope.
+    result = _v1_view(order)
     _emit_if_subscribed("order_created", result)
     return respond(200, {"result": result})
 
@@ -72,9 +95,9 @@ def on_get_v1_order(req):
 
     oid = req["params"].get("order_id", "")
     doc = store_collection("orders").get(oid)
-    if doc == None or doc.get("result") == None:
+    if doc == None:
         return respond(404, {"error": {"message": "Order not found", "code": 404}})
-    return respond(200, {"result": doc["result"]})
+    return respond(200, {"result": _v1_view(doc)})
 
 # on_list_orders returns all store orders.
 # The real Printful v2 order list filters by status (csv) before paging.
@@ -112,19 +135,7 @@ def on_create_order(req):
     if body == None:
         body = {}
 
-    oid_seq = _next_order_id()
-    oid = str(oid_seq)
-    external_id = body.get("external_id", "ext_order_" + oid)
-
-    order = {
-        "id": oid,
-        "external_id": external_id,
-        "status": body.get("status", "draft"),
-        "shipping": body.get("shipping", "STANDARD"),
-        "recipient": body.get("recipient", {}),
-        "items": body.get("items", []),
-        "created_at": 1700000000 + oid_seq,
-    }
+    order = _new_order(_next_order_id(), body)
 
     c = store_collection("orders")
     c.insert(order)

@@ -114,13 +114,10 @@ def on_token(req):
 
     code = body.get("code", "")
 
-    # One-time use: consume the code.
     cc = store_collection("oauth_codes")
     entry = cc.get(code)
     if entry == None:
         return respond(400, {"error": "invalid_grant", "detail": "invalid/used code"})
-    cc.delete(code)
-
     # redirect_uri must match the one presented at authorize.
     redirect_uri = body.get("redirect_uri", "")
     if redirect_uri != entry["redirect_uri"]:
@@ -130,6 +127,9 @@ def on_token(req):
     verifier = body.get("code_verifier") or ""
     if verifier == "":
         return respond(400, {"error": "invalid_grant", "detail": "PKCE verifier mismatch"})
+
+    # Single-use: burn only when the exchange succeeds (house rule).
+    cc.delete(code)
 
     access = _rand_token("mock_access")
     refresh = _rand_token("mock_refresh")

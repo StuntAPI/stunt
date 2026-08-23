@@ -54,7 +54,9 @@ def _require_auth(req):
     auth = _auth_header(req)
     if auth == "":
         return False, _auth_error()
-    if _contains(auth, "oauth_signature"):
+    # "oauth_signature=" — the bare substring would also match
+    # oauth_signature_method, waving signature-less TBA headers through.
+    if _contains(auth, "oauth_signature="):
         return True, None
     if _contains(auth, "NLAuth"):
         return True, None

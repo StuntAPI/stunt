@@ -5,8 +5,8 @@
     "tiers": {
       "sdk_and_vm": 2,
       "sdk_only": 34,
-      "vm_only": 28,
-      "boot": 34
+      "vm_only": 38,
+      "boot": 24
     }
   },
   "adapters": [
@@ -6385,9 +6385,34 @@
       "api_name": "Apple Search Ads API",
       "api_version": "v4",
       "routes": 12,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "a missing, malformed or unknown bearer is a 401 in the Search Ads envelope",
+        "the seeded static test token passes the gate",
+        "a client_credentials exchange mints a bearer valid for exactly one hour",
+        "malformed grants and client secrets are oauth-shaped 400s",
+        "campaign create assigns a numeric id and fills the v4 defaults",
+        "create without a name is a 400",
+        "the campaign reads back by numeric id; unknown ids are 404s",
+        "update merges fields, maps status onto servingStatus, and bumps only modificationTime",
+        "an invalid status is a 400 that writes nothing",
+        "ad groups create under a campaign; unknown campaigns are 404s",
+        "find lists the seed with default pagination and clock-derived stamps",
+        "conditions filter with EQUALS, CONTAINS and amount ranges",
+        "values within one condition are OR'd; multi-value NOT_EQUALS excludes all",
+        "orderBy sorts and pagination slices with totalResults before the slice",
+        "first touch seeds three keywords scoped to the campaign",
+        "keyword find speaks the same selector (conditions, orderBy, pagination)",
+        "create takes a single keyword or a batch body",
+        "single update merges partial fields and validates them",
+        "bulk update takes id-addressed rows; an unknown id 404s the batch",
+        "delete removes the keyword and find no longer sees it",
+        "startTime, endTime and groupBy are validated",
+        "one row per campaign with deterministic metrics and summed grandTotals",
+        "the report selector filters rows and grandTotals follow"
+      ],
       "missing": [
         "No ad group find or update — only POST campaigns/{id}/ads create",
         "No negative keywords endpoints (keywords/negative find/create/update)",
@@ -6397,7 +6422,9 @@
       "deviations": [
         "ES256 client-secret JWT is not signature-verified — structural checks only",
         "Reports group by campaign only; any other groupBy key returns 400",
-        "Selector conditions cover a fixed field set per resource (id, name, budget, status, times)"
+        "Selector conditions cover a fixed field set per resource (id, name, budget, status, times)",
+        "Bulk keyword update is non-atomic: rows before an unknown id persist though the batch 404s",
+        "Unknown selector condition fields are silently ignored; real find/report 400s"
       ],
       "covered": [
         {
@@ -12519,9 +12546,34 @@
       "api_name": "Braze REST API",
       "api_version": "2.0",
       "routes": 12,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "a missing credential is the 401 message envelope",
+        "an unknown app-group key is rejected",
+        "x-authorization carries the raw app-group key",
+        "track ingests attributes, events, and purchases",
+        "re-tracking the same external_id updates one profile",
+        "export aggregates custom events and purchases, dedups ids",
+        "fields_to_export projects the profile",
+        "per-record errors keep partial success",
+        "_update_existing_only never creates",
+        "fatal envelopes: the 75-id cap and undecodable JSON",
+        "alias/new creates an alias-only profile track can target",
+        "identify re-keys an alias-only profile when the external_id is new",
+        "identify merges an alias-only profile into an existing one",
+        "send fatals: message, variant, and recipient rules",
+        "send succeeds with a 32-hex dispatch id and emits message.sent",
+        "campaigns/trigger/send validates the campaign id",
+        "schedule/create mints a UUID-shaped schedule id",
+        "end_time is required",
+        "upcoming broadcasts list both schedules",
+        "the send transition derives on read, exactly once",
+        "segments list seeds and pages by cursor",
+        "one identifier type per delete",
+        "delete removes the profile and its dependent records"
+      ],
       "missing": [
         "No canvas endpoints: /canvas/trigger/send, /canvas/list, /canvas/data_series",
         "No campaign analytics: /campaigns/list, /campaigns/data_series, /campaigns/details",
@@ -12536,7 +12588,9 @@
         "POST /webhooks registration is a local extension; real Braze has no webhook REST API",
         "message.sent webhook payloads use a synthetic shape; Braze has no documented scheme",
         "scheduled sends flip to sent on first read past the time; message.sent fires once then",
-        "key store models expiry for app-group keys; real Braze keys do not expire"
+        "key store models expiry for app-group keys; real Braze keys do not expire",
+        "/users/track echoes *_processed counts the real API does not return",
+        "Segments list pages by a cursor; the real endpoint pages by 100s of page param"
       ],
       "covered": [
         {
@@ -109444,9 +109498,21 @@
       "api_name": "Helius Solana RPC + Enhanced API",
       "api_version": "v0",
       "routes": 11,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "the api-key query gate rejects both surfaces",
+        "the JSON-RPC reads answer deterministic values; an unknown method is a -32601 envelope",
+        "sendTransaction walks null → processed → confirmed → finalized, firing the enhanced webhook exactly once at first confirmation",
+        "simulate_fail lands an on-chain InstructionError while confirmation still proceeds",
+        "the enhanced history seeds once per address, newest first, in the Helius parsed shape",
+        "type/source filters and before/until/limit paging narrow the history",
+        "a sent transaction joins its address's history; other addresses do not see it",
+        "the parse-transactions contract holds and the balances/nfts/names lookups are deterministic",
+        "webhook registration round-trips the Helius config shape with 404s for unknown ids",
+        "deliveries are unsigned, carry authHeader as Authorization, honor transactionTypes and fire exactly once"
+      ],
       "missing": [
         "RPC covers 6 methods; no getAccountInfo, getSlot, getSignaturesForAddress",
         "No DAS API (getAsset, searchAssets) or /v0/tokens metadata endpoints",
@@ -109456,7 +109522,9 @@
         "Webhook payloads carry one transaction each; real Helius batches an array",
         "Confirmation milestones fixed by clock: processed 1-2s, confirmed 2-3s, final 3s+",
         "sendTransaction config takes simulate_fail/simulate_type/simulate_address",
-        "Enhanced transactions limit capped at 100 (real API max 1000)"
+        "Enhanced transactions limit capped at 100 (real API max 1000)",
+        "A crossed before/until cursor pair silently ignores the until signature",
+        "The confirmation webhook fires only when a read lands inside the 2-3s confirmed window"
       ],
       "covered": [
         {
@@ -188102,9 +188170,49 @@
       "api_name": "NetSuite SuiteTalk REST API",
       "api_version": "1.0",
       "routes": 9,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "a request without Authorization is 401 INVALID_LOGIN in the o: envelope",
+        "TBA without oauth_signature is rejected: the signature's presence is the gate",
+        "TBA, NLAuth and Bearer all pass the structural gate",
+        "every route family sits behind the gate",
+        "create answers 204 No Content with the record's URL in Location",
+        "internal ids are numeric strings minted past the seed range",
+        "the created record reads back verbatim under its id",
+        "POST with a seen externalId is an upsert: the existing record's Location, no duplicate",
+        "DELETE answers 204 and the record is gone afterwards",
+        "unknown ids and unknown record types are distinct 404 codes",
+        "a transaction record without entity is 400 USER_ERROR naming the field",
+        "entity references resolve by id or refName against stored customers",
+        "a dangling entity reference is 400 INVALID_KEY_OR_REF",
+        "customerPayment demands both customer and payment",
+        "a body that is not a JSON object is 400 INVALID_REQUEST",
+        "PATCH merges the sent fields into the stored record and answers 204",
+        "numeric patches round-trip through the collection as floats",
+        "an id in the PATCH body cannot move the record",
+        "PATCH on an unknown record id or type is a 404",
+        "a malformed PATCH body is 400 INVALID_REQUEST",
+        "the list envelope is items/count/hasMore/links with a self link",
+        "limit windows the page and hasMore adds a next link with the following offset",
+        "following the next link returns the tail and clears hasMore",
+        "an offset past the end is an empty page, not an error",
+        "q filters and orderBy sorts before paging",
+        "an unparseable q is 400 INVALID_SEARCH_PARAMETER, not silent unfiltered rows",
+        "the metadata catalog lists the record types the parameterized routes serve",
+        "SuiteQL returns the FROM table's live rows in the query envelope",
+        "created records are visible to SuiteQL",
+        "SQL LIMIT/OFFSET window the page and mint a next link",
+        "limit/offset query params page when the SQL has no clauses",
+        "unknown tables, FROM-less and missing statements are 400 INVALID_REQUEST",
+        "the /services/rest/v1/suiteql alias runs the same handler",
+        "a salesOrder bills into an invoice dated today, due in 30 days",
+        "the invoice settles into a customerPayment and flips its source to Paid in Full",
+        "the clock drives trandate",
+        "request-body fields override the mapped defaults",
+        "impossible chains, unknown sources and dangling overrides use NetSuite's real codes"
+      ],
       "missing": [
         "No creditMemo, purchaseOrder, vendorBill, journalEntry, or cashSale records",
         "No sublist child resources (e.g. salesOrder/{id}/item/{line})",
@@ -188113,7 +188221,8 @@
       ],
       "deviations": [
         "TBA/NLAuth/Bearer only structurally checked; OAuth 1.0a HMAC not validated",
-        "SuiteQL matches only the FROM table; WHERE and ORDER BY clauses are ignored"
+        "SuiteQL matches only the FROM table; WHERE and ORDER BY clauses are ignored",
+        "Duplicate-externalId create returns the stored record without updating it"
       ],
       "covered": [
         {
@@ -190705,9 +190814,61 @@
       "api_name": "Google Photos Library API",
       "api_version": "v1",
       "routes": 12,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "authorize without redirect_uri, state or client_id is 400 invalid_request",
+        "authorize redirects with a fresh code and echoes the state",
+        "a redirect_uri that already carries a query joins with \u0026",
+        "exchanging an unknown code is 400 invalid_grant",
+        "a client mismatch answers invalid_client but leaves the code usable",
+        "the happy exchange mints the bearer pair",
+        "the minted bearer reads the data plane",
+        "authorization codes are single-use",
+        "unknown grant types are unsupported_grant_type",
+        "refresh without client credentials is 400 invalid_client",
+        "refresh with an unknown refresh token is 400 invalid_grant",
+        "refresh mints a new access token but keeps the refresh token",
+        "the refreshed token serves the same user's library",
+        "refresh-issued access tokens expire like any other",
+        "every data surface answers 401 UNAUTHENTICATED without a bearer",
+        "non-Bearer schemes and unknown or empty tokens are equally 401",
+        "the minted bearer passes the gate on every surface",
+        "the access token dies at its expiry on the virtual clock",
+        "/v1/uploads answers a plain-text uploadToken",
+        "batchCreate links the token to a media item",
+        "mime types follow the file extension",
+        "an unknown upload token answers the per-item status error",
+        "mixed batches keep request order",
+        "upload tokens are single-use",
+        "an albumId is accepted without validation (as-is)",
+        "an empty batch answers an empty result list",
+        "=d serves the original bytes with the recorded content type",
+        "=dv serves the same original bytes",
+        "a bare baseUrl serves the derivative payload instead",
+        "baseUrl is computed from the request host at read time",
+        "unknown ids answer the 404 envelope",
+        "pages walk by pageToken and the last partial page has no next",
+        "the default page holds 25 items",
+        "pageSize clamps at 100",
+        "a single item fetch and the 404 envelope",
+        "items are private to their user",
+        "an unfiltered search returns everything in creation order",
+        "mediaTypeFilter selects PHOTO or VIDEO by mime prefix",
+        "dateFilter ranges and exact dates bound creationTime",
+        "partial dates span their whole period",
+        "multiple ranges are OR'd and keep upload order",
+        "media type and date filters compose",
+        "albumId scopes the search",
+        "search paginates from the JSON body",
+        "create returns the album shape",
+        "a missing album title defaults to Untitled Album",
+        "unknown albums answer the 404 envelope",
+        "list walks pages with the 20 default and the 50 clamp",
+        "albums are private to their user",
+        "delete removes the album but leaves its media"
+      ],
       "missing": [
         "No album item management (addItems, removeItems, batchRemoveMediaItems)",
         "No album title update (PATCH /v1/albums/{id})",
@@ -190717,7 +190878,10 @@
       ],
       "deviations": [
         "Bare-id media download returns derivative bytes; =d/=dv return original upload",
-        "search honors mediaTypeFilter and dateFilter only (no contentFilter or album filters)"
+        "search honors mediaTypeFilter and dateFilter only (no contentFilter or album filters)",
+        "Naming both PHOTO and VIDEO in mediaTypeFilter silently keeps only the last; real API 400s",
+        "albumId in batchCreate is not validated; mediaItemsCount stays 0 and description is dropped",
+        "Deleting an album leaves its items findable via search {albumId}"
       ],
       "covered": [
         {
@@ -192528,9 +192692,33 @@
       "api_name": "Printful API",
       "api_version": "v2",
       "routes": 13,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "a missing or non-Bearer Authorization is the 401 error envelope",
+        "any non-empty bearer key is accepted — the dev-key model",
+        "a sync product mints a sequential id; variants read back verbatim",
+        "unknown products get the 404 error envelope",
+        "an unpaged list is a bare data array with no paging object",
+        "limit/offset pages walk the paging envelope without repeats",
+        "a malformed offset cursor is the 400 error envelope",
+        "v1 create is result-wrapped with an integer id and draft status",
+        "v1 GET round-trips the result; unknown ids are 404",
+        "the v2 list serves one canonical order doc per order, from both create surfaces",
+        "the status csv filter applies before paging",
+        "a status update flips the canonical doc both surfaces read",
+        "order timestamps are sequence-derived, not wall-clock (documented mock choice)",
+        "STANDARD and EXPRESS quotes scale with the item count",
+        "an unset configuration reads as an empty result",
+        "POST sets and PUT replaces the single config; the secret stays masked",
+        "DELETE returns success, empties the read, and silences delivery",
+        "a config without a url is the 400 error envelope",
+        "deliveries are HMAC-SHA256-signed over the exact delivered bytes",
+        "the types filter delivers only subscribed topics",
+        "an empty types list subscribes to every event type",
+        "a v1-created order emits the v1 result shape as the event data"
+      ],
       "missing": [
         "No package_shipped, package_returned, product_synced, or order_hold events",
         "No product update or delete (PUT/DELETE /v2/store/products/{product_id})",
@@ -192539,7 +192727,9 @@
         "No reference endpoints (countries, taxes, store info)"
       ],
       "deviations": [
-        "Webhook set without a secret signs with built-in mock secret stunt_mock_pful_webhook_secret"
+        "Webhook set without a secret signs with built-in mock secret stunt_mock_pful_webhook_secret",
+        "v2 responses are bare data/resources; real Printful wraps every response in {code, result}",
+        "Timestamps are sequence-derived synthetic values, never wall-clock"
       ],
       "covered": [
         {
@@ -203648,9 +203838,50 @@
       "api_name": "Threads API (Meta)",
       "api_version": "v1.0",
       "routes": 8,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "authorize without redirect_uri, state or client_id is invalid_request",
+        "authorize redirects back with a fresh code and the state echoed",
+        "a redirect_uri that already carries a query is joined with \u0026",
+        "the exchange demands grant_type=authorization_code",
+        "an unknown code is 400 invalid_grant",
+        "a good exchange mints a token, user and refresh token",
+        "the code is single-use: a replay is invalid_grant",
+        "client mismatches are 400 invalid_client",
+        "a mismatched attempt leaves the code redeemable (house rule)",
+        "a second flow mints a distinct user",
+        "a missing bearer is 401 in the Graph error envelope",
+        "wrong schemes and unknown bearers answer the same 190",
+        "every API route enforces the same gate",
+        "a bearer dies at its clock-derived 60-day expiry",
+        "me returns the static mock profile",
+        "every user's token sees the same static profile (deviation, as-is)",
+        "?fields= is ignored: the full profile always comes back",
+        "a container without media_type=TEXT and text is a code-100 400",
+        "create assigns a c_* container id",
+        "a TEXT container polls finished immediately (no processing window)",
+        "back-to-back publish assigns an m_* media id",
+        "republishing the same container mints a second media (deviation, as-is)",
+        "simulate_fail ends in error and never publishes",
+        "unknown container ids answer the catch-all 404",
+        "the inbox lists the user's media newest first",
+        "each post carries one synthetic reply child",
+        "the inbox is scoped to the path user",
+        "?fields= projection is ignored (deviation, as-is)",
+        "all four manifest metrics return in canonical order",
+        "values are deterministic across reads",
+        "?metric= projects to the requested names in canonical order",
+        "an unknown metric name empties the data set (deviation, as-is)",
+        "insights for an unknown media id are the catch-all 404",
+        "refresh demands a known refresh_token",
+        "a refresh mints a fresh 60-day token bound to the same user",
+        "the response omits the rotated refresh_token (deviation, as-is)",
+        "the used refresh token is single-use: a replay is invalid_grant",
+        "the original access token keeps its own 60-day life",
+        "the refreshed token outlives the original's expiry"
+      ],
       "missing": [
         "Only TEXT media containers; no image or video media types or uploads",
         "No reply or quote-post creation; inbox replies are synthetic",
@@ -203659,7 +203890,10 @@
       "deviations": [
         "Container processing is a fixed ~3s clock-derived window; text needs no real poll",
         "simulate_fail=true on container create is a simulator-only failure switch",
-        "Refresh-grant response omits the rotated refresh_token; only the code exchange returns one"
+        "Refresh-grant response omits the rotated refresh_token; only the code exchange returns one",
+        "/me is a static profile shared by every token; the path user is never validated against the bearer",
+        "The refresh response omits the rotated refresh_token, so each token refreshes only once",
+        "Republishing a container mints duplicate media"
       ],
       "covered": [
         {
@@ -203740,6 +203974,7 @@
           "method": "GET",
           "route": "/v1.0/{id}/insights",
           "tags": [
+            "query",
             "params",
             "auth",
             "stateful",
@@ -203778,6 +204013,7 @@
             "params",
             "auth",
             "stateful",
+            "filter",
             "clock"
           ]
         }
@@ -205672,9 +205908,45 @@
       "api_name": "WhatsApp Business Cloud API (Meta)",
       "api_version": "v21.0",
       "routes": 8,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "a missing bearer is 401 in the Meta error envelope",
+        "wrong schemes, bare tokens and unknown bearers answer the same 190",
+        "every route enforces the same gate",
+        "the seeded test token dies at its clock-derived 10-year expiry",
+        "a text send answers Meta's contacts + messages envelope",
+        "message ids are a zero-padded monotonic sequence",
+        "a template send is accepted and reads back as type template",
+        "a send without a usable recipient is a code-131026 400",
+        "mark-as-read is unmodeled: a status=read body falls into the send path",
+        "a fresh message reads back sent",
+        "the status stays sent through the in-flight window",
+        "delivered is derived at +3s and stays delivered",
+        "simulate_fail ends at failed (simulator extension, as-is)",
+        "unknown wamids are a code-803 404",
+        "each send emits exactly one signed messages webhook",
+        "no status webhook fires before the terminal window",
+        "the terminal transition emits the statuses webhook exactly once",
+        "a multipart upload stores real bytes and reports their digest",
+        "the content download returns the exact bytes at the stored mime",
+        "a specific part content-type outranks the filename extension",
+        "a metadata-only JSON upload has no bytes to download",
+        "uploads demand messaging_product=whatsapp (code 100)",
+        "a multipart body without a file part is a 1304 400",
+        "the seeded phone reads back its registration profile",
+        "register answers success true and the phone stays readable",
+        "register on an unknown phone id still succeeds (as-is)",
+        "an unknown resource id is a code-803 404",
+        "the seeded welcome_message template lists APPROVED",
+        "a created template starts PENDING and echoes its payload",
+        "the approval lifecycle moves PENDING to APPROVED and REJECTED",
+        "an invalid status target leaves the template unchanged (as-is)",
+        "unknown template ids are a code-803 404",
+        "templates page by limit + after cursors",
+        "a malformed after cursor is a code-100 400"
+      ],
       "missing": [
         "Only text and template message types; no image, video, document, or interactive",
         "No mark-as-read (status=read) or message reaction sends",
@@ -205686,7 +205958,10 @@
         "24-hour customer service window not enforced; free-form sends never fail with 470",
         "delivered is clock-derived at a fixed +3s after send, not real carrier delivery",
         "simulate_fail:true on send is a simulator extension forcing terminal failed status",
-        "Template review is client-driven: POST {template_id} flips PENDING to APPROVED/REJECTED"
+        "Template review is client-driven: POST {template_id} flips PENDING to APPROVED/REJECTED",
+        "mark-as-read is unmodeled: a status=read body falls into the send path",
+        "register on an unknown phone id still answers success",
+        "created_at is a fixed constant, not clock-derived"
       ],
       "covered": [
         {
@@ -205821,9 +206096,20 @@
       "api_name": "Workday REST API",
       "api_version": "v40.0",
       "routes": 8,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "requests without a Bearer or Basic scheme are 401 at the gate",
+        "both Bearer and Basic credentials clear the gate",
+        "Create_Worker mints an id that reads back through staffing",
+        "the RaaS custom report wraps rows in Report_Entry",
+        "search narrows the worker list before paging",
+        "limit/offset pages tile the list without repeats",
+        "compensation serves the seed shelf and empty for created workers",
+        "payroll, positions, and financials share the list envelope",
+        "an unknown worker is a 404 with the Workday error envelope"
+      ],
       "missing": [
         "SOAP interface not implemented (REST-equivalent endpoints only)",
         "No worker update, delete, or other writes; only Create_Worker exists",
@@ -205831,7 +206117,9 @@
         "No absence, talent, recruiting, or benefits service domains"
       ],
       "deviations": [
-        "Auth validates only Authorization header presence; any bearer/basic value passes"
+        "Auth validates only Authorization header presence; any bearer/basic value passes",
+        "Compensation is a static shelf keyed to seeded worker ids — runtime workers read empty, unknown ids 200",
+        "RaaS custom reports return static rows that never reflect created workers"
       ],
       "covered": [
         {
@@ -205944,9 +206232,27 @@
       "api_name": "X (Twitter) Articles API",
       "api_version": "v2",
       "routes": 8,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "authorize 302s to the redirect_uri carrying a fresh code and the echoed state",
+        "authorize demands redirect_uri, the S256 method and a non-empty challenge",
+        "the token endpoint demands HTTP Basic client creds and a known grant type",
+        "a valid code exchange mints a bearer+refresh pair and the code is single-use",
+        "a mismatched redirect_uri or a missing verifier fails without burning the code",
+        "refresh grants rotate the pair and retire the presented token",
+        "the bearer gate is never enforced",
+        "media upload mints media_id_strings that attach as cover_media_id",
+        "draft create validates title and content_state.blocks",
+        "a draft reads back with its full metadata",
+        "publish flips the draft and attaches the minted post_id",
+        "republishing mints a fresh post_id",
+        "unknown article ids are 404s on get and publish",
+        "create enforces required text and the inclusive 280-char limit",
+        "replies must target a known tweet",
+        "tweets read back whole and unknown ids are 404s"
+      ],
       "missing": [
         "No article update, delete, or unpublish endpoints",
         "No article list or search; only single-article GET",
@@ -205954,7 +206260,10 @@
         "Tweet surface is create/get only; no delete, likes, or timeline"
       ],
       "deviations": [
-        "PKCE is relaxed: code_verifier must be non-empty but the S256 hash match is not verified"
+        "PKCE is relaxed: code_verifier must be non-empty but the S256 hash match is not verified",
+        "No v2 errors[] envelope — articles/media use flat {error: ...} shapes a reference client is built against",
+        "PKCE S256 is presence-checked only; a wrong-but-present verifier passes",
+        "Republishing mints a fresh post_id with no already-published guard"
       ],
       "covered": [
         {
