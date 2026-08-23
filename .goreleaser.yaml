@@ -154,7 +154,7 @@ winget:
     description: "stunt turns public-facing APIs into local simulators (mock/stub servers) so you can develop and test client code without creating remote accounts, provisioning cloud resources, or hitting the network."
     license: Apache-2.0
     license_url: https://github.com/stuntapi/stunt/blob/main/LICENSE
-    copyright: Copyright (c) The Stunt Authors
+    copyright: Copyright (c) Alessandro De Blasis
     tags: [mock, testing, api, simulator, stub, development]
     repository:
       owner: stuntapi
