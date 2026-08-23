@@ -278,7 +278,7 @@ def _emit_service_hook(event_type, message_text, resource):
         if s.get("eventType", "") == event_type:
             payload = {
                 "subscriptionId": s.get("id", ""),
-                "notificationId": store_kv_incr("azure-devops", "notif_seq") + 1,
+                "notificationId": store_kv_incr("azure-devops", "notif_seq"),
                 "id": _next_notification_id(),
                 "eventType": event_type,
                 "publisherId": "tfs",
@@ -292,12 +292,13 @@ def _emit_service_hook(event_type, message_text, resource):
             events_emit(event_type, payload)
             return
 
-# _next_subscription_id returns a synthetic subscription GUID.
+# _next_subscription_id returns a synthetic subscription GUID. incr already
+# returns the new value, so the first subscription is ...0001.
 def _next_subscription_id():
-    n = store_kv_incr("azure-devops", "sub_seq") + 1
+    n = store_kv_incr("azure-devops", "sub_seq")
     return "aaaa000" + str(n) + "-bbbb-cccc-dddd-eeeeffff0000"
 
 # _next_notification_id returns a synthetic notification GUID.
 def _next_notification_id():
-    n = store_kv_incr("azure-devops", "notif_guid_seq") + 1
+    n = store_kv_incr("azure-devops", "notif_guid_seq")
     return "ffff000" + str(n) + "-bbbb-cccc-dddd-eeeeaaaa0000"

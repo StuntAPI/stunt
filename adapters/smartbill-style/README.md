@@ -9,31 +9,29 @@ invoices ("what does this company spend, and on what?").
 
 - **Auth** — `Authorization: Basic base64(<username>:<token>)`. Any
   credentials pair is accepted (frictionless local testing); a missing or
-  malformed header is a genuine `401 {"error": {"code": "unauthorized", ...}}`.
-- **Envelopes** — bare JSON, unlike REST-wrapper APIs: lists are keyed arrays
-  with plain pagination metadata; create endpoints return an **empty body**;
-  single reads return the object itself.
-- **Pagination** — plain `page`/`pageSize` query parameters (default 25,
-  max 100); each response carries `page`, `pageSize`, `totalPages`,
-  `totalRecords`. Follow `totalPages`.
+  malformed header is a genuine `401` carrying the `errorText` shape.
+- **Envelopes** — bare JSON, unlike REST-wrapper APIs: document create
+  endpoints return an **empty body**; single reads return the object
+  itself; stocks and metadata (`/tax`, `/series`) use `{list: [...]}`.
 - **Scoping** — every endpoint requires the `cif` (company tax id) of a
-  company registered for the credentials; a foreign or unknown cif is a
-  plain 404.
-- **Money and quantities are decimal strings** (`"98.00"`, `"10"`).
-- **Dates** are `YYYY-MM-DD`; list filters are `startDate`/`endDate`
-  (inclusive, on issue date).
+  registered company; a foreign or unknown cif is a plain 404. Documents
+  are read by `?cif=&seriesname=&number=` — there are no list endpoints.
+- **Money and quantities are JSON numbers**, not decimal strings.
+- **Payments** use the real `{payment: {companyVatCode, value, type,
+  isCash, invoicesList}}` envelope; a body without it is a 422.
+- **Dates** are `YYYY-MM-DD`.
 
 ## Surface
 
 | Family | Endpoints |
 | --- | --- |
-| company | `GET /company` |
-| invoices | `POST /invoice`, `GET /invoice`, `GET /invoice/list`, `PUT /invoice/cancel` |
-| payments | `POST /invoice/payment`, `DELETE /invoice/payment` |
-| estimates (proforma) | `POST /estimate`, `GET /estimate/list`, `PUT /estimate/cancel` |
-| purchase invoices (spend) | `POST /purchase`, `GET /purchase/list` |
-| stocks | `GET /stocks`, `POST /stocks/movement` |
-| messages | `POST /message/email` (recorded; no delivery) |
+| invoices | `POST /invoice`, `GET /invoice`, `PUT /invoice/cancel`, `PUT /invoice/restore`, `GET /invoice/paymentstatus` |
+| estimates (proforma) | `POST /estimate`, `GET /estimate`, `PUT /estimate/cancel` |
+| purchase invoices (spend) | `POST /purchase`, `GET /purchase` |
+| payments | `POST /payment`, `POST /payment/v2`, `DELETE /payment/v2` (by `?paymentId=`) |
+| stocks | `GET /stocks` |
+| messages | `POST /document/send` (recorded; no delivery) |
+| metadata | `GET /tax`, `GET /series` |
 
 Purchase invoice **product lines** carry an explicit `category` — the
 classification in the customer's books, and the natural unit of spend: one

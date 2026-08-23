@@ -73,13 +73,14 @@ def _next_id(resource):
 def _strip_internal(doc):
     # Drop bookkeeping fields before a document leaves the simulator:
     # the company scoping key, any engine _-prefixed key (_batch et al),
-    # and render ids as ints (real FIC ids are integers).
+    # and render ids as ints (real FIC ids are integers). Webhook ids are
+    # SUBxxx strings and must survive verbatim, or list/get lose them.
     out = {}
     for k in doc:
         if k == "company_id" or k[:1] == "_":
             continue
         out[k] = doc[k]
-    out["id"] = _to_int(out.get("id", "0"), 0)
+    out["id"] = _to_int(out.get("id", "0"), out.get("id", 0))
     return out
 
 def _companies():
@@ -215,7 +216,7 @@ def _crud_create(req, resource, defaults):
     doc["id"] = _next_id(resource)
     doc["company_id"] = str(company.get("id"))
     store_collection(resource).insert(doc)
-    _emit_if_subscribed(str(company.get("id")), "entity." + resource[:-1] + ".create", _strip_internal(doc))
+    _emit_if_subscribed(str(company.get("id")), _event_type(resource, "create"), _strip_internal(doc))
     return respond(201, {"data": _strip_internal(doc)})
 
 def _crud_get(req, resource, what):
@@ -252,7 +253,7 @@ def _crud_modify(req, resource, what):
                 patch[k] = body[k]
             coll.update(d.get("id"), patch)
             updated = coll.get(d.get("id"))
-            _emit_if_subscribed(str(company.get("id")), "entity." + resource[:-1] + ".update", _strip_internal(updated))
+            _emit_if_subscribed(str(company.get("id")), _event_type(resource, "update"), _strip_internal(updated))
             return respond(200, {"data": _strip_internal(updated)})
     return _api_error(404, "not_found", what + " not found.")
 
@@ -289,6 +290,21 @@ def _categories_in_use(req, resource):
 # (Lives in lib: the CRUD helpers below reference it at load time.)
 
 _WEBHOOK_SECRET = "fic-stunt-webhook-signing-secret"
+
+_EVENT_CATEGORY = {
+    "received_documents": "received_documents",
+    "issued_documents": "issued_documents",
+    "suppliers": "entities.suppliers",
+    "clients": "entities.clients",
+    "products": "products",
+    "taxes": "taxes",
+}
+
+def _event_type(resource, action):
+    # Real type strings are it.fattureincloud.webhooks.<category>.<action>,
+    # with clients/suppliers nested under entities.* — subscribers filter on
+    # these verbatim, so made-up names silently deliver nothing.
+    return "it.fattureincloud.webhooks." + _EVENT_CATEGORY.get(resource, resource) + "." + action
 
 def _signed_emit(event_type, payload):
     # Fatture in Cloud signs notifications with X-Signature = base64 HMAC.

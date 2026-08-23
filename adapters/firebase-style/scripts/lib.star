@@ -76,6 +76,10 @@ def _contains(s, substr):
 def _to_int(s):
     if s == None or s == "":
         return 0
+    neg = False
+    if s[0] == "-":
+        neg = True
+        s = s[1:]
     n = 0
     for i in range(len(s)):
         ch = s[i]
@@ -83,7 +87,7 @@ def _to_int(s):
             n = n * 10 + (ord(ch) - ord("0"))
         else:
             return 0
-    return n
+    return -n if neg else n
 
 # ====================================================================
 # List pagination
@@ -118,67 +122,50 @@ def _list_page(req, docs):
 #   {nullValue: null}      null
 #   {timestampValue: "..."}        timestamp
 
-# _firestore_typed_value wraps a raw Go/JSON value into a Firestore typed
-# value wrapper. This is the core of the Firestore pain — every field is
-# wrapped in a type-keyed object.
-def _firestore_typed_value(val):
-    t = _type_name(val)
-    if t == "string":
-        return {"stringValue": val}
-    if t == "int":
-        return {"integerValue": str(val)}
-    if t == "bool":
-        return {"booleanValue": val}
-    if t == "float":
-        return {"doubleValue": val}
-    if t == "null":
-        return {"nullValue": None}
-    if t == "list":
-        values = []
-        for item in val:
-            values.append(_firestore_typed_value(item))
-        return {"arrayValue": {"values": values}}
-    if t == "dict":
-        return {"mapValue": {"fields": _firestore_typed_fields(val)}}
-    # Fallback: treat as string.
-    return {"stringValue": str(val)}
-
-# _firestore_typed_fields converts a dict of raw values into Firestore
-# typed fields (each value wrapped).
-def _firestore_typed_fields(fields):
-    result = {}
-    for k in fields:
-        result[k] = _firestore_typed_value(fields[k])
-    return result
-
-# _firestore_unwrap_value extracts the raw value from a Firestore typed
-# value wrapper (the inverse of _firestore_typed_value).
+# value wrapper (the inverse of _firestore_typed_value). ITERATIVE — the VM
+# forbids recursion, and real documents nest arrays and maps arbitrarily
+# deep, so containers are built with an explicit work stack of
+# [parent, key, typed] items (parent is the list/dict being filled; the
+# root rides in a one-element box).
 def _firestore_unwrap_value(typed):
-    if typed == None:
-        return None
-    if "stringValue" in typed:
-        return typed["stringValue"]
-    if "integerValue" in typed:
-        return _to_int(typed["integerValue"])
-    if "booleanValue" in typed:
-        return typed["booleanValue"]
-    if "doubleValue" in typed:
-        return typed["doubleValue"]
-    if "nullValue" in typed:
-        return None
-    if "arrayValue" in typed:
-        arr = typed["arrayValue"]
-        values = arr.get("values", [])
-        result = []
-        for v in values:
-            result.append(_firestore_unwrap_value(v))
-        return result
-    if "mapValue" in typed:
-        mv = typed["mapValue"]
-        return _firestore_unwrap_fields(mv.get("fields", {}))
-    if "timestampValue" in typed:
-        return typed["timestampValue"]
-    return None
+    root = [None]
+    stack = [[root, 0, typed]]
+    while len(stack) > 0:
+        item = stack.pop()
+        parent = item[0]
+        key = item[1]
+        tv = item[2]
+        if tv == None:
+            parent[key] = None
+        elif "stringValue" in tv:
+            parent[key] = tv["stringValue"]
+        elif "integerValue" in tv:
+            parent[key] = _to_int(tv["integerValue"])
+        elif "booleanValue" in tv:
+            parent[key] = tv["booleanValue"]
+        elif "doubleValue" in tv:
+            parent[key] = tv["doubleValue"]
+        elif "nullValue" in tv:
+            parent[key] = None
+        elif "timestampValue" in tv:
+            parent[key] = tv["timestampValue"]
+        elif "arrayValue" in tv:
+            values = tv["arrayValue"].get("values", [])
+            arr = []
+            parent[key] = arr
+            for v in values:
+                # Reserve the slot now; the popped item fills it by index.
+                stack.append([arr, len(arr), v])
+                arr.append(None)
+        elif "mapValue" in tv:
+            fields = tv["mapValue"].get("fields", {})
+            m = {}
+            parent[key] = m
+            for k in fields:
+                stack.append([m, k, fields[k]])
+        else:
+            parent[key] = None
+    return root[0]
 
 # _firestore_unwrap_fields converts Firestore typed fields back to raw values.
 def _firestore_unwrap_fields(fields):

@@ -159,7 +159,7 @@ def on_list_messages(req):
         result.append(m)
     page, next_cursor = _list_page(req, result)
     if page == None:
-        return _err(400, "INVALID_ARGUMENT", "Invalid page token.")
+        return _err(400, 400, "Invalid page token.", "INVALID_ARGUMENT")
     body = {"messages": page}
     if next_cursor != None:
         body["nextPageToken"] = next_cursor

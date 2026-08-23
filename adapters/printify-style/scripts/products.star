@@ -125,7 +125,6 @@ def on_update_product(req):
     for k in body:
         doc[k] = body[k]
 
-    seq = store_kv_incr("printify", "update_seq")
     doc["updated_at"] = clock.now_unix()
     c.update(product_id, doc)
 

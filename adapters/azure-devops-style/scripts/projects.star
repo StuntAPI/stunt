@@ -19,7 +19,8 @@ def on_list_projects(req):
             "url": p.get("url", ""),
             "state": p.get("state", "wellFormed"),
             "visibility": p.get("visibility", "private"),
-            "revision": p.get("revision", 1),
+            # revision round-trips through the store as a float; keep it an int.
+            "revision": _as_int(p.get("revision", 1)),
         })
 
     # Apply OData $top/$skip paging.

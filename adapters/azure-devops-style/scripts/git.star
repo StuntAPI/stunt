@@ -57,7 +57,9 @@ def on_get_item(req):
     if path == None or path == "":
         return _git_fault(400, "A path must be supplied.", "GitArgumentOutOfRangeException", 400)
 
-    commit_id = _resolve_commit_id(req, repo)
+    commit_id, fault = _resolve_commit_id(req, repo)
+    if fault != None:
+        return fault
     if commit_id == None:
         return _git_fault(404, "The item " + path + " does not exist at the requested version.", "GitItemNotFoundException", 4096)
 
@@ -198,7 +200,8 @@ def on_push(req):
 
     bc = store_collection("gitblobs")
     now_iso = _now_iso()
-    push_id = store_kv_incr("azure-devops", "push_seq") + 1
+    # incr returns the new value: no seeded pushes, so the first is pushId 1.
+    push_id = store_kv_incr("azure-devops", "push_seq")
     resp_commits = []
     head_id = old_id if old_id != _NULL_ID else None
     parent_id = None if old_id == _NULL_ID else old_id
@@ -311,22 +314,25 @@ def _norm_path(path):
     return p
 
 # _resolve_commit_id maps the request's versionDescriptor (or the repo's
-# default branch) to a commit id, or None when unresolvable.
+# default branch) to a commit id. Returns (commit_id, None) on resolution,
+# (None, None) when the version does not resolve, or (None, fault_response)
+# for a malformed descriptor.
 def _resolve_commit_id(req, repo):
     vt = "branch"
     version = repo.get("defaultBranch", "refs/heads/main")
     vd = _get_query(req, "versionDescriptor", "")
     if vd != None and vd != "" and vd[:1] == "{":
-        # json.decode raises on malformed input (surfacing as a 500); reject
-        # unlikely-shaped descriptors up front instead.
-        if vd.find('"') < 0 or vd[0:1] != "{" or vd[-1:] != "}":
-            return _git_fault(400, "Invalid versionDescriptor", "InvalidArgument", 0)
-        parsed = json.decode(vd)
+        # The descriptor is client input: json_safe_decode is total, so a
+        # malformed descriptor answers this adapter's 400 instead of raising
+        # into a 500 — and the fault must travel back to the caller.
+        parsed = json_safe_decode(vd)
+        if parsed == None:
+            return None, _git_fault(400, "Invalid versionDescriptor", "InvalidArgument", 0)
         vt = parsed.get("versionType", "branch")
         version = parsed.get("version", "")
 
     if vt == "commit":
-        return version
+        return version, None
 
     if version[:5] == "refs/":
         ref_name = version
@@ -338,8 +344,8 @@ def _resolve_commit_id(req, repo):
     fc = store_collection("refs")
     fdoc = fc.get(_ref_key(repo.get("id", ""), ref_name))
     if fdoc == None:
-        return None
-    return fdoc.get("object_id", None)
+        return None, None
+    return fdoc.get("object_id", None), None
 
 # _git_fault builds a Azure DevOps error envelope.
 def _git_fault(status, message, type_key, event_id):
@@ -361,7 +367,8 @@ def _repo_resource(r):
         "url": r.get("url", ""),
         "project": r.get("project", {}),
         "defaultBranch": r.get("defaultBranch", "refs/heads/main"),
-        "size": r.get("size", 0),
+        # size round-trips through the store as a float; keep it an int.
+        "size": _as_int(r.get("size", 0)),
         "remoteUrl": r.get("remoteUrl", ""),
         "sshUrl": r.get("sshUrl", ""),
         "webUrl": r.get("webUrl", ""),

@@ -91,9 +91,12 @@ endpoints:
     method: GET
     handler: scripts/library.star#on_get_rating
 
+  # concurrency_key: PUT reads-then-inserts the rating row keyed by id;
+  # racing puts on the same id would collide on the collection id.
   - route: /v1/me/ratings/{type}/{id}
     method: PUT
     handler: scripts/library.star#on_put_rating
+    concurrency_key: id
 
 # Backing stores — collections for stateful data.
 resources:

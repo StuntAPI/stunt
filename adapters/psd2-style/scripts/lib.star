@@ -66,12 +66,22 @@ def _list_page(req, docs):
 # _page_links returns the _links block additions for paginated list responses.
 # When next_cursor is not None it adds a "next" link with the cursor encoded as
 # the page query param, matching the NextGenPSD2 _links.next.href convention.
-# size_hint is the page size echoed back into the next href (string).
-def _page_links(base_href, next_cursor, size_hint):
+# Every OTHER incoming query param (size, withBalance, ...) is round-tripped —
+# a link-following client must not lose withBalance between pages.
+def _page_links(req, base_href, next_cursor):
     if next_cursor == None or next_cursor == "":
         return {}
+    parts = ["page=" + next_cursor]
+    q = _get_query(req)
+    for k in q:
+        if k == "page":
+            continue
+        v = q[k]
+        if v == None:
+            continue
+        parts.append(k + "=" + v)
     return {
-        "next": {"href": base_href + "?page=" + next_cursor + "&size=" + size_hint},
+        "next": {"href": base_href + "?" + "&".join(parts)},
     }
 
 # _num coerces a JSON-round-tripped number (int or float) to int.

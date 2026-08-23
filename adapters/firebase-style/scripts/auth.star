@@ -184,7 +184,8 @@ def _do_sign_up(body, version):
     }
     uc.insert(user)
 
-    return respond(200, _auth_response(user))
+    # signUp answers the SignupNewUserResponse kind.
+    return respond(200, _auth_response(user, "identitytoolkit#SignupNewUserResponse"))
 
 # _do_sign_in_with_idp signs in with a federated provider (Google etc).
 def _do_sign_in_with_idp(body, version):
@@ -204,7 +205,8 @@ def _do_sign_in_with_idp(body, version):
     uc = store_collection("users")
     uc.insert(user)
 
-    resp = _auth_response(user)
+    # An IdP assertion answers the VerifyAssertionResponse kind.
+    resp = _auth_response(user, "identitytoolkit#VerifyAssertionResponse")
     resp["providerUserInfo"] = [{
         "providerId": "google.com",
         "rawId": str(seq),
@@ -259,8 +261,10 @@ def _do_refresh(presented):
 # _auth_response issues tokens for a user and stores the bindings: every
 # idToken is bound to ITS user (id -> uid, with a 1h expiry) and every
 # refresh token is bound to its user. getAccountInfo / securetoken exchanges
-# verify against these bindings.
-def _auth_response(user):
+# verify against these bindings. kind is the Identity Toolkit response kind
+# the issuing endpoint answers (signupNewUser vs verifyPassword vs
+# verifyAssertion — the real API differs per method).
+def _auth_response(user, kind="identitytoolkit#VerifyPasswordResponse"):
     access_seq = store_kv_incr("fb", "token_seq")
     refresh_seq = store_kv_incr("fb", "refresh_seq")
 
@@ -280,7 +284,7 @@ def _auth_response(user):
         "email": user["email"],
         "displayName": user.get("displayName", ""),
         "registered": True,
-        "kind": "identitytoolkit#VerifyPasswordResponse",
+        "kind": kind,
     }
 
 # _user_for_token resolves the user an idToken was ISSUED to via the

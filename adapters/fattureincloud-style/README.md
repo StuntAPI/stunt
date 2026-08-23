@@ -16,9 +16,10 @@ a simulator doesn't reproduce them:
   assume one page.
 - **Auth** — `Authorization: Bearer <token>`. Any non-empty bearer is
   accepted (frictionless local testing); a missing or malformed header is a
-  genuine `401 {"error": {"code": "unauthorized", ...}}`.
-- **Scoping** — everything lives under `/c/{company_id}`. A company id
-  that doesn't exist (or belongs to nobody) is a plain 404.
+  genuine `401 {"error": "invalid_request", "error_description": ...}`.
+- **Scoping** — companies are discovered at `/user/companies`; everything
+  else lives under `/c/{company_id}`. A company id that doesn't exist (or
+  belongs to nobody) is a plain 404.
 - **Amounts are decimal strings** (`"9800.00"`), as the real API returns
   them. `JSON.parse` + cast makes them NaN; parse them.
 - **Dates** are `YYYY-MM-DD`; month bucketing is `date.slice(0, 7)`.
@@ -27,20 +28,20 @@ a simulator doesn't reproduce them:
 
 | Family | Endpoints |
 | --- | --- |
-| companies | `GET/POST /entities`, `GET/PUT /entities/{c}/info` |
-| received documents | `GET/POST /entities/{c}/received_documents`, `GET/PUT/DELETE .../{id}`, `GET .../info` |
+| companies | `GET /user/companies` (seeds one company; the v2 API has no create-company endpoint), `GET/PUT /c/{c}/company/info` |
+| received documents | `GET/POST /c/{c}/received_documents`, `GET/PUT/DELETE .../{id}`, `GET .../info` |
 | issued documents | same shape as received |
-| suppliers / clients / products | `GET/POST .../{resource}`, `GET/PUT/DELETE .../{id}` |
-| taxes | `GET /user/companies/{c}/taxes` (the standard Italian VAT bands) |
-| cashbook | `GET /user/companies/{c}/cashbook/{year}/{month}` |
-| webhooks | `GET/POST /c/{company_id}/subscriptions`, `GET/PUT/DELETE /c/{company_id}/subscriptions/{id}` |
-| archive | `POST /entities/{c}/archive` (JSON metadata — the real one is multipart) |
+| suppliers / clients / products | `GET/POST /c/{c}/{resource}`, `GET/PUT/DELETE .../{id}` |
+| taxes | `GET/POST /c/{c}/taxes`, `GET/PUT/DELETE /c/{c}/taxes/{id}` (F24 documents) |
+| cashbook | `GET /c/{c}/cashbook/{year}/{month}` |
+| webhooks | `GET/POST /c/{c}/subscriptions`, `GET/PUT/DELETE /c/{c}/subscriptions/{id}` |
+| archive | `POST /c/{c}/archive` (multipart file upload; a JSON body is accepted as a metadata-only fallback) |
 
 List filters: `page`, `per_page` (default 50, max 200), `q` (substring on
 name/description/category), `type`, `date_start`/`date_end` (inclusive, on
 document date).
 
-`GET /user/companies/{c}/received_documents/info` returns the categories in use —
+`GET /c/{c}/received_documents/info` returns the categories in use —
 the v2 "metodata" endpoint.
 
 ## Quick start
@@ -54,13 +55,12 @@ services:
 ```
 
 ```sh
-curl -X POST localhost:4210/entities -H 'Authorization: Bearer any' \
-     -H 'Content-Type: application/json' -d '{"name": "Acme SRL"}'
-curl -X POST localhost:4210/entities/1/received_documents \
+curl -H 'Authorization: Bearer any' localhost:4210/user/companies
+curl -X POST localhost:4210/c/1/received_documents \
      -H 'Authorization: Bearer any' -H 'Content-Type: application/json' \
      -d '{"date": "2026-06-10", "category": "groceries", "amount_net": "9800.00"}'
 curl -H 'Authorization: Bearer any' \
-     'localhost:4210/entities/1/received_documents?date_start=2026-06-01&date_end=2026-06-30'
+     'localhost:4210/c/1/received_documents?date_start=2026-06-01&date_end=2026-06-30'
 ```
 
 Not modelled: the OAuth2 token dance (pass any bearer), e-invoice
@@ -71,7 +71,11 @@ observable behaviour.
 
 Subscriptions (`POST /c/{company_id}/subscriptions`, real shape `{data:{sink,
 types, verification_method, config}}`, ids `SUBxxx`) register the sink and
-deliver signed notifications on subscribed document/entity events:
+deliver signed notifications on subscribed events. Event types use the real
+`it.fattureincloud.webhooks.<category>.<action>` naming (e.g.
+`it.fattureincloud.webhooks.issued_documents.create`,
+`it.fattureincloud.webhooks.entities.suppliers.create`); an empty `types`
+list subscribes to everything:
 
 ```
 X-Signature: base64(HMAC-SHA256("fic-stunt-webhook-signing-secret", raw_body))

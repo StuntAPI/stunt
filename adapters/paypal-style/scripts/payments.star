@@ -31,21 +31,12 @@ def on_get_capture(req):
         _advance_refund(r)
     refunded = _refunded_cents(refunds)
 
-    amount = doc.get("amount", {})
-    out = {
-        "id": doc["id"],
-        "status": doc.get("status", "COMPLETED"),
-        "amount": amount,
-        "final_capture": doc.get("final_capture", True),
-        "create_time": doc.get("create_time", ""),
-        "seller_protection": {"status": "ELIGIBLE", "dispute_categories": ["ITEM_NOT_RECEIVED", "UNAUTHORIZED_TRANSACTION"]},
-        "links": [
-            {"href": "https://api.stunt.test/v2/payments/captures/" + doc["id"], "rel": "self", "method": "GET"},
-        ],
-    }
-    if doc.get("order_id", "") != "":
-        out["links"].append({"href": "https://api.stunt.test/v2/checkout/orders/" + doc.get("order_id", ""), "rel": "up", "method": "GET"})
+    # Same rendering as the capture-creation endpoints (self + up, where up
+    # prefers the parent authorization over the order) plus the refund
+    # bookkeeping — one capture, one link set.
+    out = _capture_public(doc)
     if refunded > 0:
+        amount = doc.get("amount", {})
         out["refunded_amount"] = {"currency_code": amount.get("currency_code", "USD"), "value": _fmt_cents(refunded)}
 
     return respond(200, out)

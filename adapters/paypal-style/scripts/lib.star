@@ -58,13 +58,21 @@ def _pp_err_simple(status, name, message):
 
 # _pp_err_details returns a PayPal error carrying a real details[].issue
 # code (ORDER_NOT_APPROVED, PAYER_ACTION_REQUIRED, ...), the shape PayPal
-# returns for 4xx business-rule failures.
+# returns for 4xx business-rule failures. PayPal keeps the issue-specific
+# text in details[].description only — the top-level message is one fixed
+# generic string per status class.
+_PP_GENERIC_400 = "Request is not well-formed, syntactically incorrect, or violates schema."
+_PP_GENERIC_422 = "The requested action could not be performed, semantically incorrect, or failed validation."
+
 def _pp_err_details(status, name, issue, message):
     n = store_kv_incr("paypal", "debug_seq")
+    generic = _PP_GENERIC_422
+    if status != 422:
+        generic = _PP_GENERIC_400
     return respond(status, {
         "name": name,
         "details": [{"issue": issue, "description": message}],
-        "message": message,
+        "message": generic,
         "debug_id": "debug-" + str(n),
     })
 
