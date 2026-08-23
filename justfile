@@ -134,7 +134,10 @@ conformance-matrix:
 readme-counts:
     #!/bin/sh
     set -e
-    n="$(ls adapters | grep -c -- '-style$')"
+    # Same rule genmatrix uses (dirs holding an adapter.yaml), so the two
+    # derivations can never disagree on a non-*-style directory name.
+    n="$(find adapters -mindepth 2 -maxdepth 2 -name adapter.yaml | wc -l | tr -d ' ')"
+    [ "$n" -gt 0 ] || { echo "✗ no adapters found — run from the repo root" >&2; exit 1; }
     perl -pi -e 's/(\*\*Reference adapters in this repo\*\*[^0-9]*)[0-9]+( of them)/${1}'"$n"'${2}/' README.md
     grep -qE "Reference adapters in this repo\*\*[^0-9]*$n of them" README.md || {
         echo "✗ README adapter-count anchor not found — the line was reworded; update justfile readme-counts" >&2
@@ -147,7 +150,8 @@ readme-counts:
 repo-description:
     #!/bin/sh
     set -e
-    n="$(ls adapters | grep -c -- '-style$')"
+    n="$(find adapters -mindepth 2 -maxdepth 2 -name adapter.yaml | wc -l | tr -d ' ')"
+    [ "$n" -gt 0 ] || { echo "✗ no adapters found — run from the repo root" >&2; exit 1; }
     gh api -X PATCH repos/StuntAPI/stunt -f description="Local mock API server: $n offline, stateful stand-ins for public APIs (Stripe, GitHub, Twilio, AWS, Auth0…) — one static Go binary. Test without accounts, keys, or network."
     echo "✓ repo description set ($n adapters)"
 
