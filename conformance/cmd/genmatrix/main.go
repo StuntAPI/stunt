@@ -414,25 +414,33 @@ func resolveVersions(checks []check, versions map[string]string) (map[string]str
 
 // ---- derived provider surfaces -------------------------------------------
 
-// surfaceSpec names the pinned-SDK route table an adapter's provider
-// surface is derived from: a Google service dir inside the
-// google-api-go-client module (the Discovery doc ships in the module), or
-// an npm package under conformance/node (its embedded codegen route
-// table). Label resolves the display version via the usual maps.
+// surfaceSpec names the route table an adapter's provider surface is
+// derived from: a Google service dir inside the google-api-go-client
+// module (the Discovery doc ships in the module), an npm package under
+// conformance/node (its embedded codegen route table), or a vendored
+// spec artifact under conformance/surfaces/ (produced by fetchsurfaces —
+// `just surfaces-fetch`). Label resolves the display version via the
+// usual maps; vendored specs carry their own provenance string.
 type surfaceSpec struct {
-	Kind  string // "google" | "node"
+	Kind  string // "google" | "node" | "spec"
 	Ref   string
+	Also  string // optional second google table unioned in (multi-service adapters)
 	Label string
 }
 
-// surfaceSource intentionally lists only adapters whose SDK embeds a
-// trustworthy full-API table. cloudflare-go and go-shopify are hand-written
-// subsets; zendesk ships minified; salesforce/discord/graph expose none —
-// those stay curated until the vendored-spec pass.
+// surfaceSource intentionally lists only adapters with a trustworthy
+// full-API table: embedded in the pinned SDK (Google Discovery docs in
+// the module; generated tables in the Node clients) or vendored from the
+// provider's own published spec (conformance/surfaces/, via
+// `just surfaces-fetch`). cloudflare-go and go-shopify are hand-written
+// subsets; zendesk ships minified; salesforce exposes none — salesforce
+// stays curated, the rest now ride vendored specs.
 var surfaceSource = map[string]surfaceSpec{
 	// Google Discovery docs, read from the pinned module.
-	"apps-script-style":    {Kind: "google", Ref: "script/v1", Label: "google-api-go-client"},
-	"ga4-style":            {Kind: "google", Ref: "analyticsdata/v1beta", Label: "google-api-go-client"},
+	"apps-script-style": {Kind: "google", Ref: "script/v1", Label: "google-api-go-client"},
+	// ga4 spans two real services: the Data API and the Admin API the
+	// adapter's /v1beta aliases serve.
+	"ga4-style":            {Kind: "google", Ref: "analyticsdata/v1beta", Also: "analyticsadmin/v1beta", Label: "google-api-go-client"},
 	"gcalendar-style":      {Kind: "google", Ref: "calendar/v3", Label: "google-api-go-client"},
 	"gdocs-style":          {Kind: "google", Ref: "docs/v1", Label: "google-api-go-client"},
 	"gmail-style":          {Kind: "google", Ref: "gmail/v1", Label: "google-api-go-client"},
@@ -453,7 +461,30 @@ var surfaceSource = map[string]surfaceSpec{
 	"slack-style":   {Kind: "node", Ref: "@slack/web-api", Label: "slack-node"},
 	"square-style":  {Kind: "node", Ref: "square", Label: "square-node"},
 	"stripe-style":  {Kind: "node", Ref: "stripe", Label: "stripe-node"},
-	"twilio-style":  {Kind: "node", Ref: "twilio", Label: "twilio-node"},
+	// Vendored official specs (conformance/surfaces/, network-free at
+	// generation time — fetchsurfaces produced them from the URLs recorded
+	// in each artifact).
+	"apple-appstoreconnect-style": {Kind: "spec", Ref: "apple-appstoreconnect-style.json"},
+	"auth0-style":                 {Kind: "spec", Ref: "auth0-style.json"},
+	"azure-devops-style":          {Kind: "spec", Ref: "azure-devops-style.json"},
+	"azure-storage-style":         {Kind: "spec", Ref: "azure-storage-style.json"},
+	"cloudflare-style":            {Kind: "spec", Ref: "cloudflare-style.json"},
+	"discord-style":               {Kind: "spec", Ref: "discord-style.json"},
+	"entra-id-style":              {Kind: "spec", Ref: "entra-id-style.json"},
+	"fattureincloud-style":        {Kind: "spec", Ref: "fattureincloud-style.json"},
+	"microsoft-graph-style":       {Kind: "spec", Ref: "microsoft-graph-style.json"},
+	"onfido-style":                {Kind: "spec", Ref: "onfido-style.json"},
+	"opensea-style":               {Kind: "spec", Ref: "opensea-style.json"},
+	"paypal-style":                {Kind: "spec", Ref: "paypal-style.json"},
+	"persona-style":               {Kind: "spec", Ref: "persona-style.json"},
+	"printful-style":              {Kind: "spec", Ref: "printful-style.json"},
+	"printify-style":              {Kind: "spec", Ref: "printify-style.json"},
+	"revenuecat-style":            {Kind: "spec", Ref: "revenuecat-style.json"},
+	"sendgrid-style":              {Kind: "spec", Ref: "sendgrid-style.json"},
+	"twitter-style":               {Kind: "spec", Ref: "twitter-style.json"},
+	"x-articles-style":            {Kind: "spec", Ref: "x-articles-style.json"},
+	"xero-style":                  {Kind: "spec", Ref: "xero-style.json"},
+	"twilio-style":                {Kind: "node", Ref: "twilio", Label: "twilio-node"},
 }
 
 // surfaceOut is the derived coverage for one adapter.
@@ -477,19 +508,40 @@ func deriveSurfaces(adapters []*adapter.Adapter, sdkVer map[string]string, confD
 		if !ok {
 			continue
 		}
-		ver, ok := sdkVer[spec.Label]
-		if !ok {
-			return nil, fmt.Errorf("surface source for %s: sdk label %q has no resolved version — is its suite installed?", a.ID, spec.Label)
-		}
-		cacheKey := spec.Kind + " " + spec.Ref
-		table, done := tables[cacheKey]
-		if !done {
-			var err error
-			table, err = sdkmap.Extract(spec.Kind, spec.Ref, confDir)
+		var source string
+		var table []sdkmap.Route
+		if spec.Kind == "spec" {
+			// Vendored artifacts carry their own provenance; one file per
+			// adapter, so nothing is shared to cache.
+			f, err := sdkmap.LoadSurface(filepath.Join(confDir, "surfaces", spec.Ref))
 			if err != nil {
-				return nil, fmt.Errorf("surface for %s: %w", a.ID, err)
+				return nil, fmt.Errorf("surface for %s: %w — run `just surfaces-fetch`", a.ID, err)
 			}
-			tables[cacheKey] = table
+			table, source = f.Routes, f.Source
+		} else {
+			ver, ok := sdkVer[spec.Label]
+			if !ok {
+				return nil, fmt.Errorf("surface source for %s: sdk label %q has no resolved version — is its suite installed?", a.ID, spec.Label)
+			}
+			source = "sdk " + spec.Label + " @ " + ver
+			cacheKey := spec.Kind + " " + spec.Ref + " " + spec.Also
+			cached, done := tables[cacheKey]
+			if !done {
+				var err error
+				cached, err = sdkmap.Extract(spec.Kind, spec.Ref, confDir)
+				if err != nil {
+					return nil, fmt.Errorf("surface for %s: %w", a.ID, err)
+				}
+				if spec.Also != "" {
+					extra, err := sdkmap.Extract(spec.Kind, spec.Also, confDir)
+					if err != nil {
+						return nil, fmt.Errorf("surface for %s: %w", a.ID, err)
+					}
+					cached = append(append([]sdkmap.Route{}, cached...), extra...)
+				}
+				tables[cacheKey] = cached
+			}
+			table = cached
 		}
 		var adapterRoutes []sdkmap.AdapterRoute
 		for _, ep := range a.Endpoints {
@@ -501,7 +553,7 @@ func deriveSurfaces(adapters []*adapter.Adapter, sdkVer map[string]string, confD
 			pct = diff.Covered * 100 / diff.Provider
 		}
 		out[a.ID] = &surfaceOut{
-			Source:   "sdk " + spec.Label + " @ " + ver,
+			Source:   source,
 			Provider: diff.Provider,
 			Covered:  diff.Covered,
 			Pct:      pct,
@@ -601,7 +653,7 @@ Verification tiers:
 		len(adapters), nBoth, nSDK, nVM, len(adapters)-nBoth-nSDK-nVM)
 
 	if len(surfaces) > 0 {
-		fmt.Fprintf(&b, "**%d adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) — mechanical, network-free, and refreshed by SDK bumps. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no SDK table worth trusting and stay fully curated.\n\n", len(surfaces))
+		fmt.Fprintf(&b, "**%d adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.\n\n", len(surfaces))
 	}
 
 	b.WriteString("| Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |\n")

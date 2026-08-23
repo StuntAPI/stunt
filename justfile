@@ -127,6 +127,14 @@ conformance-node:
 conformance-matrix:
     cd conformance && go run ./cmd/genmatrix -json matrix.json
 
+# Vendor provider route tables from their official published specs into
+# conformance/surfaces/ — the ONLY network-touching step of the matrix.
+# Manual: run when onboarding an adapter or refreshing a spec (CI never
+# fetches; genmatrix reads the committed artifacts). Filter to specific
+# adapters with `just surfaces-fetch <adapter-id>...`.
+surfaces-fetch *ids='':
+    cd conformance && go run ./cmd/fetchsurfaces {{ids}}
+
 # Coverage-guided fuzzing — each target for the given time (default 30s;
 # pass just fuzz 2m for longer rounds). The fuzz seed corpora also run as
 # regular tests in `just test`, so discovered inputs stay pinned forever.

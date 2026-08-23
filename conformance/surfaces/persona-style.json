@@ -1,0 +1,860 @@
+{
+  "source": "spec Persona API reference @ 1.0.0",
+  "url": "https://docs.withpersona.com/openapi/api-reference.json",
+  "fetched": "2026-08-22",
+  "license": "none stated",
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/account-types/{account-type-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/accounts"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/accounts"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/accounts/search"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/accounts/{account-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/accounts/{account-id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/inquiry/v1/accounts/{account-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/accounts/{account-id}/add-relation"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/accounts/{account-id}/add-tag"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/accounts/{account-id}/consolidate"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/accounts/{account-id}/relations"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/accounts/{account-id}/remove-relation"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/accounts/{account-id}/remove-tag"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/accounts/{account-id}/run-action"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/accounts/{account-id}/set-tags"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/api-keys"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/api-keys"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/api-keys/{api-key-id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/inquiry/v1/api-keys/{api-key-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/api-keys/{api-key-id}/clone"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/api-keys/{api-key-id}/expire"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/api-logs"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/api-logs/{api-log-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/case-templates/{case-template-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/cases"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/cases"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/cases/search"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/cases/{case-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/cases/{case-id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/inquiry/v1/cases/{case-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/cases/{case-id}/add-objects"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/cases/{case-id}/add-tag"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/cases/{case-id}/assign"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/cases/{case-id}/remove-objects"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/cases/{case-id}/remove-tag"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/cases/{case-id}/set-status"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/cases/{case-id}/set-tags"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/connect/connections"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/connect/connections"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/connect/connections/{connection-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/connect/connections/{connection-id}/deactivate"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/connect/connections/{connection-id}/reactivate"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/connect/share-tokens"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/connect/share-tokens"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/connect/share-tokens/{share-token-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/connect/share-tokens/{share-token-id}/expire"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/connect/share-tokens/{share-token-id}/redeem"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/devices"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/devices/{device-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/document/generics/{document-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/document/government-ids/{document-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/documents/{document-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/events"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/events/{event-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/graph-queries"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/graph-queries/{graph-query-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/importer/accounts"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/importer/list-item/email-addresses"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/importer/list-item/faces"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/importer/list-item/geolocations"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/importer/list-item/government-id-numbers"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/importer/list-item/ip-addresses"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/importer/list-item/names"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/importer/list-item/phone-numbers"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/importers"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/importers/{importer-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/inquiries"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiries"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiries/search"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}/add-tag"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}/approve"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}/decline"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}/expire"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}/generate-one-time-link"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}/mark-for-review"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}/perform-simulate-actions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}/print"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}/remove-tag"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}/resume"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}/set-simulate-stubs"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiries/{inquiry-id}/set-tags"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/inquiry-sessions"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiry-sessions"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiry-sessions/expire-all"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/inquiry-sessions/{inquiry-session-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiry-sessions/{inquiry-session-id}/expire"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/inquiry-sessions/{inquiry-session-id}/generate-one-time-link"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/inquiry-template-versions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/inquiry-templates"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/inquiry-templates/{inquiry-template-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list-item/browser-fingerprints"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/list-item/browser-fingerprints/{list-item-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/list-item/browser-fingerprints/{list-item-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list-item/countries"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/list-item/countries/{list-item-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/list-item/countries/{list-item-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list-item/device-fingerprints"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/list-item/device-fingerprints/{list-item-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/list-item/device-fingerprints/{list-item-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list-item/email-addresses"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/list-item/email-addresses/{list-item-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/list-item/email-addresses/{list-item-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list-item/fields"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/list-item/fields/{list-item-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/list-item/fields/{list-item-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list-item/geolocations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/list-item/geolocations/{list-item-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/list-item/geolocations/{list-item-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list-item/government-id-numbers"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/list-item/government-id-numbers/{list-item-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/list-item/government-id-numbers/{list-item-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list-item/ip-addresses"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/list-item/ip-addresses/{list-item-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/list-item/ip-addresses/{list-item-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list-item/names"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/list-item/names/{list-item-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/list-item/names/{list-item-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list-item/phone-numbers"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/list-item/phone-numbers/{list-item-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/list-item/phone-numbers/{list-item-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list-item/strings"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/list-item/strings/{list-item-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/list-item/strings/{list-item-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list/browser-fingerprints"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list/countries"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list/email-addresses"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list/geolocations"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list/government-id-numbers"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list/ip-addresses"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list/names"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list/phone-numbers"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/list/strings"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/lists"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/lists/{list-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/lists/{list-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/oauth/authorize"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/oauth/token"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/privacy-passes"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/rate-limits"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/relays"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/relays/challenge"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/relays/{relay-token}/generate-claim"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/reports"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/reports"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/reports/{report-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/reports/{report-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/reports/{report-id}/add-tag"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/reports/{report-id}/dismiss"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/reports/{report-id}/history"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/reports/{report-id}/pause"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/reports/{report-id}/print"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/reports/{report-id}/remove-tag"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/reports/{report-id}/resume"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/reports/{report-id}/run"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/reports/{report-id}/set-tags"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/theme-sets"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/theme-sets"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/theme-sets/{theme-set-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/theme-sets/{theme-set-id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/inquiry/v1/theme-sets/{theme-set-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/transaction-types/{transaction-type-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/transactions"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/transactions"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/transactions/{transaction-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/transactions/{transaction-id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/inquiry/v1/transactions/{transaction-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/transactions/{transaction-id}/add-relation"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/transactions/{transaction-id}/add-tag"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/transactions/{transaction-id}/label"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/transactions/{transaction-id}/redact-biometrics"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/transactions/{transaction-id}/remove-relation"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/transactions/{transaction-id}/remove-tag"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/transactions/{transaction-id}/set-tags"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/user-audit-logs"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/user-audit-logs/{user-audit-log-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/aamvas/{verification-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/verification/database-businesses"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/database-businesses/{verification-id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/inquiry/v1/verification/database-businesses/{verification-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/verification/database-businesses/{verification-id}/submit"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/database-ecbsvs/{verification-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/database-phone-carriers/{verification-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/database-serpros/{verification-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/database-standards/{verification-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/database-tins/{verification-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/databases/{verification-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/documents/{verification-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/email-addresses/{verification-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/government-id-nfcs/{verification-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/government-ids/{verification-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/phone-numbers/{verification-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verification/selfies/{verification-id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/inquiry/v1/verifications/{verification-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verifications/{verification-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/verifications/{verification-id}/investigation-lock"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/verifications/{verification-id}/investigation-unlock"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/verifications/{verification-id}/print"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/webhooks"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/webhooks"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/webhooks/{webhook-id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/inquiry/v1/webhooks/{webhook-id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/webhooks/{webhook-id}/archive"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/webhooks/{webhook-id}/clone"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/webhooks/{webhook-id}/disable"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/webhooks/{webhook-id}/enable"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/webhooks/{webhook-id}/rotate-secret"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/workflow-runs"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/workflow-runs/{workflow-run-id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/inquiry/v1/workflow-versions"
+    },
+    {
+      "method": "POST",
+      "route": "/api/inquiry/v1/workflows/{workflow-id}/trigger"
+    }
+  ]
+}

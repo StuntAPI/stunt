@@ -1,0 +1,564 @@
+{
+  "source": "spec OpenSea ReadMe registry spec (semi-official) @ 2.0.0",
+  "url": "https://dash.readme.com/api/v1/api-registry/4c25mt2f2f8m",
+  "fetched": "2026-08-22",
+  "license": "none stated",
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/collections"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/favorites"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/listings"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/offers"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/offers_received"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/perpetual_watchlist"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/pnl"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/pnl/closed-positions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/pnl/token-transfers"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/portfolio"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/portfolio/history"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/token-activity"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/token_watchlist"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/account/{address}/tokens"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/accounts/agent"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/accounts/agent"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/accounts/agent-relationships"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/accounts/agent-relationships"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/accounts/agent-relationships"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/accounts/agent-relationships/confirm"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/accounts/resolve/{identifier}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/accounts/wallets/siwx"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/accounts/wallets/{wallet}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/accounts/wallets/{wallet}/private"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/accounts/wallets/{wallet}/private"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/accounts/{address_or_username}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/accounts/{address_or_username}/agent-relationships"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/accounts/{address_or_username}/follow"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/accounts/{address_or_username}/follow"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/accounts/{address_or_username}/followers"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/accounts/{address_or_username}/following"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/accounts/{address_or_username}/relationship"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/accounts/{address_or_username}/watch"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/accounts/{address_or_username}/watch"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/assets/transfer"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/auth/keys"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/account/{address}/nfts"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/contract/{address}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/contract/{address}/nfts"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/contract/{address}/nfts/{identifier}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/contract/{address}/nfts/{identifier}/analytics"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/contract/{address}/nfts/{identifier}/collection"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/contract/{address}/nfts/{identifier}/owners"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/chain/{chain}/contract/{address}/nfts/{identifier}/refresh"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/chain/{chain}/contract/{address}/nfts/{identifier}/validate-metadata"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/payment_token/{address}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/token/{address}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/token/{address}/activity"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/token/{address}/activity/stats"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/token/{address}/holders"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/token/{address}/liquidity-pools"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/token/{address}/ohlcv"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chain/{chain}/token/{address}/price_history"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/chains"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/collection/{slug}/nfts"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/collections"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/collections/batch"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/collections/top"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/collections/trending"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/collections/{slug}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/collections/{slug}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/collections/{slug}/floor_prices"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/collections/{slug}/holders"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/collections/{slug}/images/{image_type}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/collections/{slug}/metadata"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/collections/{slug}/offer_aggregates"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/collections/{slug}/stats"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/collections/{slug}/visibility"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/drops"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/drops/deploy"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/drops/deploy/{chain}/{tx_hash}/receipt"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/drops/{slug}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/drops/{slug}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/drops/{slug}/allowlist"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/drops/{slug}/allowlist/validate"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/drops/{slug}/cross_chain_mint"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/drops/{slug}/eligibility"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/drops/{slug}/items"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/drops/{slug}/items/media"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/drops/{slug}/items/media/save"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/drops/{slug}/items/{token_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/api/v2/drops/{slug}/items/{token_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/drops/{slug}/mint"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/drops/{slug}/prereveal-item"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/events"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/events/accounts/{address}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/events/chain/{chain}/contract/{address}/nfts/{identifier}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/events/collection/{slug}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/listings/actions"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/listings/collection/{slug}/all"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/listings/collection/{slug}/best"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/listings/collection/{slug}/nfts/{identifier}/best"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/listings/cross_chain_fulfillment_data"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/listings/fulfillment_data"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/listings/sweep"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/metadata/{chain}/{contractAddress}/{tokenId}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/nfts/batch"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/offers"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/offers/build"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/offers/collection/{slug}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/offers/collection/{slug}/all"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/offers/collection/{slug}/nfts/{identifier}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/offers/collection/{slug}/nfts/{identifier}/best"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/offers/collection/{slug}/traits"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/offers/fulfillment_data"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/orders/chain/{chain}/protocol/{protocol_address}/{order_hash}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/orders/chain/{chain}/protocol/{protocol_address}/{order_hash}/cancel"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/orders/{chain}/{protocol}/listings"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/orders/{chain}/{protocol}/offers"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/profile"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/profile/images"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/profile/nft-pfp"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/profile/nft-pfp"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/profile/shelves"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/profile/shelves"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/profile/shelves"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/profile/shelves/{shelf_id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/api/v2/profile/shelves/{shelf_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/profile/username"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/saved-tools"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/saved-tools"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/saved-tools"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/search"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/swap/execute"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/swap/quote"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/token-groups"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/token-groups/{slug}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/tokens/batch"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/tokens/top"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/tokens/trending"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/tools"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/tools/search"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/tools/usage"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/tools/{registry_chain}/{registry_addr}/{tool_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/tools/{registry_chain}/{registry_addr}/{tool_id}/activity"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v2/traits/{slug}"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/transactions/receipt"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v2/watchlist"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v2/watchlist"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "source": "spec sendgrid-oai tsg_mail_v3 @ 1.0.0",
+  "url": "https://raw.githubusercontent.com/twilio/sendgrid-oai/main/spec/yaml/tsg_mail_v3.yaml",
+  "fetched": "2026-08-22",
+  "license": "MIT",
+  "routes": [
+    {
+      "method": "POST",
+      "route": "/v3/mail/batch"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/mail/batch/{batch_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v3/mail/send"
+    }
+  ]
+}

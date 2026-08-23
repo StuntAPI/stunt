@@ -1,0 +1,284 @@
+{
+  "source": "spec azure-rest-api-specs BlobStorage 2026-06-06 @ 2026-06-06",
+  "url": "https://raw.githubusercontent.com/Azure/azure-rest-api-specs/main/specification/storage/data-plane/Microsoft.BlobStorage/stable/2026-06-06/blob.json",
+  "fetched": "2026-08-22",
+  "license": "MIT",
+  "routes": [
+    {
+      "method": "POST",
+      "route": "/?comp=batch"
+    },
+    {
+      "method": "GET",
+      "route": "/?comp=blobs"
+    },
+    {
+      "method": "GET",
+      "route": "/?comp=list"
+    },
+    {
+      "method": "GET",
+      "route": "/?restype=account\u0026comp=properties"
+    },
+    {
+      "method": "GET",
+      "route": "/?restype=service\u0026comp=properties"
+    },
+    {
+      "method": "PUT",
+      "route": "/?restype=service\u0026comp=properties"
+    },
+    {
+      "method": "GET",
+      "route": "/?restype=service\u0026comp=stats"
+    },
+    {
+      "method": "POST",
+      "route": "/?restype=service\u0026comp=userdelegationkey"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{containerName}/{blob}"
+    },
+    {
+      "method": "GET",
+      "route": "/{containerName}/{blob}"
+    },
+    {
+      "method": "HEAD",
+      "route": "/{containerName}/{blob}"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?AppendBlob"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?BlockBlob"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?BlockBlob\u0026fromUrl"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?PageBlob"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=appendblock"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=appendblock\u0026fromUrl"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=block"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=block\u0026fromURL"
+    },
+    {
+      "method": "GET",
+      "route": "/{containerName}/{blob}?comp=blocklist"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=blocklist"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=copy"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=copy\u0026copyid"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=copy\u0026sync"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=expiry"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{containerName}/{blob}?comp=immutabilityPolicies"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=immutabilityPolicies"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=incrementalcopy"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=lease\u0026acquire"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=lease\u0026break"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=lease\u0026change"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=lease\u0026release"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=lease\u0026renew"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=legalhold"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=metadata"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=page\u0026clear"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=page\u0026update"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=page\u0026update\u0026fromUrl"
+    },
+    {
+      "method": "GET",
+      "route": "/{containerName}/{blob}?comp=pagelist"
+    },
+    {
+      "method": "GET",
+      "route": "/{containerName}/{blob}?comp=pagelist\u0026diff"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=properties\u0026Resize"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=properties\u0026SetHTTPHeaders"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=properties\u0026UpdateSequenceNumber"
+    },
+    {
+      "method": "POST",
+      "route": "/{containerName}/{blob}?comp=query"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=seal"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=snapshot"
+    },
+    {
+      "method": "GET",
+      "route": "/{containerName}/{blob}?comp=tags"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=tags"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=tier"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}/{blob}?comp=undelete"
+    },
+    {
+      "method": "GET",
+      "route": "/{containerName}/{blob}?restype=account\u0026comp=properties\u0026blob"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}?comp=lease\u0026restype=container\u0026acquire"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}?comp=lease\u0026restype=container\u0026break"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}?comp=lease\u0026restype=container\u0026change"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}?comp=lease\u0026restype=container\u0026release"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}?comp=lease\u0026restype=container\u0026renew"
+    },
+    {
+      "method": "GET",
+      "route": "/{containerName}?restype=account\u0026comp=properties"
+    },
+    {
+      "method": "DELETE",
+      "route": "/{containerName}?restype=container"
+    },
+    {
+      "method": "GET",
+      "route": "/{containerName}?restype=container"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}?restype=container"
+    },
+    {
+      "method": "GET",
+      "route": "/{containerName}?restype=container\u0026comp=acl"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}?restype=container\u0026comp=acl"
+    },
+    {
+      "method": "POST",
+      "route": "/{containerName}?restype=container\u0026comp=batch"
+    },
+    {
+      "method": "GET",
+      "route": "/{containerName}?restype=container\u0026comp=blobs"
+    },
+    {
+      "method": "GET",
+      "route": "/{containerName}?restype=container\u0026comp=list\u0026flat"
+    },
+    {
+      "method": "GET",
+      "route": "/{containerName}?restype=container\u0026comp=list\u0026hierarchy"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}?restype=container\u0026comp=metadata"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}?restype=container\u0026comp=rename"
+    },
+    {
+      "method": "PUT",
+      "route": "/{containerName}?restype=container\u0026comp=undelete"
+    }
+  ]
+}

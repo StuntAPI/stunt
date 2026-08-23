@@ -1,0 +1,76 @@
+{
+  "source": "spec paypal-rest-api-specifications checkout_orders_v2 + payments_payment_v2 @ 2.32, 2.12",
+  "url": "https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/main/openapi/checkout_orders_v2.json https://raw.githubusercontent.com/paypal/paypal-rest-api-specifications/main/openapi/payments_payment_v2.json",
+  "fetched": "2026-08-22",
+  "license": "Apache-2.0",
+  "routes": [
+    {
+      "method": "POST",
+      "route": "/v2/checkout/orders"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/checkout/orders/order-update-callback"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/checkout/orders/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/checkout/orders/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/checkout/orders/{id}/authorize"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/checkout/orders/{id}/capture"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/checkout/orders/{id}/confirm-payment-source"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/checkout/orders/{id}/track"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/checkout/orders/{id}/trackers/{tracker_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/payments/authorizations/{authorization_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/payments/authorizations/{authorization_id}/capture"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/payments/authorizations/{authorization_id}/reauthorize"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/payments/authorizations/{authorization_id}/void"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/payments/captures/{capture_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/payments/captures/{capture_id}/refund"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/payments/find-eligible-methods"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/payments/refunds/{refund_id}"
+    }
+  ]
+}

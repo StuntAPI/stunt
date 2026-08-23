@@ -23,7 +23,7 @@ Verification tiers:
 
 **98 adapters** — 2 SDK+VM, 33 SDK-only, 4 VM-only, 59 boot-tier.
 
-**22 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) — mechanical, network-free, and refreshed by SDK bumps. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no SDK table worth trusting and stay fully curated.
+**42 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.
 
 | Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |
 |---|---|---|---|---|---|---|---|
@@ -660,6 +660,65 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec App Store Connect OpenAPI Specification @ 4.4.1: 1263 real routes · 10 covered · 0% · 1253 not implemented
+
+<details><summary>not implemented (1253)</summary>
+
+- `POST` `/v1/accessibilityDeclarations`
+- `DELETE` `/v1/accessibilityDeclarations/{id}`
+- `GET` `/v1/accessibilityDeclarations/{id}`
+- `PATCH` `/v1/accessibilityDeclarations/{id}`
+- `GET` `/v1/actors`
+- `GET` `/v1/actors/{id}`
+- `PATCH` `/v1/ageRatingDeclarations/{id}`
+- `GET` `/v1/alternativeDistributionDomains`
+- `POST` `/v1/alternativeDistributionDomains`
+- `DELETE` `/v1/alternativeDistributionDomains/{id}`
+- `GET` `/v1/alternativeDistributionDomains/{id}`
+- `GET` `/v1/alternativeDistributionKeys`
+- `POST` `/v1/alternativeDistributionKeys`
+- `DELETE` `/v1/alternativeDistributionKeys/{id}`
+- `GET` `/v1/alternativeDistributionKeys/{id}`
+- `GET` `/v1/alternativeDistributionPackageDeltas/{id}`
+- `GET` `/v1/alternativeDistributionPackageVariants/{id}`
+- `GET` `/v1/alternativeDistributionPackageVersions/{id}`
+- `GET` `/v1/alternativeDistributionPackageVersions/{id}/deltas`
+- `GET` `/v1/alternativeDistributionPackageVersions/{id}/relationships/deltas`
+- `GET` `/v1/alternativeDistributionPackageVersions/{id}/relationships/variants`
+- `GET` `/v1/alternativeDistributionPackageVersions/{id}/variants`
+- `POST` `/v1/alternativeDistributionPackages`
+- `GET` `/v1/alternativeDistributionPackages/{id}`
+- `GET` `/v1/alternativeDistributionPackages/{id}/relationships/versions`
+- `GET` `/v1/alternativeDistributionPackages/{id}/versions`
+- `GET` `/v1/analyticsReportInstances/{id}`
+- `GET` `/v1/analyticsReportInstances/{id}/relationships/segments`
+- `GET` `/v1/analyticsReportInstances/{id}/segments`
+- `POST` `/v1/analyticsReportRequests`
+- `DELETE` `/v1/analyticsReportRequests/{id}`
+- `GET` `/v1/analyticsReportRequests/{id}`
+- `GET` `/v1/analyticsReportRequests/{id}/relationships/reports`
+- `GET` `/v1/analyticsReportRequests/{id}/reports`
+- `GET` `/v1/analyticsReportSegments/{id}`
+- `GET` `/v1/analyticsReports/{id}`
+- `GET` `/v1/analyticsReports/{id}/instances`
+- `GET` `/v1/analyticsReports/{id}/relationships/instances`
+- `POST` `/v1/androidToIosAppMappingDetails`
+- `DELETE` `/v1/androidToIosAppMappingDetails/{id}`
+- `GET` `/v1/androidToIosAppMappingDetails/{id}`
+- `PATCH` `/v1/androidToIosAppMappingDetails/{id}`
+- `GET` `/v1/appCategories`
+- `GET` `/v1/appCategories/{id}`
+- `GET` `/v1/appCategories/{id}/parent`
+- `GET` `/v1/appCategories/{id}/relationships/parent`
+- `GET` `/v1/appCategories/{id}/relationships/subcategories`
+- `GET` `/v1/appCategories/{id}/subcategories`
+- `POST` `/v1/appClipAdvancedExperienceImages`
+- `GET` `/v1/appClipAdvancedExperienceImages/{id}`
+… and 1203 more
+
+
+</details>
+
 **Missing** (7)
 
 - No TestFlight beta testing (betaGroups, betaTesters, buildBetaDetails)
@@ -833,6 +892,65 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec Auth0 Management API OAS @ 2.0: 469 real routes · 10 covered · 2% · 459 not implemented
+
+<details><summary>not implemented (459)</summary>
+
+- `GET` `/api/v2/actions/actions`
+- `POST` `/api/v2/actions/actions`
+- `GET` `/api/v2/actions/actions/{actionId}/versions`
+- `GET` `/api/v2/actions/actions/{actionId}/versions/{id}`
+- `POST` `/api/v2/actions/actions/{actionId}/versions/{id}/deploy`
+- `DELETE` `/api/v2/actions/actions/{id}`
+- `GET` `/api/v2/actions/actions/{id}`
+- `PATCH` `/api/v2/actions/actions/{id}`
+- `POST` `/api/v2/actions/actions/{id}/deploy`
+- `POST` `/api/v2/actions/actions/{id}/test`
+- `GET` `/api/v2/actions/executions/{id}`
+- `GET` `/api/v2/actions/modules`
+- `POST` `/api/v2/actions/modules`
+- `DELETE` `/api/v2/actions/modules/{id}`
+- `GET` `/api/v2/actions/modules/{id}`
+- `PATCH` `/api/v2/actions/modules/{id}`
+- `GET` `/api/v2/actions/modules/{id}/actions`
+- `POST` `/api/v2/actions/modules/{id}/rollback`
+- `GET` `/api/v2/actions/modules/{id}/versions`
+- `POST` `/api/v2/actions/modules/{id}/versions`
+- `GET` `/api/v2/actions/modules/{id}/versions/{versionId}`
+- `GET` `/api/v2/actions/triggers`
+- `GET` `/api/v2/actions/triggers/{triggerId}/bindings`
+- `PATCH` `/api/v2/actions/triggers/{triggerId}/bindings`
+- `GET` `/api/v2/agents`
+- `POST` `/api/v2/agents`
+- `DELETE` `/api/v2/agents/{id}`
+- `GET` `/api/v2/agents/{id}`
+- `PATCH` `/api/v2/agents/{id}`
+- `DELETE` `/api/v2/anomaly/blocks/ips/{id}`
+- `GET` `/api/v2/anomaly/blocks/ips/{id}`
+- `GET` `/api/v2/attack-protection/bot-detection`
+- `PATCH` `/api/v2/attack-protection/bot-detection`
+- `GET` `/api/v2/attack-protection/breached-password-detection`
+- `PATCH` `/api/v2/attack-protection/breached-password-detection`
+- `GET` `/api/v2/attack-protection/brute-force-protection`
+- `PATCH` `/api/v2/attack-protection/brute-force-protection`
+- `GET` `/api/v2/attack-protection/captcha`
+- `PATCH` `/api/v2/attack-protection/captcha`
+- `GET` `/api/v2/attack-protection/phone-provider-protection`
+- `PATCH` `/api/v2/attack-protection/phone-provider-protection`
+- `GET` `/api/v2/attack-protection/suspicious-ip-throttling`
+- `PATCH` `/api/v2/attack-protection/suspicious-ip-throttling`
+- `GET` `/api/v2/branding`
+- `PATCH` `/api/v2/branding`
+- `GET` `/api/v2/branding/phone/providers`
+- `POST` `/api/v2/branding/phone/providers`
+- `DELETE` `/api/v2/branding/phone/providers/{id}`
+- `GET` `/api/v2/branding/phone/providers/{id}`
+- `PATCH` `/api/v2/branding/phone/providers/{id}`
+… and 409 more
+
+
+</details>
+
 **Missing** (3)
 
 - No MFA, Organizations, actions/hooks/flows, or email delivery
@@ -998,6 +1116,65 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec vsts-rest-api-specs core 7.2 + pipelines/git/wit/hooks/work 7.1 @ 7.2-preview, 7.1, 7.1, 7.1, 7.1, 7.1: 305 real routes · 17 covered · 5% · 277 not implemented
+
+<details><summary>not implemented (277)</summary>
+
+- `GET` `/{collection}/_apis/hooks/consumers`
+- `GET` `/{collection}/_apis/hooks/consumers/{consumerId}`
+- `GET` `/{collection}/_apis/hooks/consumers/{consumerId}/actions`
+- `GET` `/{collection}/_apis/hooks/consumers/{consumerId}/actions/{consumerActionId}`
+- `POST` `/{collection}/_apis/hooks/notificationsquery`
+- `GET` `/{collection}/_apis/hooks/publishers`
+- `GET` `/{collection}/_apis/hooks/publishers/{publisherId}`
+- `GET` `/{collection}/_apis/hooks/publishers/{publisherId}/eventtypes`
+- `GET` `/{collection}/_apis/hooks/publishers/{publisherId}/eventtypes/{eventTypeId}`
+- `POST` `/{collection}/_apis/hooks/publishers/{publisherId}/inputValuesQuery`
+- `POST` `/{collection}/_apis/hooks/publishersquery`
+- `GET` `/{collection}/_apis/hooks/subscriptions`
+- `DELETE` `/{collection}/_apis/hooks/subscriptions/{subscriptionId}`
+- `GET` `/{collection}/_apis/hooks/subscriptions/{subscriptionId}`
+- `PUT` `/{collection}/_apis/hooks/subscriptions/{subscriptionId}`
+- `GET` `/{collection}/_apis/hooks/subscriptions/{subscriptionId}/diagnostics`
+- `PUT` `/{collection}/_apis/hooks/subscriptions/{subscriptionId}/diagnostics`
+- `GET` `/{collection}/_apis/hooks/subscriptions/{subscriptionId}/notifications`
+- `GET` `/{collection}/_apis/hooks/subscriptions/{subscriptionId}/notifications/{notificationId}`
+- `POST` `/{collection}/_apis/hooks/subscriptionsquery`
+- `POST` `/{collection}/_apis/hooks/testnotifications`
+- `GET` `/{collection}/_apis/wit/artifactlinktypes`
+- `GET` `/{collection}/_apis/wit/workitemicons`
+- `GET` `/{collection}/_apis/wit/workitemicons/{icon}`
+- `GET` `/{collection}/_apis/wit/workitemrelationtypes`
+- `GET` `/{collection}/_apis/wit/workitemrelationtypes/{relation}`
+- `GET` `/{collection}/_apis/wit/workitemtransitions`
+- `GET` `/{collection}/_apis/work/accountmyworkrecentactivity`
+- `GET` `/{collection}/{project}/_apis/git/deletedrepositories`
+- `GET` `/{collection}/{project}/_apis/git/favorites/refs`
+- `POST` `/{collection}/{project}/_apis/git/favorites/refs`
+- `DELETE` `/{collection}/{project}/_apis/git/favorites/refs/{favoriteId}`
+- `GET` `/{collection}/{project}/_apis/git/favorites/refs/{favoriteId}`
+- `GET` `/{collection}/{project}/_apis/git/policy/configurations`
+- `GET` `/{collection}/{project}/_apis/git/pullrequests`
+- `GET` `/{collection}/{project}/_apis/git/pullrequests/{pullRequestId}`
+- `GET` `/{collection}/{project}/_apis/git/recycleBin/repositories`
+- `DELETE` `/{collection}/{project}/_apis/git/recycleBin/repositories/{repositoryId}`
+- `PATCH` `/{collection}/{project}/_apis/git/recycleBin/repositories/{repositoryId}`
+- `POST` `/{collection}/{project}/_apis/git/repositories`
+- `DELETE` `/{collection}/{project}/_apis/git/repositories/{repositoryId}`
+- `GET` `/{collection}/{project}/_apis/git/repositories/{repositoryId}`
+- `PATCH` `/{collection}/{project}/_apis/git/repositories/{repositoryId}`
+- `POST` `/{collection}/{project}/_apis/git/repositories/{repositoryId}/annotatedtags`
+- `GET` `/{collection}/{project}/_apis/git/repositories/{repositoryId}/annotatedtags/{objectId}`
+- `POST` `/{collection}/{project}/_apis/git/repositories/{repositoryId}/blobs`
+- `GET` `/{collection}/{project}/_apis/git/repositories/{repositoryId}/blobs/{sha1}`
+- `GET` `/{collection}/{project}/_apis/git/repositories/{repositoryId}/cherryPicks`
+- `POST` `/{collection}/{project}/_apis/git/repositories/{repositoryId}/cherryPicks`
+- `GET` `/{collection}/{project}/_apis/git/repositories/{repositoryId}/cherryPicks/{cherryPickId}`
+… and 227 more
+
+
+</details>
+
 **Missing** (7)
 
 - No WIQL OR predicates, @Me/@Project macros, or non-WorkItems FROM targets
@@ -1075,6 +1252,16 @@ behavior notes live in each adapter's README.
 | GET | `/{container}/{blob}` |
 | HEAD | `/{container}/{blob}` |
 | DELETE | `/{container}/{blob}` |
+
+</details>
+
+**Provider surface** — derived from spec azure-rest-api-specs BlobStorage 2026-06-06 @ 2026-06-06: 69 real routes · 5 covered · 7% · 3 not implemented
+
+<details><summary>not implemented (3)</summary>
+
+- `POST` `/?comp=batch`
+- `PUT` `/?restype=service&comp=properties`
+- `POST` `/{containerName}/{blob}?comp=query`
 
 </details>
 
@@ -1312,6 +1499,65 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec cloudflare api-schemas (paths /client/v4 prefix stripped) @ 4.0.0: 3334 real routes · 29 covered · 0% · 3304 not implemented
+
+<details><summary>not implemented (3304)</summary>
+
+- `GET` `/accounts`
+- `POST` `/accounts`
+- `POST` `/accounts/move`
+- `GET` `/accounts/{accountId}/v1/images`
+- `POST` `/accounts/{accountId}/v1/images`
+- `DELETE` `/accounts/{accountId}/v1/images/{imageId}`
+- `GET` `/accounts/{accountId}/v1/images/{imageId}`
+- `PATCH` `/accounts/{accountId}/v1/images/{imageId}`
+- `PUT` `/accounts/{accountId}/v1/images/{imageId}`
+- `GET` `/accounts/{accountId}/v1/images/{imageId}/blob`
+- `GET` `/accounts/{accountId}/v2/images`
+- `POST` `/accounts/{accountId}/v2/images/direct_upload`
+- `GET` `/accounts/{accountId}/zones/{zoneId}/v1/images/flows`
+- `PUT` `/accounts/{accountId}/zones/{zoneId}/v1/images/flows`
+- `GET` `/accounts/{account_identifier}/custom_pages`
+- `GET` `/accounts/{account_identifier}/custom_pages/assets`
+- `POST` `/accounts/{account_identifier}/custom_pages/assets`
+- `DELETE` `/accounts/{account_identifier}/custom_pages/assets/{asset_name}`
+- `GET` `/accounts/{account_identifier}/custom_pages/assets/{asset_name}`
+- `PUT` `/accounts/{account_identifier}/custom_pages/assets/{asset_name}`
+- `POST` `/accounts/{account_identifier}/custom_pages/preview_tokens`
+- `GET` `/accounts/{account_identifier}/custom_pages/{identifier}`
+- `PUT` `/accounts/{account_identifier}/custom_pages/{identifier}`
+- `DELETE` `/accounts/{account_id}`
+- `GET` `/accounts/{account_id}`
+- `PUT` `/accounts/{account_id}`
+- `GET` `/accounts/{account_id}/abuse-reports`
+- `GET` `/accounts/{account_id}/abuse-reports/{report_id}/appeals/eligibility`
+- `GET` `/accounts/{account_id}/abuse-reports/{report_id}/emails`
+- `GET` `/accounts/{account_id}/abuse-reports/{report_id}/mitigations`
+- `POST` `/accounts/{account_id}/abuse-reports/{report_id}/mitigations/appeal`
+- `GET` `/accounts/{account_id}/abuse-reports/{report_param}`
+- `POST` `/accounts/{account_id}/abuse-reports/{report_param}`
+- `GET` `/accounts/{account_id}/access/ai-controls/mcp/portals`
+- `POST` `/accounts/{account_id}/access/ai-controls/mcp/portals`
+- `DELETE` `/accounts/{account_id}/access/ai-controls/mcp/portals/{id}`
+- `GET` `/accounts/{account_id}/access/ai-controls/mcp/portals/{id}`
+- `PUT` `/accounts/{account_id}/access/ai-controls/mcp/portals/{id}`
+- `GET` `/accounts/{account_id}/access/ai-controls/mcp/portals/{portal_id}/servers/{server_id}/effective-redirect-uri`
+- `GET` `/accounts/{account_id}/access/ai-controls/mcp/servers`
+- `POST` `/accounts/{account_id}/access/ai-controls/mcp/servers`
+- `DELETE` `/accounts/{account_id}/access/ai-controls/mcp/servers/{id}`
+- `GET` `/accounts/{account_id}/access/ai-controls/mcp/servers/{id}`
+- `PUT` `/accounts/{account_id}/access/ai-controls/mcp/servers/{id}`
+- `POST` `/accounts/{account_id}/access/ai-controls/mcp/servers/{id}/sync`
+- `GET` `/accounts/{account_id}/access/apps`
+- `POST` `/accounts/{account_id}/access/apps`
+- `GET` `/accounts/{account_id}/access/apps/ca`
+- `DELETE` `/accounts/{account_id}/access/apps/{app_id}`
+- `GET` `/accounts/{account_id}/access/apps/{app_id}`
+… and 3254 more
+
+
+</details>
+
 **Missing** (8)
 
 - No Workers KV: namespace or key-value endpoints (storage/kv/values)
@@ -1397,6 +1643,65 @@ behavior notes live in each adapter's README.
 | POST | `/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` |
 | POST | `/v10/interactions` |
 | WS | `/gateway` |
+
+</details>
+
+**Provider surface** — derived from spec discord-api-spec @ 10: 242 real routes · 9 covered · 3% · 228 not implemented
+
+<details><summary>not implemented (228)</summary>
+
+- `GET` `/applications/@me`
+- `PATCH` `/applications/@me`
+- `GET` `/applications/{application_id}`
+- `PATCH` `/applications/{application_id}`
+- `GET` `/applications/{application_id}/activity-instances/{instance_id}`
+- `POST` `/applications/{application_id}/attachment`
+- `GET` `/applications/{application_id}/commands`
+- `POST` `/applications/{application_id}/commands`
+- `PUT` `/applications/{application_id}/commands`
+- `DELETE` `/applications/{application_id}/commands/{command_id}`
+- `GET` `/applications/{application_id}/commands/{command_id}`
+- `PATCH` `/applications/{application_id}/commands/{command_id}`
+- `GET` `/applications/{application_id}/emojis`
+- `POST` `/applications/{application_id}/emojis`
+- `DELETE` `/applications/{application_id}/emojis/{emoji_id}`
+- `GET` `/applications/{application_id}/emojis/{emoji_id}`
+- `PATCH` `/applications/{application_id}/emojis/{emoji_id}`
+- `GET` `/applications/{application_id}/entitlements`
+- `POST` `/applications/{application_id}/entitlements`
+- `DELETE` `/applications/{application_id}/entitlements/{entitlement_id}`
+- `GET` `/applications/{application_id}/entitlements/{entitlement_id}`
+- `POST` `/applications/{application_id}/entitlements/{entitlement_id}/consume`
+- `GET` `/applications/{application_id}/guilds/{guild_id}/commands`
+- `POST` `/applications/{application_id}/guilds/{guild_id}/commands`
+- `PUT` `/applications/{application_id}/guilds/{guild_id}/commands`
+- `GET` `/applications/{application_id}/guilds/{guild_id}/commands/permissions`
+- `DELETE` `/applications/{application_id}/guilds/{guild_id}/commands/{command_id}`
+- `GET` `/applications/{application_id}/guilds/{guild_id}/commands/{command_id}`
+- `PATCH` `/applications/{application_id}/guilds/{guild_id}/commands/{command_id}`
+- `GET` `/applications/{application_id}/guilds/{guild_id}/commands/{command_id}/permissions`
+- `PUT` `/applications/{application_id}/guilds/{guild_id}/commands/{command_id}/permissions`
+- `GET` `/applications/{application_id}/role-connections/metadata`
+- `PUT` `/applications/{application_id}/role-connections/metadata`
+- `DELETE` `/channels/{channel_id}`
+- `GET` `/channels/{channel_id}`
+- `PATCH` `/channels/{channel_id}`
+- `POST` `/channels/{channel_id}/followers`
+- `GET` `/channels/{channel_id}/invites`
+- `POST` `/channels/{channel_id}/invites`
+- `POST` `/channels/{channel_id}/messages/bulk-delete`
+- `GET` `/channels/{channel_id}/messages/pins`
+- `DELETE` `/channels/{channel_id}/messages/pins/{message_id}`
+- `PUT` `/channels/{channel_id}/messages/pins/{message_id}`
+- `DELETE` `/channels/{channel_id}/messages/{message_id}`
+- `PATCH` `/channels/{channel_id}/messages/{message_id}`
+- `POST` `/channels/{channel_id}/messages/{message_id}/crosspost`
+- `DELETE` `/channels/{channel_id}/messages/{message_id}/reactions`
+- `DELETE` `/channels/{channel_id}/messages/{message_id}/reactions/{emoji_name}`
+- `GET` `/channels/{channel_id}/messages/{message_id}/reactions/{emoji_name}`
+- `DELETE` `/channels/{channel_id}/messages/{message_id}/reactions/{emoji_name}/@me`
+… and 178 more
+
 
 </details>
 
@@ -1694,6 +1999,65 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec msgraph-metadata v1.0 @ v1.0: 17531 real routes · 6 covered · 0% · 17525 not implemented
+
+<details><summary>not implemented (17525)</summary>
+
+- `GET` `/v1.0/admin`
+- `PATCH` `/v1.0/admin`
+- `DELETE` `/v1.0/admin/configurationManagement`
+- `GET` `/v1.0/admin/configurationManagement`
+- `PATCH` `/v1.0/admin/configurationManagement`
+- `GET` `/v1.0/admin/configurationManagement/configurationDrifts`
+- `POST` `/v1.0/admin/configurationManagement/configurationDrifts`
+- `GET` `/v1.0/admin/configurationManagement/configurationDrifts/$count`
+- `DELETE` `/v1.0/admin/configurationManagement/configurationDrifts/{configurationDrift-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationDrifts/{configurationDrift-id}`
+- `PATCH` `/v1.0/admin/configurationManagement/configurationDrifts/{configurationDrift-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitoringResults`
+- `POST` `/v1.0/admin/configurationManagement/configurationMonitoringResults`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitoringResults/$count`
+- `DELETE` `/v1.0/admin/configurationManagement/configurationMonitoringResults/{configurationMonitoringResult-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitoringResults/{configurationMonitoringResult-id}`
+- `PATCH` `/v1.0/admin/configurationManagement/configurationMonitoringResults/{configurationMonitoringResult-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitors`
+- `POST` `/v1.0/admin/configurationManagement/configurationMonitors`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitors/$count`
+- `DELETE` `/v1.0/admin/configurationManagement/configurationMonitors/{configurationMonitor-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitors/{configurationMonitor-id}`
+- `PATCH` `/v1.0/admin/configurationManagement/configurationMonitors/{configurationMonitor-id}`
+- `DELETE` `/v1.0/admin/configurationManagement/configurationMonitors/{configurationMonitor-id}/baseline`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitors/{configurationMonitor-id}/baseline`
+- `PATCH` `/v1.0/admin/configurationManagement/configurationMonitors/{configurationMonitor-id}/baseline`
+- `GET` `/v1.0/admin/configurationManagement/configurationSnapshotJobs`
+- `POST` `/v1.0/admin/configurationManagement/configurationSnapshotJobs`
+- `GET` `/v1.0/admin/configurationManagement/configurationSnapshotJobs/$count`
+- `DELETE` `/v1.0/admin/configurationManagement/configurationSnapshotJobs/{configurationSnapshotJob-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationSnapshotJobs/{configurationSnapshotJob-id}`
+- `PATCH` `/v1.0/admin/configurationManagement/configurationSnapshotJobs/{configurationSnapshotJob-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationSnapshots`
+- `POST` `/v1.0/admin/configurationManagement/configurationSnapshots`
+- `GET` `/v1.0/admin/configurationManagement/configurationSnapshots/$count`
+- `DELETE` `/v1.0/admin/configurationManagement/configurationSnapshots/{configurationBaseline-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationSnapshots/{configurationBaseline-id}`
+- `PATCH` `/v1.0/admin/configurationManagement/configurationSnapshots/{configurationBaseline-id}`
+- `DELETE` `/v1.0/admin/edge`
+- `GET` `/v1.0/admin/edge`
+- `PATCH` `/v1.0/admin/edge`
+- `DELETE` `/v1.0/admin/edge/internetExplorerMode`
+- `GET` `/v1.0/admin/edge/internetExplorerMode`
+- `PATCH` `/v1.0/admin/edge/internetExplorerMode`
+- `GET` `/v1.0/admin/edge/internetExplorerMode/siteLists`
+- `POST` `/v1.0/admin/edge/internetExplorerMode/siteLists`
+- `GET` `/v1.0/admin/edge/internetExplorerMode/siteLists/$count`
+- `DELETE` `/v1.0/admin/edge/internetExplorerMode/siteLists/{browserSiteList-id}`
+- `GET` `/v1.0/admin/edge/internetExplorerMode/siteLists/{browserSiteList-id}`
+- `PATCH` `/v1.0/admin/edge/internetExplorerMode/siteLists/{browserSiteList-id}`
+… and 17475 more
+
+
+</details>
+
 **Missing** (8)
 
 - No $filter, $search, $orderby, $select, or $expand on Graph queries
@@ -1871,6 +2235,65 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec openapi-fattureincloud @ 2.1.8: 123 real routes · 31 covered · 25% · 92 not implemented
+
+<details><summary>not implemented (92)</summary>
+
+- `GET` `/c/{company_id}/archive`
+- `POST` `/c/{company_id}/archive/attachment`
+- `DELETE` `/c/{company_id}/archive/{document_id}`
+- `GET` `/c/{company_id}/archive/{document_id}`
+- `PUT` `/c/{company_id}/archive/{document_id}`
+- `GET` `/c/{company_id}/bin/issued_documents`
+- `DELETE` `/c/{company_id}/bin/issued_documents/{document_id}`
+- `GET` `/c/{company_id}/bin/issued_documents/{document_id}`
+- `POST` `/c/{company_id}/bin/issued_documents/{document_id}/recover`
+- `GET` `/c/{company_id}/bin/received_documents`
+- `DELETE` `/c/{company_id}/bin/received_documents/{document_id}`
+- `GET` `/c/{company_id}/bin/received_documents/{document_id}`
+- `POST` `/c/{company_id}/bin/received_documents/{document_id}/recover`
+- `GET` `/c/{company_id}/cashbook`
+- `POST` `/c/{company_id}/cashbook`
+- `DELETE` `/c/{company_id}/cashbook/{document_id}`
+- `PUT` `/c/{company_id}/cashbook/{document_id}`
+- `GET` `/c/{company_id}/company/plan_usage`
+- `GET` `/c/{company_id}/emails`
+- `GET` `/c/{company_id}/entities/clients`
+- `POST` `/c/{company_id}/entities/clients`
+- `GET` `/c/{company_id}/entities/clients/info`
+- `DELETE` `/c/{company_id}/entities/clients/{client_id}`
+- `GET` `/c/{company_id}/entities/clients/{client_id}`
+- `PUT` `/c/{company_id}/entities/clients/{client_id}`
+- `GET` `/c/{company_id}/entities/suppliers`
+- `POST` `/c/{company_id}/entities/suppliers`
+- `DELETE` `/c/{company_id}/entities/suppliers/{supplier_id}`
+- `GET` `/c/{company_id}/entities/suppliers/{supplier_id}`
+- `PUT` `/c/{company_id}/entities/suppliers/{supplier_id}`
+- `GET` `/c/{company_id}/info/archive_categories`
+- `GET` `/c/{company_id}/info/cost_centers`
+- `GET` `/c/{company_id}/info/payment_accounts`
+- `GET` `/c/{company_id}/info/payment_methods`
+- `GET` `/c/{company_id}/info/product_categories`
+- `GET` `/c/{company_id}/info/received_document_categories`
+- `GET` `/c/{company_id}/info/revenue_centers`
+- `GET` `/c/{company_id}/info/vat_types`
+- `POST` `/c/{company_id}/issued_documents/attachment`
+- `GET` `/c/{company_id}/issued_documents/join`
+- `POST` `/c/{company_id}/issued_documents/totals`
+- `GET` `/c/{company_id}/issued_documents/transform`
+- `DELETE` `/c/{company_id}/issued_documents/{document_id}/attachment`
+- `GET` `/c/{company_id}/issued_documents/{document_id}/e_invoice/error_reason`
+- `POST` `/c/{company_id}/issued_documents/{document_id}/e_invoice/send`
+- `GET` `/c/{company_id}/issued_documents/{document_id}/e_invoice/xml`
+- `GET` `/c/{company_id}/issued_documents/{document_id}/e_invoice/xml_verify`
+- `GET` `/c/{company_id}/issued_documents/{document_id}/email`
+- `POST` `/c/{company_id}/issued_documents/{document_id}/email`
+- `POST` `/c/{company_id}/issued_documents/{document_id}/totals`
+… and 42 more
+
+
+</details>
+
 **Missing** (3)
 
 - OAuth2 token dance not implemented (no authorize or token endpoints)
@@ -1949,15 +2372,62 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 11 real routes · 6 covered · 54% · 5 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 66 real routes · 11 covered · 16% · 55 not implemented
 
-<details><summary>not implemented (5)</summary>
+<details><summary>not implemented (55)</summary>
 
 - `GET` `/v1beta/properties/{propertiesId}/audienceExports`
 - `POST` `/v1beta/properties/{propertiesId}/audienceExports`
 - `GET` `/v1beta/properties/{propertiesId}/audienceExports/{audienceExportsId}`
 - `POST` `/v1beta/properties/{propertiesId}/audienceExports/{audienceExportsId}:query`
 - `GET` `/v1beta/properties/{propertiesId}/metadata`
+- `GET` `/v1beta/accountSummaries`
+- `DELETE` `/v1beta/accounts/{accountsId}`
+- `GET` `/v1beta/accounts/{accountsId}`
+- `PATCH` `/v1beta/accounts/{accountsId}`
+- `GET` `/v1beta/accounts/{accountsId}/dataSharingSettings`
+- `POST` `/v1beta/accounts/{accountsId}:runAccessReport`
+- `POST` `/v1beta/accounts/{accountsId}:searchChangeHistoryEvents`
+- `POST` `/v1beta/accounts:provisionAccountTicket`
+- `POST` `/v1beta/properties`
+- `DELETE` `/v1beta/properties/{propertiesId}`
+- `GET` `/v1beta/properties/{propertiesId}`
+- `PATCH` `/v1beta/properties/{propertiesId}`
+- `GET` `/v1beta/properties/{propertiesId}/conversionEvents`
+- `POST` `/v1beta/properties/{propertiesId}/conversionEvents`
+- `DELETE` `/v1beta/properties/{propertiesId}/conversionEvents/{conversionEventsId}`
+- `GET` `/v1beta/properties/{propertiesId}/conversionEvents/{conversionEventsId}`
+- `PATCH` `/v1beta/properties/{propertiesId}/conversionEvents/{conversionEventsId}`
+- `GET` `/v1beta/properties/{propertiesId}/customDimensions`
+- `POST` `/v1beta/properties/{propertiesId}/customDimensions`
+- `GET` `/v1beta/properties/{propertiesId}/customDimensions/{customDimensionsId}`
+- `PATCH` `/v1beta/properties/{propertiesId}/customDimensions/{customDimensionsId}`
+- `POST` `/v1beta/properties/{propertiesId}/customDimensions/{customDimensionsId}:archive`
+- `GET` `/v1beta/properties/{propertiesId}/customMetrics`
+- `POST` `/v1beta/properties/{propertiesId}/customMetrics`
+- `GET` `/v1beta/properties/{propertiesId}/customMetrics/{customMetricsId}`
+- `PATCH` `/v1beta/properties/{propertiesId}/customMetrics/{customMetricsId}`
+- `POST` `/v1beta/properties/{propertiesId}/customMetrics/{customMetricsId}:archive`
+- `GET` `/v1beta/properties/{propertiesId}/dataRetentionSettings`
+- `PATCH` `/v1beta/properties/{propertiesId}/dataRetentionSettings`
+- `POST` `/v1beta/properties/{propertiesId}/dataStreams`
+- `DELETE` `/v1beta/properties/{propertiesId}/dataStreams/{dataStreamsId}`
+- `GET` `/v1beta/properties/{propertiesId}/dataStreams/{dataStreamsId}`
+- `PATCH` `/v1beta/properties/{propertiesId}/dataStreams/{dataStreamsId}`
+- `GET` `/v1beta/properties/{propertiesId}/dataStreams/{dataStreamsId}/measurementProtocolSecrets`
+- `POST` `/v1beta/properties/{propertiesId}/dataStreams/{dataStreamsId}/measurementProtocolSecrets`
+- `DELETE` `/v1beta/properties/{propertiesId}/dataStreams/{dataStreamsId}/measurementProtocolSecrets/{measurementProtocolSecretsId}`
+- `GET` `/v1beta/properties/{propertiesId}/dataStreams/{dataStreamsId}/measurementProtocolSecrets/{measurementProtocolSecretsId}`
+- `PATCH` `/v1beta/properties/{propertiesId}/dataStreams/{dataStreamsId}/measurementProtocolSecrets/{measurementProtocolSecretsId}`
+- `GET` `/v1beta/properties/{propertiesId}/firebaseLinks`
+- `POST` `/v1beta/properties/{propertiesId}/firebaseLinks`
+- `DELETE` `/v1beta/properties/{propertiesId}/firebaseLinks/{firebaseLinksId}`
+- `GET` `/v1beta/properties/{propertiesId}/googleAdsLinks`
+- `POST` `/v1beta/properties/{propertiesId}/googleAdsLinks`
+- `DELETE` `/v1beta/properties/{propertiesId}/googleAdsLinks/{googleAdsLinksId}`
+- `PATCH` `/v1beta/properties/{propertiesId}/googleAdsLinks/{googleAdsLinksId}`
+… and 5 more
+
 
 </details>
 
@@ -3225,6 +3695,65 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec msgraph-metadata v1.0 @ v1.0: 17531 real routes · 34 covered · 0% · 17497 not implemented
+
+<details><summary>not implemented (17497)</summary>
+
+- `GET` `/v1.0/admin`
+- `PATCH` `/v1.0/admin`
+- `DELETE` `/v1.0/admin/configurationManagement`
+- `GET` `/v1.0/admin/configurationManagement`
+- `PATCH` `/v1.0/admin/configurationManagement`
+- `GET` `/v1.0/admin/configurationManagement/configurationDrifts`
+- `POST` `/v1.0/admin/configurationManagement/configurationDrifts`
+- `GET` `/v1.0/admin/configurationManagement/configurationDrifts/$count`
+- `DELETE` `/v1.0/admin/configurationManagement/configurationDrifts/{configurationDrift-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationDrifts/{configurationDrift-id}`
+- `PATCH` `/v1.0/admin/configurationManagement/configurationDrifts/{configurationDrift-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitoringResults`
+- `POST` `/v1.0/admin/configurationManagement/configurationMonitoringResults`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitoringResults/$count`
+- `DELETE` `/v1.0/admin/configurationManagement/configurationMonitoringResults/{configurationMonitoringResult-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitoringResults/{configurationMonitoringResult-id}`
+- `PATCH` `/v1.0/admin/configurationManagement/configurationMonitoringResults/{configurationMonitoringResult-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitors`
+- `POST` `/v1.0/admin/configurationManagement/configurationMonitors`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitors/$count`
+- `DELETE` `/v1.0/admin/configurationManagement/configurationMonitors/{configurationMonitor-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitors/{configurationMonitor-id}`
+- `PATCH` `/v1.0/admin/configurationManagement/configurationMonitors/{configurationMonitor-id}`
+- `DELETE` `/v1.0/admin/configurationManagement/configurationMonitors/{configurationMonitor-id}/baseline`
+- `GET` `/v1.0/admin/configurationManagement/configurationMonitors/{configurationMonitor-id}/baseline`
+- `PATCH` `/v1.0/admin/configurationManagement/configurationMonitors/{configurationMonitor-id}/baseline`
+- `GET` `/v1.0/admin/configurationManagement/configurationSnapshotJobs`
+- `POST` `/v1.0/admin/configurationManagement/configurationSnapshotJobs`
+- `GET` `/v1.0/admin/configurationManagement/configurationSnapshotJobs/$count`
+- `DELETE` `/v1.0/admin/configurationManagement/configurationSnapshotJobs/{configurationSnapshotJob-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationSnapshotJobs/{configurationSnapshotJob-id}`
+- `PATCH` `/v1.0/admin/configurationManagement/configurationSnapshotJobs/{configurationSnapshotJob-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationSnapshots`
+- `POST` `/v1.0/admin/configurationManagement/configurationSnapshots`
+- `GET` `/v1.0/admin/configurationManagement/configurationSnapshots/$count`
+- `DELETE` `/v1.0/admin/configurationManagement/configurationSnapshots/{configurationBaseline-id}`
+- `GET` `/v1.0/admin/configurationManagement/configurationSnapshots/{configurationBaseline-id}`
+- `PATCH` `/v1.0/admin/configurationManagement/configurationSnapshots/{configurationBaseline-id}`
+- `DELETE` `/v1.0/admin/edge`
+- `GET` `/v1.0/admin/edge`
+- `PATCH` `/v1.0/admin/edge`
+- `DELETE` `/v1.0/admin/edge/internetExplorerMode`
+- `GET` `/v1.0/admin/edge/internetExplorerMode`
+- `PATCH` `/v1.0/admin/edge/internetExplorerMode`
+- `GET` `/v1.0/admin/edge/internetExplorerMode/siteLists`
+- `POST` `/v1.0/admin/edge/internetExplorerMode/siteLists`
+- `GET` `/v1.0/admin/edge/internetExplorerMode/siteLists/$count`
+- `DELETE` `/v1.0/admin/edge/internetExplorerMode/siteLists/{browserSiteList-id}`
+- `GET` `/v1.0/admin/edge/internetExplorerMode/siteLists/{browserSiteList-id}`
+- `PATCH` `/v1.0/admin/edge/internetExplorerMode/siteLists/{browserSiteList-id}`
+… and 17447 more
+
+
+</details>
+
 **Missing** (8)
 
 - No Excel workbook sessions (createSession, refreshSession, closeSession)
@@ -3321,6 +3850,65 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec onfido-openapi-spec @ v3.6: 84 real routes · 7 covered · 8% · 73 not implemented
+
+<details><summary>not implemented (73)</summary>
+
+- `GET` `/v3.6/addresses/pick`
+- `GET` `/v3.6/advanced_electronic_signature/documents`
+- `GET` `/v3.6/applicants`
+- `DELETE` `/v3.6/applicants/{applicant_id}`
+- `PUT` `/v3.6/applicants/{applicant_id}`
+- `GET` `/v3.6/applicants/{applicant_id}/consents`
+- `POST` `/v3.6/applicants/{applicant_id}/restore`
+- `DELETE` `/v3.6/biometric_tokens/{user_id}`
+- `GET` `/v3.6/biometric_tokens/{user_id}`
+- `PUT` `/v3.6/biometric_tokens/{user_id}/{token_uuid}`
+- `GET` `/v3.6/checks`
+- `GET` `/v3.6/checks/{check_id}/download`
+- `POST` `/v3.6/checks/{check_id}/resume`
+- `GET` `/v3.6/documents`
+- `GET` `/v3.6/documents/{document_id}`
+- `GET` `/v3.6/documents/{document_id}/download`
+- `GET` `/v3.6/documents/{document_id}/nfc_face`
+- `GET` `/v3.6/documents/{document_id}/video/download`
+- `POST` `/v3.6/extractions`
+- `GET` `/v3.6/id_photos`
+- `POST` `/v3.6/id_photos`
+- `GET` `/v3.6/id_photos/{id_photo_id}`
+- `GET` `/v3.6/id_photos/{id_photo_id}/download`
+- `GET` `/v3.6/live_photos`
+- `GET` `/v3.6/live_photos/{live_photo_id}`
+- `GET` `/v3.6/live_photos/{live_photo_id}/download`
+- `GET` `/v3.6/live_videos`
+- `GET` `/v3.6/live_videos/{live_video_id}`
+- `GET` `/v3.6/live_videos/{live_video_id}/download`
+- `GET` `/v3.6/live_videos/{live_video_id}/frame`
+- `GET` `/v3.6/motion_captures`
+- `GET` `/v3.6/motion_captures/{motion_capture_id}`
+- `GET` `/v3.6/motion_captures/{motion_capture_id}/download`
+- `GET` `/v3.6/motion_captures/{motion_capture_id}/frame`
+- `DELETE` `/v3.6/passkeys/{username}`
+- `GET` `/v3.6/passkeys/{username}`
+- `PUT` `/v3.6/passkeys/{username}/{passkey_id}`
+- `GET` `/v3.6/ping`
+- `GET` `/v3.6/qualified_electronic_signature/documents`
+- `GET` `/v3.6/repeat_attempts/{report_id}`
+- `GET` `/v3.6/reports`
+- `GET` `/v3.6/reports/{report_id}`
+- `POST` `/v3.6/reports/{report_id}/cancel`
+- `POST` `/v3.6/reports/{report_id}/resume`
+- `POST` `/v3.6/results_feedback`
+- `POST` `/v3.6/sdk_token`
+- `GET` `/v3.6/signing_documents`
+- `POST` `/v3.6/signing_documents`
+- `GET` `/v3.6/signing_documents/{signing_document_id}`
+- `GET` `/v3.6/signing_documents/{signing_document_id}/download`
+… and 23 more
+
+
+</details>
+
 **Missing** (5)
 
 - No SDK token generation (POST /v3.6/sdk_token)
@@ -3351,6 +3939,65 @@ behavior notes live in each adapter's README.
 | GET | `/api/v2/orders/{chain}/{protocol}/listings` |
 | GET | `/api/v2/orders/{chain}/{protocol}/offers` |
 | POST | `/api/v2/offers` |
+
+</details>
+
+**Provider surface** — derived from spec OpenSea ReadMe registry spec (semi-official) @ 2.0.0: 139 real routes · 3 covered · 2% · 136 not implemented
+
+<details><summary>not implemented (136)</summary>
+
+- `GET` `/api/v2/account/{address}/collections`
+- `GET` `/api/v2/account/{address}/favorites`
+- `GET` `/api/v2/account/{address}/listings`
+- `GET` `/api/v2/account/{address}/offers`
+- `GET` `/api/v2/account/{address}/offers_received`
+- `GET` `/api/v2/account/{address}/perpetual_watchlist`
+- `GET` `/api/v2/account/{address}/pnl`
+- `GET` `/api/v2/account/{address}/pnl/closed-positions`
+- `GET` `/api/v2/account/{address}/pnl/token-transfers`
+- `GET` `/api/v2/account/{address}/portfolio`
+- `GET` `/api/v2/account/{address}/portfolio/history`
+- `GET` `/api/v2/account/{address}/token-activity`
+- `GET` `/api/v2/account/{address}/token_watchlist`
+- `GET` `/api/v2/account/{address}/tokens`
+- `DELETE` `/api/v2/accounts/agent`
+- `PUT` `/api/v2/accounts/agent`
+- `DELETE` `/api/v2/accounts/agent-relationships`
+- `GET` `/api/v2/accounts/agent-relationships`
+- `POST` `/api/v2/accounts/agent-relationships`
+- `POST` `/api/v2/accounts/agent-relationships/confirm`
+- `GET` `/api/v2/accounts/resolve/{identifier}`
+- `POST` `/api/v2/accounts/wallets/siwx`
+- `DELETE` `/api/v2/accounts/wallets/{wallet}`
+- `DELETE` `/api/v2/accounts/wallets/{wallet}/private`
+- `PUT` `/api/v2/accounts/wallets/{wallet}/private`
+- `GET` `/api/v2/accounts/{address_or_username}`
+- `GET` `/api/v2/accounts/{address_or_username}/agent-relationships`
+- `DELETE` `/api/v2/accounts/{address_or_username}/follow`
+- `POST` `/api/v2/accounts/{address_or_username}/follow`
+- `GET` `/api/v2/accounts/{address_or_username}/followers`
+- `GET` `/api/v2/accounts/{address_or_username}/following`
+- `GET` `/api/v2/accounts/{address_or_username}/relationship`
+- `DELETE` `/api/v2/accounts/{address_or_username}/watch`
+- `POST` `/api/v2/accounts/{address_or_username}/watch`
+- `POST` `/api/v2/assets/transfer`
+- `POST` `/api/v2/auth/keys`
+- `GET` `/api/v2/chain/{chain}/account/{address}/nfts`
+- `GET` `/api/v2/chain/{chain}/contract/{address}`
+- `GET` `/api/v2/chain/{chain}/contract/{address}/nfts`
+- `GET` `/api/v2/chain/{chain}/contract/{address}/nfts/{identifier}`
+- `GET` `/api/v2/chain/{chain}/contract/{address}/nfts/{identifier}/analytics`
+- `GET` `/api/v2/chain/{chain}/contract/{address}/nfts/{identifier}/collection`
+- `GET` `/api/v2/chain/{chain}/contract/{address}/nfts/{identifier}/owners`
+- `POST` `/api/v2/chain/{chain}/contract/{address}/nfts/{identifier}/refresh`
+- `POST` `/api/v2/chain/{chain}/contract/{address}/nfts/{identifier}/validate-metadata`
+- `GET` `/api/v2/chain/{chain}/payment_token/{address}`
+- `GET` `/api/v2/chain/{chain}/token/{address}`
+- `GET` `/api/v2/chain/{chain}/token/{address}/activity`
+- `GET` `/api/v2/chain/{chain}/token/{address}/activity/stats`
+- `GET` `/api/v2/chain/{chain}/token/{address}/holders`
+… and 86 more
+
 
 </details>
 
@@ -3393,6 +4040,19 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec paypal-rest-api-specifications checkout_orders_v2 + payments_payment_v2 @ 2.32, 2.12: 17 real routes · 11 covered · 64% · 6 not implemented
+
+<details><summary>not implemented (6)</summary>
+
+- `POST` `/v2/checkout/orders/order-update-callback`
+- `PATCH` `/v2/checkout/orders/{id}`
+- `POST` `/v2/checkout/orders/{id}/confirm-payment-source`
+- `POST` `/v2/checkout/orders/{id}/track`
+- `PATCH` `/v2/checkout/orders/{id}/trackers/{tracker_id}`
+- `POST` `/v2/payments/find-eligible-methods`
+
+</details>
+
 **Missing** (5)
 
 - No PATCH order update (PATCH /v2/checkout/orders/{id})
@@ -3422,6 +4082,65 @@ behavior notes live in each adapter's README.
 | POST | `/api/inquiry/v1/inquiries/{inquiry_id}/resume` |
 | GET | `/api/inquiry/v1/inquiries/{inquiry_id}/verifications` |
 | POST | `/api/inquiry/v1/webhooks` |
+
+</details>
+
+**Provider surface** — derived from spec Persona API reference @ 1.0.0: 213 real routes · 4 covered · 1% · 209 not implemented
+
+<details><summary>not implemented (209)</summary>
+
+- `GET` `/api/inquiry/v1/account-types/{account-type-id}`
+- `GET` `/api/inquiry/v1/accounts`
+- `POST` `/api/inquiry/v1/accounts`
+- `POST` `/api/inquiry/v1/accounts/search`
+- `DELETE` `/api/inquiry/v1/accounts/{account-id}`
+- `GET` `/api/inquiry/v1/accounts/{account-id}`
+- `PATCH` `/api/inquiry/v1/accounts/{account-id}`
+- `POST` `/api/inquiry/v1/accounts/{account-id}/add-relation`
+- `POST` `/api/inquiry/v1/accounts/{account-id}/add-tag`
+- `POST` `/api/inquiry/v1/accounts/{account-id}/consolidate`
+- `GET` `/api/inquiry/v1/accounts/{account-id}/relations`
+- `POST` `/api/inquiry/v1/accounts/{account-id}/remove-relation`
+- `POST` `/api/inquiry/v1/accounts/{account-id}/remove-tag`
+- `POST` `/api/inquiry/v1/accounts/{account-id}/run-action`
+- `POST` `/api/inquiry/v1/accounts/{account-id}/set-tags`
+- `GET` `/api/inquiry/v1/api-keys`
+- `POST` `/api/inquiry/v1/api-keys`
+- `GET` `/api/inquiry/v1/api-keys/{api-key-id}`
+- `PATCH` `/api/inquiry/v1/api-keys/{api-key-id}`
+- `POST` `/api/inquiry/v1/api-keys/{api-key-id}/clone`
+- `POST` `/api/inquiry/v1/api-keys/{api-key-id}/expire`
+- `GET` `/api/inquiry/v1/api-logs`
+- `GET` `/api/inquiry/v1/api-logs/{api-log-id}`
+- `GET` `/api/inquiry/v1/case-templates/{case-template-id}`
+- `GET` `/api/inquiry/v1/cases`
+- `POST` `/api/inquiry/v1/cases`
+- `POST` `/api/inquiry/v1/cases/search`
+- `DELETE` `/api/inquiry/v1/cases/{case-id}`
+- `GET` `/api/inquiry/v1/cases/{case-id}`
+- `PATCH` `/api/inquiry/v1/cases/{case-id}`
+- `POST` `/api/inquiry/v1/cases/{case-id}/add-objects`
+- `POST` `/api/inquiry/v1/cases/{case-id}/add-tag`
+- `POST` `/api/inquiry/v1/cases/{case-id}/assign`
+- `POST` `/api/inquiry/v1/cases/{case-id}/remove-objects`
+- `POST` `/api/inquiry/v1/cases/{case-id}/remove-tag`
+- `POST` `/api/inquiry/v1/cases/{case-id}/set-status`
+- `POST` `/api/inquiry/v1/cases/{case-id}/set-tags`
+- `GET` `/api/inquiry/v1/connect/connections`
+- `POST` `/api/inquiry/v1/connect/connections`
+- `GET` `/api/inquiry/v1/connect/connections/{connection-id}`
+- `POST` `/api/inquiry/v1/connect/connections/{connection-id}/deactivate`
+- `POST` `/api/inquiry/v1/connect/connections/{connection-id}/reactivate`
+- `GET` `/api/inquiry/v1/connect/share-tokens`
+- `POST` `/api/inquiry/v1/connect/share-tokens`
+- `GET` `/api/inquiry/v1/connect/share-tokens/{share-token-id}`
+- `POST` `/api/inquiry/v1/connect/share-tokens/{share-token-id}/expire`
+- `POST` `/api/inquiry/v1/connect/share-tokens/{share-token-id}/redeem`
+- `GET` `/api/inquiry/v1/devices`
+- `GET` `/api/inquiry/v1/devices/{device-id}`
+- `GET` `/api/inquiry/v1/document/generics/{document-id}`
+… and 159 more
+
 
 </details>
 
@@ -3654,6 +4373,63 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec Printful OpenAPI @ 1.0: 55 real routes · 5 covered · 9% · 50 not implemented
+
+<details><summary>not implemented (50)</summary>
+
+- `GET` `/approval-sheets`
+- `POST` `/approval-sheets`
+- `POST` `/approval-sheets/changes`
+- `GET` `/categories`
+- `GET` `/categories/{id}`
+- `GET` `/countries`
+- `POST` `/files`
+- `POST` `/files/thread-colors`
+- `GET` `/files/{id}`
+- `POST` `/mockup-generator/create-task/{id}`
+- `GET` `/mockup-generator/printfiles/{id}`
+- `GET` `/mockup-generator/task`
+- `GET` `/mockup-generator/templates/{id}`
+- `GET` `/oauth/scopes`
+- `GET` `/orders`
+- `POST` `/orders/estimate-costs`
+- `DELETE` `/orders/{id}`
+- `PUT` `/orders/{id}`
+- `POST` `/orders/{id}/confirm`
+- `GET` `/product-templates`
+- `DELETE` `/product-templates/{id}`
+- `GET` `/product-templates/{id}`
+- `GET` `/products`
+- `GET` `/products/variant/{id}`
+- `GET` `/products/{id}`
+- `GET` `/products/{id}/sizes`
+- `GET` `/reports/statistics`
+- `POST` `/shipping/rates`
+- `POST` `/store/packing-slip`
+- `GET` `/store/products`
+- `POST` `/store/products`
+- `DELETE` `/store/products/{id}`
+- `GET` `/store/products/{id}`
+- `PUT` `/store/products/{id}`
+- `POST` `/store/products/{id}/variants`
+- `DELETE` `/store/variants/{id}`
+- `GET` `/store/variants/{id}`
+- `PUT` `/store/variants/{id}`
+- `GET` `/stores`
+- `GET` `/stores/{id}`
+- `GET` `/sync/products`
+- `DELETE` `/sync/products/{id}`
+- `GET` `/sync/products/{id}`
+- `DELETE` `/sync/variant/{id}`
+- `GET` `/sync/variant/{id}`
+- `PUT` `/sync/variant/{id}`
+- `GET` `/tax/countries`
+- `POST` `/tax/rates`
+- `GET` `/warehouse/products`
+- `GET` `/warehouse/products/{id}`
+
+</details>
+
 **Missing** (5)
 
 - No package_shipped, package_returned, product_synced, or order_hold events
@@ -3690,6 +4466,42 @@ behavior notes live in each adapter's README.
 | POST | `/v1/shops/{shop_id}/webhooks.json` |
 | GET | `/v1/shops/{shop_id}/webhooks/{webhook_id}` |
 | DELETE | `/v1/shops/{shop_id}/webhooks/{webhook_id}` |
+
+</details>
+
+**Provider surface** — derived from spec Printify OpenAPI @ 1.0.0: 40 real routes · 11 covered · 27% · 29 not implemented
+
+<details><summary>not implemented (29)</summary>
+
+- `GET` `/v1/catalog/blueprints/{blueprint_id}.json`
+- `GET` `/v1/catalog/blueprints/{blueprint_id}/print_providers.json`
+- `GET` `/v1/catalog/blueprints/{blueprint_id}/print_providers/shipping.json`
+- `GET` `/v1/catalog/blueprints/{blueprint_id}/print_providers/shipping/economy.json`
+- `GET` `/v1/catalog/blueprints/{blueprint_id}/print_providers/shipping/express.json`
+- `GET` `/v1/catalog/blueprints/{blueprint_id}/print_providers/shipping/priority.json`
+- `GET` `/v1/catalog/blueprints/{blueprint_id}/print_providers/shipping/standard.json`
+- `GET` `/v1/catalog/blueprints/{blueprint_id}/print_providers/{print_provider_id}/variants.json`
+- `GET` `/v1/catalog/print_providers.json`
+- `GET` `/v1/catalog/print_providers/{print_provider_id}.json`
+- `GET` `/v1/shops.json`
+- `DELETE` `/v1/shops/{shop_id}/connection.json`
+- `GET` `/v1/shops/{shop_id}/orders.json`
+- `POST` `/v1/shops/{shop_id}/orders/express.json`
+- `POST` `/v1/shops/{shop_id}/orders/shipping.json`
+- `POST` `/v1/shops/{shop_id}/orders/{order_id}/cancel.json`
+- `POST` `/v1/shops/{shop_id}/orders/{order_id}/send_to_production.json`
+- `GET` `/v1/shops/{shop_id}/products/{product_id}/gpsr.json`
+- `POST` `/v1/shops/{shop_id}/products/{product_id}/publish.json`
+- `POST` `/v1/shops/{shop_id}/products/{product_id}/publishing_failed.json`
+- `POST` `/v1/shops/{shop_id}/products/{product_id}/publishing_succeeded.json`
+- `POST` `/v1/shops/{shop_id}/products/{product_id}/unpublish.json`
+- `PUT` `/v1/shops/{shop_id}/webhooks/{webhook_id}.json`
+- `POST` `/v1/shops/{shop_id}/webhooks/{webhook_id}/simulate`
+- `GET` `/v1/uploads.json`
+- `POST` `/v1/uploads/images.json`
+- `GET` `/v1/uploads/{image_id}.json`
+- `POST` `/v1/uploads/{image_id}/archive.json`
+- `GET` `/v2/catalog/blueprints/{blueprint_id}/print_providers/{print_provider_id}/shipping.json`
 
 </details>
 
@@ -3902,6 +4714,24 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec RevenueCat API v1 reference @ 1.0: 15 real routes · 4 covered · 26% · 11 not implemented
+
+<details><summary>not implemented (11)</summary>
+
+- `POST` `/v1/subscribers/{app_user_id}/attributes`
+- `POST` `/v1/subscribers/{app_user_id}/attribution`
+- `POST` `/v1/subscribers/{app_user_id}/entitlements/{entitlement_identifier}/promotional`
+- `POST` `/v1/subscribers/{app_user_id}/entitlements/{entitlement_identifier}/revoke_promotionals`
+- `GET` `/v1/subscribers/{app_user_id}/offerings`
+- `DELETE` `/v1/subscribers/{app_user_id}/offerings/override`
+- `POST` `/v1/subscribers/{app_user_id}/offerings/{offering_uuid}/override`
+- `POST` `/v1/subscribers/{app_user_id}/subscriptions/{product_identifier}/defer`
+- `POST` `/v1/subscribers/{app_user_id}/subscriptions/{store_transaction_identifier}/cancel`
+- `POST` `/v1/subscribers/{app_user_id}/subscriptions/{store_transaction_identifier}/extend`
+- `POST` `/v1/subscribers/{app_user_id}/transactions/{store_transaction_identifier}/refund`
+
+</details>
+
 **Missing** (5)
 
 - No attribution endpoint (POST /v1/subscribers/{id}/attribution)
@@ -3987,6 +4817,15 @@ behavior notes live in each adapter's README.
 | POST | `/v3/user/webhooks/event/settings` |
 | GET | `/v3/user/webhooks/event/settings` |
 | POST | `/v3/user/webhooks/event/test` |
+
+</details>
+
+**Provider surface** — derived from spec sendgrid-oai tsg_mail_v3 @ 1.0.0: 3 real routes · 1 covered · 33% · 2 not implemented
+
+<details><summary>not implemented (2)</summary>
+
+- `POST` `/v3/mail/batch`
+- `GET` `/v3/mail/batch/{batch_id}`
 
 </details>
 
@@ -4851,6 +5690,65 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec X API v2 openapi (published at the API origin) @ 2.167: 178 real routes · 8 covered · 4% · 170 not implemented
+
+<details><summary>not implemented (170)</summary>
+
+- `GET` `/2/account_activity/subscriptions/count`
+- `GET` `/2/account_activity/webhooks/{webhook_id}/subscriptions/all`
+- `POST` `/2/account_activity/webhooks/{webhook_id}/subscriptions/all`
+- `GET` `/2/account_activity/webhooks/{webhook_id}/subscriptions/all/list`
+- `DELETE` `/2/account_activity/webhooks/{webhook_id}/subscriptions/{user_id}/all`
+- `GET` `/2/activity/stream`
+- `DELETE` `/2/activity/subscriptions`
+- `GET` `/2/activity/subscriptions`
+- `POST` `/2/activity/subscriptions`
+- `DELETE` `/2/activity/subscriptions/{subscription_id}`
+- `PUT` `/2/activity/subscriptions/{subscription_id}`
+- `POST` `/2/articles/draft`
+- `POST` `/2/articles/{article_id}/publish`
+- `GET` `/2/broadcasts`
+- `GET` `/2/broadcasts/scheduled`
+- `POST` `/2/broadcasts/scheduled`
+- `DELETE` `/2/broadcasts/scheduled/{id}`
+- `GET` `/2/broadcasts/scheduled/{id}`
+- `PUT` `/2/broadcasts/scheduled/{id}`
+- `POST` `/2/broadcasts/scheduled/{id}/live`
+- `GET` `/2/broadcasts/{id}`
+- `GET` `/2/broadcasts/{id}/chat`
+- `POST` `/2/broadcasts/{id}/chat`
+- `POST` `/2/broadcasts/{id}/chat/mutes`
+- `DELETE` `/2/broadcasts/{id}/chat/mutes/{user_id}`
+- `DELETE` `/2/broadcasts/{id}/chat/{message_id}`
+- `GET` `/2/chat/conversations`
+- `POST` `/2/chat/conversations/group`
+- `POST` `/2/chat/conversations/group/initialize`
+- `GET` `/2/chat/conversations/{id}`
+- `GET` `/2/chat/conversations/{id}/events`
+- `POST` `/2/chat/conversations/{id}/keys`
+- `POST` `/2/chat/conversations/{id}/members`
+- `POST` `/2/chat/conversations/{id}/messages`
+- `POST` `/2/chat/conversations/{id}/messages/delete`
+- `POST` `/2/chat/conversations/{id}/read`
+- `POST` `/2/chat/conversations/{id}/typing`
+- `POST` `/2/chat/media/upload/initialize`
+- `POST` `/2/chat/media/upload/{id}/append`
+- `POST` `/2/chat/media/upload/{id}/finalize`
+- `GET` `/2/chat/media/{id}/{media_hash_key}`
+- `GET` `/2/communities/search`
+- `GET` `/2/communities/{id}`
+- `GET` `/2/compliance/jobs`
+- `POST` `/2/compliance/jobs`
+- `GET` `/2/compliance/jobs/{id}`
+- `DELETE` `/2/connections`
+- `GET` `/2/connections`
+- `DELETE` `/2/connections/all`
+- `DELETE` `/2/connections/{endpoint_id}`
+… and 120 more
+
+
+</details>
+
 **Missing** (7)
 
 - No tweet search (/2/tweets/search/recent or /all) endpoints
@@ -4979,6 +5877,65 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec X API v2 openapi (published at the API origin) @ 2.167: 178 real routes · 5 covered · 2% · 173 not implemented
+
+<details><summary>not implemented (173)</summary>
+
+- `GET` `/2/account_activity/subscriptions/count`
+- `GET` `/2/account_activity/webhooks/{webhook_id}/subscriptions/all`
+- `POST` `/2/account_activity/webhooks/{webhook_id}/subscriptions/all`
+- `GET` `/2/account_activity/webhooks/{webhook_id}/subscriptions/all/list`
+- `DELETE` `/2/account_activity/webhooks/{webhook_id}/subscriptions/{user_id}/all`
+- `GET` `/2/activity/stream`
+- `DELETE` `/2/activity/subscriptions`
+- `GET` `/2/activity/subscriptions`
+- `POST` `/2/activity/subscriptions`
+- `DELETE` `/2/activity/subscriptions/{subscription_id}`
+- `PUT` `/2/activity/subscriptions/{subscription_id}`
+- `GET` `/2/broadcasts`
+- `GET` `/2/broadcasts/scheduled`
+- `POST` `/2/broadcasts/scheduled`
+- `DELETE` `/2/broadcasts/scheduled/{id}`
+- `GET` `/2/broadcasts/scheduled/{id}`
+- `PUT` `/2/broadcasts/scheduled/{id}`
+- `POST` `/2/broadcasts/scheduled/{id}/live`
+- `GET` `/2/broadcasts/{id}`
+- `GET` `/2/broadcasts/{id}/chat`
+- `POST` `/2/broadcasts/{id}/chat`
+- `POST` `/2/broadcasts/{id}/chat/mutes`
+- `DELETE` `/2/broadcasts/{id}/chat/mutes/{user_id}`
+- `DELETE` `/2/broadcasts/{id}/chat/{message_id}`
+- `GET` `/2/chat/conversations`
+- `POST` `/2/chat/conversations/group`
+- `POST` `/2/chat/conversations/group/initialize`
+- `GET` `/2/chat/conversations/{id}`
+- `GET` `/2/chat/conversations/{id}/events`
+- `POST` `/2/chat/conversations/{id}/keys`
+- `POST` `/2/chat/conversations/{id}/members`
+- `POST` `/2/chat/conversations/{id}/messages`
+- `POST` `/2/chat/conversations/{id}/messages/delete`
+- `POST` `/2/chat/conversations/{id}/read`
+- `POST` `/2/chat/conversations/{id}/typing`
+- `POST` `/2/chat/media/upload/initialize`
+- `POST` `/2/chat/media/upload/{id}/append`
+- `POST` `/2/chat/media/upload/{id}/finalize`
+- `GET` `/2/chat/media/{id}/{media_hash_key}`
+- `GET` `/2/communities/search`
+- `GET` `/2/communities/{id}`
+- `GET` `/2/compliance/jobs`
+- `POST` `/2/compliance/jobs`
+- `GET` `/2/compliance/jobs/{id}`
+- `DELETE` `/2/connections`
+- `GET` `/2/connections`
+- `DELETE` `/2/connections/all`
+- `DELETE` `/2/connections/{endpoint_id}`
+- `POST` `/2/dm_conversations`
+- `GET` `/2/dm_conversations/media/{dm_id}/{media_id}/{resource_id}`
+… and 123 more
+
+
+</details>
+
 **Missing** (4)
 
 - No article update, delete, or unpublish endpoints
@@ -5013,6 +5970,65 @@ behavior notes live in each adapter's README.
 | GET | `/api.xro/2.0/Items` |
 | GET | `/api.xro/2.0/TrackingCategories` |
 | POST | `/webhooks` |
+
+</details>
+
+**Provider surface** — derived from spec Xero-OpenAPI xero_accounting @ 17.0.0: 235 real routes · 10 covered · 4% · 211 not implemented
+
+<details><summary>not implemented (211)</summary>
+
+- `PUT` `/api.xro/2.0/Accounts`
+- `DELETE` `/api.xro/2.0/Accounts/{AccountID}`
+- `GET` `/api.xro/2.0/Accounts/{AccountID}`
+- `POST` `/api.xro/2.0/Accounts/{AccountID}`
+- `GET` `/api.xro/2.0/Accounts/{AccountID}/Attachments`
+- `GET` `/api.xro/2.0/Accounts/{AccountID}/Attachments/{AttachmentID}`
+- `POST` `/api.xro/2.0/Accounts/{AccountID}/Attachments/{FileName}`
+- `PUT` `/api.xro/2.0/Accounts/{AccountID}/Attachments/{FileName}`
+- `POST` `/api.xro/2.0/BankTransactions`
+- `PUT` `/api.xro/2.0/BankTransactions`
+- `GET` `/api.xro/2.0/BankTransactions/{BankTransactionID}`
+- `POST` `/api.xro/2.0/BankTransactions/{BankTransactionID}`
+- `GET` `/api.xro/2.0/BankTransactions/{BankTransactionID}/Attachments`
+- `GET` `/api.xro/2.0/BankTransactions/{BankTransactionID}/Attachments/{AttachmentID}`
+- `POST` `/api.xro/2.0/BankTransactions/{BankTransactionID}/Attachments/{FileName}`
+- `PUT` `/api.xro/2.0/BankTransactions/{BankTransactionID}/Attachments/{FileName}`
+- `GET` `/api.xro/2.0/BankTransactions/{BankTransactionID}/History`
+- `PUT` `/api.xro/2.0/BankTransactions/{BankTransactionID}/History`
+- `GET` `/api.xro/2.0/BankTransfers`
+- `POST` `/api.xro/2.0/BankTransfers`
+- `PUT` `/api.xro/2.0/BankTransfers`
+- `GET` `/api.xro/2.0/BankTransfers/{BankTransferID}`
+- `POST` `/api.xro/2.0/BankTransfers/{BankTransferID}`
+- `GET` `/api.xro/2.0/BankTransfers/{BankTransferID}/Attachments`
+- `GET` `/api.xro/2.0/BankTransfers/{BankTransferID}/Attachments/{AttachmentID}`
+- `POST` `/api.xro/2.0/BankTransfers/{BankTransferID}/Attachments/{FileName}`
+- `PUT` `/api.xro/2.0/BankTransfers/{BankTransferID}/Attachments/{FileName}`
+- `GET` `/api.xro/2.0/BankTransfers/{BankTransferID}/History`
+- `PUT` `/api.xro/2.0/BankTransfers/{BankTransferID}/History`
+- `GET` `/api.xro/2.0/BatchPayments`
+- `POST` `/api.xro/2.0/BatchPayments`
+- `PUT` `/api.xro/2.0/BatchPayments`
+- `GET` `/api.xro/2.0/BatchPayments/{BatchPaymentID}`
+- `POST` `/api.xro/2.0/BatchPayments/{BatchPaymentID}`
+- `GET` `/api.xro/2.0/BatchPayments/{BatchPaymentID}/History`
+- `PUT` `/api.xro/2.0/BatchPayments/{BatchPaymentID}/History`
+- `GET` `/api.xro/2.0/BrandingThemes`
+- `GET` `/api.xro/2.0/BrandingThemes/{BrandingThemeID}`
+- `GET` `/api.xro/2.0/BrandingThemes/{BrandingThemeID}/PaymentServices`
+- `POST` `/api.xro/2.0/BrandingThemes/{BrandingThemeID}/PaymentServices`
+- `GET` `/api.xro/2.0/Budgets`
+- `GET` `/api.xro/2.0/Budgets/{BudgetID}`
+- `GET` `/api.xro/2.0/ContactGroups`
+- `PUT` `/api.xro/2.0/ContactGroups`
+- `GET` `/api.xro/2.0/ContactGroups/{ContactGroupID}`
+- `POST` `/api.xro/2.0/ContactGroups/{ContactGroupID}`
+- `DELETE` `/api.xro/2.0/ContactGroups/{ContactGroupID}/Contacts`
+- `PUT` `/api.xro/2.0/ContactGroups/{ContactGroupID}/Contacts`
+- `DELETE` `/api.xro/2.0/ContactGroups/{ContactGroupID}/Contacts/{ContactID}`
+- `POST` `/api.xro/2.0/Contacts`
+… and 161 more
+
 
 </details>
 

@@ -1,0 +1,68 @@
+{
+  "source": "spec RevenueCat API v1 reference @ 1.0",
+  "url": "https://www.revenuecat.com/docs/redocusaurus/openapi-v1.yaml",
+  "fetched": "2026-08-22",
+  "license": "none stated",
+  "routes": [
+    {
+      "method": "POST",
+      "route": "/v1/receipts"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscribers/{app_user_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscribers/{app_user_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscribers/{app_user_id}/attributes"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscribers/{app_user_id}/attribution"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscribers/{app_user_id}/entitlements/{entitlement_identifier}/promotional"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscribers/{app_user_id}/entitlements/{entitlement_identifier}/revoke_promotionals"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscribers/{app_user_id}/offerings"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscribers/{app_user_id}/offerings/override"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscribers/{app_user_id}/offerings/{offering_uuid}/override"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscribers/{app_user_id}/subscriptions/{product_identifier}/defer"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscribers/{app_user_id}/subscriptions/{product_identifier}/revoke"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscribers/{app_user_id}/subscriptions/{store_transaction_identifier}/cancel"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscribers/{app_user_id}/subscriptions/{store_transaction_identifier}/extend"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscribers/{app_user_id}/transactions/{store_transaction_identifier}/refund"
+    }
+  ]
+}

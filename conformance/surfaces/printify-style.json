@@ -1,0 +1,168 @@
+{
+  "source": "spec Printify OpenAPI @ 1.0.0",
+  "url": "https://developers.printify.com/openapi.json",
+  "fetched": "2026-08-22",
+  "license": "ISC (declared in spec)",
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/v1/catalog/blueprints.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/catalog/blueprints/{blueprint_id}.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/catalog/blueprints/{blueprint_id}/print_providers.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/catalog/blueprints/{blueprint_id}/print_providers/shipping.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/catalog/blueprints/{blueprint_id}/print_providers/shipping/economy.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/catalog/blueprints/{blueprint_id}/print_providers/shipping/express.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/catalog/blueprints/{blueprint_id}/print_providers/shipping/priority.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/catalog/blueprints/{blueprint_id}/print_providers/shipping/standard.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/catalog/blueprints/{blueprint_id}/print_providers/{print_provider_id}/variants.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/catalog/print_providers.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/catalog/print_providers/{print_provider_id}.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/shops.json"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/shops/{shop_id}/connection.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/shops/{shop_id}/orders.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/shops/{shop_id}/orders.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/shops/{shop_id}/orders/express.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/shops/{shop_id}/orders/shipping.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/shops/{shop_id}/orders/{order_id}.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/shops/{shop_id}/orders/{order_id}/cancel.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/shops/{shop_id}/orders/{order_id}/send_to_production.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/shops/{shop_id}/products.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/shops/{shop_id}/products.json"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/shops/{shop_id}/products/{product_id}.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/shops/{shop_id}/products/{product_id}.json"
+    },
+    {
+      "method": "PUT",
+      "route": "/v1/shops/{shop_id}/products/{product_id}.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/shops/{shop_id}/products/{product_id}/gpsr.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/shops/{shop_id}/products/{product_id}/publish.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/shops/{shop_id}/products/{product_id}/publishing_failed.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/shops/{shop_id}/products/{product_id}/publishing_succeeded.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/shops/{shop_id}/products/{product_id}/unpublish.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/shops/{shop_id}/webhooks.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/shops/{shop_id}/webhooks.json"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/shops/{shop_id}/webhooks/{webhook_id}.json"
+    },
+    {
+      "method": "PUT",
+      "route": "/v1/shops/{shop_id}/webhooks/{webhook_id}.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/shops/{shop_id}/webhooks/{webhook_id}/simulate"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/uploads.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/uploads/images.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/uploads/{image_id}.json"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/uploads/{image_id}/archive.json"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/catalog/blueprints/{blueprint_id}/print_providers/{print_provider_id}/shipping.json"
+    }
+  ]
+}

@@ -1,0 +1,500 @@
+{
+  "source": "spec openapi-fattureincloud @ 2.1.8",
+  "url": "https://raw.githubusercontent.com/fattureincloud/openapi-fattureincloud/master/openapi.yaml",
+  "fetched": "2026-08-22",
+  "license": "MIT",
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/archive"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/archive"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/archive/attachment"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/archive/{document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/archive/{document_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/archive/{document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/bin/issued_documents"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/bin/issued_documents/{document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/bin/issued_documents/{document_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/bin/issued_documents/{document_id}/recover"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/bin/received_documents"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/bin/received_documents/{document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/bin/received_documents/{document_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/bin/received_documents/{document_id}/recover"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/cashbook"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/cashbook"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/cashbook/{document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/cashbook/{document_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/cashbook/{document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/company/info"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/company/plan_usage"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/emails"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/entities/clients"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/entities/clients"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/entities/clients/info"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/entities/clients/{client_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/entities/clients/{client_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/entities/clients/{client_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/entities/suppliers"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/entities/suppliers"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/entities/suppliers/{supplier_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/entities/suppliers/{supplier_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/entities/suppliers/{supplier_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/info/archive_categories"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/info/cost_centers"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/info/payment_accounts"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/info/payment_methods"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/info/product_categories"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/info/received_document_categories"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/info/revenue_centers"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/info/vat_types"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/issued_documents"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/issued_documents"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/issued_documents/attachment"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/issued_documents/info"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/issued_documents/join"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/issued_documents/totals"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/issued_documents/transform"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/issued_documents/{document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/issued_documents/{document_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/issued_documents/{document_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/issued_documents/{document_id}/attachment"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/issued_documents/{document_id}/e_invoice/error_reason"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/issued_documents/{document_id}/e_invoice/send"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/issued_documents/{document_id}/e_invoice/xml"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/issued_documents/{document_id}/e_invoice/xml_verify"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/issued_documents/{document_id}/email"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/issued_documents/{document_id}/email"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/issued_documents/{document_id}/totals"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/price_lists"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/price_lists/{price_list_id}/items"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/products"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/products"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/products/{product_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/products/{product_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/products/{product_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/receipts"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/receipts"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/receipts/info"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/receipts/monthly_totals"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/receipts/{document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/receipts/{document_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/receipts/{document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/received_documents"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/received_documents"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/received_documents/attachment"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/received_documents/info"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/received_documents/pending"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/received_documents/pending/{document_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/received_documents/totals"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/received_documents/{document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/received_documents/{document_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/received_documents/{document_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/received_documents/{document_id}/attachment"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/received_documents/{document_id}/totals"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/settings/payment_accounts"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/settings/payment_accounts/{payment_account_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/settings/payment_accounts/{payment_account_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/settings/payment_accounts/{payment_account_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/settings/payment_methods"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/settings/payment_methods/{payment_method_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/settings/payment_methods/{payment_method_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/settings/payment_methods/{payment_method_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/settings/tax_profile"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/settings/templates"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/settings/templates/{template_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/settings/vat_types"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/settings/vat_types/{vat_type_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/settings/vat_types/{vat_type_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/settings/vat_types/{vat_type_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/subscriptions"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/subscriptions"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/subscriptions/{subscription_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/subscriptions/{subscription_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/subscriptions/{subscription_id}"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/subscriptions/{subscription_id}/verify"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/taxes"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/taxes"
+    },
+    {
+      "method": "POST",
+      "route": "/c/{company_id}/taxes/attachment"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/taxes/{document_id}"
+    },
+    {
+      "method": "GET",
+      "route": "/c/{company_id}/taxes/{document_id}"
+    },
+    {
+      "method": "PUT",
+      "route": "/c/{company_id}/taxes/{document_id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/c/{company_id}/taxes/{document_id}/attachment"
+    },
+    {
+      "method": "GET",
+      "route": "/info/cities"
+    },
+    {
+      "method": "GET",
+      "route": "/info/countries"
+    },
+    {
+      "method": "GET",
+      "route": "/info/currencies"
+    },
+    {
+      "method": "GET",
+      "route": "/info/detailed_countries"
+    },
+    {
+      "method": "GET",
+      "route": "/info/dn_causals"
+    },
+    {
+      "method": "GET",
+      "route": "/info/languages"
+    },
+    {
+      "method": "GET",
+      "route": "/info/measures"
+    },
+    {
+      "method": "GET",
+      "route": "/info/templates"
+    },
+    {
+      "method": "GET",
+      "route": "/user/companies"
+    },
+    {
+      "method": "GET",
+      "route": "/user/info"
+    }
+  ]
+}

@@ -1,0 +1,5060 @@
+{
+  "source": "spec App Store Connect OpenAPI Specification @ 4.4.1",
+  "url": "https://developer.apple.com/sample-code/app-store-connect/app-store-connect-openapi-specification.zip",
+  "fetched": "2026-08-22",
+  "license": "none stated",
+  "routes": [
+    {
+      "method": "POST",
+      "route": "/v1/accessibilityDeclarations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/accessibilityDeclarations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/accessibilityDeclarations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/accessibilityDeclarations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/actors"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/actors/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/ageRatingDeclarations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionDomains"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/alternativeDistributionDomains"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/alternativeDistributionDomains/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionDomains/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionKeys"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/alternativeDistributionKeys"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/alternativeDistributionKeys/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionKeys/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionPackageDeltas/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionPackageVariants/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionPackageVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionPackageVersions/{id}/deltas"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionPackageVersions/{id}/relationships/deltas"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionPackageVersions/{id}/relationships/variants"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionPackageVersions/{id}/variants"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/alternativeDistributionPackages"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionPackages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionPackages/{id}/relationships/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/alternativeDistributionPackages/{id}/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/analyticsReportInstances/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/analyticsReportInstances/{id}/relationships/segments"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/analyticsReportInstances/{id}/segments"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/analyticsReportRequests"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/analyticsReportRequests/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/analyticsReportRequests/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/analyticsReportRequests/{id}/relationships/reports"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/analyticsReportRequests/{id}/reports"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/analyticsReportSegments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/analyticsReports/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/analyticsReports/{id}/instances"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/analyticsReports/{id}/relationships/instances"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/androidToIosAppMappingDetails"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/androidToIosAppMappingDetails/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/androidToIosAppMappingDetails/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/androidToIosAppMappingDetails/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCategories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCategories/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCategories/{id}/parent"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCategories/{id}/relationships/parent"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCategories/{id}/relationships/subcategories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCategories/{id}/subcategories"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appClipAdvancedExperienceImages"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipAdvancedExperienceImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appClipAdvancedExperienceImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appClipAdvancedExperiences"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipAdvancedExperiences/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appClipAdvancedExperiences/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appClipAppStoreReviewDetails"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipAppStoreReviewDetails/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appClipAppStoreReviewDetails/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appClipDefaultExperienceLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appClipDefaultExperienceLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipDefaultExperienceLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appClipDefaultExperienceLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipDefaultExperienceLocalizations/{id}/appClipHeaderImage"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipDefaultExperienceLocalizations/{id}/relationships/appClipHeaderImage"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appClipDefaultExperiences"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appClipDefaultExperiences/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipDefaultExperiences/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appClipDefaultExperiences/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipDefaultExperiences/{id}/appClipAppStoreReviewDetail"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipDefaultExperiences/{id}/appClipDefaultExperienceLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipDefaultExperiences/{id}/relationships/appClipAppStoreReviewDetail"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipDefaultExperiences/{id}/relationships/appClipDefaultExperienceLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipDefaultExperiences/{id}/relationships/releaseWithAppStoreVersion"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appClipDefaultExperiences/{id}/relationships/releaseWithAppStoreVersion"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipDefaultExperiences/{id}/releaseWithAppStoreVersion"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appClipHeaderImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appClipHeaderImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClipHeaderImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appClipHeaderImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClips/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClips/{id}/appClipAdvancedExperiences"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClips/{id}/appClipDefaultExperiences"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClips/{id}/relationships/appClipAdvancedExperiences"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appClips/{id}/relationships/appClipDefaultExperiences"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appCustomProductPageLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appCustomProductPageLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPageLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appCustomProductPageLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPageLocalizations/{id}/appPreviewSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPageLocalizations/{id}/appScreenshotSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPageLocalizations/{id}/relationships/appPreviewSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPageLocalizations/{id}/relationships/appScreenshotSets"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appCustomProductPageLocalizations/{id}/relationships/searchKeywords"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPageLocalizations/{id}/relationships/searchKeywords"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appCustomProductPageLocalizations/{id}/relationships/searchKeywords"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPageLocalizations/{id}/searchKeywords"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appCustomProductPageVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPageVersions/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appCustomProductPageVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPageVersions/{id}/appCustomProductPageLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPageVersions/{id}/relationships/appCustomProductPageLocalizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appCustomProductPages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appCustomProductPages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appCustomProductPages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPages/{id}/appCustomProductPageVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appCustomProductPages/{id}/relationships/appCustomProductPageVersions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appEncryptionDeclarationDocuments"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEncryptionDeclarationDocuments/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appEncryptionDeclarationDocuments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEncryptionDeclarations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appEncryptionDeclarations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEncryptionDeclarations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEncryptionDeclarations/{id}/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEncryptionDeclarations/{id}/appEncryptionDeclarationDocument"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEncryptionDeclarations/{id}/relationships/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEncryptionDeclarations/{id}/relationships/appEncryptionDeclarationDocument"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appEncryptionDeclarations/{id}/relationships/builds"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appEventLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appEventLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEventLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appEventLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEventLocalizations/{id}/appEventScreenshots"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEventLocalizations/{id}/appEventVideoClips"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEventLocalizations/{id}/relationships/appEventScreenshots"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEventLocalizations/{id}/relationships/appEventVideoClips"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appEventScreenshots"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appEventScreenshots/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEventScreenshots/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appEventScreenshots/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appEventVideoClips"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appEventVideoClips/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEventVideoClips/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appEventVideoClips/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appEvents"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appEvents/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEvents/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appEvents/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEvents/{id}/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appEvents/{id}/relationships/localizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appInfoLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appInfoLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfoLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appInfoLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appInfos/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/ageRatingDeclaration"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/appInfoLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/primaryCategory"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/primarySubcategoryOne"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/primarySubcategoryTwo"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/relationships/ageRatingDeclaration"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/relationships/appInfoLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/relationships/primaryCategory"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/relationships/primarySubcategoryOne"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/relationships/primarySubcategoryTwo"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/relationships/secondaryCategory"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/relationships/secondarySubcategoryOne"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/relationships/secondarySubcategoryTwo"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/relationships/territoryAgeRatings"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/secondaryCategory"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/secondarySubcategoryOne"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/secondarySubcategoryTwo"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appInfos/{id}/territoryAgeRatings"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appPreviewSets"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appPreviewSets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appPreviewSets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appPreviewSets/{id}/appPreviews"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appPreviewSets/{id}/relationships/appPreviews"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appPreviewSets/{id}/relationships/appPreviews"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appPreviews"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appPreviews/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appPreviews/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appPreviews/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appPriceSchedules"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appPriceSchedules/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appPriceSchedules/{id}/automaticPrices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appPriceSchedules/{id}/baseTerritory"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appPriceSchedules/{id}/manualPrices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appPriceSchedules/{id}/relationships/automaticPrices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appPriceSchedules/{id}/relationships/baseTerritory"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appPriceSchedules/{id}/relationships/manualPrices"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appScreenshotSets"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appScreenshotSets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appScreenshotSets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appScreenshotSets/{id}/appScreenshots"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appScreenshotSets/{id}/relationships/appScreenshots"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appScreenshotSets/{id}/relationships/appScreenshots"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appScreenshots"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appScreenshots/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appScreenshots/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appScreenshots/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appStoreReviewAttachments"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appStoreReviewAttachments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreReviewAttachments/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appStoreReviewAttachments/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appStoreReviewDetails"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreReviewDetails/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appStoreReviewDetails/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreReviewDetails/{id}/appStoreReviewAttachments"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreReviewDetails/{id}/relationships/appStoreReviewAttachments"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appStoreVersionExperimentTreatmentLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appStoreVersionExperimentTreatmentLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionExperimentTreatmentLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionExperimentTreatmentLocalizations/{id}/appPreviewSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionExperimentTreatmentLocalizations/{id}/appScreenshotSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionExperimentTreatmentLocalizations/{id}/relationships/appPreviewSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionExperimentTreatmentLocalizations/{id}/relationships/appScreenshotSets"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appStoreVersionExperimentTreatments"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appStoreVersionExperimentTreatments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionExperimentTreatments/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appStoreVersionExperimentTreatments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionExperimentTreatments/{id}/appStoreVersionExperimentTreatmentLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionExperimentTreatments/{id}/relationships/appStoreVersionExperimentTreatmentLocalizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appStoreVersionExperiments"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appStoreVersionExperiments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionExperiments/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appStoreVersionExperiments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionExperiments/{id}/appStoreVersionExperimentTreatments"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionExperiments/{id}/relationships/appStoreVersionExperimentTreatments"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appStoreVersionLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appStoreVersionLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appStoreVersionLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionLocalizations/{id}/appPreviewSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionLocalizations/{id}/appScreenshotSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionLocalizations/{id}/relationships/appPreviewSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionLocalizations/{id}/relationships/appScreenshotSets"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appStoreVersionLocalizations/{id}/relationships/searchKeywords"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionLocalizations/{id}/relationships/searchKeywords"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appStoreVersionLocalizations/{id}/relationships/searchKeywords"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersionLocalizations/{id}/searchKeywords"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appStoreVersionPhasedReleases"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appStoreVersionPhasedReleases/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appStoreVersionPhasedReleases/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appStoreVersionPromotions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appStoreVersionReleaseRequests"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appStoreVersionSubmissions/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/appStoreVersions"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/appStoreVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appStoreVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/alternativeDistributionPackage"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/appClipDefaultExperience"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/appStoreReviewDetail"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/appStoreVersionExperiments"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/appStoreVersionExperimentsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/appStoreVersionLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/appStoreVersionPhasedRelease"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/appStoreVersionSubmission"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/build"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/customerReviews"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/gameCenterAppVersion"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/relationships/alternativeDistributionPackage"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/relationships/appClipDefaultExperience"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appStoreVersions/{id}/relationships/appClipDefaultExperience"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/relationships/appStoreReviewDetail"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/relationships/appStoreVersionExperiments"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/relationships/appStoreVersionExperimentsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/relationships/appStoreVersionLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/relationships/appStoreVersionPhasedRelease"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/relationships/appStoreVersionSubmission"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/relationships/build"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appStoreVersions/{id}/relationships/build"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/relationships/customerReviews"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/relationships/gameCenterAppVersion"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/relationships/routingAppCoverage"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appStoreVersions/{id}/routingAppCoverage"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/appTags/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appTags/{id}/relationships/territories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/appTags/{id}/territories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/apps/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/accessibilityDeclarations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/alternativeDistributionKey"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/analyticsReportRequests"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/androidToIosAppMappingDetails"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/appAvailabilityV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/appClips"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/appCustomProductPages"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/appEncryptionDeclarations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/appEvents"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/appInfos"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/appPricePoints"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/appPriceSchedule"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/appStoreVersionExperimentsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/appStoreVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/appTags"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/backgroundAssets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/betaAppLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/betaAppReviewDetail"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/betaFeedbackCrashSubmissions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/betaFeedbackScreenshotSubmissions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/betaGroups"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/betaLicenseAgreement"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/buildUploads"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/ciProduct"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/customerReviewSummarizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/customerReviews"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/endUserLicenseAgreement"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/gameCenterDetail"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/gameCenterEnabledVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/inAppPurchases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/inAppPurchasesV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/marketplaceSearchDetail"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/metrics/betaTesterUsages"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/perfPowerMetrics"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/preReleaseVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/promotedPurchases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/accessibilityDeclarations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/alternativeDistributionKey"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/analyticsReportRequests"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/androidToIosAppMappingDetails"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/appAvailabilityV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/appClips"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/appCustomProductPages"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/appEncryptionDeclarations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/appEvents"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/appInfos"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/appPricePoints"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/appPriceSchedule"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/appStoreVersionExperimentsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/appStoreVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/appTags"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/backgroundAssets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/betaAppLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/betaAppReviewDetail"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/betaFeedbackCrashSubmissions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/betaFeedbackScreenshotSubmissions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/betaGroups"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/betaLicenseAgreement"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/apps/{id}/relationships/betaTesters"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/buildUploads"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/ciProduct"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/customerReviews"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/endUserLicenseAgreement"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/gameCenterDetail"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/gameCenterEnabledVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/inAppPurchases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/inAppPurchasesV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/marketplaceSearchDetail"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/preReleaseVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/promotedPurchases"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/apps/{id}/relationships/promotedPurchases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/reviewSubmissions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/searchKeywords"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/subscriptionGracePeriod"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/subscriptionGroups"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/relationships/webhooks"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/reviewSubmissions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/searchKeywords"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/subscriptionGracePeriod"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/subscriptionGroups"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/apps/{id}/webhooks"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/backgroundAssetUploadFiles"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/backgroundAssetUploadFiles/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/backgroundAssetUploadFiles/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/backgroundAssetVersionAppStoreReleases/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/backgroundAssetVersionExternalBetaReleases/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/backgroundAssetVersionInternalBetaReleases/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/backgroundAssetVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/backgroundAssetVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/backgroundAssetVersions/{id}/backgroundAssetUploadFiles"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/backgroundAssetVersions/{id}/relationships/backgroundAssetUploadFiles"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/backgroundAssets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/backgroundAssets/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/backgroundAssets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/backgroundAssets/{id}/relationships/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/backgroundAssets/{id}/versions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaAppClipInvocationLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaAppClipInvocationLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/betaAppClipInvocationLocalizations/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaAppClipInvocations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaAppClipInvocations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppClipInvocations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/betaAppClipInvocations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppLocalizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaAppLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaAppLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/betaAppLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppLocalizations/{id}/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppLocalizations/{id}/relationships/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppReviewDetails"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppReviewDetails/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/betaAppReviewDetails/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppReviewDetails/{id}/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppReviewDetails/{id}/relationships/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppReviewSubmissions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaAppReviewSubmissions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppReviewSubmissions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppReviewSubmissions/{id}/build"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaAppReviewSubmissions/{id}/relationships/build"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaBuildLocalizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaBuildLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaBuildLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaBuildLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/betaBuildLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaBuildLocalizations/{id}/build"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaBuildLocalizations/{id}/relationships/build"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaCrashLogs/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaFeedbackCrashSubmissions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaFeedbackCrashSubmissions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaFeedbackCrashSubmissions/{id}/crashLog"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaFeedbackCrashSubmissions/{id}/relationships/crashLog"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaFeedbackScreenshotSubmissions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaFeedbackScreenshotSubmissions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaGroups"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaGroups/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/betaGroups/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}/betaRecruitmentCriteria"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}/betaRecruitmentCriterionCompatibleBuildCheck"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}/betaTesters"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}/metrics/betaTesterUsages"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}/metrics/publicLinkUsages"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}/relationships/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}/relationships/betaRecruitmentCriteria"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}/relationships/betaRecruitmentCriterionCompatibleBuildCheck"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaGroups/{id}/relationships/betaTesters"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}/relationships/betaTesters"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaGroups/{id}/relationships/betaTesters"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaGroups/{id}/relationships/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaGroups/{id}/relationships/builds"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaGroups/{id}/relationships/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaLicenseAgreements"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaLicenseAgreements/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/betaLicenseAgreements/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaLicenseAgreements/{id}/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaLicenseAgreements/{id}/relationships/app"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaRecruitmentCriteria"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaRecruitmentCriteria/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/betaRecruitmentCriteria/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaRecruitmentCriterionOptions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaTesterInvitations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaTesters"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaTesters"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaTesters/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaTesters/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaTesters/{id}/apps"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaTesters/{id}/betaGroups"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaTesters/{id}/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaTesters/{id}/metrics/betaTesterUsages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaTesters/{id}/relationships/apps"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaTesters/{id}/relationships/apps"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaTesters/{id}/relationships/betaGroups"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaTesters/{id}/relationships/betaGroups"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaTesters/{id}/relationships/betaGroups"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/betaTesters/{id}/relationships/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/betaTesters/{id}/relationships/builds"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/betaTesters/{id}/relationships/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildBetaDetails"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildBetaDetails/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/buildBetaDetails/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildBetaDetails/{id}/build"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildBetaDetails/{id}/relationships/build"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/buildBetaNotifications"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildBundles/{id}/appClipDomainCacheStatus"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildBundles/{id}/appClipDomainDebugStatus"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildBundles/{id}/betaAppClipInvocations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildBundles/{id}/buildBundleFileSizes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildBundles/{id}/relationships/appClipDomainCacheStatus"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildBundles/{id}/relationships/appClipDomainDebugStatus"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildBundles/{id}/relationships/betaAppClipInvocations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildBundles/{id}/relationships/buildBundleFileSizes"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/buildUploadFiles"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildUploadFiles/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/buildUploadFiles/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/buildUploads"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/buildUploads/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildUploads/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildUploads/{id}/buildUploadFiles"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/buildUploads/{id}/relationships/buildUploadFiles"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/builds/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/appEncryptionDeclaration"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/appStoreVersion"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/betaAppReviewSubmission"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/betaBuildLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/buildBetaDetail"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/diagnosticSignatures"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/icons"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/individualTesters"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/metrics/betaBuildUsages"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/perfPowerMetrics"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/preReleaseVersion"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/relationships/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/relationships/appEncryptionDeclaration"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/builds/{id}/relationships/appEncryptionDeclaration"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/relationships/appStoreVersion"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/relationships/betaAppReviewSubmission"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/relationships/betaBuildLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/builds/{id}/relationships/betaGroups"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/builds/{id}/relationships/betaGroups"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/relationships/buildBetaDetail"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/relationships/diagnosticSignatures"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/relationships/icons"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/builds/{id}/relationships/individualTesters"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/relationships/individualTesters"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/builds/{id}/relationships/individualTesters"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/builds/{id}/relationships/preReleaseVersion"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/bundleIdCapabilities"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/bundleIdCapabilities/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/bundleIdCapabilities/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/bundleIds"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/bundleIds"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/bundleIds/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/bundleIds/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/bundleIds/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/bundleIds/{id}/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/bundleIds/{id}/bundleIdCapabilities"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/bundleIds/{id}/profiles"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/bundleIds/{id}/relationships/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/bundleIds/{id}/relationships/bundleIdCapabilities"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/bundleIds/{id}/relationships/profiles"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/certificates"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/certificates"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/certificates/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/certificates/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/certificates/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/certificates/{id}/passTypeId"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/certificates/{id}/relationships/passTypeId"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciArtifacts/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildActions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildActions/{id}/artifacts"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildActions/{id}/buildRun"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildActions/{id}/issues"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildActions/{id}/relationships/artifacts"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildActions/{id}/relationships/buildRun"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildActions/{id}/relationships/issues"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildActions/{id}/relationships/testResults"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildActions/{id}/testResults"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/ciBuildRuns"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildRuns/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildRuns/{id}/actions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildRuns/{id}/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildRuns/{id}/relationships/actions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciBuildRuns/{id}/relationships/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciIssues/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciMacOsVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciMacOsVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciMacOsVersions/{id}/relationships/xcodeVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciMacOsVersions/{id}/xcodeVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciProducts"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/ciProducts/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciProducts/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciProducts/{id}/additionalRepositories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciProducts/{id}/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciProducts/{id}/buildRuns"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciProducts/{id}/primaryRepositories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciProducts/{id}/relationships/additionalRepositories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciProducts/{id}/relationships/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciProducts/{id}/relationships/buildRuns"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciProducts/{id}/relationships/primaryRepositories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciProducts/{id}/relationships/workflows"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciProducts/{id}/workflows"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciTestResults/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/ciWorkflows"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/ciWorkflows/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciWorkflows/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/ciWorkflows/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciWorkflows/{id}/buildRuns"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciWorkflows/{id}/relationships/buildRuns"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciWorkflows/{id}/relationships/repository"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciWorkflows/{id}/repository"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciXcodeVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciXcodeVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciXcodeVersions/{id}/macOsVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/ciXcodeVersions/{id}/relationships/macOsVersions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/customerReviewResponses"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/customerReviewResponses/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/customerReviewResponses/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/customerReviews/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/customerReviews/{id}/relationships/response"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/customerReviews/{id}/response"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/devices"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/devices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/devices/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/devices/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/diagnosticSignatures/{id}/logs"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/endAppAvailabilityPreOrders"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/endUserLicenseAgreements"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/endUserLicenseAgreements/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/endUserLicenseAgreements/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/endUserLicenseAgreements/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/endUserLicenseAgreements/{id}/relationships/territories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/endUserLicenseAgreements/{id}/territories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/financeReports"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterAchievementImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterAchievementImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievementImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterAchievementImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterAchievementLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterAchievementLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievementLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterAchievementLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievementLocalizations/{id}/gameCenterAchievement"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievementLocalizations/{id}/gameCenterAchievementImage"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievementLocalizations/{id}/relationships/gameCenterAchievement"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievementLocalizations/{id}/relationships/gameCenterAchievementImage"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterAchievementReleases"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterAchievementReleases/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievementReleases/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterAchievements"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterAchievements/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievements/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterAchievements/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievements/{id}/groupAchievement"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievements/{id}/localizations"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterAchievements/{id}/relationships/activity"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievements/{id}/relationships/groupAchievement"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterAchievements/{id}/relationships/groupAchievement"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievements/{id}/relationships/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievements/{id}/relationships/releases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAchievements/{id}/releases"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterActivities"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterActivities/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivities/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterActivities/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterActivities/{id}/relationships/achievements"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterActivities/{id}/relationships/achievements"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterActivities/{id}/relationships/achievementsV2"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterActivities/{id}/relationships/achievementsV2"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterActivities/{id}/relationships/leaderboards"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterActivities/{id}/relationships/leaderboards"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterActivities/{id}/relationships/leaderboardsV2"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterActivities/{id}/relationships/leaderboardsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivities/{id}/relationships/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivities/{id}/versions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterActivityImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterActivityImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivityImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterActivityImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterActivityLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterActivityLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivityLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterActivityLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivityLocalizations/{id}/image"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivityLocalizations/{id}/relationships/image"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterActivityVersionReleases"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterActivityVersionReleases/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivityVersionReleases/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterActivityVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivityVersions/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterActivityVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivityVersions/{id}/defaultImage"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivityVersions/{id}/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivityVersions/{id}/relationships/defaultImage"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterActivityVersions/{id}/relationships/localizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterAppVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAppVersions/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterAppVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAppVersions/{id}/appStoreVersion"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAppVersions/{id}/compatibilityVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAppVersions/{id}/relationships/appStoreVersion"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterAppVersions/{id}/relationships/compatibilityVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterAppVersions/{id}/relationships/compatibilityVersions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterAppVersions/{id}/relationships/compatibilityVersions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterChallengeImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterChallengeImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallengeImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterChallengeImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterChallengeLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterChallengeLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallengeLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterChallengeLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallengeLocalizations/{id}/image"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallengeLocalizations/{id}/relationships/image"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterChallengeVersionReleases"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterChallengeVersionReleases/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallengeVersionReleases/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterChallengeVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallengeVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallengeVersions/{id}/defaultImage"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallengeVersions/{id}/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallengeVersions/{id}/relationships/defaultImage"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallengeVersions/{id}/relationships/localizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterChallenges"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterChallenges/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallenges/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterChallenges/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterChallenges/{id}/relationships/leaderboard"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterChallenges/{id}/relationships/leaderboardV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallenges/{id}/relationships/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterChallenges/{id}/versions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterDetails"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterDetails/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/achievementReleases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/activityReleases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/challengeReleases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/gameCenterAchievements"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/gameCenterAchievementsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/gameCenterActivities"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/gameCenterAppVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/gameCenterChallenges"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/gameCenterGroup"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/gameCenterLeaderboardSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/gameCenterLeaderboardSetsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/gameCenterLeaderboards"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/gameCenterLeaderboardsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/leaderboardReleases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/leaderboardSetReleases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/metrics/classicMatchmakingRequests"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/metrics/ruleBasedMatchmakingRequests"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/achievementReleases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/activityReleases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/challengeReleases"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterDetails/{id}/relationships/challengesMinimumPlatformVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterAchievements"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterAchievements"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterAchievementsV2"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterAchievementsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterActivities"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterAppVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterChallenges"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterGroup"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterLeaderboardSets"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterLeaderboardSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterLeaderboardSetsV2"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterLeaderboardSetsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterLeaderboards"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterLeaderboards"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterLeaderboardsV2"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterDetails/{id}/relationships/gameCenterLeaderboardsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/leaderboardReleases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterDetails/{id}/relationships/leaderboardSetReleases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterEnabledVersions/{id}/compatibleVersions"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterEnabledVersions/{id}/relationships/compatibleVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterEnabledVersions/{id}/relationships/compatibleVersions"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterEnabledVersions/{id}/relationships/compatibleVersions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterEnabledVersions/{id}/relationships/compatibleVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterGroups"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterGroups/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterGroups/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/gameCenterAchievements"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/gameCenterAchievementsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/gameCenterActivities"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/gameCenterChallenges"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/gameCenterDetails"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/gameCenterLeaderboardSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/gameCenterLeaderboardSetsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/gameCenterLeaderboards"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/gameCenterLeaderboardsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterAchievements"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterAchievements"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterAchievementsV2"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterAchievementsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterActivities"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterChallenges"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterDetails"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterLeaderboardSets"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterLeaderboardSets"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterLeaderboardSetsV2"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterLeaderboardSetsV2"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterLeaderboards"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterLeaderboards"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterLeaderboardsV2"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterGroups/{id}/relationships/gameCenterLeaderboardsV2"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterLeaderboardEntrySubmissions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterLeaderboardImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterLeaderboardImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterLeaderboardImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterLeaderboardLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterLeaderboardLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterLeaderboardLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardLocalizations/{id}/gameCenterLeaderboardImage"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardLocalizations/{id}/relationships/gameCenterLeaderboardImage"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterLeaderboardReleases"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterLeaderboardReleases/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardReleases/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterLeaderboardSetImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterLeaderboardSetImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSetImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterLeaderboardSetImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterLeaderboardSetLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterLeaderboardSetLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSetLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterLeaderboardSetLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSetLocalizations/{id}/gameCenterLeaderboardSetImage"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSetLocalizations/{id}/relationships/gameCenterLeaderboardSetImage"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSetMemberLocalizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterLeaderboardSetMemberLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterLeaderboardSetMemberLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterLeaderboardSetMemberLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSetMemberLocalizations/{id}/gameCenterLeaderboard"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSetMemberLocalizations/{id}/gameCenterLeaderboardSet"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSetMemberLocalizations/{id}/relationships/gameCenterLeaderboard"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSetMemberLocalizations/{id}/relationships/gameCenterLeaderboardSet"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterLeaderboardSetReleases"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterLeaderboardSetReleases/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSetReleases/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterLeaderboardSets"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterLeaderboardSets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSets/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterLeaderboardSets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSets/{id}/gameCenterLeaderboards"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSets/{id}/groupLeaderboardSet"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSets/{id}/localizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterLeaderboardSets/{id}/relationships/gameCenterLeaderboards"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSets/{id}/relationships/gameCenterLeaderboards"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterLeaderboardSets/{id}/relationships/gameCenterLeaderboards"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterLeaderboardSets/{id}/relationships/gameCenterLeaderboards"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSets/{id}/relationships/groupLeaderboardSet"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterLeaderboardSets/{id}/relationships/groupLeaderboardSet"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSets/{id}/relationships/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSets/{id}/relationships/releases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboardSets/{id}/releases"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterLeaderboards"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterLeaderboards/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboards/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterLeaderboards/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboards/{id}/groupLeaderboard"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboards/{id}/localizations"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterLeaderboards/{id}/relationships/activity"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterLeaderboards/{id}/relationships/challenge"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboards/{id}/relationships/groupLeaderboard"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterLeaderboards/{id}/relationships/groupLeaderboard"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboards/{id}/relationships/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboards/{id}/relationships/releases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterLeaderboards/{id}/releases"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingQueues"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterMatchmakingQueues"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterMatchmakingQueues/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingQueues/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterMatchmakingQueues/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingQueues/{id}/metrics/experimentMatchmakingQueueSizes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingQueues/{id}/metrics/experimentMatchmakingRequests"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingQueues/{id}/metrics/matchmakingQueueSizes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingQueues/{id}/metrics/matchmakingRequests"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingQueues/{id}/metrics/matchmakingSessions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterMatchmakingRuleSetTests"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingRuleSets"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterMatchmakingRuleSets"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterMatchmakingRuleSets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingRuleSets/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterMatchmakingRuleSets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingRuleSets/{id}/matchmakingQueues"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingRuleSets/{id}/relationships/matchmakingQueues"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingRuleSets/{id}/relationships/rules"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingRuleSets/{id}/relationships/teams"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingRuleSets/{id}/rules"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingRuleSets/{id}/teams"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterMatchmakingRules"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterMatchmakingRules/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterMatchmakingRules/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingRules/{id}/metrics/matchmakingBooleanRuleResults"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingRules/{id}/metrics/matchmakingNumberRuleResults"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/gameCenterMatchmakingRules/{id}/metrics/matchmakingRuleErrors"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterMatchmakingTeams"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/gameCenterMatchmakingTeams/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/gameCenterMatchmakingTeams/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/gameCenterPlayerAchievementSubmissions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/inAppPurchaseAppStoreReviewScreenshots"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/inAppPurchaseAppStoreReviewScreenshots/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseAppStoreReviewScreenshots/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/inAppPurchaseAppStoreReviewScreenshots/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/inAppPurchaseAvailabilities"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseAvailabilities/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseAvailabilities/{id}/availableTerritories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseAvailabilities/{id}/relationships/availableTerritories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseContents/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/inAppPurchaseImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/inAppPurchaseImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/inAppPurchaseImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/inAppPurchaseLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/inAppPurchaseLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/inAppPurchaseLocalizations/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/inAppPurchaseOfferCodeCustomCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseOfferCodeCustomCodes/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/inAppPurchaseOfferCodeCustomCodes/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/inAppPurchaseOfferCodeOneTimeUseCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseOfferCodeOneTimeUseCodes/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/inAppPurchaseOfferCodeOneTimeUseCodes/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseOfferCodeOneTimeUseCodes/{id}/values"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/inAppPurchaseOfferCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseOfferCodes/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/inAppPurchaseOfferCodes/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseOfferCodes/{id}/customCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseOfferCodes/{id}/oneTimeUseCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseOfferCodes/{id}/prices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseOfferCodes/{id}/relationships/customCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseOfferCodes/{id}/relationships/oneTimeUseCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseOfferCodes/{id}/relationships/prices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchasePricePoints/{id}/equalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchasePricePoints/{id}/relationships/equalizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/inAppPurchasePriceSchedules"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchasePriceSchedules/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchasePriceSchedules/{id}/automaticPrices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchasePriceSchedules/{id}/baseTerritory"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchasePriceSchedules/{id}/manualPrices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchasePriceSchedules/{id}/relationships/automaticPrices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchasePriceSchedules/{id}/relationships/baseTerritory"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchasePriceSchedules/{id}/relationships/manualPrices"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/inAppPurchaseSubmissions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/inAppPurchaseVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseVersions/{id}/image"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseVersions/{id}/images"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseVersions/{id}/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseVersions/{id}/relationships/image"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseVersions/{id}/relationships/images"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchaseVersions/{id}/relationships/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/inAppPurchases/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/marketplaceSearchDetails"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/marketplaceSearchDetails/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/marketplaceSearchDetails/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/marketplaceWebhooks"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/marketplaceWebhooks"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/marketplaceWebhooks/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/marketplaceWebhooks/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/merchantIds"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/merchantIds"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/merchantIds/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/merchantIds/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/merchantIds/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/merchantIds/{id}/certificates"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/merchantIds/{id}/relationships/certificates"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/nominations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/nominations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/nominations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/nominations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/nominations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/passTypeIds"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/passTypeIds"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/passTypeIds/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/passTypeIds/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/passTypeIds/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/passTypeIds/{id}/certificates"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/passTypeIds/{id}/relationships/certificates"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/preReleaseVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/preReleaseVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/preReleaseVersions/{id}/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/preReleaseVersions/{id}/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/preReleaseVersions/{id}/relationships/app"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/preReleaseVersions/{id}/relationships/builds"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/profiles"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/profiles"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/profiles/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/profiles/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/profiles/{id}/bundleId"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/profiles/{id}/certificates"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/profiles/{id}/devices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/profiles/{id}/relationships/bundleId"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/profiles/{id}/relationships/certificates"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/profiles/{id}/relationships/devices"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/promotedPurchases"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/promotedPurchases/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/promotedPurchases/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/promotedPurchases/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/reviewSubmissionItems"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/reviewSubmissionItems/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/reviewSubmissionItems/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/reviewSubmissions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/reviewSubmissions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/reviewSubmissions/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/reviewSubmissions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/reviewSubmissions/{id}/items"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/reviewSubmissions/{id}/relationships/items"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/routingAppCoverages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/routingAppCoverages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/routingAppCoverages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/routingAppCoverages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/salesReports"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/scmGitReferences/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/scmProviders"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/scmProviders/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/scmProviders/{id}/relationships/repositories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/scmProviders/{id}/repositories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/scmPullRequests/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/scmRepositories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/scmRepositories/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/scmRepositories/{id}/gitReferences"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/scmRepositories/{id}/pullRequests"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/scmRepositories/{id}/relationships/gitReferences"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/scmRepositories/{id}/relationships/pullRequests"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionAppStoreReviewScreenshots"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscriptionAppStoreReviewScreenshots/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionAppStoreReviewScreenshots/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionAppStoreReviewScreenshots/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionAvailabilities"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionAvailabilities/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionAvailabilities/{id}/availableTerritories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionAvailabilities/{id}/relationships/availableTerritories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionGracePeriods/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionGracePeriods/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionGroupLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscriptionGroupLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionGroupLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionGroupLocalizations/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionGroupSubmissions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionGroupVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionGroupVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionGroupVersions/{id}/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionGroupVersions/{id}/relationships/localizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionGroups"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscriptionGroups/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionGroups/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionGroups/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionGroups/{id}/relationships/subscriptionGroupLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionGroups/{id}/relationships/subscriptions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionGroups/{id}/relationships/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionGroups/{id}/subscriptionGroupLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionGroups/{id}/subscriptions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionGroups/{id}/versions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscriptionImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionIntroductoryOffers"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscriptionIntroductoryOffers/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionIntroductoryOffers/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscriptionLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionLocalizations/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionOfferCodeCustomCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionOfferCodeCustomCodes/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionOfferCodeCustomCodes/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionOfferCodeOneTimeUseCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionOfferCodeOneTimeUseCodes/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionOfferCodeOneTimeUseCodes/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionOfferCodeOneTimeUseCodes/{id}/values"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionOfferCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionOfferCodes/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionOfferCodes/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionOfferCodes/{id}/customCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionOfferCodes/{id}/oneTimeUseCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionOfferCodes/{id}/prices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionOfferCodes/{id}/relationships/customCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionOfferCodes/{id}/relationships/oneTimeUseCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionOfferCodes/{id}/relationships/prices"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionPlanAvailabilities"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionPlanAvailabilities/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionPlanAvailabilities/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionPlanAvailabilities/{id}/availableTerritories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionPlanAvailabilities/{id}/relationships/availableTerritories"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionPlanAvailabilities/{id}/relationships/availableTerritories"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionPricePoints/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionPricePoints/{id}/adjustedEqualizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionPricePoints/{id}/equalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionPricePoints/{id}/relationships/equalizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionPrices"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscriptionPrices/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionPromotionalOffers"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscriptionPromotionalOffers/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionPromotionalOffers/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptionPromotionalOffers/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionPromotionalOffers/{id}/prices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionPromotionalOffers/{id}/relationships/prices"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionSubmissions"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptionVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionVersions/{id}/image"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionVersions/{id}/images"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionVersions/{id}/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionVersions/{id}/relationships/image"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionVersions/{id}/relationships/images"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptionVersions/{id}/relationships/localizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/subscriptions"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscriptions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/subscriptions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/appStoreReviewScreenshot"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/images"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/introductoryOffers"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/offerCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/planAvailabilities"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/pricePoints"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/prices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/promotedPurchase"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/promotionalOffers"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/appStoreReviewScreenshot"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/images"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscriptions/{id}/relationships/introductoryOffers"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/introductoryOffers"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/offerCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/planAvailabilities"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/pricePoints"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/subscriptions/{id}/relationships/prices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/prices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/promotedPurchase"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/promotionalOffers"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/subscriptionAvailability"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/subscriptionLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/relationships/winBackOffers"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/subscriptionAvailability"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/subscriptionLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/subscriptions/{id}/winBackOffers"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/territories"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/territoryAvailabilities/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/userInvitations"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/userInvitations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/userInvitations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/userInvitations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/userInvitations/{id}/relationships/visibleApps"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/userInvitations/{id}/visibleApps"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/users"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/users/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/users/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/users/{id}"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/users/{id}/relationships/visibleApps"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/users/{id}/relationships/visibleApps"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/users/{id}/relationships/visibleApps"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/users/{id}/relationships/visibleApps"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/users/{id}/visibleApps"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/webhookDeliveries"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/webhookPings"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/webhooks"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/webhooks/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/webhooks/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/webhooks/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/webhooks/{id}/deliveries"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/webhooks/{id}/relationships/deliveries"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/winBackOffers"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/winBackOffers/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/winBackOffers/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/winBackOffers/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/winBackOffers/{id}/prices"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/winBackOffers/{id}/relationships/prices"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/appAvailabilities"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/appAvailabilities/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/appAvailabilities/{id}/relationships/territoryAvailabilities"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/appAvailabilities/{id}/territoryAvailabilities"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/appStoreVersionExperiments"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/appStoreVersionExperiments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/appStoreVersionExperiments/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/appStoreVersionExperiments/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/appStoreVersionExperiments/{id}/appStoreVersionExperimentTreatments"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/appStoreVersionExperiments/{id}/relationships/appStoreVersionExperimentTreatments"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterAchievementImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/gameCenterAchievementImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterAchievementImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterAchievementImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterAchievementLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/gameCenterAchievementLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterAchievementLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterAchievementLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterAchievementLocalizations/{id}/image"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterAchievementLocalizations/{id}/relationships/image"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterAchievementVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterAchievementVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterAchievementVersions/{id}/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterAchievementVersions/{id}/relationships/localizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterAchievements"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/gameCenterAchievements/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterAchievements/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterAchievements/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterAchievements/{id}/relationships/activity"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterAchievements/{id}/relationships/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterAchievements/{id}/versions"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterLeaderboardImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/gameCenterLeaderboardImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterLeaderboardImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterLeaderboardLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/gameCenterLeaderboardLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterLeaderboardLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardLocalizations/{id}/image"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardLocalizations/{id}/relationships/image"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterLeaderboardSetImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/gameCenterLeaderboardSetImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardSetImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterLeaderboardSetImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterLeaderboardSetLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/gameCenterLeaderboardSetLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardSetLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterLeaderboardSetLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardSetLocalizations/{id}/image"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardSetLocalizations/{id}/relationships/image"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterLeaderboardSetVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardSetVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardSetVersions/{id}/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardSetVersions/{id}/relationships/localizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterLeaderboardSets"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/gameCenterLeaderboardSets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardSets/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterLeaderboardSets/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardSets/{id}/gameCenterLeaderboards"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/gameCenterLeaderboardSets/{id}/relationships/gameCenterLeaderboards"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardSets/{id}/relationships/gameCenterLeaderboards"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterLeaderboardSets/{id}/relationships/gameCenterLeaderboards"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterLeaderboardSets/{id}/relationships/gameCenterLeaderboards"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardSets/{id}/relationships/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardSets/{id}/versions"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterLeaderboardVersions"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardVersions/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardVersions/{id}/localizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboardVersions/{id}/relationships/localizations"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/gameCenterLeaderboards"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/gameCenterLeaderboards/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboards/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterLeaderboards/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterLeaderboards/{id}/relationships/activity"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/gameCenterLeaderboards/{id}/relationships/challenge"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboards/{id}/relationships/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/gameCenterLeaderboards/{id}/versions"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/inAppPurchaseImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/inAppPurchaseImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchaseImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/inAppPurchaseImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/inAppPurchaseLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/inAppPurchaseLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchaseLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/inAppPurchaseLocalizations/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/inAppPurchases"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/inAppPurchases/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/inAppPurchases/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/appStoreReviewScreenshot"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/content"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/iapPriceSchedule"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/images"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/inAppPurchaseAvailability"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/inAppPurchaseLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/offerCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/pricePoints"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/promotedPurchase"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/relationships/appStoreReviewScreenshot"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/relationships/content"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/relationships/iapPriceSchedule"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/relationships/images"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/relationships/inAppPurchaseAvailability"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/relationships/inAppPurchaseLocalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/relationships/offerCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/relationships/pricePoints"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/relationships/promotedPurchase"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/relationships/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/inAppPurchases/{id}/versions"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/sandboxTesters"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/sandboxTesters/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/sandboxTestersClearPurchaseHistoryRequest"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/subscriptionGroupLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/subscriptionGroupLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/subscriptionGroupLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/subscriptionGroupLocalizations/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/subscriptionImages"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/subscriptionImages/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/subscriptionImages/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/subscriptionImages/{id}"
+    },
+    {
+      "method": "POST",
+      "route": "/v2/subscriptionLocalizations"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v2/subscriptionLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v2/subscriptionLocalizations/{id}"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v2/subscriptionLocalizations/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/appPricePoints/{id}"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/appPricePoints/{id}/equalizations"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/appPricePoints/{id}/relationships/equalizations"
+    }
+  ]
+}
