@@ -272,5 +272,6 @@ func sgPostJSON(t *testing.T, rawurl, auth string, body map[string]any) *http.Re
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer resp.Body.Close()
 	return resp
 }

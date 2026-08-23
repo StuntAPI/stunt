@@ -49,6 +49,7 @@ adapters:
     deviations:
       - "Provider JWT verified against one fixed P-256 key whose private half is published"
       - "GET /3/device/{token}/notifications is a simulator-only endpoint (no real fetch API)"
+      - "sent_at on the notifications endpoint is a constant; 410 Unregistered is modeled but unreachable"
     missing:
       - "No apns-topic, apns-push-type, apns-priority, or apns-collapse-id handling"
       - "No provider-certificate auth — only JWT provider tokens"
@@ -117,6 +118,8 @@ adapters:
   avalara-style:
     deviations:
       - "Tax is a deterministic split — State 50%, County 25%, City 20%, Special 5% of the rate"
+      - "Void returns a minimal {id, status} envelope; real AvaTax returns the full TransactionModel"
+      - "Re-void is idempotent 200; real AvaTax rejects voiding a Cancelled document"
     missing:
       - "No company CRUD — GET /v2/companies list only"
       - "No address validation (/v2/addresses/resolve)"
@@ -345,6 +348,7 @@ adapters:
       - "executions follow a fixed clock: EXECUTING at +1s, COMPLETED at +3s after execute"
       - "queries come from a static 3-entry catalog; no real SQL is executed"
       - "simulate_fail body flag forces QUERY_STATE_FAILED; real API has no failure trigger"
+      - "Auth is a presence-only Bearer; real Dune uses the x-dune-api-key header"
     missing:
       - "No query management: GET/POST/PATCH/DELETE /api/v1/query endpoints"
       - "No execution cancel (POST /api/v1/execution/{id}/cancel)"
@@ -398,6 +402,8 @@ adapters:
       - "inclusion runs on a fixed clock: mempool 0-1s, bundled 1-3s, included at >=3s"
       - "eth_sendUserOperation accepts {simulate_fail:true} as a third params element"
       - "mock paymaster POST /paymaster/sign mints synthetic sponsorship signatures"
+      - "userOp keeps the v0.6 paymasterAndData field though the adapter is EntryPoint-v0.7-only"
+      - "Error envelopes use generic -32602 rather than AA-prefixed codes (-32500...)"
     missing:
       - "No eth_chainId, eth_blockNumber, or eth_getBlockByNumber passthrough"
       - "No ERC-7677 paymaster RPC (pm_* methods); only local /paymaster/sign"
@@ -429,8 +435,9 @@ adapters:
   etherscan-style:
     deviations:
       - "Auth accepts any non-empty apikey; only a missing key yields the error envelope"
+      - "txlistinternal/tokentx/tokenbalance return hard-coded empty results"
     missing:
-      - "No txlistinternal, tokentx, or getLogs actions"
+      - "No getLogs action (txlistinternal/tokentx are served, hard-coded empty)"
       - "No logs, proxy, or gastracker modules (gasoracle, eth_call passthrough)"
       - "No getminedblocks, getblocknobytime, or nodecount actions"
   fattureincloud-style:
@@ -631,6 +638,8 @@ adapters:
       - "simulate_fail and simulate_reject_reason create fields are stunt-only hooks"
       - "Webhook HMAC secret is the public constant stunt_jumio_mock_signing_key"
       - "POST /netverify/v2/webhooks is a local stand-in receiver, not a Jumio endpoint"
+      - "Bearer-presence gate; real Jumio uses HTTP Basic against a server-token store"
+      - "Scan references are decimal groups, not UUIDs; extracted PII is fixed synthetic"
     missing:
       - "No document or selfie image upload/retrieval endpoints"
       - "No hosted redirect verification flow; API scan creation only"
@@ -638,6 +647,8 @@ adapters:
   linkedin-style:
     deviations:
       - "Rate-limit injection on POST /v2/ugcPosts publish is a simulator test hook"
+      - "An unknown analytics queryType silently falls back to the base total; real LinkedIn 400s"
+      - "Refresh tokens never expire; only access tokens carry the 60-day expiry"
     missing:
       - "No ugcPosts delete or edit (DELETE /v2/ugcPosts/{id})"
       - "No organizations or company page API (GET /v2/organizations)"
@@ -694,6 +705,9 @@ adapters:
   oneinch-style:
     deviations:
       - "Quotes deterministic from src/dst/amount; same input yields same toAmount and split"
+      - "Quote field is toAmount; real v6.0 returns dstAmount"
+      - "Same-token quotes return amount x pseudo-rate; real API rejects"
+      - "slippage is optional and ignored on swap; real v6.0 requires it"
     missing:
       - "No Fusion+ order flow (order quotes, submission, status, events)"
       - "No Limit Order Protocol endpoints (create, list, history)"
@@ -704,6 +718,8 @@ adapters:
       - "simulate_fail yields result consider; real sandbox uses special sandbox documents"
       - "Webhook HMAC secret is the public constant stunt_onfido_mock_signing_key"
       - "POST /v3.6/webhooks is a local stand-in receiver, not an Onfido endpoint"
+      - "Synthetic sequential ids (app-000001...) where real Onfido uses UUIDs"
+      - "The awaiting_applicant phase is skipped; documents assumed on file"
     missing:
       - "No SDK token generation (POST /v3.6/sdk_token)"
       - "No applicant list, update, delete, or resume endpoints"
@@ -713,6 +729,9 @@ adapters:
   opensea-style:
     deviations:
       - "X-API-KEY accepted as any non-empty value; no real key validation"
+      - "Asset routes serve the deprecated v2 surface; real v2 replaced them with collection-scoped nfts endpoints"
+      - "Identical offers re-create and store duplicate orders (no order_hash dedupe)"
+      - "Create-offer body and response are simulator-specific, not the documented criteria-offer shapes"
     missing:
       - "No collections list endpoint (GET /api/v2/collections), only get-by-slug"
       - "No listing creation or order cancellation (offer creation only)"
@@ -741,6 +760,8 @@ adapters:
       - "simulate_fail create flag yields declined instead of completed (stunt-only)"
       - "Webhook HMAC secret is the public constant stunt_persona_mock_signing_key"
       - "POST /api/inquiry/v1/webhooks is a local stand-in receiver with 5-minute replay window"
+      - "JSON:API attributes are snake_case; real Persona serializes kebab-case"
+      - "Create takes a flat body; real API expects the JSON:API data/attributes wrapper"
     missing:
       - "No inquiries list endpoint (GET /api/inquiry/v1/inquiries)"
       - "No inquiry templates or reports endpoints"
@@ -761,7 +782,10 @@ adapters:
       - "No shared albums (list, join, leave, unshare)"
       - "No favorites marking or favorite filtering in search"
   pinata-style:
-    deviations: []
+    deviations:
+      - "Credentials are presence-checked only; any non-empty key pair or Bearer JWT passes"
+      - "Every stored pin is status pinned — unpinned/pending/failed not modeled (no job queue)"
+      - "JSON pin CIDs derive from stunt canonical serialization, not byte-identical to real Pinata"
     missing:
       - "No pin-by-CID endpoint (POST /pinning/addHashToPinQueue)"
       - "No pin-jobs listing (GET /pinning/pinJobs)"
@@ -854,6 +878,8 @@ adapters:
   reddit-style:
     deviations:
       - "User-Agent gate simplified: any UA containing / and ( passes, else 429"
+      - "The authorization_code grant never validates code or redirect_uri — any or missing code mints tokens"
+      - "Post ids are plain sequence strings, not Reddit base36"
     missing:
       - "No listing endpoints (subreddit hot/new/top, thread comment pages)"
       - "No votes or comments (/api/vote, /api/comment)"
@@ -874,10 +900,11 @@ adapters:
       - "No broadcasts or tags"
   revenuecat-style:
     deviations:
-      - "Webhook registration endpoint is simulator-only; real RC v1 webhooks are dashboard-configured"
       - "fetch_token prefixed with invalid is the deterministic bad-receipt 400 path"
       - "Subscription expiry is derive-on-read; first read past it fires EXPIRATION"
       - "POST /v1/subscribers accepts _expires_at seeding to drive EXPIRATION in tests"
+      - "pk_ public keys are simulator convention; real RC public keys are appl_/goog_-prefixed"
+      - "REST webhook registration does not exist in real RC v1 (dashboard-configured)"
     missing:
       - "No attribution endpoint (POST /v1/subscribers/{id}/attribution)"
       - "No offers API (promotional offer creation)"
@@ -903,8 +930,9 @@ adapters:
       - "Webhook ECDSA signature is raw r||s (64 bytes), not Twilio ASN.1 DER encoding"
       - "simulate_fail: true in send body forces dropped terminal (simulator extension)"
       - "delivered derives at fixed +3s on first list read, not real async delivery"
-      - "Webhook deliveries are single stunt-enveloped objects; real SendGrid POSTs a JSON array"
       - "Email Activity query subset: =, !=, CONTAINS terms AND-ed over six fields"
+      - "Each delivery wraps one event in the transport envelope; real SendGrid batches a JSON array of events"
+      - "asm, sandbox_mode, and batch_id are accepted but not modeled"
     missing:
       - "No single-message fetch (GET /v3/messages/{msg_id})"
       - "No GET of event-webhook settings (POST-only)"
@@ -1008,6 +1036,8 @@ adapters:
     deviations:
       - "gas_used is derived from input length, not real EVM execution; status defaults to true"
       - "An explicit revert:true body flag forces the revert path; real API has no such switch"
+      - "Bearer auth where real Tenderly uses the X-Access-Key header"
+      - "Responses mix camelCase where Tenderly is snake_case and nests simulation.id"
     missing:
       - "No contracts endpoints (import/verify/update contracts per project)"
       - "No alerts or notification-rules API"
@@ -1015,6 +1045,7 @@ adapters:
   thegraph-style:
     deviations:
       - "One merged schema serves Uniswap and ENS entities; real Graph serves one per deployment"
+      - "_meta.block.number advances per query; the real head is block-height driven"
     missing:
       - "No subgraph deployment/management surface; the two seeded ids are fixed"
       - "No indexing-status queries beyond _meta (no /status endpoint)"
@@ -1062,6 +1093,9 @@ adapters:
     deviations:
       - "Pairing, session approve, and JSON-RPC requests are auto-approved (no wallet device)"
       - "personal_sign and eth_sendTransaction return synthetic hashes; nothing is signed"
+      - "The projectId gate ships but is never wired — every route answers without a credential"
+      - "Expiry fields are TTL constants, not absolute unix timestamps; extend persists nothing"
+      - "Unacknowledged sessions serve JSON-RPC requests immediately (no approval gate)"
     missing:
       - "No WebSocket relay; the real IRN protocol is WSS JSON-RPC pub/sub, not HTTP REST"
       - "No session update, ping, or event emission (chainChanged/accountsChanged)"

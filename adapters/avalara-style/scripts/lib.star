@@ -165,8 +165,8 @@ def _compute_tax(lines, state):
 
         result_lines.append({
             "number": number,
-            "tax": _fmt(tax),
-            "taxCalculated": _fmt(tax),
+            "tax": tax,
+            "taxCalculated": tax,
             "taxCode": line_in.get("taxCode", "P0000000"),
             "details": details,
         })
@@ -180,19 +180,22 @@ def _compute_tax(lines, state):
             "jurisdictionType": bd["jurisdictionType"],
             "taxType": "Sales",
             "rate": bd["rate"],
-            "tax": _fmt(total_taxable * bd["rate"]),
+            "tax": total_taxable * bd["rate"],
             "taxName": bd["taxName"],
         })
 
+    # AvaTax serializes decimal fields as JSON numbers, not strings.
     return {
-        "totalTax": _fmt(total_tax),
-        "totalTaxable": _fmt(total_taxable),
+        "totalTax": total_tax,
+        "totalTaxable": total_taxable,
         "totalRate": rate,
         "lines": result_lines,
         "summary": summary,
     }
 
-# _to_float converts a value to float64 (handles int, string, float).
+# _to_float converts a value to float64. AvaTax SDKs send decimal strings
+# ("100.00") as often as JSON numbers, so the string form is parsed too
+# (digits, one optional dot, one optional leading sign); junk becomes 0.0.
 def _to_float(val):
     if val == None:
         return 0.0
@@ -200,8 +203,22 @@ def _to_float(val):
         return float(val)
     if type(val) == "float":
         return val
-    # String.
-    return 0.0
+    s = str(val)
+    if s == "":
+        return 0.0
+    dots = 0
+    for i in range(len(s)):
+        ch = s[i]
+        if ch == ".":
+            dots = dots + 1
+            if dots > 1:
+                return 0.0
+        elif ch == "+" or ch == "-":
+            if i != 0 or len(s) == 1:
+                return 0.0
+        elif ch < "0" or ch > "9":
+            return 0.0
+    return float(s)
 
 # _round2 rounds a float to 2 decimal places.
 def _round2(val):
@@ -211,10 +228,6 @@ def _round2(val):
 # _round4 rounds a float to 4 decimal places.
 def _round4(val):
     return float(int(val * 10000 + 0.5)) / 10000.0
-
-# _fmt formats a float as a string like "8.25".
-def _fmt(val):
-    return str(val)
 
 # --- Query + pagination helpers ---
 

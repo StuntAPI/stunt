@@ -26,9 +26,12 @@ endpoints:
   - route: /pinning/pinJSONToIPFS
     method: POST
     handler: scripts/pinning.star#on_pin_json
+  # concurrency_key serialises the read-modify-write (find the pin row,
+  # then delete it) against concurrent unpinners of the same CID.
   - route: /pinning/unpin/{cid}
     method: DELETE
     handler: scripts/pinning.star#on_unpin
+    concurrency_key: cid
 
   # --- Data ---
   - route: /data/pinList

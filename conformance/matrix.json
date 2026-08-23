@@ -5,8 +5,8 @@
     "tiers": {
       "sdk_and_vm": 2,
       "sdk_only": 34,
-      "vm_only": 38,
-      "boot": 24
+      "vm_only": 59,
+      "boot": 3
     }
   },
   "adapters": [
@@ -724,9 +724,16 @@
       "api_name": "Apple Push Notification service (APNs)",
       "api_version": "v2",
       "routes": 2,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "the provider token gate distinguishes missing invalid and expired tokens",
+        "a push to the known device returns 200 with a canonical uuid apns-id",
+        "unknown device tokens are 400 baddevicetoken",
+        "empty aps payloads are 400 payloadempty",
+        "sent notifications are retrievable per device"
+      ],
       "missing": [
         "No apns-topic, apns-push-type, apns-priority, or apns-collapse-id handling",
         "No provider-certificate auth — only JWT provider tokens",
@@ -735,7 +742,8 @@
       ],
       "deviations": [
         "Provider JWT verified against one fixed P-256 key whose private half is published",
-        "GET /3/device/{token}/notifications is a simulator-only endpoint (no real fetch API)"
+        "GET /3/device/{token}/notifications is a simulator-only endpoint (no real fetch API)",
+        "sent_at on the notifications endpoint is a constant; 410 Unregistered is modeled but unreachable"
       ],
       "covered": [
         {
@@ -8978,9 +8986,30 @@
       "api_name": "Avalara AvaTax REST API",
       "api_version": "2",
       "routes": 8,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "every v2 endpoint demands a credential: a bare call is a 401 AuthenticationRequired envelope",
+        "any Bearer or any HTTP Basic credential opens the gate",
+        "a non-Basic/Non-Bearer scheme does not count as a credential",
+        "the effective rate keys off the address state (CA 0.095) with a State/County/City/Special breakdown",
+        "the summary aggregates the taxable base per jurisdiction",
+        "per-line tax rounds to cents: two lines aggregate, line 2 keeps its own tax",
+        "SDK decimal strings (\"100.00\") price identically to JSON numbers",
+        "the shipFrom/shipTo form keys off shipTo (NY 0.0875)",
+        "unknown or missing addresses fall back to the synthetic 0.0825 default",
+        "create prices the document, mints id/code/companyId and applies AvaTax defaults",
+        "an omitted date defaults to the clock's today, and advances with it",
+        "read round-trips by id; unknown ids are 404 NotFound",
+        "the list supports OData $filter and $orderBy with @recordsetCount",
+        "$top/$skip pages through an @odata.nextLink that round-trips",
+        "void flips status to Cancelled and the record reads back cancelled",
+        "re-void is idempotent",
+        "the companies catalog lists DEFAULT and STORE1 with default locations",
+        "nexus $filter literals are typed: id eq 1001 matches ints, hasNexus eq true matches bools",
+        "the taxcode catalog is filterable by taxCode"
+      ],
       "missing": [
         "No company CRUD — GET /v2/companies list only",
         "No address validation (/v2/addresses/resolve)",
@@ -8989,7 +9018,9 @@
         "No jurisdiction lookups — definitions serve nexuses and taxcodes only"
       ],
       "deviations": [
-        "Tax is a deterministic split — State 50%, County 25%, City 20%, Special 5% of the rate"
+        "Tax is a deterministic split — State 50%, County 25%, City 20%, Special 5% of the rate",
+        "Void returns a minimal {id, status} envelope; real AvaTax returns the full TransactionModel",
+        "Re-void is idempotent 200; real AvaTax rejects voiding a Cancelled document"
       ],
       "covered": [
         {
@@ -26867,9 +26898,17 @@
       "api_name": "CloudKit Web Services API",
       "api_version": "1",
       "routes": 5,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "the s2s signature gate rejects unsigned tampered stale and foreign-key requests",
+        "users current returns the s2s owner identity",
+        "zones list seeds defaults filters by prefix and pages",
+        "records lookup returns the seeded shape with inline NOT_FOUND",
+        "records query filters sorts and pages on a numeric resultsLimit",
+        "records modify creates updates and deletes round-trip"
+      ],
       "missing": [
         "No private or shared database surfaces (/database/1/.../private|shared)",
         "No assets: no /assets/upload endpoint or asset field handling",
@@ -28760,9 +28799,28 @@
       "api_name": "Dropbox API",
       "api_version": "2",
       "routes": 8,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "upload takes the JSON {path, content} convenience body (documented deviation)",
+        "the real RPC upload (Dropbox-API-Arg header + raw octet-stream body) lands identically",
+        "re-uploading an existing path answers the real mode:\"add\" conflict",
+        "mode overwrite replaces in place; autorename forks a suffixed path",
+        "list_folder returns the whole path-prefix subtree, not one level",
+        "the root listing spans everything; unknown and file paths carry distinct 409 tags",
+        "paging slices the filtered subtree by body cursor, ignoring query strings",
+        "download streams raw bytes by path and by id, with metadata alongside",
+        "folders and unknown paths decline under the 409 path envelope",
+        "get_temporary_link pairs the file's metadata with the synthetic link",
+        "a presented bearer must be registered: unknown and expired tokens get distinct 401 tags",
+        "an absent Authorization header stays open (documented deviation)",
+        "create_folder mints folder metadata and conflicts case-insensitively",
+        "get_current_account returns the synthetic /2/users snapshot",
+        "deleting a folder removes its entire subtree from every read path",
+        "trash tombstones audit the exact cascade batch",
+        "delete is permanent: a re-created path is a brand-new entry"
+      ],
       "missing": [
         "No move or copy endpoints (/2/files/move_v2, /2/files/copy_v2)",
         "No upload sessions for large files (/2/files/upload_session/*)",
@@ -29173,9 +29231,18 @@
       "api_name": "Dune Analytics API",
       "api_version": "v1",
       "routes": 6,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "the api-key gate rejects missing, empty and non-bearer authorization",
+        "an execution walks PENDING -\u003e EXECUTING -\u003e COMPLETED as the clock advances",
+        "a missing required parameter is the 400 envelope and both SDK parameter shapes resolve",
+        "simulate_fail terminates QUERY_STATE_FAILED and results carry the failure envelope",
+        "the inline-result route completes synchronously",
+        "results pages honor limit/offset with a followable next_uri",
+        "the CSV variant streams text/csv for the same page"
+      ],
       "missing": [
         "No query management: GET/POST/PATCH/DELETE /api/v1/query endpoints",
         "No execution cancel (POST /api/v1/execution/{id}/cancel)",
@@ -29186,7 +29253,8 @@
       "deviations": [
         "executions follow a fixed clock: EXECUTING at +1s, COMPLETED at +3s after execute",
         "queries come from a static 3-entry catalog; no real SQL is executed",
-        "simulate_fail body flag forces QUERY_STATE_FAILED; real API has no failure trigger"
+        "simulate_fail body flag forces QUERY_STATE_FAILED; real API has no failure trigger",
+        "Auth is a presence-only Bearer; real Dune uses the x-dune-api-key header"
       ],
       "covered": [
         {
@@ -100006,9 +100074,18 @@
       "api_name": "ERC-4337 Bundler RPC",
       "api_version": "0.7",
       "routes": 2,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "supportedEntryPoints, chainId, and the JSON-RPC envelope",
+        "estimateUserOperationGas validates the full v0.7 field set",
+        "sendUserOperation answers a deterministic hash and defaults the entry point",
+        "the op walks mempool -\u003e bundled -\u003e included on the virtual clock",
+        "simulate_fail reverts on inclusion with the AA95 reason",
+        "the paymaster signs the op into paymasterAndData",
+        "missing or invalid userOps are 400s"
+      ],
       "missing": [
         "No eth_chainId, eth_blockNumber, or eth_getBlockByNumber passthrough",
         "No ERC-7677 paymaster RPC (pm_* methods); only local /paymaster/sign",
@@ -100020,7 +100097,9 @@
         "gas estimates are deterministic fixed values; real bundlers differ per implementation",
         "inclusion runs on a fixed clock: mempool 0-1s, bundled 1-3s, included at \u003e=3s",
         "eth_sendUserOperation accepts {simulate_fail:true} as a third params element",
-        "mock paymaster POST /paymaster/sign mints synthetic sponsorship signatures"
+        "mock paymaster POST /paymaster/sign mints synthetic sponsorship signatures",
+        "userOp keeps the v0.6 paymasterAndData field though the adapter is EntryPoint-v0.7-only",
+        "Error envelopes use generic -32602 rather than AA-prefixed codes (-32500...)"
       ],
       "covered": [
         {
@@ -100291,16 +100370,25 @@
       "api_name": "Etherscan API",
       "api_version": "1.0",
       "routes": 1,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "the apikey query parameter gates every module call",
+        "unknown modules and actions answer the NOTOK envelope over HTTP 200",
+        "balance reads the seeded ledger; unknown addresses default to \"0\"",
+        "txlist scopes by address then applies block filters, sort and paging",
+        "contract verification: ABI, source, and the unverified fallback",
+        "stats and token holders keep every number a decimal string"
+      ],
       "missing": [
-        "No txlistinternal, tokentx, or getLogs actions",
+        "No getLogs action (txlistinternal/tokentx are served, hard-coded empty)",
         "No logs, proxy, or gastracker modules (gasoracle, eth_call passthrough)",
         "No getminedblocks, getblocknobytime, or nodecount actions"
       ],
       "deviations": [
-        "Auth accepts any non-empty apikey; only a missing key yields the error envelope"
+        "Auth accepts any non-empty apikey; only a missing key yields the error envelope",
+        "txlistinternal/tokentx/tokenbalance return hard-coded empty results"
       ],
       "covered": [
         {
@@ -115679,9 +115767,28 @@
       "api_name": "Jumio API",
       "api_version": "v1",
       "routes": 5,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "a missing, bare or wrong-scheme token is a 401 in the Jumio error envelope",
+        "a scan create answers PENDING with a synthetic decimal scan reference",
+        "sequential creates advance the reference sequence",
+        "a create without merchantScanReference is a 400",
+        "PENDING holds through the processing window then flips to DONE",
+        "a FAILED scan carries a real reject reason and its description",
+        "unknown scans are 404 on every parameterized route",
+        "extracted data is None while the scan is PENDING",
+        "DONE exposes the synthetic document extraction",
+        "FAILED scans answer data with a 409 repeating the reason",
+        "delete removes the scan and later reads are 404s",
+        "deleting after the terminal window still advances the lifecycle",
+        "a correctly MACed webhook body is accepted",
+        "a tampered body, wrong MAC or missing header is a 401",
+        "the terminal transition emits exactly one signed scan.completed",
+        "failed scans emit scan.failed carrying the rejection reason",
+        "a delete-driven terminal transition also emits, then nothing more"
+      ],
       "missing": [
         "No document or selfie image upload/retrieval endpoints",
         "No hosted redirect verification flow; API scan creation only",
@@ -115691,7 +115798,9 @@
         "Scan lifecycle on a fixed clock: PENDING ~3s then DONE or FAILED at +3s",
         "simulate_fail and simulate_reject_reason create fields are stunt-only hooks",
         "Webhook HMAC secret is the public constant stunt_jumio_mock_signing_key",
-        "POST /netverify/v2/webhooks is a local stand-in receiver, not a Jumio endpoint"
+        "POST /netverify/v2/webhooks is a local stand-in receiver, not a Jumio endpoint",
+        "Bearer-presence gate; real Jumio uses HTTP Basic against a server-token store",
+        "Scan references are decimal groups, not UUIDs; extracted PII is fixed synthetic"
       ],
       "covered": [
         {
@@ -115779,9 +115888,54 @@
       "api_name": "LinkedIn API",
       "api_version": "v2",
       "routes": 8,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "authorize without redirect_uri, state or client_id is invalid_request",
+        "authorize redirects back with a fresh code and the state echoed",
+        "a redirect_uri that already carries a query is joined with \u0026",
+        "the exchange demands grant_type=authorization_code",
+        "an unknown code is 400 invalid_grant",
+        "a good exchange mints a 60-day token pair for a fresh member",
+        "the code is single-use: a replay is invalid_grant",
+        "client mismatches are 400 invalid_client",
+        "a mismatched attempt must not burn the code",
+        "a second flow mints a distinct member",
+        "the refresh grant demands client creds",
+        "an unknown refresh token is invalid_grant",
+        "refresh rotates the pair and keeps the member",
+        "the presented refresh token is single-use",
+        "rotation chains: the new refresh token refreshes again",
+        "a missing bearer is 401 in the service error envelope",
+        "wrong schemes and unknown bearers answer the same 401",
+        "every API route enforces the same gate",
+        "a bearer dies at its clock-derived 60-day expiry",
+        "userinfo returns the OAuth member profile",
+        "publishing as anyone but the token's member is a 403",
+        "a good publish mints a ugcPost urn echoed in x-linkedin-id",
+        "the post resolves to a share urn carrying its own author",
+        "resolving an unknown urn is a 404",
+        "unconfigured, publishing is unthrottled",
+        "arming fail_after injects 429 REQUEST_LIMIT_EXCEEDED",
+        "the limit is per member",
+        "a throttled attempt creates no post",
+        "q must be author",
+        "reply resolves urn:li:person:me to the authenticated member",
+        "commenting as anyone but the caller is a 403",
+        "replying to an unknown object is a 404",
+        "ingest lists only the token member's comments",
+        "member B's comment resolved me and lists only under B",
+        "createdOn is clock-stamped and monotonic",
+        "count pages with a next link that round-trips the query",
+        "without count the whole list returns unpaged",
+        "a malformed start cursor is a 400",
+        "an unknown entity is a 404",
+        "each queryType totals base+3/5/7/11 split across two daily buckets",
+        "entity accepts both the parenthesized and bare urn forms",
+        "start past the data returns an empty page",
+        "an unknown queryType falls back to the base total (deviation, as-is)"
+      ],
       "missing": [
         "No ugcPosts delete or edit (DELETE /v2/ugcPosts/{id})",
         "No organizations or company page API (GET /v2/organizations)",
@@ -115789,7 +115943,9 @@
         "No video upload flow or multi-image carousel posts"
       ],
       "deviations": [
-        "Rate-limit injection on POST /v2/ugcPosts publish is a simulator test hook"
+        "Rate-limit injection on POST /v2/ugcPosts publish is a simulator test hook",
+        "An unknown analytics queryType silently falls back to the base total; real LinkedIn 400s",
+        "Refresh tokens never expire; only access tokens carry the 60-day expiry"
       ],
       "covered": [
         {
@@ -188352,16 +188508,35 @@
       "api_name": "1inch Aggregation Protocol API",
       "api_version": "v6.0",
       "routes": 5,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "a quote returns token pairs, a decimal toAmount and a 100-point split",
+        "quotes are deterministic and address matching is case-insensitive",
+        "the toAmount scales linearly with the input amount",
+        "a same-token quote scales the amount by the pseudo-rate (as-is)",
+        "missing params and unknown tokens are 400 error envelopes",
+        "a swap returns router-addressed calldata with gas and gasPrice",
+        "the swap toAmount matches the quote for the same input",
+        "slippage is optional and ignored (as-is)",
+        "missing params and unknown tokens are 400s",
+        "the spender is the router contract address",
+        "approve calldata targets the token with the max allowance",
+        "a missing or unknown token is a 400",
+        "the token list is an address-keyed map of six tokens",
+        "every token in the list is quotable as a source"
+      ],
       "missing": [
         "No Fusion+ order flow (order quotes, submission, status, events)",
         "No Limit Order Protocol endpoints (create, list, history)",
         "No raw transaction broadcast, status check, or chains list endpoints"
       ],
       "deviations": [
-        "Quotes deterministic from src/dst/amount; same input yields same toAmount and split"
+        "Quotes deterministic from src/dst/amount; same input yields same toAmount and split",
+        "Quote field is toAmount; real v6.0 returns dstAmount",
+        "Same-token quotes return amount x pseudo-rate; real API rejects",
+        "slippage is optional and ignored on swap; real v6.0 requires it"
       ],
       "covered": [
         {
@@ -188427,9 +188602,18 @@
       "api_name": "Onfido API",
       "api_version": "v3.6",
       "routes": 7,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "a missing or non-Token Authorization header is 401 authorization_error",
+        "applicant create flags exactly the blank names and reads back by id",
+        "document and live photo uploads bind to a real applicant and default side",
+        "check create demands report_names and a known applicant",
+        "the check completes from the clock and emits check.completed exactly once",
+        "simulate_fail completes with consider and consider breakdowns",
+        "the webhook receiver MACs the exact raw bytes"
+      ],
       "missing": [
         "No SDK token generation (POST /v3.6/sdk_token)",
         "No applicant list, update, delete, or resume endpoints",
@@ -188441,7 +188625,9 @@
         "Check lifecycle fixed: in_progress ~3s then complete; awaiting_applicant skipped",
         "simulate_fail yields result consider; real sandbox uses special sandbox documents",
         "Webhook HMAC secret is the public constant stunt_onfido_mock_signing_key",
-        "POST /v3.6/webhooks is a local stand-in receiver, not an Onfido endpoint"
+        "POST /v3.6/webhooks is a local stand-in receiver, not an Onfido endpoint",
+        "Synthetic sequential ids (app-000001...) where real Onfido uses UUIDs",
+        "The awaiting_applicant phase is skipped; documents assumed on file"
       ],
       "covered": [
         {
@@ -188857,9 +189043,20 @@
       "api_name": "OpenSea API",
       "api_version": "2.0.0",
       "routes": 7,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "the X-API-KEY gate 401s every surface with the V1ErrorWrapper envelope",
+        "the asset list seeds five mock-punks NFTs and filters by collection_slug",
+        "single-asset reads match the address case-insensitively and 404 unknown shapes",
+        "collections read back contracts and string-typed stats; unknown slugs 404",
+        "limit/next cursor pagination walks the pages and 400s a malformed cursor",
+        "events filter by collection_slug and event_type",
+        "listings carry the Seaport ask shape: the NFT in offer, payment in consideration",
+        "offers invert the shape: payment in offer, the NFT in consideration",
+        "created offers are stateful, deterministic, and defaulted"
+      ],
       "missing": [
         "No collections list endpoint (GET /api/v2/collections), only get-by-slug",
         "No listing creation or order cancellation (offer creation only)",
@@ -188867,7 +189064,10 @@
         "No NFT transfer history endpoint (chain/{chain}/transfers)"
       ],
       "deviations": [
-        "X-API-KEY accepted as any non-empty value; no real key validation"
+        "X-API-KEY accepted as any non-empty value; no real key validation",
+        "Asset routes serve the deprecated v2 surface; real v2 replaced them with collection-scoped nfts endpoints",
+        "Identical offers re-create and store duplicate orders (no order_hash dedupe)",
+        "Create-offer body and response are simulator-specific, not the documented criteria-offer shapes"
       ],
       "covered": [
         {
@@ -189870,9 +190070,29 @@
       "api_name": "Persona Inquiry API",
       "api_version": "2023-01-05",
       "routes": 5,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "a missing, bare or wrong-scheme token is a 401 in the JSON:API error envelope",
+        "a create mints a zero-padded inq_ id in the JSON:API envelope",
+        "sequential creates advance the id sequence",
+        "any Bearer is accepted: the gate checks presence, not a store (as-is)",
+        "a create missing template_id or reference_id is a 400 invalid_request",
+        "the status derives from the clock created to pending to completed",
+        "resume restarts the clock at pending without duplicating verifications",
+        "simulate_fail declines at the terminal transition and seeds nothing",
+        "unknown inquiries are JSON:API 404s on every parameterized route",
+        "verifications are empty until the terminal transition fires",
+        "completion seeds the government-id and selfie verifications",
+        "a fresh correctly-signed webhook is accepted",
+        "a tampered body or wrong MAC is a 401 invalid_signature",
+        "a stale or far-future t is a 401 invalid_timestamp",
+        "a missing header or unparseable signature is a 401",
+        "polling through pending still emits exactly one inquiry.completed",
+        "re-reads and post-resume re-completions do not re-emit",
+        "a declined inquiry emits inquiry.declined signed the same way"
+      ],
       "missing": [
         "No inquiries list endpoint (GET /api/inquiry/v1/inquiries)",
         "No inquiry templates or reports endpoints",
@@ -189884,7 +190104,9 @@
         "Fixed clock lifecycle: created (0-1s), pending (1-3s), completed or declined (+3s)",
         "simulate_fail create flag yields declined instead of completed (stunt-only)",
         "Webhook HMAC secret is the public constant stunt_persona_mock_signing_key",
-        "POST /api/inquiry/v1/webhooks is a local stand-in receiver with 5-minute replay window"
+        "POST /api/inquiry/v1/webhooks is a local stand-in receiver with 5-minute replay window",
+        "JSON:API attributes are snake_case; real Persona serializes kebab-case",
+        "Create takes a flat body; real API expects the JSON:API data/attributes wrapper"
       ],
       "covered": [
         {
@@ -191062,16 +191284,32 @@
       "api_name": "Pinata API",
       "api_version": "1.0",
       "routes": 6,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "missing or half-present credentials are 401 with the error envelope",
+        "the API key pair and a Bearer JWT both open testAuthentication",
+        "pinJSONToIPFS pins content to a real CIDv0",
+        "re-pinning identical content is isDuplicate, not a new pin",
+        "pinFileToIPFS sizes and names the pin from the multipart parts",
+        "pinList filters by hash, size, status, and metadata name",
+        "pinStart/pinEnd bound the date-pinned window",
+        "pinByHash requires hash and matches the CID exactly",
+        "pinList pages at the real default of 10 rows",
+        "unpin removes the CID; a second unpin is 403 FORBIDDEN"
+      ],
       "missing": [
         "No pin-by-CID endpoint (POST /pinning/addHashToPinQueue)",
         "No pin-jobs listing (GET /pinning/pinJobs)",
         "No metadata update or pin-policy change (POST /pinning/hashMetadata)",
         "No pinned-data-usage endpoint (GET /data/userPinnedDataTotal)"
       ],
-      "deviations": [],
+      "deviations": [
+        "Credentials are presence-checked only; any non-empty key pair or Bearer JWT passes",
+        "Every stored pin is status pinned — unpinned/pending/failed not modeled (no job queue)",
+        "JSON pin CIDs derive from stunt canonical serialization, not byte-identical to real Pinata"
+      ],
       "covered": [
         {
           "method": "POST",
@@ -191103,8 +191341,8 @@
           "method": "POST",
           "route": "/pinning/pinFileToIPFS",
           "tags": [
-            "body",
-            "stateful"
+            "stateful",
+            "clock"
           ]
         },
         {
@@ -191112,7 +191350,8 @@
           "route": "/pinning/pinJSONToIPFS",
           "tags": [
             "body",
-            "stateful"
+            "stateful",
+            "clock"
           ]
         },
         {
@@ -194094,9 +194333,19 @@
       "api_name": "Reddit API",
       "api_version": "1.0",
       "routes": 2,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "a missing or generic User-Agent is 429 on both routes",
+        "the token endpoint requires HTTP Basic client credentials",
+        "a permanent authorization_code mints access and refresh together",
+        "a refresh grant returns a fresh access token and no new refresh",
+        "submit requires a bearer the adapter itself minted",
+        "a valid submit returns the t3_ thing envelope",
+        "missing sr or title stay HTTP 200 with Reddit error triples",
+        "an access token dies after its one-hour window"
+      ],
       "missing": [
         "No listing endpoints (subreddit hot/new/top, thread comment pages)",
         "No votes or comments (/api/vote, /api/comment)",
@@ -194105,7 +194354,9 @@
         "No subreddit, search, or inbox/messages endpoints"
       ],
       "deviations": [
-        "User-Agent gate simplified: any UA containing / and ( passes, else 429"
+        "User-Agent gate simplified: any UA containing / and ( passes, else 429",
+        "The authorization_code grant never validates code or redirect_uri — any or missing code mints tokens",
+        "Post ids are plain sequence strings, not Reddit base36"
       ],
       "covered": [
         {
@@ -194351,9 +194602,19 @@
       "api_name": "RevenueCat API",
       "api_version": "v1",
       "routes": 7,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "a missing or unknown key is a 401 {code, message} envelope",
+        "the public pk_ SDK key passes subscriber reads and receipt posts but is 401 on restricted writes",
+        "GET subscriber is get-or-create and answers in the v1 CustomerInfo envelope",
+        "receipt validation mirrors the real 400 order: app_user_id, platform, fetch_token, bad token",
+        "an ios receipt grants the pro entitlement with real trial math, and renewals stack",
+        "a google-play dict receipt feeds the product and lands in non_subscriptions",
+        "revoke lapses a live subscription; delete and the 404 envelopes",
+        "expiry is derived on read: a lapsed trial drops its entitlement"
+      ],
       "missing": [
         "No attribution endpoint (POST /v1/subscribers/{id}/attribution)",
         "No offers API (promotional offer creation)",
@@ -194362,10 +194623,11 @@
         "No v2 REST surface (customers, subscriptions, entitlements)"
       ],
       "deviations": [
-        "Webhook registration endpoint is simulator-only; real RC v1 webhooks are dashboard-configured",
         "fetch_token prefixed with invalid is the deterministic bad-receipt 400 path",
         "Subscription expiry is derive-on-read; first read past it fires EXPIRATION",
-        "POST /v1/subscribers accepts _expires_at seeding to drive EXPIRATION in tests"
+        "POST /v1/subscribers accepts _expires_at seeding to drive EXPIRATION in tests",
+        "pk_ public keys are simulator convention; real RC public keys are appl_/goog_-prefixed",
+        "REST webhook registration does not exist in real RC v1 (dashboard-configured)"
       ],
       "covered": [
         {
@@ -194984,9 +195246,18 @@
       "api_name": "Twilio SendGrid v3 API",
       "api_version": "v3",
       "routes": 5,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "the bearer gate rejects missing and unknown keys with SendGrid's grant envelope",
+        "mail send answers 202 with an empty body, an X-Message-Id, and flattened personalizations",
+        "the retrieval endpoint pages with limit and the opaque offset cursor",
+        "the delivery lifecycle derives processed -\u003e delivered (or dropped) on read, exactly once",
+        "the Email Activity query language narrows the list",
+        "event webhook settings round-trip and require a URL when enabled",
+        "deliveries are ECDSA P-256 signed over timestamp + raw body and fire once per recipient stage"
+      ],
       "missing": [
         "No single-message fetch (GET /v3/messages/{msg_id})",
         "No GET of event-webhook settings (POST-only)",
@@ -195000,8 +195271,9 @@
         "Webhook ECDSA signature is raw r||s (64 bytes), not Twilio ASN.1 DER encoding",
         "simulate_fail: true in send body forces dropped terminal (simulator extension)",
         "delivered derives at fixed +3s on first list read, not real async delivery",
-        "Webhook deliveries are single stunt-enveloped objects; real SendGrid POSTs a JSON array",
-        "Email Activity query subset: =, !=, CONTAINS terms AND-ed over six fields"
+        "Email Activity query subset: =, !=, CONTAINS terms AND-ed over six fields",
+        "Each delivery wraps one event in the transport envelope; real SendGrid batches a JSON array of events",
+        "asm, sandbox_mode, and batch_id are accepted but not modeled"
       ],
       "covered": [
         {
@@ -195155,6 +195427,7 @@
             "body",
             "auth",
             "stateful",
+            "errors",
             "clock"
           ]
         },
@@ -196230,9 +196503,16 @@
       "api_name": "Sign in with Apple",
       "api_version": "v2",
       "routes": 3,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "authorize redirects with a single-use code plus state and validates its params",
+        "the token exchange mints a real es256 id_token with apple claim shapes",
+        "the served jwks verifies the minted id_token signature",
+        "auth codes are single-use and client_secrets are verified cryptographically",
+        "the refresh grant rotates access tokens and rejects stale or foreign inputs"
+      ],
       "missing": [
         "No token revocation (POST /auth/revoke)",
         "No user endpoint (GET /auth/user for name/email)",
@@ -203705,9 +203985,17 @@
       "api_name": "Tenderly Simulation API",
       "api_version": "v1",
       "routes": 5,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "the access-key gate rejects missing and unknown bearers with the slug envelope",
+        "networks answer the bare array and switch to the paged envelope under perPage",
+        "a plain simulation round-trips the deterministic Tenderly shape",
+        "a value transfer emits the ERC-20 Transfer log and balance overrides",
+        "reverting simulations carry the ABI-encoded Error(string) output",
+        "bundles fan out per simulation and stored results list and retrieve by id"
+      ],
       "missing": [
         "No contracts endpoints (import/verify/update contracts per project)",
         "No alerts or notification-rules API",
@@ -203715,7 +204003,9 @@
       ],
       "deviations": [
         "gas_used is derived from input length, not real EVM execution; status defaults to true",
-        "An explicit revert:true body flag forces the revert path; real API has no such switch"
+        "An explicit revert:true body flag forces the revert path; real API has no such switch",
+        "Bearer auth where real Tenderly uses the X-Access-Key header",
+        "Responses mix camelCase where Tenderly is snake_case and nests simulation.id"
       ],
       "covered": [
         {
@@ -203803,16 +204093,25 @@
       "api_version": "1.0",
       "routes": 1,
       "graphql": true,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "pools collection arguments sort by volume and join token0/token1",
+        "where filters map the graph-node suffix operators",
+        "validation failures and the first cap surface as GraphQL errors",
+        "domains join owner/resolvedAddress; lookups miss as null",
+        "_meta reports the deployment head; Token.pools joins in reverse",
+        "the REST SDL surface is public and rejects unknown bearer keys"
+      ],
       "missing": [
         "No subgraph deployment/management surface; the two seeded ids are fixed",
         "No indexing-status queries beyond _meta (no /status endpoint)",
         "No GraphQL subscriptions over websockets; HTTP queries only"
       ],
       "deviations": [
-        "One merged schema serves Uniswap and ENS entities; real Graph serves one per deployment"
+        "One merged schema serves Uniswap and ENS entities; real Graph serves one per deployment",
+        "_meta.block.number advances per query; the real head is block-height driven"
       ],
       "covered": [
         {
@@ -205793,9 +206092,22 @@
       "api_name": "WalletConnect (Relay Protocol v2)",
       "api_version": "2.0",
       "routes": 7,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
+      "vm_behaviors": [
+        "every route answers without a projectId (the gate is not wired)",
+        "a wc: URI pairing round-trips its topic, relay protocol, and symKey",
+        "an auto pairing mints a fresh topic and a 64-hex symKey",
+        "proposing requires pairingTopic — and accepts one never paired",
+        "approve acknowledges the session and derives eip155 namespaces",
+        "the session list is a bare array capped by limit",
+        "the approval gate is missing: an unacknowledged session still answers",
+        "wallet requests answer in a JSON-RPC 2.0 envelope with monotonic ids",
+        "signing and transaction methods return synthetic 0x-hex hashes",
+        "extend echoes the fixed session TTL without persisting anything",
+        "disconnect retires the topic and every later call 404s"
+      ],
       "missing": [
         "No WebSocket relay; the real IRN protocol is WSS JSON-RPC pub/sub, not HTTP REST",
         "No session update, ping, or event emission (chainChanged/accountsChanged)",
@@ -205803,7 +206115,10 @@
       ],
       "deviations": [
         "Pairing, session approve, and JSON-RPC requests are auto-approved (no wallet device)",
-        "personal_sign and eth_sendTransaction return synthetic hashes; nothing is signed"
+        "personal_sign and eth_sendTransaction return synthetic hashes; nothing is signed",
+        "The projectId gate ships but is never wired — every route answers without a credential",
+        "Expiry fields are TTL constants, not absolute unix timestamps; extend persists nothing",
+        "Unacknowledged sessions serve JSON-RPC requests immediately (no approval gate)"
       ],
       "covered": [
         {

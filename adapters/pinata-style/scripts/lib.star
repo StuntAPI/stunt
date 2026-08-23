@@ -53,27 +53,50 @@ def _p_err(status, reason, details):
         },
     })
 
-# _cid_gen generates a deterministic-looking CIDv0 string (Qm + 44 base58 chars).
-# Uses a monotonic counter so each pin gets a unique CID.
-def _cid_gen():
-    n = store_kv_incr("pinata", "cid_seq")
-    # Base58 alphabet (Bitcoin / IPFS flavour)
+# _hex_val maps one lowercase hex digit to its value (find == -1 never
+# happens: crypto.sha256's default encoding is lowercase hex).
+def _hex_val(ch):
+    return "0123456789abcdef".find(ch)
+
+# _base58 encodes a non-negative int in the Bitcoin/IPFS alphabet.
+def _base58(n):
     alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-    seed = n + 1
-    suffix = ""
-    for _ in range(44):
-        suffix = alphabet[seed % 58] + suffix
-        seed = seed // 58 + 1
-    return "Qm" + suffix
+    out = ""
+    while n > 0:
+        out = alphabet[n % 58] + out
+        n = n // 58
+    return out
+
+# _cid_for returns a real CIDv0 for content bytes: base58 of the sha2-256
+# multihash (0x12 0x20 || digest), which is why it always starts "Qm".
+# Content addressing means identical bytes pin to the identical CID, so
+# re-pins are detectable (isDuplicate), like the real API.
+def _cid_for(data):
+    n = 0x1220  # multihash prefix: sha2-256, 32-byte digest
+    digest = crypto.sha256(data)
+    for i in range(len(digest)):
+        n = n * 16 + _hex_val(digest[i])
+    return _base58(n)
 
 # _pin_id generates a Pinata pin row id.
 def _pin_id():
     n = store_kv_incr("pinata", "pin_seq")
     return str(7000000000 + n)
 
-# _timestamp generates a synthetic ISO-8601 timestamp.
+# _timestamp returns the pin time in Pinata's ISO-8601 millisecond form
+# (real API stamps each pin at request time; now_rfc3339 stops at seconds).
 def _timestamp():
-    return "2024-06-15T12:30:00.000Z"
+    s = clock.now_rfc3339()
+    if s.endswith("Z"):
+        return s[:-1] + ".000Z"
+    return s
+
+# _pin_for returns the stored pin doc with the given CID, or None.
+def _pin_for(cid):
+    for doc in store_collection("pins").list():
+        if doc.get("ipfs_pin_hash", "") == cid:
+            return doc
+    return None
 
 # _pin_public returns the Pinata-shaped pin list row.
 def _pin_row(doc):
@@ -111,11 +134,12 @@ def _to_int(s):
             return 0
     return n
 
-# _pin_result returns the Pinata-shaped pin result (from pinFileToIPFS / pinJSONToIPFS).
-def _pin_result(doc):
+# _pin_result returns the Pinata-shaped pin result (from pinFileToIPFS /
+# pinJSONToIPFS). is_duplicate is True only on the re-pin response.
+def _pin_result(doc, is_duplicate):
     return {
         "IpfsHash": doc.get("ipfs_pin_hash", ""),
         "PinSize": doc.get("size", 0),
         "Timestamp": doc.get("timestamp", ""),
-        "isDuplicate": doc.get("is_duplicate", False),
+        "isDuplicate": is_duplicate,
     }

@@ -10,9 +10,11 @@
 def _ok(result):
     return {"status": "1", "message": "OK", "result": result}
 
-# _err wraps an error in the Etherscan envelope.
+# _err wraps an error in the Etherscan envelope: message stays "NOTOK" and
+# result carries the human description (the real wire shape — Etherscan
+# answers {"status":"0","message":"NOTOK","result":"Missing API Key"}).
 def _err(message):
-    return {"status": "0", "message": message, "result": ""}
+    return {"status": "0", "message": "NOTOK", "result": message}
 
 # --- auth ---
 
@@ -21,7 +23,7 @@ def _err(message):
 def _require_apikey(req):
     apikey = req["query"].get("apikey", "")
     if apikey == None or apikey == "":
-        return respond(200, {"status": "0", "message": "Missing API key", "result": []})
+        return respond(200, _err("Missing API Key"))
     return None
 
 # --- deterministic hashing (same as eth-jsonrpc for cross-adapter fidelity) ---

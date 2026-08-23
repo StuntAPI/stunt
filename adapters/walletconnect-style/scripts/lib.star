@@ -96,6 +96,9 @@ def _parse_wc_uri(uri):
     if at_idx < 0:
         return None
     topic = rest[:at_idx]
+    if topic == "":
+        # A wc: URI always names a non-empty topic before the @version.
+        return None
     after_at = rest[at_idx + 1:]
     q_idx = _find_char(after_at, "?")
     if q_idx < 0:

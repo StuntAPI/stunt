@@ -74,9 +74,12 @@ def _advance_inquiry(inquiry_id):
     new_status = _derive_inquiry_status(doc)
     if new_status != doc["status"]:
         doc["status"] = new_status
-        ic.update(inquiry_id, doc)
         already_terminal = doc.get("_ever_terminal", False)
-        doc["_ever_terminal"] = True
+        # Stamp _ever_terminal on terminal transitions ONLY: the created ->
+        # pending hop must not spend the inquiry's one webhook (real Persona
+        # notifies the terminal outcome whether or not the client polled).
+        if new_status == "completed" or new_status == "declined":
+            doc["_ever_terminal"] = True
         ic.update(inquiry_id, doc)
         if new_status == "completed":
             _seed_verifications(inquiry_id, doc["reference_id"])

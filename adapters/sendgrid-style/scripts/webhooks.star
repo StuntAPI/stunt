@@ -31,6 +31,19 @@ def on_update_settings(req):
     if url == None:
         url = ""
 
+    # Real SendGrid requires the URL when the webhook is enabled; without
+    # this guard the flag would say on while deliveries silently go nowhere.
+    if enabled and url == "":
+        return respond(400, {
+            "errors": [
+                {
+                    "message": "The event webhook URL is required when the webhook is enabled.",
+                    "field": "url",
+                    "help": None,
+                }
+            ],
+        })
+
     flag = "no"
     if enabled:
         flag = "yes"

@@ -169,13 +169,15 @@ def _provider_token_expired(claims):
     return True
 
 # _require_jwt returns the token if valid, or an error response if not.
-# Distinct reasons per real APNs: a present-but-expired provider token is
-# 403 ExpiredProviderToken; anything else unusable is 403 (bad/missing
-# provider auth).
+# Distinct reasons per real APNs: no bearer header at all is 403
+# MissingProviderToken; a present-but-expired provider token is 403
+# ExpiredProviderToken; anything else unusable is 403 InvalidProviderToken.
 def _require_jwt(req):
     auth = req["headers"].get("Authorization", "")
     if auth == "":
         auth = req["headers"].get("authorization", "")
+    if auth == "":
+        return None, respond(403, {"reason": "MissingProviderToken"})
     token, expired = _verify_provider_token(auth)
     if token == None:
         if expired:
@@ -223,12 +225,16 @@ def _mint_jwt(header_json, payload_json):
 
 # --- APNs helpers ---
 
-# _generate_apns_id creates a synthetic APNs ID (UUID-like).
+# _generate_apns_id creates a synthetic APNs ID in canonical UUID form
+# (8-4-4-4-12 hex; real APNs returns a canonical UUID when the request omits
+# apns-id). Derived from the sequence, so ids stay unique per notification.
 def _generate_apns_id():
     seq = store_kv_incr("apns", "apns_id_seq")
-    # Format as a UUID-like string.
-    s = str(0x10000000 + seq)
-    return s + "-0000-0000-0000-0000000000" + str(seq)[-3:]
+    h = "%x" % seq
+    # % has no zero-padding verb here, so pad by hand to 32 hex digits.
+    while len(h) < 32:
+        h = "0" + h
+    return h[:8] + "-" + h[8:12] + "-4" + h[13:16] + "-8" + h[17:20] + "-" + h[20:32]
 
 # _seed populates default device tokens on first access.
 def _seed():

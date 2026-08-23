@@ -27,7 +27,9 @@
 # _apply_purchase, _refresh_subscriber, _subscriber_response) are preloaded
 # from scripts/lib.star.
 
-# on_post_receipt validates a receipt and applies the purchase.
+# on_post_receipt validates a receipt and applies the purchase. SDK-facing:
+# the public "pk_" key is accepted alongside the secret one (the real
+# endpoint is what the mobile SDK posts receipts with).
 def on_post_receipt(req):
     err = _require_auth(req)
     if err != None:

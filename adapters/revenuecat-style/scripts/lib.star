@@ -8,22 +8,26 @@
 # One day in seconds, assembled at runtime (no long digit runs in source).
 _DAY_SECONDS = 24 * 60 * 60
 
-# Well-known static test API key, seeded once into the KV store on first
-# request (see _seed_tokens) so existing clients/tests that use it keep
-# working while any other key is rejected with 401. This mirrors
-# RevenueCat's public "sk_" SDK keys.
+# Well-known static test API keys, seeded once into the KV store on first
+# request (see _seed_tokens) so existing clients/tests that use them keep
+# working while any other key is rejected with 401. This mirrors RevenueCat's
+# key split: the "sk_" key is the project-wide SECRET key (any request); the
+# "pk_" key is the app-specific PUBLIC SDK key (subscriber reads + receipt
+# posts only — restricted actions need the secret key, like the real API).
 _TEST_API_KEY = "sk_test_revenuecat_style_mock_key"
+_TEST_PUBLIC_KEY = "pk_test_revenuecat_style_mock_key"
 
-# _seed_tokens inserts the well-known test key into the KV store exactly once
-# per instance (guarded by the "auth_seeded" flag), stored under
+# _seed_tokens inserts the well-known test keys into the KV store exactly
+# once per instance (guarded by the "auth_seeded" flag): secrets under
 # "tok:<key>" with a far-future expiry computed at runtime (never a
-# hardcoded epoch).
+# hardcoded epoch), publics under "pub:<key>".
 def _seed_tokens():
     if store_kv_get("revenuecat", "auth_seeded") == "yes":
         return
     store_kv_set("revenuecat", "auth_seeded", "yes")
     exp = str(clock.now_unix() + 3600 * 24 * 365 * 10)
     store_kv_set("revenuecat", "tok:" + _TEST_API_KEY, exp)
+    store_kv_set("revenuecat", "pub:" + _TEST_PUBLIC_KEY, "yes")
 
 # _bearer extracts the token from an "Authorization: Bearer <t>" header.
 # Returns "" if the header is absent or not a Bearer header.
@@ -38,22 +42,42 @@ def _bearer(req):
         return auth[7:]
     return ""
 
+# _key_kind classifies a bearer key: "secret" (known + unexpired), "public",
+# or "" (unknown or expired).
+def _key_kind(token):
+    if token == "":
+        return ""
+    _seed_tokens()
+    exp = store_kv_get("revenuecat", "tok:" + token)
+    if exp != None and clock.now_unix() <= _to_int(exp):
+        return "secret"
+    if store_kv_get("revenuecat", "pub:" + token) == "yes":
+        return "public"
+    return ""
+
 # _require_auth validates the Authorization: Bearer <key> header against the
-# KV token store. Returns None if the key is known and unexpired, or a 401
-# error-response dict if missing, malformed, unknown, or expired.
-def _require_auth(req):
+# KV token store with the real key split: secret "sk_" keys may make any
+# request; public "pk_" SDK keys only the SDK-facing ones. secret_only marks
+# the restricted endpoints (subscriber writes, deletes, revoke, webhook
+# management) where a public key is a 401. Returns None if the key is
+# acceptable, else a 401 error-response dict.
+def _require_auth(req, secret_only = False):
     token = _bearer(req)
     if token == "":
         return respond(401, {
             "code": 401,
             "message": "Missing API key in Authorization header.",
         })
-    _seed_tokens()
-    exp = store_kv_get("revenuecat", "tok:" + token)
-    if exp == None or clock.now_unix() > _to_int(exp):
+    kind = _key_kind(token)
+    if kind == "":
         return respond(401, {
             "code": 401,
             "message": "Invalid API key.",
+        })
+    if kind == "public" and secret_only:
+        return respond(401, {
+            "code": 401,
+            "message": "This endpoint requires a secret API key.",
         })
     return None
 
@@ -180,10 +204,16 @@ def _strip_map_scalars(m):
             out[k] = m[k]
     return out
 
-# _subscriber_response wraps the public view in RevenueCat's response shape:
-# {subscriber: {...}}.
+# _subscriber_response wraps the public view in RevenueCat's v1 CustomerInfo
+# response shape: {request_date, request_date_ms, subscriber: {...}} — the
+# envelope the SDKs parse, timestamps minted from the engine clock.
 def _subscriber_response(doc):
-    return respond(200, {"subscriber": _subscriber_view(doc)})
+    now = clock.now_unix()
+    return respond(200, {
+        "request_date": clock.unix_to_rfc3339(now),
+        "request_date_ms": now * 1000,
+        "subscriber": _subscriber_view(doc),
+    })
 
 # ============================================================================
 # EXPIRATION (derive-on-read state machine)

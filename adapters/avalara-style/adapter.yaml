@@ -36,6 +36,7 @@ endpoints:
   - route: /v2/transactions/{id}/void
     method: POST
     handler: scripts/transactions.star#on_void_transaction
+    concurrency_key: id # read-then-cancel read-modify-write, serialized per transaction
 
   # --- Companies ---
   - route: /v2/companies

@@ -21,7 +21,7 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**98 adapters** — 2 SDK+VM, 34 SDK-only, 38 VM-only, 24 boot-tier.
+**98 adapters** — 2 SDK+VM, 34 SDK-only, 59 VM-only, 3 boot-tier.
 
 **45 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.
 
@@ -31,13 +31,13 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 |---|---|---|---|---|---|---|---|
 | [adyen-style](adapters/adyen-style/) | Adyen Checkout + Notification API `v68` | 14 | VM | — | — | [4](#adyen-style) | [8](#adyen-style) |
 | [anaplan-style](adapters/anaplan-style/) | Anaplan API `2.0` | 18 | VM | — | — | [4](#anaplan-style) | [5](#anaplan-style) |
-| [apple-apns-style](adapters/apple-apns-style/) | Apple Push Notification service (APNs) `v2` | 2 | boot | — | — | [4](#apple-apns-style) | [2](#apple-apns-style) |
+| [apple-apns-style](adapters/apple-apns-style/) | Apple Push Notification service (APNs) `v2` | 2 | VM | — | — | [4](#apple-apns-style) | [3](#apple-apns-style) |
 | [apple-appstoreconnect-style](adapters/apple-appstoreconnect-style/) | App Store Connect API `v3` | 15 | VM | — | — | [7](#apple-appstoreconnect-style) | [7](#apple-appstoreconnect-style) |
 | [apple-music-style](adapters/apple-music-style/) | Apple Music API `1.0` | 18 | VM | — | — | [5](#apple-music-style) | [5](#apple-music-style) |
 | [apple-searchads-style](adapters/apple-searchads-style/) | Apple Search Ads API `v4` | 12 | VM | — | — | [4](#apple-searchads-style) | [5](#apple-searchads-style) |
 | [apps-script-style](adapters/apps-script-style/) | Google Apps Script API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 6 | [2](#apps-script-style) | [3](#apps-script-style) |
 | [auth0-style](adapters/auth0-style/) | Auth0 Authentication & Management API `v2` | 17 | VM | — | — | [3](#auth0-style) | [4](#auth0-style) |
-| [avalara-style](adapters/avalara-style/) | Avalara AvaTax REST API `2` | 8 | boot | — | — | [5](#avalara-style) | [1](#avalara-style) |
+| [avalara-style](adapters/avalara-style/) | Avalara AvaTax REST API `2` | 8 | VM | — | — | [5](#avalara-style) | [3](#avalara-style) |
 | [aws-cognito-style](adapters/aws-cognito-style/) | Amazon Cognito Identity Provider API `2016-04-18` | 7 | VM | — | — | [6](#aws-cognito-style) | [3](#aws-cognito-style) |
 | [aws-iam-sts-style](adapters/aws-iam-sts-style/) | AWS STS + IAM API `2011-06-15` | 2 | SDK | aws-sdk-go-v2 @ v1.43.7 | 2 | [3](#aws-iam-sts-style) | [3](#aws-iam-sts-style) |
 | [aws-s3-style](adapters/aws-s3-style/) | Amazon S3 API `2006-03-01` | 8 | SDK | aws-sdk-go-v2 @ v1.43.7 | 6 | [5](#aws-s3-style) | [5](#aws-s3-style) |
@@ -50,19 +50,19 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [braze-style](adapters/braze-style/) | Braze REST API `2.0` | 12 | VM | — | — | [8](#braze-style) | [6](#braze-style) |
 | [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | VM | — | — | [6](#chainlink-style) | [7](#chainlink-style) |
 | [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | SDK | cloudflare-go @ v0.117.0 | 7 | [8](#cloudflare-style) | [6](#cloudflare-style) |
-| [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | boot | — | — | [6](#cloudkit-style) | [2](#cloudkit-style) |
+| [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | VM | — | — | [6](#cloudkit-style) | [2](#cloudkit-style) |
 | [discord-style](adapters/discord-style/) | Discord API `v10` | 26 (+1 ws) | SDK | discord-node @ 2.6.3 (floor) | 5 | [8](#discord-style) | [5](#discord-style) |
 | [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | SDK | google-api-go-client @ v0.293.0 | 8 | [7](#drive-style) | [5](#drive-style) |
-| [dropbox-style](adapters/dropbox-style/) | Dropbox API `2` | 8 | boot | — | — | [8](#dropbox-style) | [4](#dropbox-style) |
-| [dune-style](adapters/dune-style/) | Dune Analytics API `v1` | 6 | boot | — | — | [5](#dune-style) | [3](#dune-style) |
+| [dropbox-style](adapters/dropbox-style/) | Dropbox API `2` | 8 | VM | — | — | [8](#dropbox-style) | [4](#dropbox-style) |
+| [dune-style](adapters/dune-style/) | Dune Analytics API `v1` | 6 | VM | — | — | [5](#dune-style) | [4](#dune-style) |
 | [dynamodb-style](adapters/dynamodb-style/) | Amazon DynamoDB API `2012-08-10` | 1 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 8 | [8](#dynamodb-style) | [5](#dynamodb-style) |
 | [echo-style](adapters/echo-style/) | gRPC echo demo `1.0` | 0 (+1 ws) | boot | — | — | — | — |
 | [emailoctopus-style](adapters/emailoctopus-style/) | EmailOctopus API `2.0.0` | 21 | VM | — | — | [2](#emailoctopus-style) | [3](#emailoctopus-style) |
 | [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 8 | [8](#entra-id-style) | [3](#entra-id-style) |
-| [erc4337-style](adapters/erc4337-style/) | ERC-4337 Bundler RPC `0.7` | 2 | boot | — | — | [5](#erc4337-style) | [4](#erc4337-style) |
+| [erc4337-style](adapters/erc4337-style/) | ERC-4337 Bundler RPC `0.7` | 2 | VM | — | — | [5](#erc4337-style) | [6](#erc4337-style) |
 | [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | VM | — | — | [3](#escrow-style) | [4](#escrow-style) |
 | [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | SDK | go-ethereum @ v1.17.5 | 5 | [5](#eth-jsonrpc-style) | [4](#eth-jsonrpc-style) |
-| [etherscan-style](adapters/etherscan-style/) | Etherscan API `1.0` | 1 | boot | — | — | [3](#etherscan-style) | [1](#etherscan-style) |
+| [etherscan-style](adapters/etherscan-style/) | Etherscan API `1.0` | 1 | VM | — | — | [3](#etherscan-style) | [2](#etherscan-style) |
 | [fattureincloud-style](adapters/fattureincloud-style/) | Fatture in Cloud API v2 `2.0.29` | 42 | VM | — | — | [3](#fattureincloud-style) | [6](#fattureincloud-style) |
 | [firebase-style](adapters/firebase-style/) | Firebase Auth + Firestore + Cloud Messaging API `v1` | 22 | VM | — | — | [4](#firebase-style) | [8](#firebase-style) |
 | [ga4-style](adapters/ga4-style/) | Google Analytics Data API + Admin API `v1beta` | 7 | SDK | google-api-go-client @ v0.293.0 | 7 | [4](#ga4-style) | [3](#ga4-style) |
@@ -81,19 +81,19 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [hubspot-style](adapters/hubspot-style/) | HubSpot CRM API `v3` | 33 | SDK | hubspot-node @ 14.0.1 (floor) | 5 | [4](#hubspot-style) | — |
 | [instagram-style](adapters/instagram-style/) | Instagram Graph API `v21.0` | 10 | VM | — | — | [4](#instagram-style) | [5](#instagram-style) |
 | [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 32 | SDK | jira-js @ 6.1.0 (floor) | 7 | [5](#jira-style) | [6](#jira-style) |
-| [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | boot | — | — | [3](#jumio-style) | [4](#jumio-style) |
-| [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | boot | — | — | [4](#linkedin-style) | [1](#linkedin-style) |
+| [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | VM | — | — | [3](#jumio-style) | [6](#jumio-style) |
+| [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | VM | — | — | [4](#linkedin-style) | [3](#linkedin-style) |
 | [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | SDK | openai-node @ 7.5.0 (floor) | 2 | [4](#llm-style) | [3](#llm-style) |
 | [marketo-style](adapters/marketo-style/) | Marketo Engage REST API `1.0` | 21 | VM | — | — | [5](#marketo-style) | [3](#marketo-style) |
 | [microsoft-graph-style](adapters/microsoft-graph-style/) | Microsoft Graph API `v1.0` | 55 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 10 | [8](#microsoft-graph-style) | [6](#microsoft-graph-style) |
 | [netsuite-style](adapters/netsuite-style/) | NetSuite SuiteTalk REST API `1.0` | 9 | VM | — | — | [4](#netsuite-style) | [3](#netsuite-style) |
-| [oneinch-style](adapters/oneinch-style/) | 1inch Aggregation Protocol API `v6.0` | 5 | boot | — | — | [3](#oneinch-style) | [1](#oneinch-style) |
-| [onfido-style](adapters/onfido-style/) | Onfido API `v3.6` | 7 | boot | — | — | [5](#onfido-style) | [4](#onfido-style) |
-| [opensea-style](adapters/opensea-style/) | OpenSea API `2.0.0` | 7 | boot | — | — | [4](#opensea-style) | [1](#opensea-style) |
+| [oneinch-style](adapters/oneinch-style/) | 1inch Aggregation Protocol API `v6.0` | 5 | VM | — | — | [3](#oneinch-style) | [4](#oneinch-style) |
+| [onfido-style](adapters/onfido-style/) | Onfido API `v3.6` | 7 | VM | — | — | [5](#onfido-style) | [6](#onfido-style) |
+| [opensea-style](adapters/opensea-style/) | OpenSea API `2.0.0` | 7 | VM | — | — | [4](#opensea-style) | [4](#opensea-style) |
 | [paypal-style](adapters/paypal-style/) | PayPal Orders API `v2` | 17 | VM | — | — | [6](#paypal-style) | [8](#paypal-style) |
-| [persona-style](adapters/persona-style/) | Persona Inquiry API `2023-01-05` | 5 | boot | — | — | [5](#persona-style) | [4](#persona-style) |
+| [persona-style](adapters/persona-style/) | Persona Inquiry API `2023-01-05` | 5 | VM | — | — | [5](#persona-style) | [6](#persona-style) |
 | [photos-style](adapters/photos-style/) | Google Photos Library API `v1` | 12 | VM | — | — | [5](#photos-style) | [5](#photos-style) |
-| [pinata-style](adapters/pinata-style/) | Pinata API `1.0` | 6 | boot | — | — | [4](#pinata-style) | — |
+| [pinata-style](adapters/pinata-style/) | Pinata API `1.0` | 6 | VM | — | — | [4](#pinata-style) | [3](#pinata-style) |
 | [plaid-style](adapters/plaid-style/) | Plaid API `2020-09-14` | 13 | SDK | plaid-node @ 32.0.0 (floor) | 4 | [5](#plaid-style) | [3](#plaid-style) |
 | [powerplatform-style](adapters/powerplatform-style/) | Microsoft Power Platform API `2` | 9 | VM | — | — | [4](#powerplatform-style) | [6](#powerplatform-style) |
 | [printful-style](adapters/printful-style/) | Printful API `v2` | 13 | VM | — | — | [5](#printful-style) | [3](#printful-style) |
@@ -101,25 +101,25 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [producthunt-style](adapters/producthunt-style/) | Product Hunt GraphQL API `2` | 0 +GQL | boot | — | — | [3](#producthunt-style) | [2](#producthunt-style) |
 | [psd2-style](adapters/psd2-style/) | Open Banking / PSD2 (Berlin Group NextGenPSD2) `1.3.6` | 19 | VM | — | — | [6](#psd2-style) | [7](#psd2-style) |
 | [qbo-style](adapters/qbo-style/) | QuickBooks Online API `v3` | 11 | VM | — | — | [6](#qbo-style) | [4](#qbo-style) |
-| [reddit-style](adapters/reddit-style/) | Reddit API `1.0` | 2 | boot | — | — | [5](#reddit-style) | [1](#reddit-style) |
+| [reddit-style](adapters/reddit-style/) | Reddit API `1.0` | 2 | VM | — | — | [5](#reddit-style) | [3](#reddit-style) |
 | [resend-style](adapters/resend-style/) | Resend API `1.0.0` | 6 | SDK | resend-node @ 6.22.0 (floor) | 4 | [6](#resend-style) | [3](#resend-style) |
-| [revenuecat-style](adapters/revenuecat-style/) | RevenueCat API `v1` | 7 | boot | — | — | [5](#revenuecat-style) | [4](#revenuecat-style) |
+| [revenuecat-style](adapters/revenuecat-style/) | RevenueCat API `v1` | 7 | VM | — | — | [5](#revenuecat-style) | [5](#revenuecat-style) |
 | [salesforce-style](adapters/salesforce-style/) | Salesforce REST API `v60.0` | 29 | SDK | jsforce @ 3.10.22 (floor) | 6 | [7](#salesforce-style) | [4](#salesforce-style) |
-| [sendgrid-style](adapters/sendgrid-style/) | Twilio SendGrid v3 API `v3` | 5 | boot | — | — | [7](#sendgrid-style) | [5](#sendgrid-style) |
+| [sendgrid-style](adapters/sendgrid-style/) | Twilio SendGrid v3 API `v3` | 5 | VM | — | — | [7](#sendgrid-style) | [6](#sendgrid-style) |
 | [servicenow-style](adapters/servicenow-style/) | ServiceNow Table API `2` | 44 | VM | — | — | [5](#servicenow-style) | [1](#servicenow-style) |
 | [shopify-style](adapters/shopify-style/) | Shopify Admin REST + GraphQL API `2024-10` | 21 +GQL | SDK | go-shopify/v4 @ v4.7.0 | 5 | [7](#shopify-style) | [4](#shopify-style) |
-| [signin-with-apple-style](adapters/signin-with-apple-style/) | Sign in with Apple `v2` | 3 | boot | — | — | [3](#signin-with-apple-style) | [2](#signin-with-apple-style) |
+| [signin-with-apple-style](adapters/signin-with-apple-style/) | Sign in with Apple `v2` | 3 | VM | — | — | [3](#signin-with-apple-style) | [2](#signin-with-apple-style) |
 | [slack-style](adapters/slack-style/) | Slack Web API `1.0` | 7 | SDK | slack-node @ 7.19.0 (floor) | 4 | [6](#slack-style) | [2](#slack-style) |
 | [smartbill-style](adapters/smartbill-style/) | SmartBill Cloud API `1.0` | 18 | VM | — | — | [3](#smartbill-style) | [4](#smartbill-style) |
 | [sqs-style](adapters/sqs-style/) | Amazon SQS API `2012-11-05` | 2 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 6 | [4](#sqs-style) | [5](#sqs-style) |
 | [square-style](adapters/square-style/) | Square API `2024-08-21` | 18 | SDK | square-node @ 45.1.0 (floor) | 4 | [7](#square-style) | [2](#square-style) |
 | [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.3.0<br>stripe-node @ 22.5.0 (floor) | 9 | [7](#stripe-style) | [5](#stripe-style) |
-| [tenderly-style](adapters/tenderly-style/) | Tenderly Simulation API `v1` | 5 | boot | — | — | [3](#tenderly-style) | [2](#tenderly-style) |
-| [thegraph-style](adapters/thegraph-style/) | The Graph (GraphQL over subgraphs) `1.0` | 1 +GQL | boot | — | — | [3](#thegraph-style) | [1](#thegraph-style) |
+| [tenderly-style](adapters/tenderly-style/) | Tenderly Simulation API `v1` | 5 | VM | — | — | [3](#tenderly-style) | [4](#tenderly-style) |
+| [thegraph-style](adapters/thegraph-style/) | The Graph (GraphQL over subgraphs) `1.0` | 1 +GQL | VM | — | — | [3](#thegraph-style) | [2](#thegraph-style) |
 | [threads-style](adapters/threads-style/) | Threads API (Meta) `v1.0` | 8 | VM | — | — | [3](#threads-style) | [6](#threads-style) |
 | [twilio-style](adapters/twilio-style/) | Twilio API `2010-04-01` | 6 | SDK | twilio-go @ v1.30.9<br>twilio-node @ 6.1.0 (floor) | 8 | [6](#twilio-style) | [4](#twilio-style) |
 | [twitter-style](adapters/twitter-style/) | Twitter/X API `v2` | 9 | VM | — | — | [6](#twitter-style) | [5](#twitter-style) |
-| [walletconnect-style](adapters/walletconnect-style/) | WalletConnect (Relay Protocol v2) `2.0` | 7 | boot | — | — | [3](#walletconnect-style) | [2](#walletconnect-style) |
+| [walletconnect-style](adapters/walletconnect-style/) | WalletConnect (Relay Protocol v2) `2.0` | 7 | VM | — | — | [3](#walletconnect-style) | [5](#walletconnect-style) |
 | [whatsapp-style](adapters/whatsapp-style/) | WhatsApp Business Cloud API (Meta) `v21.0` | 8 | VM | — | — | [5](#whatsapp-style) | [7](#whatsapp-style) |
 | [workday-style](adapters/workday-style/) | Workday REST API `v40.0` | 8 | VM | — | — | [4](#workday-style) | [3](#workday-style) |
 | [x-articles-style](adapters/x-articles-style/) | X (Twitter) Articles API `v2` | 8 | VM | — | — | [4](#x-articles-style) | [4](#x-articles-style) |
@@ -602,6 +602,14 @@ Named by their `// =====` section markers.
 - catalog ids resolve only within their model
 - task status is scoped to its workspace and model
 
+**apple-apns-style**
+
+- the provider token gate distinguishes missing invalid and expired tokens
+- a push to the known device returns 200 with a canonical uuid apns-id
+- unknown device tokens are 400 baddevicetoken
+- empty aps payloads are 400 payloadempty
+- sent notifications are retrievable per device
+
 **apple-appstoreconnect-style**
 
 - a rejected credential answers Apple's 401 errors array, not a bare status
@@ -706,6 +714,28 @@ Named by their `// =====` section markers.
 - assignment is additive, idempotent, and validated
 - signup creates an unverified user the Management API can see
 - duplicate, weak, and unknown-client signups are rejected
+
+**avalara-style**
+
+- every v2 endpoint demands a credential: a bare call is a 401 AuthenticationRequired envelope
+- any Bearer or any HTTP Basic credential opens the gate
+- a non-Basic/Non-Bearer scheme does not count as a credential
+- the effective rate keys off the address state (CA 0.095) with a State/County/City/Special breakdown
+- the summary aggregates the taxable base per jurisdiction
+- per-line tax rounds to cents: two lines aggregate, line 2 keeps its own tax
+- SDK decimal strings ("100.00") price identically to JSON numbers
+- the shipFrom/shipTo form keys off shipTo (NY 0.0875)
+- unknown or missing addresses fall back to the synthetic 0.0825 default
+- create prices the document, mints id/code/companyId and applies AvaTax defaults
+- an omitted date defaults to the clock's today, and advances with it
+- read round-trips by id; unknown ids are 404 NotFound
+- the list supports OData $filter and $orderBy with @recordsetCount
+- $top/$skip pages through an @odata.nextLink that round-trips
+- void flips status to Cancelled and the record reads back cancelled
+- re-void is idempotent
+- the companies catalog lists DEFAULT and STORE1 with default locations
+- nexus $filter literals are typed: id eq 1001 matches ints, hasNexus eq true matches bools
+- the taxcode catalog is filterable by taxCode
 
 **aws-cognito-style**
 
@@ -833,6 +863,45 @@ Named by their `// =====` section markers.
 - lane status echoes the requested pair with its ramp addresses
 - the seeded test token dies after its ten-year virtual window
 
+**cloudkit-style**
+
+- the s2s signature gate rejects unsigned tampered stale and foreign-key requests
+- users current returns the s2s owner identity
+- zones list seeds defaults filters by prefix and pages
+- records lookup returns the seeded shape with inline NOT_FOUND
+- records query filters sorts and pages on a numeric resultsLimit
+- records modify creates updates and deletes round-trip
+
+**dropbox-style**
+
+- upload takes the JSON {path, content} convenience body (documented deviation)
+- the real RPC upload (Dropbox-API-Arg header + raw octet-stream body) lands identically
+- re-uploading an existing path answers the real mode:"add" conflict
+- mode overwrite replaces in place; autorename forks a suffixed path
+- list_folder returns the whole path-prefix subtree, not one level
+- the root listing spans everything; unknown and file paths carry distinct 409 tags
+- paging slices the filtered subtree by body cursor, ignoring query strings
+- download streams raw bytes by path and by id, with metadata alongside
+- folders and unknown paths decline under the 409 path envelope
+- get_temporary_link pairs the file's metadata with the synthetic link
+- a presented bearer must be registered: unknown and expired tokens get distinct 401 tags
+- an absent Authorization header stays open (documented deviation)
+- create_folder mints folder metadata and conflicts case-insensitively
+- get_current_account returns the synthetic /2/users snapshot
+- deleting a folder removes its entire subtree from every read path
+- trash tombstones audit the exact cascade batch
+- delete is permanent: a re-created path is a brand-new entry
+
+**dune-style**
+
+- the api-key gate rejects missing, empty and non-bearer authorization
+- an execution walks PENDING -> EXECUTING -> COMPLETED as the clock advances
+- a missing required parameter is the 400 envelope and both SDK parameter shapes resolve
+- simulate_fail terminates QUERY_STATE_FAILED and results carry the failure envelope
+- the inline-result route completes synchronously
+- results pages honor limit/offset with a followable next_uri
+- the CSV variant streams text/csv for the same page
+
 **dynamodb-style**
 
 - an unsigned request is 403; a real SigV4 signature passes
@@ -869,6 +938,16 @@ Named by their `// =====` section markers.
 - get by contact id round-trips the email
 - delete removes the contact; reads 404 after
 
+**erc4337-style**
+
+- supportedEntryPoints, chainId, and the JSON-RPC envelope
+- estimateUserOperationGas validates the full v0.7 field set
+- sendUserOperation answers a deterministic hash and defaults the entry point
+- the op walks mempool -> bundled -> included on the virtual clock
+- simulate_fail reverts on inclusion with the AA95 reason
+- the paymaster signs the op into paymasterAndData
+- missing or invalid userOps are 400s
+
 **escrow-style**
 
 - missing, Bearer, and malformed Authorization are 401s with the challenge header
@@ -902,6 +981,15 @@ Named by their `// =====` section markers.
 - registration assigns integer ids and echoes the URL
 - the list carries every registered webhook
 - a missing or blank url is the can't-be-blank field error
+
+**etherscan-style**
+
+- the apikey query parameter gates every module call
+- unknown modules and actions answer the NOTOK envelope over HTTP 200
+- balance reads the seeded ledger; unknown addresses default to "0"
+- txlist scopes by address then applies block filters, sort and paging
+- contract verification: ABI, source, and the unverified fallback
+- stats and token holders keep every number a decimal string
 
 **fattureincloud-style**
 
@@ -1020,6 +1108,72 @@ Named by their `// =====` section markers.
 - refresh mints a fresh 60-day token; the old one keeps working
 - the refreshed token outlives the original's expiry
 
+**jumio-style**
+
+- a missing, bare or wrong-scheme token is a 401 in the Jumio error envelope
+- a scan create answers PENDING with a synthetic decimal scan reference
+- sequential creates advance the reference sequence
+- a create without merchantScanReference is a 400
+- PENDING holds through the processing window then flips to DONE
+- a FAILED scan carries a real reject reason and its description
+- unknown scans are 404 on every parameterized route
+- extracted data is None while the scan is PENDING
+- DONE exposes the synthetic document extraction
+- FAILED scans answer data with a 409 repeating the reason
+- delete removes the scan and later reads are 404s
+- deleting after the terminal window still advances the lifecycle
+- a correctly MACed webhook body is accepted
+- a tampered body, wrong MAC or missing header is a 401
+- the terminal transition emits exactly one signed scan.completed
+- failed scans emit scan.failed carrying the rejection reason
+- a delete-driven terminal transition also emits, then nothing more
+
+**linkedin-style**
+
+- authorize without redirect_uri, state or client_id is invalid_request
+- authorize redirects back with a fresh code and the state echoed
+- a redirect_uri that already carries a query is joined with &
+- the exchange demands grant_type=authorization_code
+- an unknown code is 400 invalid_grant
+- a good exchange mints a 60-day token pair for a fresh member
+- the code is single-use: a replay is invalid_grant
+- client mismatches are 400 invalid_client
+- a mismatched attempt must not burn the code
+- a second flow mints a distinct member
+- the refresh grant demands client creds
+- an unknown refresh token is invalid_grant
+- refresh rotates the pair and keeps the member
+- the presented refresh token is single-use
+- rotation chains: the new refresh token refreshes again
+- a missing bearer is 401 in the service error envelope
+- wrong schemes and unknown bearers answer the same 401
+- every API route enforces the same gate
+- a bearer dies at its clock-derived 60-day expiry
+- userinfo returns the OAuth member profile
+- publishing as anyone but the token's member is a 403
+- a good publish mints a ugcPost urn echoed in x-linkedin-id
+- the post resolves to a share urn carrying its own author
+- resolving an unknown urn is a 404
+- unconfigured, publishing is unthrottled
+- arming fail_after injects 429 REQUEST_LIMIT_EXCEEDED
+- the limit is per member
+- a throttled attempt creates no post
+- q must be author
+- reply resolves urn:li:person:me to the authenticated member
+- commenting as anyone but the caller is a 403
+- replying to an unknown object is a 404
+- ingest lists only the token member's comments
+- member B's comment resolved me and lists only under B
+- createdOn is clock-stamped and monotonic
+- count pages with a next link that round-trips the query
+- without count the whole list returns unpaged
+- a malformed start cursor is a 400
+- an unknown entity is a 404
+- each queryType totals base+3/5/7/11 split across two daily buckets
+- entity accepts both the parenthesized and bare urn forms
+- start past the data returns an empty page
+- an unknown queryType falls back to the base total (deviation, as-is)
+
 **marketo-style**
 
 - only client_credentials mints a token
@@ -1070,6 +1224,45 @@ Named by their `// =====` section markers.
 - request-body fields override the mapped defaults
 - impossible chains, unknown sources and dangling overrides use NetSuite's real codes
 
+**oneinch-style**
+
+- a quote returns token pairs, a decimal toAmount and a 100-point split
+- quotes are deterministic and address matching is case-insensitive
+- the toAmount scales linearly with the input amount
+- a same-token quote scales the amount by the pseudo-rate (as-is)
+- missing params and unknown tokens are 400 error envelopes
+- a swap returns router-addressed calldata with gas and gasPrice
+- the swap toAmount matches the quote for the same input
+- slippage is optional and ignored (as-is)
+- missing params and unknown tokens are 400s
+- the spender is the router contract address
+- approve calldata targets the token with the max allowance
+- a missing or unknown token is a 400
+- the token list is an address-keyed map of six tokens
+- every token in the list is quotable as a source
+
+**onfido-style**
+
+- a missing or non-Token Authorization header is 401 authorization_error
+- applicant create flags exactly the blank names and reads back by id
+- document and live photo uploads bind to a real applicant and default side
+- check create demands report_names and a known applicant
+- the check completes from the clock and emits check.completed exactly once
+- simulate_fail completes with consider and consider breakdowns
+- the webhook receiver MACs the exact raw bytes
+
+**opensea-style**
+
+- the X-API-KEY gate 401s every surface with the V1ErrorWrapper envelope
+- the asset list seeds five mock-punks NFTs and filters by collection_slug
+- single-asset reads match the address case-insensitively and 404 unknown shapes
+- collections read back contracts and string-typed stats; unknown slugs 404
+- limit/next cursor pagination walks the pages and 400s a malformed cursor
+- events filter by collection_slug and event_type
+- listings carry the Seaport ask shape: the NFT in offer, payment in consideration
+- offers invert the shape: payment in offer, the NFT in consideration
+- created offers are stateful, deterministic, and defaulted
+
 **paypal-style**
 
 - client_credentials over Basic auth mints a distinct Bearer with PayPal's token envelope
@@ -1109,6 +1302,27 @@ Named by their `// =====` section markers.
 - webhook registration round-trips through the list
 - signature verification answers SUCCESS only for known webhook ids
 - deletion is 204, and repeats are 404
+
+**persona-style**
+
+- a missing, bare or wrong-scheme token is a 401 in the JSON:API error envelope
+- a create mints a zero-padded inq_ id in the JSON:API envelope
+- sequential creates advance the id sequence
+- any Bearer is accepted: the gate checks presence, not a store (as-is)
+- a create missing template_id or reference_id is a 400 invalid_request
+- the status derives from the clock created to pending to completed
+- resume restarts the clock at pending without duplicating verifications
+- simulate_fail declines at the terminal transition and seeds nothing
+- unknown inquiries are JSON:API 404s on every parameterized route
+- verifications are empty until the terminal transition fires
+- completion seeds the government-id and selfie verifications
+- a fresh correctly-signed webhook is accepted
+- a tampered body or wrong MAC is a 401 invalid_signature
+- a stale or far-future t is a 401 invalid_timestamp
+- a missing header or unparseable signature is a 401
+- polling through pending still emits exactly one inquiry.completed
+- re-reads and post-resume re-completions do not re-emit
+- a declined inquiry emits inquiry.declined signed the same way
 
 **photos-style**
 
@@ -1162,6 +1376,19 @@ Named by their `// =====` section markers.
 - list walks pages with the 20 default and the 50 clamp
 - albums are private to their user
 - delete removes the album but leaves its media
+
+**pinata-style**
+
+- missing or half-present credentials are 401 with the error envelope
+- the API key pair and a Bearer JWT both open testAuthentication
+- pinJSONToIPFS pins content to a real CIDv0
+- re-pinning identical content is isDuplicate, not a new pin
+- pinFileToIPFS sizes and names the pin from the multipart parts
+- pinList filters by hash, size, status, and metadata name
+- pinStart/pinEnd bound the date-pinned window
+- pinByHash requires hash and matches the CID exactly
+- pinList pages at the real default of 10 rows
+- unpin removes the CID; a second unpin is 403 FORBIDDEN
 
 **powerplatform-style**
 
@@ -1276,6 +1503,38 @@ Named by their `// =====` section markers.
 - an unknown entity answers an empty QueryResponse; a statement without one is a 400 fault
 - STARTPOSITION pages with MAXRESULTS: row 2 of the sorted set
 
+**reddit-style**
+
+- a missing or generic User-Agent is 429 on both routes
+- the token endpoint requires HTTP Basic client credentials
+- a permanent authorization_code mints access and refresh together
+- a refresh grant returns a fresh access token and no new refresh
+- submit requires a bearer the adapter itself minted
+- a valid submit returns the t3_ thing envelope
+- missing sr or title stay HTTP 200 with Reddit error triples
+- an access token dies after its one-hour window
+
+**revenuecat-style**
+
+- a missing or unknown key is a 401 {code, message} envelope
+- the public pk_ SDK key passes subscriber reads and receipt posts but is 401 on restricted writes
+- GET subscriber is get-or-create and answers in the v1 CustomerInfo envelope
+- receipt validation mirrors the real 400 order: app_user_id, platform, fetch_token, bad token
+- an ios receipt grants the pro entitlement with real trial math, and renewals stack
+- a google-play dict receipt feeds the product and lands in non_subscriptions
+- revoke lapses a live subscription; delete and the 404 envelopes
+- expiry is derived on read: a lapsed trial drops its entitlement
+
+**sendgrid-style**
+
+- the bearer gate rejects missing and unknown keys with SendGrid's grant envelope
+- mail send answers 202 with an empty body, an X-Message-Id, and flattened personalizations
+- the retrieval endpoint pages with limit and the opaque offset cursor
+- the delivery lifecycle derives processed -> delivered (or dropped) on read, exactly once
+- the Email Activity query language narrows the list
+- event webhook settings round-trip and require a URL when enabled
+- deliveries are ECDSA P-256 signed over timestamp + raw body and fire once per recipient stage
+
 **servicenow-style**
 
 - unknown credentials are 401 at the gate
@@ -1287,6 +1546,14 @@ Named by their `// =====` section markers.
 - tables are isolated from each other
 - unknown sys_id and unknown table are 404
 - delete removes the record for good
+
+**signin-with-apple-style**
+
+- authorize redirects with a single-use code plus state and validates its params
+- the token exchange mints a real es256 id_token with apple claim shapes
+- the served jwks verifies the minted id_token signature
+- auth codes are single-use and client_secrets are verified cryptographically
+- the refresh grant rotates access tokens and rejects stale or foreign inputs
 
 **smartbill-style**
 
@@ -1338,6 +1605,24 @@ Named by their `// =====` section markers.
 - SetQueueAttributes persists; unknown names are InvalidAttributeName
 - DeleteQueue tears the queue down for its messages too
 - the throttled profile alternates empty receives deterministically
+
+**tenderly-style**
+
+- the access-key gate rejects missing and unknown bearers with the slug envelope
+- networks answer the bare array and switch to the paged envelope under perPage
+- a plain simulation round-trips the deterministic Tenderly shape
+- a value transfer emits the ERC-20 Transfer log and balance overrides
+- reverting simulations carry the ABI-encoded Error(string) output
+- bundles fan out per simulation and stored results list and retrieve by id
+
+**thegraph-style**
+
+- pools collection arguments sort by volume and join token0/token1
+- where filters map the graph-node suffix operators
+- validation failures and the first cap surface as GraphQL errors
+- domains join owner/resolvedAddress; lookups miss as null
+- _meta reports the deployment head; Token.pools joins in reverse
+- the REST SDL surface is public and rejects unknown bearer keys
 
 **threads-style**
 
@@ -1395,6 +1680,20 @@ Named by their `// =====` section markers.
 - start_time/end_time bound created_at and exclude=replies drops threads
 - max_results pages via meta.next_token; an invalid pagination_token is a 400
 - the tweet list shares the same v2 paging and stays unpaged without max_results
+
+**walletconnect-style**
+
+- every route answers without a projectId (the gate is not wired)
+- a wc: URI pairing round-trips its topic, relay protocol, and symKey
+- an auto pairing mints a fresh topic and a 64-hex symKey
+- proposing requires pairingTopic — and accepts one never paired
+- approve acknowledges the session and derives eip155 namespaces
+- the session list is a bare array capped by limit
+- the approval gate is missing: an unacknowledged session still answers
+- wallet requests answer in a JSON-RPC 2.0 envelope with monotonic ids
+- signing and transaction methods return synthetic 0x-hex hashes
+- extend echoes the fixed session TTL without persisting anything
+- disconnect retires the topic and every later call 404s
 
 **whatsapp-style**
 
@@ -1700,10 +1999,11 @@ behavior notes live in each adapter's README.
 - No 429 TooManyRequests or 503 ServiceUnavailable rate-limit responses
 - No Web Push endpoints (Safari webpush) or VOIP push handling
 
-**Deviations** (2)
+**Deviations** (3)
 
 - Provider JWT verified against one fixed P-256 key whose private half is published
 - GET /3/device/{token}/notifications is a simulator-only endpoint (no real fetch API)
+- sent_at on the notifications endpoint is a constant; 410 Unregistered is modeled but unreachable
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -2174,9 +2474,11 @@ behavior notes live in each adapter's README.
 - No customers, certificates, or exemption endpoints
 - No jurisdiction lookups — definitions serve nexuses and taxcodes only
 
-**Deviations** (1)
+**Deviations** (3)
 
 - Tax is a deterministic split — State 50%, County 25%, City 20%, Special 5% of the rate
+- Void returns a minimal {id, status} envelope; real AvaTax returns the full TransactionModel
+- Re-void is idempotent 200; real AvaTax rejects voiding a Cancelled document
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -3490,11 +3792,12 @@ behavior notes live in each adapter's README.
 - No CSV transfer to external storage (transfers endpoints)
 - No table metadata endpoints (GET /api/v1/table/{namespace}/{table})
 
-**Deviations** (3)
+**Deviations** (4)
 
 - executions follow a fixed clock: EXECUTING at +1s, COMPLETED at +3s after execute
 - queries come from a static 3-entry catalog; no real SQL is executed
 - simulate_fail body flag forces QUERY_STATE_FAILED; real API has no failure trigger
+- Auth is a presence-only Bearer; real Dune uses the x-dune-api-key header
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -3756,12 +4059,14 @@ behavior notes live in each adapter's README.
 - No debug_bundler_* ops: sendBundleNow, clearState, dropUserOperation
 - No WebSocket transport or newHeads subscriptions
 
-**Deviations** (4)
+**Deviations** (6)
 
 - gas estimates are deterministic fixed values; real bundlers differ per implementation
 - inclusion runs on a fixed clock: mempool 0-1s, bundled 1-3s, included at >=3s
 - eth_sendUserOperation accepts {simulate_fail:true} as a third params element
 - mock paymaster POST /paymaster/sign mints synthetic sponsorship signatures
+- userOp keeps the v0.6 paymasterAndData field though the adapter is EntryPoint-v0.7-only
+- Error envelopes use generic -32602 rather than AA-prefixed codes (-32500...)
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -3864,13 +4169,14 @@ behavior notes live in each adapter's README.
 
 **Missing** (3)
 
-- No txlistinternal, tokentx, or getLogs actions
+- No getLogs action (txlistinternal/tokentx are served, hard-coded empty)
 - No logs, proxy, or gastracker modules (gasoracle, eth_call passthrough)
 - No getminedblocks, getblocknobytime, or nodecount actions
 
-**Deviations** (1)
+**Deviations** (2)
 
 - Auth accepts any non-empty apikey; only a missing key yields the error envelope
+- txlistinternal/tokentx/tokenbalance return hard-coded empty results
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -5543,12 +5849,14 @@ behavior notes live in each adapter's README.
 - No hosted redirect verification flow; API scan creation only
 - No Document Verification, Data Verification, or Transaction Screening APIs
 
-**Deviations** (4)
+**Deviations** (6)
 
 - Scan lifecycle on a fixed clock: PENDING ~3s then DONE or FAILED at +3s
 - simulate_fail and simulate_reject_reason create fields are stunt-only hooks
 - Webhook HMAC secret is the public constant stunt_jumio_mock_signing_key
 - POST /netverify/v2/webhooks is a local stand-in receiver, not a Jumio endpoint
+- Bearer-presence gate; real Jumio uses HTTP Basic against a server-token store
+- Scan references are decimal groups, not UUIDs; extracted PII is fixed synthetic
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -5586,9 +5894,11 @@ behavior notes live in each adapter's README.
 - No reactions or likes endpoints (socialActions likes)
 - No video upload flow or multi-image carousel posts
 
-**Deviations** (1)
+**Deviations** (3)
 
 - Rate-limit injection on POST /v2/ugcPosts publish is a simulator test hook
+- An unknown analytics queryType silently falls back to the base total; real LinkedIn 400s
+- Refresh tokens never expire; only access tokens carry the 60-day expiry
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -6043,9 +6353,12 @@ behavior notes live in each adapter's README.
 - No Limit Order Protocol endpoints (create, list, history)
 - No raw transaction broadcast, status check, or chains list endpoints
 
-**Deviations** (1)
+**Deviations** (4)
 
 - Quotes deterministic from src/dst/amount; same input yields same toAmount and split
+- Quote field is toAmount; real v6.0 returns dstAmount
+- Same-token quotes return amount x pseudo-rate; real API rejects
+- slippage is optional and ignored on swap; real v6.0 requires it
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -6142,12 +6455,14 @@ behavior notes live in each adapter's README.
 - No motion capture or video uploads; no document/live photo list or delete
 - No webhook registration or listing (local receiver only)
 
-**Deviations** (4)
+**Deviations** (6)
 
 - Check lifecycle fixed: in_progress ~3s then complete; awaiting_applicant skipped
 - simulate_fail yields result consider; real sandbox uses special sandbox documents
 - Webhook HMAC secret is the public constant stunt_onfido_mock_signing_key
 - POST /v3.6/webhooks is a local stand-in receiver, not an Onfido endpoint
+- Synthetic sequential ids (app-000001...) where real Onfido uses UUIDs
+- The awaiting_applicant phase is skipped; documents assumed on file
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -6245,9 +6560,12 @@ behavior notes live in each adapter's README.
 - No account lookup (GET /api/v2/accounts/{address})
 - No NFT transfer history endpoint (chain/{chain}/transfers)
 
-**Deviations** (1)
+**Deviations** (4)
 
 - X-API-KEY accepted as any non-empty value; no real key validation
+- Asset routes serve the deprecated v2 surface; real v2 replaced them with collection-scoped nfts endpoints
+- Identical offers re-create and store duplicate orders (no order_hash dedupe)
+- Create-offer body and response are simulator-specific, not the documented criteria-offer shapes
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -6427,12 +6745,14 @@ behavior notes live in each adapter's README.
 - No Transactions API (bank account linking and verification)
 - No inquiry cancel, expire, redact, or mark-under-review actions
 
-**Deviations** (4)
+**Deviations** (6)
 
 - Fixed clock lifecycle: created (0-1s), pending (1-3s), completed or declined (+3s)
 - simulate_fail create flag yields declined instead of completed (stunt-only)
 - Webhook HMAC secret is the public constant stunt_persona_mock_signing_key
 - POST /api/inquiry/v1/webhooks is a local stand-in receiver with 5-minute replay window
+- JSON:API attributes are snake_case; real Persona serializes kebab-case
+- Create takes a flat body; real API expects the JSON:API data/attributes wrapper
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -6524,10 +6844,16 @@ behavior notes live in each adapter's README.
 - No metadata update or pin-policy change (POST /pinning/hashMetadata)
 - No pinned-data-usage endpoint (GET /data/userPinnedDataTotal)
 
+**Deviations** (3)
+
+- Credentials are presence-checked only; any non-empty key pair or Bearer JWT passes
+- Every stored pin is status pinned — unpinned/pending/failed not modeled (no job queue)
+- JSON pin CIDs derive from stunt canonical serialization, not byte-identical to real Pinata
+
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
-- `POST` `/pinning/pinFileToIPFS` — body, stateful
-- `POST` `/pinning/pinJSONToIPFS` — body, stateful
+- `POST` `/pinning/pinFileToIPFS` — stateful, clock
+- `POST` `/pinning/pinJSONToIPFS` — body, stateful, clock
 - `DELETE` `/pinning/unpin/{cid}` — params, stateful
 - `GET` `/data/pinList` — query, stateful, filter
 - `GET` `/data/testAuthentication` — —
@@ -7075,9 +7401,11 @@ behavior notes live in each adapter's README.
 - No token revocation (POST /api/v1/revoke_token)
 - No subreddit, search, or inbox/messages endpoints
 
-**Deviations** (1)
+**Deviations** (3)
 
 - User-Agent gate simplified: any UA containing / and ( passes, else 429
+- The authorization_code grant never validates code or redirect_uri — any or missing code mints tokens
+- Post ids are plain sequence strings, not Reddit base36
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -7198,12 +7526,13 @@ behavior notes live in each adapter's README.
 - Only ios and android platforms — no amazon, stripe, or web billing
 - No v2 REST surface (customers, subscriptions, entitlements)
 
-**Deviations** (4)
+**Deviations** (5)
 
-- Webhook registration endpoint is simulator-only; real RC v1 webhooks are dashboard-configured
 - fetch_token prefixed with invalid is the deterministic bad-receipt 400 path
 - Subscription expiry is derive-on-read; first read past it fires EXPIRATION
 - POST /v1/subscribers accepts _expires_at seeding to drive EXPIRATION in tests
+- pk_ public keys are simulator convention; real RC public keys are appl_/goog_-prefixed
+- REST webhook registration does not exist in real RC v1 (dashboard-configured)
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -7363,19 +7692,20 @@ behavior notes live in each adapter's README.
 - No sender authentication or domains setup
 - No templates surface (/v3/templates)
 
-**Deviations** (5)
+**Deviations** (6)
 
 - Webhook ECDSA signature is raw r||s (64 bytes), not Twilio ASN.1 DER encoding
 - simulate_fail: true in send body forces dropped terminal (simulator extension)
 - delivered derives at fixed +3s on first list read, not real async delivery
-- Webhook deliveries are single stunt-enveloped objects; real SendGrid POSTs a JSON array
 - Email Activity query subset: =, !=, CONTAINS terms AND-ed over six fields
+- Each delivery wraps one event in the transport envelope; real SendGrid batches a JSON array of events
+- asm, sandbox_mode, and batch_id are accepted but not modeled
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
 - `POST` `/v3/mail/send` — body, auth, stateful, webhooks, clock
 - `GET` `/v3/messages` — query, auth, stateful, paginate, filter, webhooks, errors, clock
-- `POST` `/v3/user/webhooks/event/settings` — body, auth, stateful, clock
+- `POST` `/v3/user/webhooks/event/settings` — body, auth, stateful, errors, clock
 - `GET` `/v3/user/webhooks/event/settings` — auth, stateful, clock
 - `POST` `/v3/user/webhooks/event/test` — auth, stateful, webhooks, errors, clock
 
@@ -8365,10 +8695,12 @@ behavior notes live in each adapter's README.
 - No alerts or notification-rules API
 - No transaction lookup/list endpoints (transactions by hash)
 
-**Deviations** (2)
+**Deviations** (4)
 
 - gas_used is derived from input length, not real EVM execution; status defaults to true
 - An explicit revert:true body flag forces the revert path; real API has no such switch
+- Bearer auth where real Tenderly uses the X-Access-Key header
+- Responses mix camelCase where Tenderly is snake_case and nests simulation.id
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -8398,9 +8730,10 @@ behavior notes live in each adapter's README.
 - No indexing-status queries beyond _meta (no /status endpoint)
 - No GraphQL subscriptions over websockets; HTTP queries only
 
-**Deviations** (1)
+**Deviations** (2)
 
 - One merged schema serves Uniswap and ENS entities; real Graph serves one per deployment
+- _meta.block.number advances per query; the real head is block-height driven
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -8692,10 +9025,13 @@ behavior notes live in each adapter's README.
 - No session update, ping, or event emission (chainChanged/accountsChanged)
 - No pairing list, expire, or ping operations
 
-**Deviations** (2)
+**Deviations** (5)
 
 - Pairing, session approve, and JSON-RPC requests are auto-approved (no wallet device)
 - personal_sign and eth_sendTransaction return synthetic hashes; nothing is signed
+- The projectId gate ships but is never wired — every route answers without a credential
+- Expiry fields are TTL constants, not absolute unix timestamps; extend persists nothing
+- Unacknowledged sessions serve JSON-RPC requests immediately (no approval gate)
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 

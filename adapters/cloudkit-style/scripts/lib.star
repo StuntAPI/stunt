@@ -263,10 +263,15 @@ def _err(status, code, reason):
         "reason": reason,
     })
 
-# _to_int parses a decimal string to int.
+# _to_int parses a decimal string to int. JSON numbers (resultsLimit) reach
+# handlers as int or float, so those pass through untouched.
 def _to_int(s):
     if s == None or s == "":
         return 0
+    if type(s) == "int":
+        return s
+    if type(s) == "float":
+        return int(s)
     n = 0
     for i in range(len(s)):
         ch = s[i]

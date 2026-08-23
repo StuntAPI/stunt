@@ -147,6 +147,8 @@ with the real RC field names:
 
 ```json
 {
+  "request_date": "2026-08-14T10:00:00Z",
+  "request_date_ms": 1786768800000,
   "subscriber": {
     "original_app_user_id": "user-1",
     "first_seen": "2026-08-14T10:00:00Z",
@@ -195,10 +197,21 @@ deterministically.
 
 ## Auth
 
-Bearer authentication: `Authorization: Bearer <key>` against the token store.
-The well-known static test key **`sk_test_revenuecat_style_mock_key`** is
-seeded once on first request (insert-once); any other key is rejected with
-`401 {"code": 401, "message": "Invalid API key."}`.
+Bearer authentication: `Authorization: Bearer <key>` against the token store,
+mirroring RevenueCat's key split:
+
+- **Secret key** **`sk_test_revenuecat_style_mock_key`** — accepted on every
+  endpoint (like real `sk_` project secret keys).
+- **Public SDK key** **`pk_test_revenuecat_style_mock_key`** — accepted only on
+  the SDK-facing endpoints (`GET /v1/subscribers/{id}`, `POST /v1/receipts`).
+  On restricted endpoints (subscriber `POST`/`DELETE`, revoke, webhook
+  management) it is rejected with
+  `401 {"code": 401, "message": "This endpoint requires a secret API key."}`.
+
+Both keys are seeded once on first request (insert-once); any other key is
+rejected with `401 {"code": 401, "message": "Invalid API key."}`, and a
+missing header with
+`401 {"code": 401, "message": "Missing API key in Authorization header."}`.
 
 ## Usage
 

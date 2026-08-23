@@ -28,9 +28,12 @@ endpoints:
     handler: scripts/relay.star#on_list_sessions
 
   # --- Session actions (parameterized) ---
+  # concurrency_key: approve and disconnect read-modify-write the session
+  # doc keyed by topic (find -> update/delete), so same-topic calls serialize.
   - route: /v1/sessions/{topic}/approve
     method: POST
     handler: scripts/relay.star#on_approve_session
+    concurrency_key: topic
   - route: /v1/sessions/{topic}/request
     method: POST
     handler: scripts/relay.star#on_session_request
@@ -40,6 +43,7 @@ endpoints:
   - route: /v1/sessions/{topic}
     method: DELETE
     handler: scripts/relay.star#on_disconnect_session
+    concurrency_key: topic
 
 # Backing stores — collections for stateful data.
 resources:

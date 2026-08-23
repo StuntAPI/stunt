@@ -26,6 +26,7 @@ def on_create_pairing(req):
         body = {}
 
     uri = body.get("uri", None)
+    relay_proto = "irn"
 
     if uri != None and uri != "":
         # Parse the wc: URI to extract the topic and symKey.
@@ -34,21 +35,22 @@ def on_create_pairing(req):
             return respond(400, {"error": "invalid_uri", "message": "could not parse wc: URI"})
         topic = parsed["topic"]
         sym_key = parsed["symKey"]
+        # The URI names its relay protocol; echo it rather than assume irn.
+        relay_proto = parsed["relayProtocol"]
     else:
-        # No URI — generate a topic from a sequence number.
+        # No URI — mint a topic AND symKey: a real pairing always carries a
+        # 256-bit symmetric key (an empty one cannot seed a wc: URI).
         seq = store_kv_incr("wc", "pairing_seq")
         topic = _topic("pairing-" + str(seq))
-        sym_key = ""
+        sym_key = _topic("symkey-" + str(seq))
 
     pc = store_collection("pairings")
     doc = {
         "topic": topic,
-        "relay": {"protocol": "irn"},
+        "relay": {"protocol": relay_proto},
         "expiry": PAIRING_EXPIRY,
         "state": {"symKey": sym_key},
     }
-    for k in doc:
-        pass
     pc.insert(doc)
 
     return respond(200, doc)

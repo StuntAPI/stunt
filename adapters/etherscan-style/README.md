@@ -18,7 +18,7 @@ lookups, contract verification, and chain stats.
 ### Auth
 
 Auth is via the `apikey` query parameter. The mock accepts any non-empty
-value. A missing `apikey` returns `{status: "0", message: "Missing API key"}`.
+value. A missing `apikey` returns `{status: "0", message: "NOTOK", result: "Missing API Key"}`.
 
 ### Modules & Actions
 

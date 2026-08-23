@@ -59,8 +59,10 @@ resources:
   - name: webhooks
     kind: collection
 
-# Auth scheme metadata (mock: Bearer sk_... public SDK key; the well-known
-# static test key in scripts/lib.star is seeded into the token store).
+# Auth scheme metadata (mock: Bearer keys; the well-known static test secret
+# sk_... key and public pk_... SDK key in scripts/lib.star are seeded into
+# the token store — secrets work everywhere, publics only on SDK-facing
+# routes, like the real API).
 identity:
   token_scheme: bearer
 
