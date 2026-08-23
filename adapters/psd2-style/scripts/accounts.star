@@ -68,15 +68,15 @@ def on_list_accounts(req):
     # Apply Berlin Group NextGenPSD2 pagination (page/size) to the account list.
     page, next_cursor = _list_page(req, result)
     if page == None:
-        return _psd2_err(400, "INVALID", "FORMAT_ERROR", "Invalid page cursor.")
+        # category must stay ERROR — "INVALID" is not in the tppMessages enum.
+        return _psd2_err(400, "ERROR", "FORMAT_ERROR", "Invalid page cursor.")
 
     self_href = "https://api.stunt.test/v1/accounts"
-    size_hint = str(_to_int(_get_query(req).get("size", "")))
 
     links = {
         "self": {"href": self_href},
     }
-    links.update(_page_links(self_href, next_cursor, size_hint))
+    links.update(_page_links(req, self_href, next_cursor))
 
     return respond(200, {
         "accounts": page,

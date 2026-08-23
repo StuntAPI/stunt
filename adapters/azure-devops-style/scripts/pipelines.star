@@ -109,8 +109,10 @@ def on_queue_run(req):
     if body.get("simulate_fail", False):
         fail_mode = "failed"
 
-    run_id = store_kv_incr("azure-devops", "run_seq") + 1
-    run_no = store_kv_incr("azure-devops", "runno_" + str(pid)) + 1
+    # store_kv_incr returns the new value (first call is 1), so no seeded
+    # runs means the first queued run is id 1, named yyyymmdd.1 like ADO.
+    run_id = store_kv_incr("azure-devops", "run_seq")
+    run_no = store_kv_incr("azure-devops", "runno_" + str(pid))
     # Run name is the real date-sequence form (yyyymmdd.N), built at runtime.
     today = _now_iso()[:10].replace("-", "")
     name = today + "." + str(run_no)

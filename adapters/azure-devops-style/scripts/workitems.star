@@ -91,6 +91,7 @@ def on_create_workitem(req):
     if body == None:
         body = {}
 
+    # The +1 skips id 1, which the seeded sample bug occupies.
     wi_num = store_kv_incr("azure-devops", "wi_seq") + 1
     wi_id_str = str(wi_num)
 
@@ -205,7 +206,12 @@ def on_update_workitem(req):
                 relations.append(value)
                 changed = changed + 1
             elif o == "remove" and rest[:1] != "" and rest.find("/") == 0:
-                idx = _to_int(rest[1:])
+                idx_raw = rest[1:]
+                # A malformed index must 400, not hit _to_int's 0 fallback
+                # and silently delete relation 0.
+                if not _is_digits(idx_raw):
+                    return _wit_fault(400, "The index '" + rest + "' is out of range.", "PatchOperationFailedException")
+                idx = _to_int(idx_raw)
                 if idx < 0 or idx >= len(relations):
                     return _wit_fault(400, "The index '" + rest + "' is out of range.", "PatchOperationFailedException")
                 nxt = []
@@ -472,7 +478,8 @@ def _workitem_resource(wi):
     wid = _as_int(wi.get("wi_id", wi.get("id", 0)))
     res = {
         "id": wid,
-        "rev": wi.get("rev", 1),
+        # rev round-trips through the store as a float; keep it an int.
+        "rev": _as_int(wi.get("rev", 1)),
         "fields": wi.get("fields", {}),
         "_links": {
             "self": {

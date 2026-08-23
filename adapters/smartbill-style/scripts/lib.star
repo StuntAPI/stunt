@@ -137,11 +137,11 @@ def next_num(resource):
 
 def strip_internal(doc):
     # Drop internal bookkeeping: the credential account, the store's auto id,
-    # and any engine _-prefixed key (_batch et al). Real SmartBill documents
-    # have no id field.
+    # the cif scope key, and any engine _-prefixed key (_batch et al). Real
+    # SmartBill documents carry companyVatCode, never cif/id.
     out = {}
     for k in doc:
-        if k == "sim_account" or k == "id" or k[:1] == "_":
+        if k == "sim_account" or k == "id" or k == "cif" or k[:1] == "_":
             continue
         out[k] = doc[k]
     return out

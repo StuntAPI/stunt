@@ -190,16 +190,20 @@ def _seed_catalog():
         })
 
         # Default upload for the import file (3 data rows), so an import run
-        # without a prior upload still applies real content.
-        b.put(_blob_key(ws, mid, import_file_id), default_csv, "text/csv")
-        files.insert({
-            "id": _file_key(ws, mid, import_file_id),
-            "fileId": import_file_id,
-            "name": "revenue_load.csv",
-            "contentType": "text/csv",
-            "size": len(default_csv),
-            "chunks": [{"index": 0, "offset": 0, "size": len(default_csv)}],
-        })
+        # without a prior upload still applies real content. A client upload
+        # that landed before the first catalog seed keeps its content —
+        # re-inserting would collide on the id and 500 the task run.
+        import_key = _file_key(ws, mid, import_file_id)
+        if files.get(import_key) == None:
+            b.put(_blob_key(ws, mid, import_file_id), default_csv, "text/csv")
+            files.insert({
+                "id": import_key,
+                "fileId": import_file_id,
+                "name": "revenue_load.csv",
+                "contentType": "text/csv",
+                "size": len(default_csv),
+                "chunks": [{"index": 0, "offset": 0, "size": len(default_csv)}],
+            })
 
 # _list_page slices a list of docs by the Anaplan pagination query params
 # (limit = page size, offset = opaque cursor token) via the paginate() builtin

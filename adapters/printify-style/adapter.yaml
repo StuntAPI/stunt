@@ -37,6 +37,7 @@ endpoints:
   - route: /v1/shops/{shop_id}/products/{product_id}
     method: PUT
     handler: scripts/products.star#on_update_product
+    concurrency_key: product_id # field merge is read-modify-write
   - route: /v1/shops/{shop_id}/products/{product_id}
     method: DELETE
     handler: scripts/products.star#on_delete_product
@@ -62,6 +63,7 @@ endpoints:
   - route: /v1/orders/{order_id}/send.json
     method: POST
     handler: scripts/orders.star#on_send_order
+    concurrency_key: order_id # status flip is read-modify-write
 
   # --- Webhooks ---
   - route: /v1/shops/{shop_id}/webhooks.json

@@ -42,7 +42,9 @@ Three Firebase surfaces with their distinctive shapes:
 - `GET /v1/projects/{project}/databases/(default)/documents/{collection}` → list.
 - `POST .../documents/{collection}` → create. Honors an explicit
   `?documentId=` (or body `documentId`); reusing an existing ID returns
-  **409 `ALREADY_EXISTS`** like the real API.
+  **409 `ALREADY_EXISTS`** like the real API. IDs are unique per
+  project + collection path — the same ID may exist in two collections
+  (or projects) at once, like the real API.
 - `GET .../documents/{collection}/{id}` → get.
 - `PATCH .../documents/{collection}/{id}` → upsert (existing fields are merged).
 - `DELETE .../documents/{collection}/{id}` → delete (200 with empty body;

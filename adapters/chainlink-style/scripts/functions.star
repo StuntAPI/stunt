@@ -257,31 +257,46 @@ def _fulfill_event(doc, result):
     return {
         "name": "RequestFulfilled",
         "requestId": "0x" + _hex_pad(rid, 64),
-        "subscriptionId": doc.get("subscriptionId", 0),
+        "subscriptionId": _as_int(doc.get("subscriptionId", 0)),
         "data": result,
         "gasUsed": gas_used,
         "gasUsedAndChainIdCode": str(packed),
     }
 
 # _request_view returns the public request shape (internal _-prefixed
-# timing/failure fields are stripped).
+# timing/failure fields are stripped). Numeric fields are coerced: numbers
+# re-read from the store arrive as floats, so raw passthrough would make a
+# response's types differ between a fresh doc and a re-read one.
 def _request_view(doc):
     status = doc.get("status", "queued")
     out = {
         "requestID": doc.get("requestID", ""),
         "donId": doc.get("donId", ""),
-        "subscriptionId": doc.get("subscriptionId", 0),
+        "subscriptionId": _as_int(doc.get("subscriptionId", 0)),
         "status": status,
         "encryptedSecrets": doc.get("encryptedSecrets", ""),
-        "gasLimit": doc.get("gasLimit", 500 * 1000),
+        "gasLimit": _as_int(doc.get("gasLimit", 500 * 1000)),
     }
     if status == "fulfilled":
         out["result"] = doc.get("result", "")
-        out["fulfillEvent"] = doc.get("fulfillEvent", {})
-        out["completedAt"] = doc.get("completedAt", 0)
+        out["fulfillEvent"] = _fulfill_event_view(doc)
+        out["completedAt"] = _as_int(doc.get("completedAt", 0))
     elif status == "failed":
-        out["fulfillmentCode"] = doc.get("fulfillmentCode", 2)
+        out["fulfillmentCode"] = _as_int(doc.get("fulfillmentCode", 2))
         out["fulfillmentCodeName"] = doc.get("fulfillmentCodeName", "FULFILLMENT_CODE_COMPUTED_FAILED")
         out["errorMessage"] = doc.get("errorMessage", "")
-        out["completedAt"] = doc.get("completedAt", 0)
+        out["completedAt"] = _as_int(doc.get("completedAt", 0))
     return out
+
+# _fulfill_event_view projects the persisted fulfill event with its numeric
+# fields coerced (same rationale as _request_view).
+def _fulfill_event_view(doc):
+    ev = doc.get("fulfillEvent", {})
+    return {
+        "name": ev.get("name", ""),
+        "requestId": ev.get("requestId", ""),
+        "subscriptionId": _as_int(ev.get("subscriptionId", 0)),
+        "data": ev.get("data", ""),
+        "gasUsed": _as_int(ev.get("gasUsed", 0)),
+        "gasUsedAndChainIdCode": ev.get("gasUsedAndChainIdCode", ""),
+    }

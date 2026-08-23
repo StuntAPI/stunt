@@ -56,7 +56,7 @@ def _list_path(req, project, path):
             result.append(_document_entity(d, project))
     page, next_cursor = _list_page(req, result)
     if page == None:
-        return _err(400, "INVALID_ARGUMENT", "Invalid page token.")
+        return _err(400, 400, "Invalid page token.", "INVALID_ARGUMENT")
     body = {"documents": page}
     if next_cursor != None:
         body["nextPageToken"] = next_cursor
@@ -83,6 +83,12 @@ def on_create_subdocument(req):
     path = p.get("collection", "") + "/" + p.get("document", "") + "/" + p.get("sub", "")
     return _create_path(req, p.get("project", ""), path)
 
+# _doc_key is the storage key of a document: project + collection path +
+# id, because real Firestore scopes document ids per collection path — the
+# same id may exist in two collections (or projects) at once.
+def _doc_key(project, path, doc_id):
+    return project + "|" + path + "|" + doc_id
+
 # _create_path creates a document under a relative collection path,
 # honoring an explicit documentId (query param first, then body field).
 def _create_path(req, project, path):
@@ -107,14 +113,15 @@ def _create_path(req, project, path):
 
     dc = store_collection("documents")
     if doc_id != "":
-        if dc.get(doc_id) != None:
+        if dc.get(_doc_key(project, path, doc_id)) != None:
             return _err(409, 409, "Document already exists: " + path + "/" + doc_id, "ALREADY_EXISTS")
     else:
         seq = store_kv_incr("fb", "doc_seq")
         doc_id = "doc-" + _pad6(seq)
 
     doc = {
-        "id": doc_id,
+        "id": _doc_key(project, path, doc_id),
+        "docId": doc_id,
         "project": project,
         "collection": path,
         "fields": fields,
@@ -142,13 +149,12 @@ def on_get_subdocument(req):
     path = p.get("collection", "") + "/" + p.get("document", "") + "/" + p.get("sub", "")
     return _get_path(p.get("project", ""), path, p.get("id", ""))
 
-# _get_path fetches a document by relative collection path + id.
+# _get_path fetches a document by relative collection path + id (the
+# storage key already encodes the project and path, so a miss is a 404).
 def _get_path(project, path, doc_id):
     dc = store_collection("documents")
-    doc = dc.get(doc_id)
+    doc = dc.get(_doc_key(project, path, doc_id))
     if doc == None:
-        return _err(404, 404, "Document not found: " + path + "/" + doc_id, "NOT_FOUND")
-    if doc.get("collection", "") != path or doc.get("project", "") != project:
         return _err(404, 404, "Document not found: " + path + "/" + doc_id, "NOT_FOUND")
     return respond(200, _document_entity(doc, project))
 
@@ -171,15 +177,13 @@ def on_delete_subdocument(req):
     path = p.get("collection", "") + "/" + p.get("document", "") + "/" + p.get("sub", "")
     return _delete_path(p.get("project", ""), path, p.get("id", ""))
 
-# _delete_path deletes a document after validating its path/project.
+# _delete_path deletes a document identified by its path-scoped key.
 def _delete_path(project, path, doc_id):
     dc = store_collection("documents")
-    doc = dc.get(doc_id)
-    if doc == None:
+    key = _doc_key(project, path, doc_id)
+    if dc.get(key) == None:
         return _err(404, 404, "Document not found: " + path + "/" + doc_id, "NOT_FOUND")
-    if doc.get("collection", "") != path or doc.get("project", "") != project:
-        return _err(404, 404, "Document not found: " + path + "/" + doc_id, "NOT_FOUND")
-    dc.delete(doc_id)
+    dc.delete(key)
     return respond(200, {})
 
 # on_upsert_document creates or updates a document by id (PATCH = upsert).
@@ -212,7 +216,8 @@ def _upsert_path(req, project, path, doc_id):
         fields = {}
 
     dc = store_collection("documents")
-    existing = dc.get(doc_id)
+    key = _doc_key(project, path, doc_id)
+    existing = dc.get(key)
 
     if existing != None:
         # Update existing document fields (merge).
@@ -223,13 +228,14 @@ def _upsert_path(req, project, path, doc_id):
             merged[k] = fields[k]
         existing["fields"] = merged
         existing["updateTime"] = clock.now_rfc3339()
-        dc.delete(doc_id)
+        dc.delete(key)
         dc.insert(existing)
         return respond(200, _document_entity(existing, project))
 
     # Create new document with the given id.
     doc = {
-        "id": doc_id,
+        "id": key,
+        "docId": doc_id,
         "project": project,
         "collection": path,
         "fields": fields,
@@ -284,6 +290,10 @@ def on_run_query(req):
         rows.append(row)
 
     flt = []
+    # ARRAY_CONTAINS is filtered inline below: query_select's "contains" is
+    # a substring op over strings, not array membership.
+    array_field = ""
+    array_value = None
     where = sq.get("where", None)
     if where != None:
         ff = where.get("fieldFilter", None)
@@ -293,11 +303,25 @@ def on_run_query(req):
         field_path = ""
         if field_obj != None:
             field_path = field_obj.get("fieldPath", "")
-        op = _map_query_op(ff.get("op", ""))
-        if op == "":
-            return _err(400, 400, "Unsupported where op: " + ff.get("op", ""), "INVALID_ARGUMENT")
-        value = _firestore_unwrap_value(ff.get("value", None))
-        flt.append([field_path, op, value])
+        raw_op = ff.get("op", "")
+        if raw_op == "ARRAY_CONTAINS":
+            array_field = field_path
+            array_value = _firestore_unwrap_value(ff.get("value", None))
+        else:
+            op = _map_query_op(raw_op)
+            if op == "":
+                return _err(400, 400, "Unsupported where op: " + raw_op, "INVALID_ARGUMENT")
+            value = _firestore_unwrap_value(ff.get("value", None))
+            flt.append([field_path, op, value])
+
+    if array_field != "":
+        # Array membership: only list-valued fields carrying the value match.
+        kept = []
+        for row in rows:
+            v = row.get(array_field, None)
+            if v != None and _is_list(v) and array_value in v:
+                kept.append(row)
+        rows = kept
 
     order_by = ""
     order_dir = ""
@@ -372,9 +396,10 @@ def _query_num(v):
 # --- helpers ---
 
 # _document_entity builds the Firestore document response shape with the
-# full resource name (works for flat and nested collection paths).
+# full resource name (works for flat and nested collection paths). docId is
+# the client-visible id; doc["id"] is the internal path-scoped storage key.
 def _document_entity(doc, project):
-    name = "projects/" + project + "/databases/(default)/documents/" + doc.get("collection", "") + "/" + doc["id"]
+    name = "projects/" + project + "/databases/(default)/documents/" + doc.get("collection", "") + "/" + doc.get("docId", doc["id"])
     return {
         "name": name,
         "fields": doc.get("fields", {}),

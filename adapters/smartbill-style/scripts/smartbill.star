@@ -111,7 +111,8 @@ def on_invoice_paymentstatus(req):
         if p.get("canceled", False):
             continue
         for inv in p.get("invoicesList", []):
-            if str(inv.get("seriesName", "")) == str(series) and str(inv.get("number", "")) == str(number):
+            # Stored ints round-trip as floats; match numerically or str(1.0) misses "1".
+            if str(inv.get("seriesName", "")) == str(series) and _num_key(inv.get("number", "")) == _num_key(number):
                 paid = paid + to_num(p.get("value", 0))
     paid = round2(paid)
     unpaid = round2(total - paid)
@@ -246,7 +247,9 @@ def on_payment_add(req):
     body = body_of(req)
     if body == None:
         return bad_body()
-    p = body.get("payment", {})
+    # Missing must not default to {} — the guard would be unreachable and a
+    # bare body would fall through to the cif error instead.
+    p = body.get("payment")
     if p == None or type(p) != "dict":
         return api_error(422, "The payment field is required.")
     company, err = require_cif(req, account, p.get("companyVatCode", ""))
@@ -340,7 +343,8 @@ def on_document_send(req):
     body = body_of(req)
     if body == None:
         return bad_body()
-    sr = body.get("sendDocumentRequest", {})
+    # Same reachability rule as the payment envelope: missing is an error, not {}.
+    sr = body.get("sendDocumentRequest")
     if sr == None or type(sr) != "dict":
         return api_error(422, "The sendDocumentRequest field is required.")
     company, err = require_cif(req, account, sr.get("companyVatCode", ""))
@@ -405,7 +409,8 @@ def on_sim_company_create(req):
     if doc["cif"] == "":
         return api_error(422, "cif is required")
     companies().insert(doc)
-    return respond(201, strip_internal(doc))
+    # Echo the registered pair directly; strip_internal drops cif as a scope key.
+    return respond(201, {"cif": doc["cif"], "name": doc["name"]})
 
 def on_sim_stock_movement(req):
     # Stands in for warehouse operations driven by the SmartBill UI (the API

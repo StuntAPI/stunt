@@ -34,6 +34,8 @@ adapters:
       - "Task state derives from the clock — IN_PROGRESS at +1s, COMPLETE at +3s"
       - "simulate_fail in the task body is a simulator-only trigger (real Anaplan has none)"
       - "PUT file upload is the same surface as POST; /jobs aliases /tasks"
+      - "links[0].href pinned to api.anaplan.com regardless of request host"
+      - "Unknown workspace/model scope returns 200 + empty items rather than 404"
     missing:
       - "No line-item, list, view, or module-data endpoints — data moves via CSV only"
       - "No file DELETE; no workspace or model CRUD (catalogs are read-only)"
@@ -67,6 +69,9 @@ adapters:
     deviations:
       - "Developer JWT signature not verified — structural check plus exact-string token registry"
       - "Music-User-Token accepts any non-empty value — no real user-token validation"
+      - "Only registered developer tokens pass the gate; real Apple accepts any properly signed ES256 token"
+      - "Storefront codes are validated but do not scope the catalog (gb == us)"
+      - "Library lists carry a meta.total the real API does not return"
     missing:
       - "No music-videos, stations, genres, or curators catalog endpoints"
       - "No storefronts endpoint (GET /v1/storefronts)"
@@ -149,6 +154,9 @@ adapters:
       - "Run state derives from clock — inProgress at +1s, completed/succeeded at +3s"
       - "simulate_fail run parameter (templateParameters or top-level) forces result failed"
       - "Run-state webhooks may double-emit when list/bulk reads race single-run polls"
+      - "A non-JSON versionDescriptor is silently ignored (falls back to the default branch); real ADO 400s"
+      - "Items always returns the JSON envelope with inline content; real ADO serves raw bytes for single items"
+      - "A no-op replace patch skips the rev bump and audit fields"
     missing:
       - "No WIQL OR predicates, @Me/@Project macros, or non-WorkItems FROM targets"
       - "No work-item comments, links/attachments, or revisions endpoints"
@@ -157,6 +165,7 @@ adapters:
       - "No repo create, refs/branch ops, pull requests, or tags"
       - "No team-settings writes — iterations are list-only, no boards/columns"
       - "No service-hook list/update/delete or publisher/consumer discovery"
+      - "No project-create and no pull-request routes (repos/pushes/commits/items only)"
   azure-servicebus-style:
     deviations:
       - "Default 30s peek-lock, overridable via simulator-only lockduration query param"
@@ -236,6 +245,8 @@ adapters:
       - "Functions requests: queued 0-1s, running 1-3s, fulfilled at +3s (derive-on-read)"
       - "createRequest accepts simulate_fail to inject failures; real sandbox has no trigger"
       - "keeper performs are derived on read per elapsed cadence tick; real network performs on-chain"
+      - "invalid_cursor error code is lowercase while every other code is SCREAMING_SNAKE"
+      - "CCIP lane status is active with ramp addresses for any src/dst pair, including nonexistent chains"
     missing:
       - "No Functions subscription management: create, fund, update, cancel subscription"
       - "No Functions requests listing or DON listing endpoints"
@@ -412,6 +423,9 @@ adapters:
       - "Any non-empty bearer accepted; missing/malformed header is a genuine 401"
       - "POST /entities/{c}/archive takes JSON; the real endpoint is multipart"
       - "Webhook HMAC uses fixed secret fic-stunt-webhook-signing-secret"
+      - "DELETE returns bare {}; real API wraps delete responses in {data: ...}"
+      - "Webhook deliveries use a platform envelope, not CloudEvents (ce-* headers, JWT bearer)"
+      - "Update events are generalized <category>.update; real API uses per-document-kind types"
     missing:
       - "OAuth2 token dance not implemented (no authorize or token endpoints)"
       - "No e-invoice send/retrieve side effects or email dispatch"
@@ -423,6 +437,9 @@ adapters:
       - "Auth checks credential presence only; Bearer or key value never validated"
       - "FCM topic :subscribe/:unsubscribe stand in for the Instance ID API"
       - "GET .../messages lists sent messages — simulator extension, no real endpoint"
+      - "securetoken /v1/token errors use the Identity Toolkit envelope; real securetoken answers OAuth-style {error: invalid_grant}"
+      - "securetoken access_token mirrors id_token; real Firebase mints distinct tokens"
+      - "signUp includes registered:true and an empty displayName (real API emits those on sign-in only)"
     missing:
       - "No Realtime Database, Cloud Storage, or App Check surfaces"
       - "No password reset (sendOobCode), account update/delete, or phone auth"
@@ -685,12 +702,16 @@ adapters:
       - "Webhook deliveries unsigned; real PayPal uses a certificate-based signature scheme"
       - "verify-webhook-signature returns SUCCESS for any known webhook_id, no real check"
       - "Refund derives terminal state on read after fixed ~3s (PENDING to COMPLETED/FAILED)"
+      - "Token endpoint validates only the Basic scheme — any credentials mint, grant_type ignored"
+      - "Captures always complete immediately; no PENDING/ON_HOLD capture states"
+      - "Idempotency replay re-renders the order's current state, not the cached original response"
     missing:
       - "No PATCH order update (PATCH /v2/checkout/orders/{id})"
       - "No payouts API (POST /v1/payments/payouts)"
       - "No disputes API (/v1/customer/disputes)"
       - "No subscriptions, billing plans, or catalog products APIs"
       - "No webhook event-types list or simulate-event endpoints"
+      - "No order patch endpoint (PATCH /v2/checkout/orders/{id})"
   persona-style:
     deviations:
       - "Fixed clock lifecycle: created (0-1s), pending (1-3s), completed or declined (+3s)"
@@ -753,6 +774,9 @@ adapters:
   printify-style:
     deviations:
       - "Webhook without a secret signs with built-in mock secret stunt_mock_potify_webhook_secret"
+      - "List envelopes are a stunt invention with hardcoded current_page/per_page/last_page; real Printify returns bare arrays"
+      - "total_price is a synthetic whole number (qty x 20); real prices are per-variant cent strings"
+      - "The order list is global across shops; real Printify lists orders shop-scoped"
     missing:
       - "No shops endpoints (GET /v1/shops.json); shop_id is a path placeholder"
       - "No image uploads (POST /v1/uploads/images.json)"
@@ -774,6 +798,8 @@ adapters:
       - "simulate_fail: true in POST /payments forces RJCT (simulator-only trigger)"
       - "Signed transition webhooks are a simulator extension; NextGenPSD2 defines none"
       - "scaRedirect _links URL is synthetic — no real bank SCA login page behind it"
+      - "DELETE consent returns 200 + body; real NextGenPSD2 returns 204 No Content"
+      - "PARAMETER_MISSING-<FIELD> error codes are simulator conventions, not the official code list"
     missing:
       - "No Confirmation of Funds (POST /v1/funds-confirmations)"
       - "No card accounts (GET /v1/card-accounts and card transactions)"
@@ -897,12 +923,12 @@ adapters:
       - "Only message, channel_created, reaction_added events; no app_mention or team_join"
   smartbill-style:
     deviations:
-      - "Money and quantities are decimal strings; real SmartBill uses JSON numbers"
-      - "Invoice/estimate/purchase list endpoints are sim-only; the real API has none"
-      - "Simplified shapes: series not seriesname; keyed arrays, not the real {list:[...]}"
       - "paymentId on POST /invoice/payment is a simulator extension for the delete flow"
-      - "Payment create skips the real {payment:{companyVatCode,value,type,isCash}} envelope"
+      - "/tax and /series require no cif (real SmartBill scopes both per company)"
+      - "cif falls back to ?cif= for POST bodies; the real API takes companyVatCode from the body only"
+      - "Overpaid invoices report paidAmount above total and a zero-total invoice can never read paid"
     missing:
+      - "No invoice/estimate/purchase list endpoints"
       - "No PDF rendering, e-Factura (ANAF SPV) transmission, or email/SMS delivery"
       - "No GET /invoice/paymentstatus (paidAmount/unpaidAmount/paid reporting)"
   sqs-style:

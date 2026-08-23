@@ -81,7 +81,8 @@ def on_get_webhook(req):
     doc = wc.get(wid)
     if doc == None:
         return respond(404, {"status": 404, "message": "webhook not found"})
-    return respond(200, doc)
+    # Masked view, like create/list: the secret is write-only.
+    return respond(200, _webhook_view(doc))
 
 # on_delete_webhook removes a webhook subscription; its topic is no longer
 # delivered or signed.

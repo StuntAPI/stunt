@@ -104,9 +104,15 @@ def on_get_task(req):
         return err
 
     task_id = req["params"]["taskId"]
+    ws = req["params"]["workspaceId"]
+    mid = req["params"]["modelId"]
     tc = store_collection("tasks")
     for task in tc.list():
         if task.get("id") == task_id:
+            # The route is model-scoped: a task belonging to another model is
+            # indistinguishable from a missing one (404), like the real API.
+            if task.get("workspaceId", "") != ws or task.get("modelId", "") != mid:
+                break
             state = _advance_task(task_id, task)
             resp = {
                 "taskId": task.get("id", ""),

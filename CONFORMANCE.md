@@ -21,7 +21,7 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**98 adapters** — 2 SDK+VM, 34 SDK-only, 8 VM-only, 54 boot-tier.
+**98 adapters** — 2 SDK+VM, 34 SDK-only, 18 VM-only, 44 boot-tier.
 
 **43 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.
 
@@ -30,10 +30,10 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |
 |---|---|---|---|---|---|---|---|
 | [adyen-style](adapters/adyen-style/) | Adyen Checkout + Notification API `v68` | 14 | boot | — | — | [4](#adyen-style) | [4](#adyen-style) |
-| [anaplan-style](adapters/anaplan-style/) | Anaplan API `2.0` | 18 | boot | — | — | [4](#anaplan-style) | [3](#anaplan-style) |
+| [anaplan-style](adapters/anaplan-style/) | Anaplan API `2.0` | 18 | VM | — | — | [4](#anaplan-style) | [5](#anaplan-style) |
 | [apple-apns-style](adapters/apple-apns-style/) | Apple Push Notification service (APNs) `v2` | 2 | boot | — | — | [4](#apple-apns-style) | [2](#apple-apns-style) |
 | [apple-appstoreconnect-style](adapters/apple-appstoreconnect-style/) | App Store Connect API `v3` | 15 | boot | — | — | [7](#apple-appstoreconnect-style) | [5](#apple-appstoreconnect-style) |
-| [apple-music-style](adapters/apple-music-style/) | Apple Music API `1.0` | 18 | boot | — | — | [5](#apple-music-style) | [2](#apple-music-style) |
+| [apple-music-style](adapters/apple-music-style/) | Apple Music API `1.0` | 18 | VM | — | — | [5](#apple-music-style) | [5](#apple-music-style) |
 | [apple-searchads-style](adapters/apple-searchads-style/) | Apple Search Ads API `v4` | 12 | boot | — | — | [4](#apple-searchads-style) | [3](#apple-searchads-style) |
 | [apps-script-style](adapters/apps-script-style/) | Google Apps Script API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 6 | [2](#apps-script-style) | [3](#apps-script-style) |
 | [auth0-style](adapters/auth0-style/) | Auth0 Authentication & Management API `v2` | 17 | VM | — | — | [3](#auth0-style) | [4](#auth0-style) |
@@ -41,14 +41,14 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [aws-cognito-style](adapters/aws-cognito-style/) | Amazon Cognito Identity Provider API `2016-04-18` | 7 | VM | — | — | [6](#aws-cognito-style) | [3](#aws-cognito-style) |
 | [aws-iam-sts-style](adapters/aws-iam-sts-style/) | AWS STS + IAM API `2011-06-15` | 2 | SDK | aws-sdk-go-v2 @ v1.43.7 | 2 | [3](#aws-iam-sts-style) | [3](#aws-iam-sts-style) |
 | [aws-s3-style](adapters/aws-s3-style/) | Amazon S3 API `2006-03-01` | 8 | SDK | aws-sdk-go-v2 @ v1.43.7 | 6 | [5](#aws-s3-style) | [5](#aws-s3-style) |
-| [azure-devops-style](adapters/azure-devops-style/) | Azure DevOps REST API `7.1` | 17 | boot | — | — | [7](#azure-devops-style) | [3](#azure-devops-style) |
+| [azure-devops-style](adapters/azure-devops-style/) | Azure DevOps REST API `7.1` | 17 | VM | — | — | [8](#azure-devops-style) | [6](#azure-devops-style) |
 | [azure-servicebus-style](adapters/azure-servicebus-style/) | Azure Service Bus + Storage `2024-01-01` | 18 | VM | — | — | [6](#azure-servicebus-style) | [3](#azure-servicebus-style) |
 | [azure-storage-style](adapters/azure-storage-style/) | Azure Storage Blob REST API `2024-08-04` | 9 | VM | — | — | [6](#azure-storage-style) | [3](#azure-storage-style) |
 | [blog-style](adapters/blog-style/) | GraphQL demo `1.0` | 0 +GQL | boot | — | — | — | — |
 | [bluesky-style](adapters/bluesky-style/) | Bluesky AT Protocol `com.atproto (2024-Q4)` | 7 | SDK | atproto @ 0.20.41 (floor) | 8 | [7](#bluesky-style) | [4](#bluesky-style) |
 | [braintree-style](adapters/braintree-style/) | Braintree GraphQL + REST API `2024-09-01` | 15 +GQL | boot | — | — | [8](#braintree-style) | [5](#braintree-style) |
 | [braze-style](adapters/braze-style/) | Braze REST API `2.0` | 12 | boot | — | — | [8](#braze-style) | [4](#braze-style) |
-| [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | boot | — | — | [6](#chainlink-style) | [5](#chainlink-style) |
+| [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | VM | — | — | [6](#chainlink-style) | [7](#chainlink-style) |
 | [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | SDK | cloudflare-go @ v0.117.0 | 7 | [8](#cloudflare-style) | [6](#cloudflare-style) |
 | [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | boot | — | — | [6](#cloudkit-style) | [2](#cloudkit-style) |
 | [discord-style](adapters/discord-style/) | Discord API `v10` | 26 (+1 ws) | SDK | discord-node @ 2.6.3 (floor) | 5 | [8](#discord-style) | [5](#discord-style) |
@@ -63,8 +63,8 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | boot | — | — | [3](#escrow-style) | [1](#escrow-style) |
 | [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | SDK | go-ethereum @ v1.17.5 | 5 | [5](#eth-jsonrpc-style) | [4](#eth-jsonrpc-style) |
 | [etherscan-style](adapters/etherscan-style/) | Etherscan API `1.0` | 1 | boot | — | — | [3](#etherscan-style) | [1](#etherscan-style) |
-| [fattureincloud-style](adapters/fattureincloud-style/) | Fatture in Cloud API v2 `2.0.29` | 42 | boot | — | — | [3](#fattureincloud-style) | [3](#fattureincloud-style) |
-| [firebase-style](adapters/firebase-style/) | Firebase Auth + Firestore + Cloud Messaging API `v1` | 22 | boot | — | — | [4](#firebase-style) | [5](#firebase-style) |
+| [fattureincloud-style](adapters/fattureincloud-style/) | Fatture in Cloud API v2 `2.0.29` | 42 | VM | — | — | [3](#fattureincloud-style) | [6](#fattureincloud-style) |
+| [firebase-style](adapters/firebase-style/) | Firebase Auth + Firestore + Cloud Messaging API `v1` | 22 | VM | — | — | [4](#firebase-style) | [8](#firebase-style) |
 | [ga4-style](adapters/ga4-style/) | Google Analytics Data API + Admin API `v1beta` | 7 | SDK | google-api-go-client @ v0.293.0 | 7 | [4](#ga4-style) | [3](#ga4-style) |
 | [gcalendar-style](adapters/gcalendar-style/) | Google Calendar API `v3` | 10 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#gcalendar-style) | [2](#gcalendar-style) |
 | [gdocs-style](adapters/gdocs-style/) | Google Docs API `v1` | 5 | SDK | google-api-go-client @ v0.293.0 | 5 | [3](#gdocs-style) | [5](#gdocs-style) |
@@ -90,16 +90,16 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [oneinch-style](adapters/oneinch-style/) | 1inch Aggregation Protocol API `v6.0` | 5 | boot | — | — | [3](#oneinch-style) | [1](#oneinch-style) |
 | [onfido-style](adapters/onfido-style/) | Onfido API `v3.6` | 7 | boot | — | — | [5](#onfido-style) | [4](#onfido-style) |
 | [opensea-style](adapters/opensea-style/) | OpenSea API `2.0.0` | 7 | boot | — | — | [4](#opensea-style) | [1](#opensea-style) |
-| [paypal-style](adapters/paypal-style/) | PayPal Orders API `v2` | 17 | boot | — | — | [5](#paypal-style) | [5](#paypal-style) |
+| [paypal-style](adapters/paypal-style/) | PayPal Orders API `v2` | 17 | VM | — | — | [6](#paypal-style) | [8](#paypal-style) |
 | [persona-style](adapters/persona-style/) | Persona Inquiry API `2023-01-05` | 5 | boot | — | — | [5](#persona-style) | [4](#persona-style) |
 | [photos-style](adapters/photos-style/) | Google Photos Library API `v1` | 12 | boot | — | — | [5](#photos-style) | [2](#photos-style) |
 | [pinata-style](adapters/pinata-style/) | Pinata API `1.0` | 6 | boot | — | — | [4](#pinata-style) | — |
 | [plaid-style](adapters/plaid-style/) | Plaid API `2020-09-14` | 13 | SDK | plaid-node @ 32.0.0 (floor) | 4 | [5](#plaid-style) | [3](#plaid-style) |
 | [powerplatform-style](adapters/powerplatform-style/) | Microsoft Power Platform API `2` | 9 | boot | — | — | [4](#powerplatform-style) | [3](#powerplatform-style) |
 | [printful-style](adapters/printful-style/) | Printful API `v2` | 13 | boot | — | — | [5](#printful-style) | [1](#printful-style) |
-| [printify-style](adapters/printify-style/) | Printify API `v1` | 16 | boot | — | — | [5](#printify-style) | [1](#printify-style) |
+| [printify-style](adapters/printify-style/) | Printify API `v1` | 16 | VM | — | — | [5](#printify-style) | [4](#printify-style) |
 | [producthunt-style](adapters/producthunt-style/) | Product Hunt GraphQL API `2` | 0 +GQL | boot | — | — | [3](#producthunt-style) | [2](#producthunt-style) |
-| [psd2-style](adapters/psd2-style/) | Open Banking / PSD2 (Berlin Group NextGenPSD2) `1.3.6` | 19 | boot | — | — | [6](#psd2-style) | [5](#psd2-style) |
+| [psd2-style](adapters/psd2-style/) | Open Banking / PSD2 (Berlin Group NextGenPSD2) `1.3.6` | 19 | VM | — | — | [6](#psd2-style) | [7](#psd2-style) |
 | [qbo-style](adapters/qbo-style/) | QuickBooks Online API `v3` | 11 | boot | — | — | [6](#qbo-style) | [1](#qbo-style) |
 | [reddit-style](adapters/reddit-style/) | Reddit API `1.0` | 2 | boot | — | — | [5](#reddit-style) | [1](#reddit-style) |
 | [resend-style](adapters/resend-style/) | Resend API `1.0.0` | 6 | SDK | resend-node @ 6.22.0 (floor) | 4 | [6](#resend-style) | [3](#resend-style) |
@@ -110,7 +110,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [shopify-style](adapters/shopify-style/) | Shopify Admin REST + GraphQL API `2024-10` | 21 +GQL | SDK | go-shopify/v4 @ v4.7.0 | 5 | [7](#shopify-style) | [4](#shopify-style) |
 | [signin-with-apple-style](adapters/signin-with-apple-style/) | Sign in with Apple `v2` | 3 | boot | — | — | [3](#signin-with-apple-style) | [2](#signin-with-apple-style) |
 | [slack-style](adapters/slack-style/) | Slack Web API `1.0` | 7 | SDK | slack-node @ 7.19.0 (floor) | 4 | [6](#slack-style) | [2](#slack-style) |
-| [smartbill-style](adapters/smartbill-style/) | SmartBill Cloud API `1.0` | 18 | boot | — | — | [2](#smartbill-style) | [5](#smartbill-style) |
+| [smartbill-style](adapters/smartbill-style/) | SmartBill Cloud API `1.0` | 18 | VM | — | — | [3](#smartbill-style) | [4](#smartbill-style) |
 | [sqs-style](adapters/sqs-style/) | Amazon SQS API `2012-11-05` | 2 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 6 | [4](#sqs-style) | [5](#sqs-style) |
 | [square-style](adapters/square-style/) | Square API `2024-08-21` | 18 | SDK | square-node @ 45.1.0 (floor) | 4 | [7](#square-style) | [2](#square-style) |
 | [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.3.0<br>stripe-node @ 22.5.0 (floor) | 9 | [7](#stripe-style) | [5](#stripe-style) |
@@ -542,6 +542,51 @@ What the engine-level suites in `adapters/<name>_style_test.go` assert — the
 adapter's real handlers execute against the real engine; no SDK is involved.
 Named by their `// =====` section markers.
 
+**anaplan-style**
+
+- missing or unrecognized credentials draw the 401 failure envelope
+- the workspace list is seeded with Anaplan paging metadata
+- paging walks the opaque offset cursor and rejects a bad token
+- models are workspace-scoped and a single model round-trips or 404s
+- catalog lists serve the seeded per-model action catalog
+- a full-body upload replaces file content byte-exact on POST and PUT
+- chunked uploads append in order and reject gaps and malformed ranges
+- invalid identifiers and unknown files get 400/404 envelopes
+- an import task walks CREATED → NOT_STARTED → IN_PROGRESS → COMPLETE
+- completion applies the import once and the export renders the model data
+- simulate_fail completes with every row failed
+- an import over an empty upload reports no contents
+- unknown import, export, and task ids get 404 failure envelopes
+- catalog ids resolve only within their model
+- task status is scoped to its workspace and model
+
+**apple-music-style**
+
+- a missing bearer answers 401 in Apple's error envelope
+- malformed schemes, segments, algs and signatures are all 401
+- the registered deterministic developer token reads the catalog
+- the developer token dies when its registry entry expires
+- search without a term is a 400 invalid_parameter
+- results group by requested type in meta order with next links
+- the term matches names, artists and album text case-insensitively
+- unknown search and chart types are 400 invalid_parameter
+- charts order the seed by release date within each requested type
+- include=tracks embeds track resources; without it only an href
+- storefront codes are validated and normalized (US -> us)
+- unknown ids answer Apple's 404 error body
+- a known album and artist fetch with storefront-derived hrefs
+- pages walk by offset and the last partial page has no next
+- limits clamp to the endpoint default and max
+- library lists page with meta.total
+- /v1/me checks the developer JWT before the Music-User-Token
+- adding resources to the library is idempotent and validates ids
+- played bumps playCount and stamps lastPlayedDate at play time
+- recently-added lists newest first across mixed resource types
+- fields[type] projects library attributes
+- delete addresses the catalog id or the library id, then 404s
+- an unrated resource reads 0; love/dislike/clear round-trip
+- invalid values and unknown targets keep the documented shapes
+
 **auth0-style**
 
 - discovery and JWKS are self-consistent for the host
@@ -581,6 +626,32 @@ Named by their `// =====` section markers.
 - two authorize flows bind the same seeded demo-user
 - authorize never mints new users into the collection
 
+**azure-devops-style**
+
+- a missing, unknown, or non-PAT credential gets the UnauthorizedRequestException 401 envelope
+- both PAT wire forms — Basic base64(PAT:) and Bearer — authenticate
+- the projects list returns the two seeded projects in the Azure DevOps shape
+- $top/$skip walk pages each project exactly once via continuationToken, and a bad token 400s
+- creating on the typed route applies the patch document and defaults area/iteration
+- the fully-qualified $type route normalizes to the bare type
+- read-back returns the integer id; an unknown id is the WIT 404 envelope
+- a patch bumps rev, applies field ops, and refreshes audit fields
+- relations are added at - and removed by numeric index only
+- malformed patches answer the PatchOperationFailed / Argument envelopes
+- ids= returns the asked work items and fields= projects to those columns
+- WIQL ANDs string and numeric predicates and matches CONTAINS
+- ORDER BY sorts by the field and $top caps the result
+- OR and non-WorkItems FROM targets answer the 400 envelope
+- the repos list is scoped to the project
+- a push stores content that items serves at the branch and at a pinned commit
+- the commits list walks newest-first along the parent chain and filters by refName
+- git faults: unknown repo, missing path, unknown path, malformed versionDescriptor
+- pipelines list and get round-trip, and unknown ids answer 404
+- a queued run derives inProgress then completed from the clock, once each
+- simulate_fail drives the completed result to failed
+- a registered subscription receives the service-hook envelope when a work item is created
+- iterations list the two sprints and page under $top
+
 **azure-servicebus-style**
 
 - a correctly signed SAS token sends the message
@@ -599,6 +670,29 @@ Named by their `// =====` section markers.
 - ListContainers includes the container with query params signed
 - a tampered signature gets the 403 AuthenticationFailed XML envelope
 - an account outside the key table fails closed with 403
+
+**chainlink-style**
+
+- the five default feeds seed on first read and narrow by network
+- the feed summary and latestRoundData agree at the same instant
+- rounds roll one per virtual minute with phase-1 string roundIds
+- round history pages newest-first and getRoundData resolves ids
+- unknown feeds and rounds answer the documented 404 envelopes
+- v2 endpoints reject missing and wrong bearers
+- encryptSecrets is a deterministic version-0 canonical envelope
+- createSecrets bumps the slot version and never leaks plaintext
+- a request walks queued -> running -> fulfilled on the virtual clock
+- the fulfill event packs chainId << 64 | gasUsed
+- simulate_fail lands the real fulfillment-code vocabulary
+- registration validates the registry shape and funds in juels
+- the keepers network performs on cadence until the LINK runs out
+- check gates eligibility and a manual perform charges the premium
+- cadence performs interleave chronologically with manual ones
+- cancel freezes the upkeep and withdraw pays out exactly once
+- the upkeep list derives state for every entry and 404s unknown ids
+- ccip messages require the bearer token
+- lane status echoes the requested pair with its ramp addresses
+- the seeded test token dies after its ten-year virtual window
 
 **dynamodb-style**
 
@@ -636,6 +730,50 @@ Named by their `// =====` section markers.
 - get by contact id round-trips the email
 - delete removes the contact; reads 404 after
 
+**fattureincloud-style**
+
+- auth failures answer the flat OAuth envelope; any non-empty bearer passes
+- an unknown company id is the nested NOT_FOUND 404
+- document create wraps the v2 defaults, an int id, and decimal-string amounts
+- modify merges, delete clears, and the after-states keep the v2 envelope
+- the Laravel pagination envelope is exact and clamps page and per_page
+- type, date, and q filters narrow received documents inclusively
+- the metodata endpoint lists the sorted categories in use
+- subscriptions round-trip the real data.sink shape; a missing sink is a validation 400
+- deliveries are HMAC-signed, real-typed, and respect the types filter
+- F24 taxes stamp the virtual clock and flip status through the lifecycle
+
+**firebase-style**
+
+- signUp mints the Identity Toolkit token set with a padded localId
+- duplicate and email-less signUps are Firebase-coded 400s
+- password sign-in round-trips the user; bad credentials answer the real codes
+- signInWithIdp provisions a verified Google user
+- the v3 relyingparty dispatcher mirrors verifyPassword and 404s unknown actions
+- endpoints accept Bearer or key and reject anonymous requests 401
+- getAccountInfo resolves each idToken to the user it was minted for
+- unknown and empty idTokens are 401 INVALID_ID_TOKEN
+- the idToken dies at 1h while its refresh token survives
+- v3 refreshToken rotates the token pair for the bound user
+- unknown and missing refresh tokens are 400 INVALID_REFRESH_TOKEN
+- POST /v1/token exchanges a refresh token in the securetoken shape
+- the grant rejects wrong grant types and unknown tokens
+- create wraps fields in Firestore typed values under a full resource name
+- get reads the document back; unknown ids are 404 NOT_FOUND
+- PATCH merges fields, bumps updateTime, and upserts unknown ids
+- explicit documentIds are scoped per project+collection and 409 on reuse
+- delete returns an empty 200 and leaves 404s behind (its own project only)
+- list pages with pageSize/pageToken and rejects a malformed token
+- subcollections nest under their parent document path
+- runQuery filters, sorts, and limits over typed fields
+- IN and ARRAY_CONTAINS resolve over array values
+- queries are project-scoped and malformed bodies are 400 INVALID_ARGUMENT
+- a token send is stored with its recipient and answers with its resource name
+- a send must carry exactly one target
+- topic and condition sends fan out to the subscribed tokens
+- unsubscribing shrinks the fanout and a bare subscribe is a 400
+- the stored message list is project-scoped
+
 **marketo-style**
 
 - only client_credentials mints a token
@@ -644,6 +782,86 @@ Named by their `// =====` section markers.
 - get by id round-trips the fields
 - createOrUpdate dedupes by email in place
 - batchSize/nextPageToken paging walks leads without overlap
+
+**paypal-style**
+
+- client_credentials over Basic auth mints a distinct Bearer with PayPal's token envelope
+- the minted bearer authorizes the Orders API
+- minting without HTTP Basic client auth is a 401 AUTHENTICATION_FAILURE envelope
+- a bearer that was never minted is rejected with 401
+- the advertised 9-hour expires_in is enforced — the token dies past it
+- any Basic credentials mint a token — no client registry (deviation, asserted as-is)
+- create assigns ORDERID-N, stamps create_time, and echoes intent + purchase_units
+- a CREATED order carries self/approve/capture links
+- get round-trips the order; unknown ids are 404 INVALID_RESOURCE_ID
+- orders are accepted without purchase_units — no create-time validation (deviation, asserted as-is)
+- capture or authorize before payer approval is 422 ORDER_NOT_APPROVED
+- simulate_fail approval keeps the order CREATED with 422 PAYER_ACTION_REQUIRED
+- approval flips CREATED -> APPROVED and swaps in capture/authorize links
+- re-approval is idempotent
+- capture completes the order and embeds a COMPLETED capture in purchase_units
+- the capture resource is readable via the payments API
+- re-capturing the order is 422 ORDER_ALREADY_CAPTURED
+- authorize completes the order and lands a CREATED authorization
+- re-authorizing the order is 422 ORDER_ALREADY_AUTHORIZED
+- GET shows the auth with a 3-day honor window from the virtual clock
+- reauthorize refreshes the honor window and syncs the embedded order copy
+- void is 204, moves the auth to VOIDED, and syncs the order
+- a voided authorization rejects every action with 422
+- malformed, mismatched-currency, and over-authorization amounts are 400s with real issue codes
+- a partial capture keeps final_capture false and moves the auth to CAPTURED
+- the capture is appended to the order and links up to the authorization
+- a captured authorization is terminal
+- refunds are created PENDING and reserve the unrefunded balance
+- the 3-second settle window flips PENDING -> COMPLETED on read
+- the settled refund is reported as refunded_amount on the capture
+- a FAILED refund frees the balance again
+- PayPal-Request-Id replays return the same order
+- a replay returns the order's current state, not a cached snapshot (deviation, asserted as-is)
+- requests without the header (or with a new one) are not deduplicated
+- webhook registration round-trips through the list
+- signature verification answers SUCCESS only for known webhook ids
+- deletion is 204, and repeats are 404
+
+**printify-style**
+
+- a missing or non-Bearer Authorization is a flat 401 at every surface
+- the static catalog serves both blueprints and their variant tables
+- product create mints sequential hex ids for each blueprint/provider pair
+- product lists are shop-scoped and walk the page cursor without repeats
+- update merges under the clock and delete leaves a flat 404
+- both order-create route forms build the same priced pending document
+- order polling strips .json and send flips it to fulfilled
+- the global order list pages by limit/page and rejects garbage cursors
+- webhook secrets stay masked through every read, and delete leaves a flat 404
+- deliveries are HMAC-signed by the subscribing hook's own secret
+
+**psd2-style**
+
+- the tpp token endpoint mints a bearer; other grants and missing or unknown bearers are rejected
+- a created consent answers 201 received with self and startAuthorisation links, and reads back
+- the sca redirect flow advances one hop per PUT: started → psuAuthenticated → scaReceived
+- an update carrying neither method nor OTP is a 400 PARAMETER_INVALID that leaves the chain put
+- after the 1s challenge window a read derives finalised and the consent reads valid
+- delete terminates the consent and consent-bound reads then reject it
+- account reads require a valid consent: 401 CONSENT_INVALID without one
+- a valid consent unlocks the seeded account list with per-account links
+- withBalance=true embeds an interimBooked balance in each account entry
+- the balances read returns interimBooked and forwardAvailable pairs and 404s unknown accounts
+- the transaction report requires bookingStatus and dateFrom
+- bookingStatus splits booked from pending and dateFrom/dateTo bound the report
+- a restricted consent scopes the account list and 404s uncovered reads
+- a consent past its validUntil finalises but gates reads with 401 CONSENT_EXPIRED
+- with no Consent-ID header, only-expired consents still answer CONSENT_EXPIRED
+- an unknown Consent-ID is 400 CONSENT_INVALID; a not-yet-finalised one is 401 CONSENT_INVALID
+- page/size walks every account exactly once with a next link only between pages
+- the next href round-trips the caller's other query params (withBalance)
+- a malformed page cursor is 400 FORMAT_ERROR; a cursor past the end is an empty last page
+- the tpp bearer dies at its 3600s expires_in with 401 TOKEN_EXPIRED
+- a payment validates its product and amount before answering 201 RCVD with startAuthorisation
+- the payment SCA chain mirrors the consent chain and finalises on read
+- the transaction status walks RCVD → ACTC → ACSC on the clock and terminal payments refuse cancellation
+- a non-terminal payment cancels to 204/CANC and simulate_fail drives RJCT
 
 **servicenow-style**
 
@@ -656,6 +874,34 @@ Named by their `// =====` section markers.
 - tables are isolated from each other
 - unknown sys_id and unknown table are 404
 - delete removes the record for good
+
+**smartbill-style**
+
+- requests without credentials are turned away with the errorText envelope
+- non-Basic schemes, malformed base64, and colon-less pairs are 401, never a 5xx
+- any username:token Basic pair is accepted, under any header case
+- the company bootstrap registers a cif and echoes it without internal fields
+- a missing cif is a 422 and an unknown cif is a plain 404
+- invoice create answers 200 with an empty body and numbers documents sequentially
+- totals are computed per line and returned as JSON numbers on read-back
+- the read-back drops internal fields and defaults issueDate from the clock
+- documents are scoped by series: the FCT number space is not the PRO one
+- cancel marks the invoice canceled and records the cancellation tax
+- restore flips the document back to active
+- canceling an unknown invoice is the 404 errorText envelope
+- a payment whose invoicesList number is a JSON number lands on its invoice
+- paymentstatus walks to paid and clamps overpayment at zero
+- deleting a payment un-pays the invoice; a second delete is 404
+- a payment body without the payment envelope is 422
+- estimates number on their own PRO counter and cancel like invoices
+- purchase invoices number on the ACH counter and carry the supplier object
+- stock movements seed quantities that read back grouped by warehouse
+- out movements decrement stock and cannot drain a product that was never in
+- productName and productCode filters narrow the grouped read
+- tax and series metadata are static {list} envelopes with no cif
+- document send records the message; a missing envelope is 422
+- undecodable and non-object bodies are a 400 errorText, never a 5xx
+- an empty body still creates when the cif rides in the query
 
 **sqs-style**
 
@@ -829,11 +1075,13 @@ behavior notes live in each adapter's README.
 - No ALM surface — revisions, comparisons, synthetic models
 - No Anaplan token service (/token/authenticate) — Basic/Bearer only
 
-**Deviations** (3)
+**Deviations** (5)
 
 - Task state derives from the clock — IN_PROGRESS at +1s, COMPLETE at +3s
 - simulate_fail in the task body is a simulator-only trigger (real Anaplan has none)
 - PUT file upload is the same surface as POST; /jobs aliases /tasks
+- links[0].href pinned to api.anaplan.com regardless of request host
+- Unknown workspace/model scope returns 200 + empty items rather than 404
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -1050,10 +1298,13 @@ behavior notes live in each adapter's README.
 - No personal playlist create or add-tracks (POST /v1/me/library/playlists)
 - No recommendations or play history (heavy-rotation, recent/played)
 
-**Deviations** (2)
+**Deviations** (5)
 
 - Developer JWT signature not verified — structural check plus exact-string token registry
 - Music-User-Token accepts any non-empty value — no real user-token validation
+- Only registered developer tokens pass the gate; real Apple accepts any properly signed ES256 token
+- Storefront codes are validated but do not scope the catalog (gb == us)
+- Library lists carry a meta.total the real API does not return
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -1574,7 +1825,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Missing** (7)
+**Missing** (8)
 
 - No WIQL OR predicates, @Me/@Project macros, or non-WorkItems FROM targets
 - No work-item comments, links/attachments, or revisions endpoints
@@ -1583,12 +1834,16 @@ behavior notes live in each adapter's README.
 - No repo create, refs/branch ops, pull requests, or tags
 - No team-settings writes — iterations are list-only, no boards/columns
 - No service-hook list/update/delete or publisher/consumer discovery
+- No project-create and no pull-request routes (repos/pushes/commits/items only)
 
-**Deviations** (3)
+**Deviations** (6)
 
 - Run state derives from clock — inProgress at +1s, completed/succeeded at +3s
 - simulate_fail run parameter (templateParameters or top-level) forces result failed
 - Run-state webhooks may double-emit when list/bulk reads race single-run polls
+- A non-JSON versionDescriptor is silently ignored (falls back to the default branch); real ADO 400s
+- Items always returns the JSON envelope with inline content; real ADO serves raw bytes for single items
+- A no-op replace patch skips the rev bump and audit fields
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -1953,13 +2208,15 @@ behavior notes live in each adapter's README.
 - No Data Streams product: stream auth, WebSocket report feeds, report upload
 - No feed timeseries/chart history endpoint beyond /rounds paging
 
-**Deviations** (5)
+**Deviations** (7)
 
 - feed rounds aggregate per 60s heartbeat vs real deviation/3600s; answers drift ±0.25%
 - DON secrets use a deterministic HMAC envelope, not real randomized ECIES encryption
 - Functions requests: queued 0-1s, running 1-3s, fulfilled at +3s (derive-on-read)
 - createRequest accepts simulate_fail to inject failures; real sandbox has no trigger
 - keeper performs are derived on read per elapsed cadence tick; real network performs on-chain
+- invalid_cursor error code is lowercase while every other code is SCREAMING_SNAKE
+- CCIP lane status is active with ramp addresses for any src/dst pair, including nonexistent chains
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -3036,11 +3293,14 @@ behavior notes live in each adapter's README.
 - No e-invoice send/retrieve side effects or email dispatch
 - No receipts, settings, or document attachment endpoints
 
-**Deviations** (3)
+**Deviations** (6)
 
 - Any non-empty bearer accepted; missing/malformed header is a genuine 401
 - POST /entities/{c}/archive takes JSON; the real endpoint is multipart
 - Webhook HMAC uses fixed secret fic-stunt-webhook-signing-secret
+- DELETE returns bare {}; real API wraps delete responses in {data: ...}
+- Webhook deliveries use a platform envelope, not CloudEvents (ce-* headers, JWT bearer)
+- Update events are generalized <category>.update; real API uses per-document-kind types
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -3129,13 +3389,16 @@ behavior notes live in each adapter's README.
 - No Firestore index management, listCollectionIds, batchGet, or listen
 - runQuery lacks composite/unary filters, offset, and startAt/endAt cursors
 
-**Deviations** (5)
+**Deviations** (8)
 
 - Firestore subcollections supported one level deep only
 - runQuery covers a structuredQuery subset: from/where/orderBy/limit, 8 filter ops
 - Auth checks credential presence only; Bearer or key value never validated
 - FCM topic :subscribe/:unsubscribe stand in for the Instance ID API
 - GET .../messages lists sent messages — simulator extension, no real endpoint
+- securetoken /v1/token errors use the Identity Toolkit envelope; real securetoken answers OAuth-style {error: invalid_grant}
+- securetoken access_token mirrors id_token; real Firebase mints distinct tokens
+- signUp includes registered:true and an empty displayName (real API emits those on sign-in only)
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -5328,21 +5591,25 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Missing** (5)
+**Missing** (6)
 
 - No PATCH order update (PATCH /v2/checkout/orders/{id})
 - No payouts API (POST /v1/payments/payouts)
 - No disputes API (/v1/customer/disputes)
 - No subscriptions, billing plans, or catalog products APIs
 - No webhook event-types list or simulate-event endpoints
+- No order patch endpoint (PATCH /v2/checkout/orders/{id})
 
-**Deviations** (5)
+**Deviations** (8)
 
 - Payer approval endpoint /approve is simulator-only; real flow is browser rel=approve
 - simulate_fail flags on approve and refund are stunt-only test hooks
 - Webhook deliveries unsigned; real PayPal uses a certificate-based signature scheme
 - verify-webhook-signature returns SUCCESS for any known webhook_id, no real check
 - Refund derives terminal state on read after fixed ~3s (PENDING to COMPLETED/FAILED)
+- Token endpoint validates only the Basic scheme — any credentials mint, grant_type ignored
+- Captures always complete immediately; no PENDING/ON_HOLD capture states
+- Idempotency replay re-renders the order's current state, not the cached original response
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -5898,9 +6165,12 @@ behavior notes live in each adapter's README.
 - No product publish/unpublish (publish.json, unpublish.json)
 - No shipping calculation or shipping-methods endpoints
 
-**Deviations** (1)
+**Deviations** (4)
 
 - Webhook without a secret signs with built-in mock secret stunt_mock_potify_webhook_secret
+- List envelopes are a stunt invention with hardcoded current_page/per_page/last_page; real Printify returns bare arrays
+- total_price is a synthetic whole number (qty x 20); real prices are per-variant cent strings
+- The order list is global across shops; real Printify lists orders shop-scoped
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -5977,13 +6247,15 @@ behavior notes live in each adapter's README.
 - No GET /v1/consents/{id}/status sub-resource
 - No payment cancellation-authorisations SCA sub-resource
 
-**Deviations** (5)
+**Deviations** (7)
 
 - SCA finalisation is derive-on-read after a fixed 1s challenge window
 - Payment status derives on read: ACTC at 1s, ACSC at 3s — fixed, not bank async
 - simulate_fail: true in POST /payments forces RJCT (simulator-only trigger)
 - Signed transition webhooks are a simulator extension; NextGenPSD2 defines none
 - scaRedirect _links URL is synthetic — no real bank SCA login page behind it
+- DELETE consent returns 200 + body; real NextGenPSD2 returns 204 No Content
+- PARAMETER_MISSING-<FIELD> error codes are simulator conventions, not the official code list
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -6743,18 +7015,18 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Missing** (2)
+**Missing** (3)
 
+- No invoice/estimate/purchase list endpoints
 - No PDF rendering, e-Factura (ANAF SPV) transmission, or email/SMS delivery
 - No GET /invoice/paymentstatus (paidAmount/unpaidAmount/paid reporting)
 
-**Deviations** (5)
+**Deviations** (4)
 
-- Money and quantities are decimal strings; real SmartBill uses JSON numbers
-- Invoice/estimate/purchase list endpoints are sim-only; the real API has none
-- Simplified shapes: series not seriesname; keyed arrays, not the real {list:[...]}
 - paymentId on POST /invoice/payment is a simulator extension for the delete flow
-- Payment create skips the real {payment:{companyVatCode,value,type,isCash}} envelope
+- /tax and /series require no cif (real SmartBill scopes both per company)
+- cif falls back to ?cif= for POST bodies; the real API takes companyVatCode from the body only
+- Overpaid invoices report paidAmount above total and a zero-total invoice can never read paid
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 

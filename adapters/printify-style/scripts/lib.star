@@ -110,6 +110,10 @@ def _synth_total(line_items):
     total = 0
     for it in line_items:
         q = it.get("quantity", 1)
+        # JSON numbers arrive as floats; coerce before the type check or a
+        # wire-sent quantity 2 prices as 1.
+        if type(q) == "float":
+            q = int(q)
         if type(q) != "int":
             q = 1
         total += q * 20
