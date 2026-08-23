@@ -260,6 +260,7 @@ func locationQueryValue(location, key string) string {
 func TestAuth0CodeFlowEndToEnd(t *testing.T) {
 	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
 
+	// ===== discovery and JWKS are self-consistent for the host =====
 	disc := f.oidcCall("on_discovery", "GET", "/.well-known/openid-configuration", nil, nil, nil)
 	if disc.Status != 200 {
 		t.Fatalf("discovery -> %d: %v", disc.Status, disc.Body)
@@ -287,6 +288,7 @@ func TestAuth0CodeFlowEndToEnd(t *testing.T) {
 		t.Fatalf("jwks key missing modulus/exponent: %v", key)
 	}
 
+	// ===== authorize issues a code; the grant mints a real RS256 token pair =====
 	auth := f.oidcCall("on_authorize", "GET", "/authorize", map[string]any{
 		"client_id":     auth0ClientID,
 		"redirect_uri":  auth0RedirectURI,
@@ -333,6 +335,7 @@ func TestAuth0CodeFlowEndToEnd(t *testing.T) {
 		t.Fatalf("code grant returned no refresh_token: %v", tokResp.Body)
 	}
 
+	// ===== userinfo resolves the token to the seeded user; login_hint picks another =====
 	// The default authorize subject is the first seeded user.
 	ui := f.oidcCall("on_userinfo", "GET", "/userinfo", nil, nil,
 		map[string]any{"Authorization": "Bearer " + access})
@@ -357,6 +360,7 @@ func TestAuth0CodeFlowEndToEnd(t *testing.T) {
 		t.Fatalf("login_hint flow userinfo = %d %v", ui2.Status, ui2.Body)
 	}
 
+	// ===== spent and mismatched-redirect codes answer invalid_grant =====
 	// The authorization code is single-use.
 	replay := f.oidcCall("on_token", "POST", "/oauth/token", nil, map[string]any{
 		"grant_type":    "authorization_code",
@@ -399,6 +403,7 @@ func TestAuth0CodeFlowEndToEnd(t *testing.T) {
 func TestAuth0AuthCodeExpiry(t *testing.T) {
 	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
 
+	// ===== authorization codes expire after five minutes =====
 	authResp := f.oidcCall("on_authorize", "GET", "/authorize", map[string]any{
 		"client_id":     auth0ClientID,
 		"redirect_uri":  auth0RedirectURI,
@@ -437,6 +442,7 @@ func TestAuth0PaginationZeroBasedPages(t *testing.T) {
 	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
 	token := f.mgmtToken()
 
+	// ===== zero-based pages cover every user exactly once with true totals =====
 	type summary struct {
 		start, limit, length, total int64
 	}
@@ -482,6 +488,7 @@ func TestAuth0PaginationZeroBasedPages(t *testing.T) {
 func TestAuth0ControlCharClaims(t *testing.T) {
 	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
 
+	// ===== control characters in claims round-trip as escaped JSON =====
 	signup := f.oidcCall("on_signup", "POST", "/dbconnections/signup", nil, map[string]any{
 		"client_id": auth0ClientID,
 		"email":     "ctrl@example.test",
@@ -507,6 +514,7 @@ func TestAuth0ControlCharClaims(t *testing.T) {
 		t.Fatalf("nickname claim = %q, want the control character round-tripped", claims["nickname"])
 	}
 
+	// ===== a control-char audience survives the adapter's own token check =====
 	cc := f.oidcCall("on_token", "POST", "/oauth/token", nil, map[string]any{
 		"grant_type":    "client_credentials",
 		"client_id":     auth0ClientID,
@@ -529,6 +537,7 @@ func TestAuth0PatchDuplicateEmail(t *testing.T) {
 	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
 	token := f.mgmtToken()
 
+	// ===== patching onto another user's email is a 409 Conflict envelope =====
 	created := f.mgmtCall("on_user_create", "POST", "/api/v2/users", "", token, map[string]any{
 		"email":    "bob@example.test",
 		"password": "BobPass123!",
@@ -547,6 +556,7 @@ func TestAuth0PatchDuplicateEmail(t *testing.T) {
 		t.Fatalf("409 message = %v", conflict.Body["message"])
 	}
 
+	// ===== fresh and self-owned email patches both succeed =====
 	moved := f.mgmtCall("on_user_patch", "PATCH", "/api/v2/users/"+uid, uid, token,
 		map[string]any{"email": "carol@example.test"}, nil)
 	if moved.Status != 200 || moved.Body["email"] != "carol@example.test" {
@@ -570,6 +580,7 @@ func TestAuth0AuthorizeValidation(t *testing.T) {
 		return f.oidcCall("on_authorize", "GET", "/authorize", query, nil, nil)
 	}
 
+	// ===== bad clients, redirect_uris, response types, and login hints get OAuth error redirects =====
 	badRedirect := authorize(map[string]any{
 		"client_id":     auth0ClientID,
 		"redirect_uri":  "https://evil.example.test/cb",
@@ -615,6 +626,7 @@ func TestAuth0AuthorizeValidation(t *testing.T) {
 		t.Fatalf("unknown login_hint error = %q, want access_denied", got)
 	}
 
+	// ===== a missing redirect_uri is a 400, not a redirect =====
 	missing := authorize(map[string]any{"client_id": auth0ClientID})
 	if missing.Status != 400 || missing.Body["error"] != "invalid_request" {
 		t.Fatalf("missing redirect_uri -> %d %v, want 400 invalid_request", missing.Status, missing.Body)
@@ -642,6 +654,7 @@ func TestAuth0RefreshGrantAndRevoke(t *testing.T) {
 		}, nil)
 	}
 
+	// ===== the refresh grant returns fresh tokens without rotation =====
 	first := grant()
 	if first.Status != 200 {
 		t.Fatalf("refresh grant -> %d: %v", first.Status, first.Body)
@@ -661,6 +674,7 @@ func TestAuth0RefreshGrantAndRevoke(t *testing.T) {
 		t.Fatalf("second refresh grant with the SAME token -> %d: %v (refresh tokens must be reusable)", second.Status, second.Body)
 	}
 
+	// ===== revoke is idempotent and actually kills the token =====
 	revoke := func() starlark.Response {
 		return f.oidcCall("on_revoke", "POST", "/oauth/revoke", nil, map[string]any{
 			"token":         refresh,
@@ -691,6 +705,7 @@ func TestAuth0TokenExpiryWithVirtualClock(t *testing.T) {
 	refresh := issued["refresh_token"].(string)
 	bearer := map[string]any{"Authorization": "Bearer " + access}
 
+	// ===== the access token dies at its 1-hour exp on both APIs =====
 	if ui := f.oidcCall("on_userinfo", "GET", "/userinfo", nil, nil, bearer); ui.Status != 200 {
 		t.Fatalf("userinfo before expiry -> %d: %v", ui.Status, ui.Body)
 	}
@@ -709,6 +724,7 @@ func TestAuth0TokenExpiryWithVirtualClock(t *testing.T) {
 		t.Fatalf("expired-token message = %v, want \"Token expired\"", mgmt.Body["message"])
 	}
 
+	// ===== the refresh token outlives it, then dies at 30 days =====
 	// The refresh grant still works after the access token expired.
 	refreshed := f.oidcCall("on_token", "POST", "/oauth/token", nil, map[string]any{
 		"grant_type":    "refresh_token",
@@ -745,6 +761,7 @@ func TestAuth0TokenExpiryWithVirtualClock(t *testing.T) {
 func TestAuth0ClientCredentialsGrant(t *testing.T) {
 	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
 
+	// ===== client_credentials mints a bare JWS that drives the Management API =====
 	cc := f.oidcCall("on_token", "POST", "/oauth/token", nil, map[string]any{
 		"grant_type":    "client_credentials",
 		"client_id":     auth0ClientID,
@@ -769,6 +786,7 @@ func TestAuth0ClientCredentialsGrant(t *testing.T) {
 		t.Fatalf("users list with M2M token -> %d: %v", list.Status, list.Body)
 	}
 
+	// ===== the M2M token cannot call userinfo; a bad secret is invalid_client =====
 	ui := f.oidcCall("on_userinfo", "GET", "/userinfo", nil, nil,
 		map[string]any{"Authorization": "Bearer " + access})
 	if ui.Status != 401 || ui.Body["error"] != "invalid_token" {
@@ -792,6 +810,7 @@ func TestAuth0ManagementUsersCRUD(t *testing.T) {
 	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
 	token := f.mgmtToken()
 
+	// ===== list returns the seeded users without leaking password internals =====
 	list := f.mgmtCall("on_users_list", "GET", "/api/v2/users", "", token, nil, nil)
 	if list.Status != 200 {
 		t.Fatalf("users list -> %d: %v", list.Status, list.Body)
@@ -807,6 +826,7 @@ func TestAuth0ManagementUsersCRUD(t *testing.T) {
 		t.Fatal("user response leaks the seed email_local field")
 	}
 
+	// ===== q search and zero-based paging narrow the list =====
 	byID := f.usersQ(t, token, `user_id:"auth0|a1b2c3"`)
 	if len(byID) != 1 || byID[0].(map[string]any)["email"] != "ada@example.test" {
 		t.Fatalf("q=user_id field search = %v", byID)
@@ -838,6 +858,7 @@ func TestAuth0ManagementUsersCRUD(t *testing.T) {
 		t.Fatalf("per_page=101 -> %d %v, want 400 Bad Request", badPage.Status, badPage.Body)
 	}
 
+	// ===== create/get/patch round-trip the user and its metadata =====
 	created := f.mgmtCall("on_user_create", "POST", "/api/v2/users", "", token, map[string]any{
 		"email":         "bob@example.test",
 		"password":      "BobPass123!",
@@ -875,6 +896,7 @@ func TestAuth0ManagementUsersCRUD(t *testing.T) {
 		t.Fatalf("patch dropped email: %v", patched.Body)
 	}
 
+	// ===== validation errors and delete leave the documented envelopes =====
 	dup := f.mgmtCall("on_user_create", "POST", "/api/v2/users", "", token,
 		map[string]any{"email": "BOB@example.test"}, nil)
 	if dup.Status != 400 || dup.Body["message"] != "The user already exists." {
@@ -902,6 +924,7 @@ func TestAuth0ManagementRoles(t *testing.T) {
 	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
 	token := f.mgmtToken()
 
+	// ===== role create/list round-trip with conflict and name validation =====
 	roles := f.mgmtCall("on_roles_list", "GET", "/api/v2/roles", "", token, nil, nil)
 	if roles.Status != 200 || len(roles.BodyList) != 2 {
 		t.Fatalf("roles list -> %d %v, want the 2 seeded roles", roles.Status, roles.BodyList)
@@ -925,6 +948,7 @@ func TestAuth0ManagementRoles(t *testing.T) {
 		t.Fatalf("role without name -> %d %v, want 400", unnamed.Status, unnamed.Body)
 	}
 
+	// ===== assignment is additive, idempotent, and validated =====
 	// ada is seeded with rol_mock_admin_1; assign auditor next to it.
 	const ada = "auth0|a1b2c3"
 	assign := f.mgmtCall("on_user_roles_assign", "POST", "/api/v2/users/"+ada+"/roles", ada, token,
@@ -984,6 +1008,7 @@ func TestAuth0ManagementRoles(t *testing.T) {
 func TestAuth0DbConnectionsSignup(t *testing.T) {
 	f := newAuth0Fixture(t, time.Unix(1_750_000_000, 0).UTC())
 
+	// ===== signup creates an unverified user the Management API can see =====
 	signup := f.oidcCall("on_signup", "POST", "/dbconnections/signup", nil, map[string]any{
 		"client_id": auth0ClientID,
 		"email":     "pat@example.test",
@@ -1005,6 +1030,7 @@ func TestAuth0DbConnectionsSignup(t *testing.T) {
 		t.Fatalf("q=email field search for signup user = %v", found)
 	}
 
+	// ===== duplicate, weak, and unknown-client signups are rejected =====
 	dup := f.oidcCall("on_signup", "POST", "/dbconnections/signup", nil, map[string]any{
 		"client_id": auth0ClientID,
 		"email":     "pat@example.test",

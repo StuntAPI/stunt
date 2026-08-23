@@ -82,17 +82,20 @@ func TestEmailOctopusListsAndContacts(t *testing.T) {
 	base := time.Date(2026, 2, 3, 11, 0, 0, 0, time.UTC)
 	f := newEOFixture(t, base)
 
+	// ===== a missing API key is 401 problem+json =====
 	// No API key -> 401 problem+json.
 	if r := f.call(f.vmLists, "on_list_lists", "GET", "/lists", nil, nil, nil, ""); r.Status != 401 {
 		t.Fatalf("no auth -> %d, want 401", r.Status)
 	}
 
+	// ===== a blank name is 422 with the field error =====
 	// Blank name -> 422 with the field error.
 	blank := f.call(f.vmLists, "on_create_list", "POST", "/lists", nil, nil, map[string]any{"name": "  "}, eoAuth)
 	if blank.Status != 422 {
 		t.Fatalf("blank name -> %d, want 422", blank.Status)
 	}
 
+	// ===== list create/get round-trip =====
 	// Create + get round-trip.
 	created := f.call(f.vmLists, "on_create_list", "POST", "/lists", nil, nil, map[string]any{"name": "VM Suite List"}, eoAuth)
 	if created.Status != 201 {
@@ -107,11 +110,13 @@ func TestEmailOctopusListsAndContacts(t *testing.T) {
 		t.Fatalf("get list -> %d %v", got.Status, got.Body)
 	}
 
+	// ===== an unknown list is 404 on contact routes too =====
 	// Unknown list -> 404 on contact routes too.
 	if r := f.call(f.vmCont, "on_list_contacts", "GET", "/lists/nope/contacts", map[string]string{"list_id": "nope"}, map[string]string{"limit": "10"}, nil, eoAuth); r.Status != 404 {
 		t.Fatalf("unknown list contacts -> %d, want 404", r.Status)
 	}
 
+	// ===== contacts create into the list =====
 	// Two contacts, one unsubscribed for the status filter.
 	mk := func(email string) starlark.Response {
 		return f.call(f.vmCont, "on_create_contact", "POST", "/lists/"+listID+"/contacts",
@@ -125,6 +130,7 @@ func TestEmailOctopusListsAndContacts(t *testing.T) {
 		t.Fatalf("create contact two -> %d: %v", r.Status, r.Body)
 	}
 
+	// ===== limit/starting_after paging pages contacts without repeats =====
 	// limit paging: page of one carries starting_after; page two differs.
 	p1 := f.call(f.vmCont, "on_list_contacts", "GET", "/lists/"+listID+"/contacts",
 		map[string]string{"list_id": listID}, map[string]string{"limit": "1"}, nil, eoAuth)
@@ -145,6 +151,7 @@ func TestEmailOctopusListsAndContacts(t *testing.T) {
 		t.Fatalf("cursor paging repeated a row: %v then %v", d1, d2)
 	}
 
+	// ===== get by contact id round-trips the email =====
 	// Get by contact id round-trips the email.
 	cid, _ := d1[0].(map[string]any)["id"].(string)
 	one := f.call(f.vmCont, "on_get_contact", "GET", "/lists/"+listID+"/contacts/"+cid,
@@ -153,6 +160,7 @@ func TestEmailOctopusListsAndContacts(t *testing.T) {
 		t.Fatalf("get contact -> %d %v", one.Status, one.Body)
 	}
 
+	// ===== delete removes the contact; reads 404 after =====
 	// Delete removes it; the read is a 404 problem afterwards.
 	del := f.call(f.vmCont, "on_delete_contact", "DELETE", "/lists/"+listID+"/contacts/"+cid,
 		map[string]string{"list_id": listID, "contact_id": cid}, nil, nil, eoAuth)

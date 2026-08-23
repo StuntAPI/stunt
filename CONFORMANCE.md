@@ -535,6 +535,161 @@ sections in `conformance/node/tests/*.test.ts`).
 - refresh grant rotates the access token
 - userinfo honors the refreshed token
 
+
+### vm (handler-level Go suites)
+
+What the engine-level suites in `adapters/<name>_style_test.go` assert — the
+adapter's real handlers execute against the real engine; no SDK is involved.
+Named by their `// =====` section markers.
+
+**auth0-style**
+
+- discovery and JWKS are self-consistent for the host
+- authorize issues a code; the grant mints a real RS256 token pair
+- userinfo resolves the token to the seeded user; login_hint picks another
+- spent and mismatched-redirect codes answer invalid_grant
+- authorization codes expire after five minutes
+- zero-based pages cover every user exactly once with true totals
+- control characters in claims round-trip as escaped JSON
+- a control-char audience survives the adapter's own token check
+- patching onto another user's email is a 409 Conflict envelope
+- fresh and self-owned email patches both succeed
+- bad clients, redirect_uris, response types, and login hints get OAuth error redirects
+- a missing redirect_uri is a 400, not a redirect
+- the refresh grant returns fresh tokens without rotation
+- revoke is idempotent and actually kills the token
+- the access token dies at its 1-hour exp on both APIs
+- the refresh token outlives it, then dies at 30 days
+- client_credentials mints a bare JWS that drives the Management API
+- the M2M token cannot call userinfo; a bad secret is invalid_client
+- list returns the seeded users without leaking password internals
+- q search and zero-based paging narrow the list
+- create/get/patch round-trip the user and its metadata
+- validation errors and delete leave the documented envelopes
+- role create/list round-trip with conflict and name validation
+- assignment is additive, idempotent, and validated
+- signup creates an unverified user the Management API can see
+- duplicate, weak, and unknown-client signups are rejected
+
+**aws-cognito-style**
+
+- a reset code older than one hour answers ExpiredCodeException
+- a NEW_PASSWORD_REQUIRED session works until AuthSessionValidity lapses
+- past the session window the challenge answer is NotAuthorizedException
+- refresh tokens are reusable without rotation; access tokens rotate
+- the refresh token dies at its 30-day expiry with invalid_grant
+- two authorize flows bind the same seeded demo-user
+- authorize never mints new users into the collection
+
+**azure-servicebus-style**
+
+- a correctly signed SAS token sends the message
+- a tampered signature is 401 InvalidSignature
+- an expired se is 401 ExpiredToken
+- structurally broken tokens map to MalformedToken or InvalidSignature
+- Entra Bearer tokens are accepted alongside SAS
+- the storage-queue endpoint accepts the same SAS verifier
+- a tampered storage-queue signature is 401 InvalidSignature
+
+**azure-storage-style**
+
+- container create passes auth with clock-driven Last-Modified and ETag
+- blob upload passes auth with byte-exact content
+- blob download round-trips bytes with the stored ETag
+- ListContainers includes the container with query params signed
+- a tampered signature gets the 403 AuthenticationFailed XML envelope
+- an account outside the key table fails closed with 403
+
+**dynamodb-style**
+
+- an unsigned request is 403; a real SigV4 signature passes
+- tampered signatures, wrong secrets, and clock skew are all 403
+- CreateTable returns ACTIVE; duplicate and bad-schema creates throw the real exceptions
+- Describe/List/Delete round out the lifecycle with table paging
+- typed values round-trip verbatim through PutItem/GetItem
+- projection, misses, and malformed keys take the documented paths
+- SET upserts, ADD does exact-decimal math, REMOVE drops with UPDATED_OLD
+- non-numeric ADD and bogus ReturnValues are ValidationExceptions
+- numeric sort keys order numerically (10 after 9)
+- BETWEEN, >=, descending, and begins_with shape the key range
+- Limit + ExclusiveStartKey pages queries; bad conditions are rejected
+- Scan returns the whole table and filters by expression
+- Select COUNT, pagination, and error paths round out Scan
+- attribute_not_exists guards writes; failed checks return the old item
+- conditional deletes enforce the condition; consumed capacity echoes
+- batch writes and gets round-trip with empty Unprocessed maps
+- oversized, unknown-table, and invalid batches are rejected atomically
+- unsupported constructs fail with named ValidationExceptions
+- a leading "." answers ValidationException instead of wedging the tokenizer
+- "|" in key values cannot collide two composite keys
+- set members dedupe by string and numeric value
+- "-0" and "0" name the same stored item
+
+**emailoctopus-style**
+
+- a missing API key is 401 problem+json
+- a blank name is 422 with the field error
+- list create/get round-trip
+- an unknown list is 404 on contact routes too
+- contacts create into the list
+- limit/starting_after paging pages contacts without repeats
+- get by contact id round-trips the email
+- delete removes the contact; reads 404 after
+
+**marketo-style**
+
+- only client_credentials mints a token
+- an invalid token gets the 403 success=false envelope
+- create assigns ids through the input array
+- get by id round-trips the fields
+- createOrUpdate dedupes by email in place
+- batchSize/nextPageToken paging walks leads without overlap
+
+**servicenow-style**
+
+- unknown credentials are 401 at the gate
+- create assigns a sys_id and INC number
+- get round-trips the fields
+- update persists the new state
+- sysparm_query narrows the list with a total count
+- offset/limit pagination pages via the Link header without repeats
+- tables are isolated from each other
+- unknown sys_id and unknown table are 404
+- delete removes the record for good
+
+**sqs-style**
+
+- signed calls pass on both transports with the real MD5
+- missing and garbage auth are 403
+- tampered signatures and wrong or unknown keys are 403
+- a stale x-amz-date is RequestTimeTooSkewed; a fresh signature passes
+- a delayed send is not receivable until the delay lapses
+- MaxNumberOfMessages bounds are enforced
+- receive hides the message until the timeout lapses, counted NotVisible
+- redelivery mints a fresh receipt handle and bumps the receive count
+- ChangeMessageVisibility extends the in-flight window
+- delete removes the message; stale handles are ReceiptHandleIsInvalid
+- one bad entry fails alone; the rest of the batch still sends
+- delivered entries round-trip their message attributes
+- oversize and duplicate-id batches are rejected
+- purge empties the queue immediately over the queue-URL transport
+- a second purge inside 60s is 403, then works again after the window
+- create, GetQueueUrl, and prefix-filtered ListQueues round-trip
+- identical re-create is idempotent; conflicting attributes are QueueAlreadyExists
+- SetQueueAttributes persists; unknown names are InvalidAttributeName
+- DeleteQueue tears the queue down for its messages too
+- the throttled profile alternates empty receives deterministically
+
+**zuora-style**
+
+- an unknown bearer is 401
+- account create assigns an id and reads back
+- subscribing to a catalog plan prices the subscription
+- unknown accounts and empty plan lists are 400s
+- EndOfTerm cancel stays Active and a second cancel is rejected
+- ZOQL finds the account by name
+- webhook registration round-trips through the list
+
 ## Adapter surface detail
 
 Per adapter: the **covered surface** — the exact routes served, read

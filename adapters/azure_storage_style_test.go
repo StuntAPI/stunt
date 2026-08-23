@@ -175,6 +175,7 @@ func TestAzureStorageSharedKeyRoundTrip(t *testing.T) {
 	httpDate := fixed.Format(http.TimeFormat)
 
 	// Create the container (PUT /mycontainer).
+	// ===== container create passes auth with clock-driven Last-Modified and ETag =====
 	hdr := map[string]string{
 		"content-length": "0",
 		"x-ms-date":      httpDate,
@@ -194,6 +195,7 @@ func TestAzureStorageSharedKeyRoundTrip(t *testing.T) {
 		t.Errorf("create container ETag = %q, want quoted 0x-prefixed etag", got)
 	}
 
+	// ===== blob upload passes auth with byte-exact content =====
 	// Upload a blob (PUT /mycontainer/report.json) with byte-exact content.
 	body := `{"report":{"rows":[1,2,3]}}`
 	hdr = map[string]string{
@@ -218,6 +220,7 @@ func TestAzureStorageSharedKeyRoundTrip(t *testing.T) {
 		t.Errorf("put blob Last-Modified = %q, want %q", got, httpDate)
 	}
 
+	// ===== blob download round-trips bytes with the stored ETag =====
 	// Download the blob (GET) — bytes round-trip, ETag/Last-Modified come
 	// from the stored content.
 	hdr = map[string]string{
@@ -241,6 +244,7 @@ func TestAzureStorageSharedKeyRoundTrip(t *testing.T) {
 		t.Errorf("get blob Last-Modified = %q, want %q", resp.Headers["Last-Modified"], httpDate)
 	}
 
+	// ===== ListContainers includes the container with query params signed =====
 	// ListContainers (GET /?comp=list) — the canonicalized resource includes
 	// the sorted query params.
 	resp, err = contVM.Call("on_list_containers", storageReq(t, "GET", "/", map[string]string{
@@ -266,6 +270,7 @@ func TestAzureStorageSharedKeyTampered(t *testing.T) {
 	h := newStorageHarness(t, fixed)
 	vm := h.vm(filepath.Join("scripts", "blobs.star"))
 
+	// ===== a tampered signature gets the 403 AuthenticationFailed XML envelope =====
 	body := "hello"
 	hdr := map[string]string{
 		"content-length": strconv.Itoa(len(body)),
@@ -301,6 +306,7 @@ func TestAzureStorageSharedKeyUnknownAccount(t *testing.T) {
 	h := newStorageHarness(t, fixed)
 	vm := h.vm(filepath.Join("scripts", "containers.star"))
 
+	// ===== an account outside the key table fails closed with 403 =====
 	hdr := map[string]string{"x-ms-date": fixed.Format(http.TimeFormat)}
 	signed := map[string]string{"x-ms-date": hdr["x-ms-date"]}
 	// Sign with the demo key but claim a different account: the MAC input

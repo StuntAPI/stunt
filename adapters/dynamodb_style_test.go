@@ -249,6 +249,7 @@ func TestDynamoDBSigV4Auth(t *testing.T) {
 	f := newDynamoFixture(t, time.Unix(1_750_000_000, 0).UTC())
 	list := map[string]any{}
 
+	// ===== an unsigned request is 403; a real SigV4 signature passes =====
 	// Missing Authorization header → 403 in the DynamoDB error shape.
 	resp := f.callWithHeaders(ddbTarget+"ListTables", list, ddbUnsignedHeaders(ddbTarget+"ListTables"))
 	ddbWantErr(t, resp, 403, "MissingAuthenticationTokenException")
@@ -269,6 +270,7 @@ func TestDynamoDBSigV4Auth(t *testing.T) {
 		t.Fatalf("TableNames = %v, want the seeded demo-table", names)
 	}
 
+	// ===== tampered signatures, wrong secrets, and clock skew are all 403 =====
 	// Tampered signature (flip a hex digit, stays well-formed) → 403.
 	raw, _ := json.Marshal(list)
 	h := f.ddbSignedHeaders(ddbTarget+"ListTables", raw, ddbSecretKey)
@@ -304,6 +306,7 @@ func TestDynamoDBTableCrud(t *testing.T) {
 		"ProvisionedThroughput": map[string]any{"ReadCapacityUnits": 5, "WriteCapacityUnits": 5},
 	}
 
+	// ===== CreateTable returns ACTIVE; duplicate and bad-schema creates throw the real exceptions =====
 	resp := f.call(ddbTarget+"CreateTable", create)
 	if resp.Status != 200 {
 		t.Fatalf("CreateTable -> %d: %v", resp.Status, resp.Body)
@@ -327,6 +330,7 @@ func TestDynamoDBTableCrud(t *testing.T) {
 	}
 	ddbWantErr(t, f.call(ddbTarget+"CreateTable", bad), 400, "ValidationException")
 
+	// ===== Describe/List/Delete round out the lifecycle with table paging =====
 	// DescribeTable reflects the schema and live item count.
 	desc := f.call(ddbTarget+"DescribeTable", map[string]any{"TableName": "crud-table"})
 	if desc.Status != 200 {
@@ -384,6 +388,7 @@ func TestDynamoDBItemRoundTrip(t *testing.T) {
 		"note":   map[string]any{"NULL": true},
 	}
 
+	// ===== typed values round-trip verbatim through PutItem/GetItem =====
 	put := f.call(ddbTarget+"PutItem", map[string]any{"TableName": "demo-table", "Item": item})
 	if put.Status != 200 {
 		t.Fatalf("PutItem -> %d: %v", put.Status, put.Body)
@@ -423,6 +428,7 @@ func TestDynamoDBItemRoundTrip(t *testing.T) {
 		t.Fatalf("note = %v", ddbAttr(t, got, "note"))
 	}
 
+	// ===== projection, misses, and malformed keys take the documented paths =====
 	// ProjectionExpression keeps only the named top-level attributes.
 	proj := f.call(ddbTarget+"GetItem", map[string]any{
 		"TableName":            "demo-table",
@@ -487,6 +493,7 @@ func TestDynamoDBUpdateItem(t *testing.T) {
 	f := newDynamoFixture(t, time.Unix(1_750_000_000, 0).UTC())
 	key := map[string]any{"pk": map[string]any{"S": "cnt-1"}}
 
+	// ===== SET upserts, ADD does exact-decimal math, REMOVE drops with UPDATED_OLD =====
 	// SET on a missing item upserts: the item is created with its key.
 	set := f.call(ddbTarget+"UpdateItem", map[string]any{
 		"TableName":        "demo-table",
@@ -547,6 +554,7 @@ func TestDynamoDBUpdateItem(t *testing.T) {
 		t.Fatalf("label still present after REMOVE: %v", item)
 	}
 
+	// ===== non-numeric ADD and bogus ReturnValues are ValidationExceptions =====
 	// ADD against a non-numeric attribute → ValidationException.
 	ddbWantErr(t, f.call(ddbTarget+"UpdateItem", map[string]any{
 		"TableName":        "demo-table",
@@ -574,6 +582,7 @@ func TestDynamoDBUpdateItem(t *testing.T) {
 func TestDynamoDBQuerySortKey(t *testing.T) {
 	f := newDynamoFixture(t, time.Unix(1_750_000_000, 0).UTC())
 
+	// ===== numeric sort keys order numerically (10 after 9) =====
 	// Table with a numeric sort key: "10" must sort AFTER "9" numerically
 	// (a lexicographic sort would place it first).
 	resp := f.call(ddbTarget+"CreateTable", map[string]any{
@@ -621,6 +630,7 @@ func TestDynamoDBQuerySortKey(t *testing.T) {
 		t.Fatalf("sk order = %v, want numeric order 1,2,9,10", sks)
 	}
 
+	// ===== BETWEEN, >=, descending, and begins_with shape the key range =====
 	// BETWEEN range.
 	q = f.call(ddbTarget+"Query", map[string]any{
 		"TableName":              "range-table",
@@ -664,6 +674,7 @@ func TestDynamoDBQuerySortKey(t *testing.T) {
 		t.Fatalf("descending sk order = %v, want 10,9,2,1", desc)
 	}
 
+	// ===== Limit + ExclusiveStartKey pages queries; bad conditions are rejected =====
 	// Limit + ExclusiveStartKey pagination: page 1 of 2, then the rest.
 	page1 := f.call(ddbTarget+"Query", map[string]any{
 		"TableName":                 "range-table",
@@ -759,6 +770,7 @@ func TestDynamoDBQuerySortKey(t *testing.T) {
 func TestDynamoDBScanFilter(t *testing.T) {
 	f := newDynamoFixture(t, time.Unix(1_750_000_000, 0).UTC())
 
+	// ===== Scan returns the whole table and filters by expression =====
 	all := f.call(ddbTarget+"Scan", map[string]any{"TableName": "demo-table"})
 	if all.Status != 200 || ddbInt(all.Body["Count"]) != 4 {
 		t.Fatalf("Scan -> %d %v, want the 4 seeded items", all.Status, all.Body)
@@ -797,6 +809,7 @@ func TestDynamoDBScanFilter(t *testing.T) {
 		t.Fatalf("attribute_exists(meta) matched %d items, want the 1 seeded item", len(ne))
 	}
 
+	// ===== Select COUNT, pagination, and error paths round out Scan =====
 	// Select COUNT returns counts only.
 	countOnly := f.call(ddbTarget+"Scan", map[string]any{
 		"TableName":        "demo-table",
@@ -837,6 +850,7 @@ func TestDynamoDBConditionalWrites(t *testing.T) {
 	f := newDynamoFixture(t, time.Unix(1_750_000_000, 0).UTC())
 	key := map[string]any{"pk": map[string]any{"S": "cond-1"}}
 
+	// ===== attribute_not_exists guards writes; failed checks return the old item =====
 	// Insert-if-absent succeeds on a fresh key.
 	first := f.call(ddbTarget+"PutItem", map[string]any{
 		"TableName":           "demo-table",
@@ -865,6 +879,7 @@ func TestDynamoDBConditionalWrites(t *testing.T) {
 		t.Fatalf("failed conditional write mutated the item: %v", item)
 	}
 
+	// ===== conditional deletes enforce the condition; consumed capacity echoes =====
 	// DeleteItem with a condition that does not hold.
 	del := f.call(ddbTarget+"DeleteItem", map[string]any{
 		"TableName":           "demo-table",
@@ -919,6 +934,7 @@ func TestDynamoDBBatchOperations(t *testing.T) {
 		t.Fatalf("CreateTable batch-table -> %d: %v", r.Status, r.Body)
 	}
 
+	// ===== batch writes and gets round-trip with empty Unprocessed maps =====
 	// BatchWriteItem: a PutRequest/DeleteRequest mix.
 	var writes []any
 	for _, id := range []string{"b-1", "b-2", "b-3"} {
@@ -977,6 +993,7 @@ func TestDynamoDBBatchOperations(t *testing.T) {
 		t.Fatalf("UnprocessedKeys = %v, want empty", un)
 	}
 
+	// ===== oversized, unknown-table, and invalid batches are rejected atomically =====
 	// 26 keys in one table exceeds the cap → ValidationException.
 	var tooMany []any
 	for i := 0; i < 26; i++ {
@@ -1037,6 +1054,7 @@ func TestDynamoDBExpressionSubset(t *testing.T) {
 	f := newDynamoFixture(t, time.Unix(1_750_000_000, 0).UTC())
 	key := map[string]any{"pk": map[string]any{"S": "demo-1"}}
 
+	// ===== unsupported constructs fail with named ValidationExceptions =====
 	// OR is unsupported.
 	orErr := f.call(ddbTarget+"PutItem", map[string]any{
 		"TableName":           "demo-table",
@@ -1081,6 +1099,7 @@ func TestDynamoDBExpressionSubset(t *testing.T) {
 	})
 	ddbWantErr(t, emptyQ, 400, "ValidationException")
 
+	// ===== a leading "." answers ValidationException instead of wedging the tokenizer =====
 	// A token-initial "." must answer ValidationException, not loop the
 	// tokenizer until the VM step budget dies (500): one case per flavor.
 	dotProj := f.call(ddbTarget+"GetItem", map[string]any{
@@ -1189,6 +1208,7 @@ func TestDynamoDBKeyEncodingNoCollision(t *testing.T) {
 	f := newDynamoFixture(t, time.Unix(1_750_000_000, 0).UTC())
 	ddbCreateRangeTable(t, f, "coll-table")
 
+	// ===== "|" in key values cannot collide two composite keys =====
 	first := map[string]any{"pk": map[string]any{"S": "a"}, "sk": map[string]any{"S": "b|S:c"}, "label": map[string]any{"S": "first"}}
 	second := map[string]any{"pk": map[string]any{"S": "a|S:b"}, "sk": map[string]any{"S": "c"}, "label": map[string]any{"S": "second"}}
 	for _, item := range []map[string]any{first, second} {
@@ -1224,6 +1244,7 @@ func TestDynamoDBKeyEncodingNoCollision(t *testing.T) {
 func TestDynamoDBSetDuplicates(t *testing.T) {
 	f := newDynamoFixture(t, time.Unix(1_750_000_000, 0).UTC())
 
+	// ===== set members dedupe by string and numeric value =====
 	ddbWantErr(t, f.call(ddbTarget+"PutItem", map[string]any{
 		"TableName": "demo-table",
 		"Item": map[string]any{
@@ -1291,6 +1312,7 @@ func TestDynamoDBSetDuplicates(t *testing.T) {
 // spelling is found under the other, and both share a single stored item.
 func TestDynamoDBNumericZeroKey(t *testing.T) {
 	f := newDynamoFixture(t, time.Unix(1_750_000_000, 0).UTC())
+	// ===== "-0" and "0" name the same stored item =====
 	resp := f.call(ddbTarget+"CreateTable", map[string]any{
 		"TableName":            "nkey-table",
 		"AttributeDefinitions": []any{map[string]any{"AttributeName": "pk", "AttributeType": "N"}},
