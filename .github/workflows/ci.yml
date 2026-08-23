@@ -59,10 +59,33 @@ jobs:
       - name: Node SDK conformance (stripe-node, octokit, twilio-node)
         run: just conformance-node
 
-      - name: Conformance matrix freshness (CONFORMANCE.md)
+      - name: Generated files fresh (CONFORMANCE.md, README counts)
         run: |
           just conformance-matrix
-          if ! git diff --exit-code CONFORMANCE.md conformance/matrix.json; then
-            echo "::error::CONFORMANCE.md or conformance/matrix.json is stale — run 'just conformance-matrix' and commit"
+          just readme-counts
+          if ! git diff --exit-code CONFORMANCE.md conformance/matrix.json README.md; then
+            echo "::error::CONFORMANCE.md, conformance/matrix.json or README.md is stale — run 'just conformance-matrix readme-counts' and commit"
+            exit 1
+          fi
+
+  # The repo description quotes the adapter count; it went stale silently
+  # once (said 91 through 95). GITHUB_TOKEN cannot write repo metadata, so
+  # this job only fails loudly on drift after landing on main — the fix is
+  # `just repo-description` (needs an admin gh token locally).
+  repo-description:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Description count matches adapters/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          want="$(ls adapters | grep -c -- '-style$')"
+          desc="$(gh api repos/StuntAPI/stunt --jq .description)"
+          have="$(printf '%s' "$desc" | sed -E 's/^[^0-9]*([0-9]+).*/\1/')"
+          echo "repo has $want adapters; description says '$have'"
+          if [ "$have" != "$want" ]; then
+            echo "::error::repo description is stale — run 'just repo-description' (needs an admin token)"
             exit 1
           fi

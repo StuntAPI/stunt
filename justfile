@@ -38,9 +38,10 @@ ci-full: ci conformance conformance-node
     #!/bin/sh
     set -e
     just conformance-matrix
-    if ! git diff --quiet CONFORMANCE.md conformance/matrix.json; then
-        echo "✗ CONFORMANCE.md or conformance/matrix.json is stale — run 'just conformance-matrix' and commit" >&2
-        git diff --stat CONFORMANCE.md conformance/matrix.json >&2
+    just readme-counts
+    if ! git diff --quiet CONFORMANCE.md conformance/matrix.json README.md; then
+        echo "✗ CONFORMANCE.md, conformance/matrix.json or README.md is stale — run 'just conformance-matrix readme-counts' and commit" >&2
+        git diff --stat CONFORMANCE.md conformance/matrix.json README.md >&2
         exit 1
     fi
     echo "✓ conformance matrix fresh"
@@ -126,6 +127,29 @@ conformance-node:
 # Record(...) calls, node test sections, or matrix.yaml.
 conformance-matrix:
     cd conformance && go run ./cmd/genmatrix -json matrix.json
+
+# Re-template the adapter count in README.md from the adapters/ dir. The
+# ci-full freshness gate regenerates and diffs it, so the number can never
+# silently go stale again.
+readme-counts:
+    #!/bin/sh
+    set -e
+    n="$(ls adapters | grep -c -- '-style$')"
+    perl -pi -e 's/(\*\*Reference adapters in this repo\*\*[^0-9]*)[0-9]+( of them)/${1}'"$n"'${2}/' README.md
+    grep -qE "Reference adapters in this repo\*\*[^0-9]*$n of them" README.md || {
+        echo "✗ README adapter-count anchor not found — the line was reworded; update justfile readme-counts" >&2
+        exit 1
+    }
+
+# Reset the GitHub repo description with the current adapter count. The
+# description is repo metadata GITHUB_TOKEN cannot write, so CI only checks
+# it for drift on main pushes — this is the one-command fix.
+repo-description:
+    #!/bin/sh
+    set -e
+    n="$(ls adapters | grep -c -- '-style$')"
+    gh api -X PATCH repos/StuntAPI/stunt -f description="Local mock API server: $n offline, stateful stand-ins for public APIs (Stripe, GitHub, Twilio, AWS, Auth0…) — one static Go binary. Test without accounts, keys, or network."
+    echo "✓ repo description set ($n adapters)"
 
 # Vendor provider route tables from their official published specs into
 # conformance/surfaces/ — the ONLY network-touching step of the matrix.

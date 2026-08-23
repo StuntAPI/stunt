@@ -943,16 +943,22 @@ type matrixJSON struct {
 }
 
 type adapterJSON struct {
-	ID           string    `json:"id"`
-	APIName      string    `json:"api_name"`
-	APIVersion   string    `json:"api_version"`
-	Routes       int       `json:"routes"`
-	WSRoutes     int       `json:"ws_routes,omitempty"`
-	GraphQL      bool      `json:"graphql,omitempty"`
-	GRPCService  string    `json:"grpc_service,omitempty"`
-	Verification string    `json:"verification"`
-	SDKs         []sdkJSON `json:"sdks"`
-	Behaviors    []string  `json:"behaviors"`
+	ID string `json:"id"`
+	// Manifest identity for the website catalog sync (stunt-www
+	// scripts/sync-catalog.mjs): the catalog must derive these from this
+	// file, never re-parse adapter.yaml with a second parser.
+	DisplayName    string    `json:"display_name"`
+	AdapterVersion string    `json:"adapter_version"`
+	RealHosts      []string  `json:"real_hosts"`
+	APIName        string    `json:"api_name"`
+	APIVersion     string    `json:"api_version"`
+	Routes         int       `json:"routes"`
+	WSRoutes       int       `json:"ws_routes,omitempty"`
+	GraphQL        bool      `json:"graphql,omitempty"`
+	GRPCService    string    `json:"grpc_service,omitempty"`
+	Verification   string    `json:"verification"`
+	SDKs           []sdkJSON `json:"sdks"`
+	Behaviors      []string  `json:"behaviors"`
 	// VMBehaviors are verified by the engine-level Go suite (markers in
 	// adapters/<name>_style_test.go) — real handler execution, no SDK.
 	VMBehaviors []string `json:"vm_behaviors,omitempty"`
@@ -1033,14 +1039,20 @@ func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]s
 			m.Generated.Tiers.Boot++
 		}
 		row := adapterJSON{
-			ID:           a.ID,
-			Routes:       len(a.Endpoints),
-			WSRoutes:     len(a.Websockets),
-			Verification: tier,
-			Behaviors:    []string{},
-			VMBehaviors:  vmBehav[a.ID],
-			Missing:      gaps[a.ID].Missing,
-			Deviations:   gaps[a.ID].Deviations,
+			ID:             a.ID,
+			DisplayName:    a.Name,
+			AdapterVersion: a.Version,
+			RealHosts:      a.RealHosts,
+			Routes:         len(a.Endpoints),
+			WSRoutes:       len(a.Websockets),
+			Verification:   tier,
+			Behaviors:      []string{},
+			VMBehaviors:    vmBehav[a.ID],
+			Missing:        gaps[a.ID].Missing,
+			Deviations:     gaps[a.ID].Deviations,
+		}
+		if row.RealHosts == nil {
+			row.RealHosts = []string{}
 		}
 		if row.Missing == nil {
 			row.Missing = []string{}
