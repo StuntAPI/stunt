@@ -1,0 +1,816 @@
+{
+  "source": "spec atproto lexicons app.bsky.* + com.atproto.* (XRPC: query=GET, procedure=POST; records/objects/subscriptions skipped)",
+  "url": "https://api.github.com/repos/bluesky-social/atproto/git/trees/main?recursive=1",
+  "fetched": "2026-08-23",
+  "license": "mixed MIT/Apache-2.0",
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.actor.getPreferences"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.actor.getProfile"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.actor.getProfiles"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.actor.getSuggestions"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.actor.putPreferences"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.actor.searchActors"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.actor.searchActorsTypeahead"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.ageassurance.begin"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.ageassurance.getConfig"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.ageassurance.getState"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.bookmark.createBookmark"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.bookmark.deleteBookmark"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.bookmark.getBookmarks"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.contact.dismissMatch"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.contact.getMatches"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.contact.getSyncStatus"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.contact.importContacts"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.contact.removeData"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.contact.sendNotification"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.contact.startPhoneVerification"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.contact.verifyPhone"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.draft.createDraft"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.draft.deleteDraft"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.draft.getDrafts"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.draft.updateDraft"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.embed.getEmbedExternalView"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.describeFeedGenerator"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getActorFeeds"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getActorLikes"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getAuthorFeed"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getFeed"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getFeedGenerator"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getFeedGenerators"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getFeedSkeleton"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getLikes"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getListFeed"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getPostThread"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getPosts"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getQuotes"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getRepostedBy"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getSuggestedFeeds"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.getTimeline"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.searchPosts"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.feed.searchPostsV2"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.feed.sendInteractions"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getActorStarterPacks"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getBlocks"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getFollowers"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getFollows"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getKnownFollowers"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getList"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getListBlocks"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getListMutes"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getLists"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getListsWithMembership"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getMutes"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getRelationships"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getStarterPack"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getStarterPacks"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getStarterPacksWithMembership"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.getSuggestedFollowsByActor"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.graph.muteActor"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.graph.muteActorList"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.graph.muteThread"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.searchStarterPacks"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.graph.searchStarterPacksV2"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.graph.unmuteActor"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.graph.unmuteActorList"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.graph.unmuteThread"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.labeler.getServices"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.notification.getPreferences"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.notification.getUnreadCount"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.notification.listActivitySubscriptions"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.notification.listNotifications"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.notification.putActivitySubscription"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.notification.putPreferences"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.notification.putPreferencesV2"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.notification.registerPush"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.notification.unregisterPush"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.notification.updateSeen"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getAgeAssuranceState"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getConfig"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getOnboardingSuggestedStarterPacks"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getOnboardingSuggestedStarterPacksSkeleton"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getOnboardingSuggestedUsersSkeleton"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getPopularFeedGenerators"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getPostThreadOtherV2"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getPostThreadV2"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedFeeds"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedFeedsSkeleton"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedOnboardingUsers"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedStarterPacks"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedStarterPacksSkeleton"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedUsers"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedUsersForDiscover"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedUsersForDiscoverSkeleton"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedUsersForExplore"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedUsersForExploreSkeleton"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedUsersForSeeMore"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedUsersForSeeMoreSkeleton"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestedUsersSkeleton"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getSuggestionsSkeleton"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getTaggedSuggestions"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getTrendingTopics"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getTrends"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.getTrendsSkeleton"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.unspecced.initAgeAssurance"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.searchActorsSkeleton"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.searchPostsSkeleton"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.unspecced.searchStarterPacksSkeleton"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.video.abortUpload"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.video.finishUpload"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.video.getJobStatus"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.video.getUploadLimits"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/app.bsky.video.getUploadStatus"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.video.startUpload"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.video.uploadPart"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/app.bsky.video.uploadVideo"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.admin.deleteAccount"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.admin.disableAccountInvites"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.admin.disableInviteCodes"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.admin.enableAccountInvites"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.admin.getAccountInfo"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.admin.getAccountInfos"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.admin.getInviteCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.admin.getSubjectStatus"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.admin.searchAccounts"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.admin.sendEmail"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.admin.updateAccountEmail"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.admin.updateAccountHandle"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.admin.updateAccountPassword"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.admin.updateAccountSigningKey"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.admin.updateSubjectStatus"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.identity.getRecommendedDidCredentials"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.identity.refreshIdentity"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.identity.requestPlcOperationSignature"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.identity.resolveDid"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.identity.resolveHandle"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.identity.resolveIdentity"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.identity.signPlcOperation"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.identity.submitPlcOperation"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.identity.updateHandle"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.label.queryLabels"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.lexicon.resolveLexicon"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.moderation.createReport"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.repo.applyWrites"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.repo.createRecord"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.repo.deleteRecord"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.repo.describeRepo"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.repo.getRecord"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.repo.importRepo"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.repo.listMissingBlobs"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.repo.listRecords"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.repo.putRecord"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.repo.uploadBlob"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.activateAccount"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.server.checkAccountStatus"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.confirmEmail"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.createAccount"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.createAppPassword"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.createInviteCode"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.createInviteCodes"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.createSession"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.deactivateAccount"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.deleteAccount"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.deleteSession"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.server.describeServer"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.server.getAccountInviteCodes"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.server.getServiceAuth"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.server.getSession"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.server.listAppPasswords"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.refreshSession"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.requestAccountDelete"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.requestEmailConfirmation"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.requestEmailUpdate"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.requestPasswordReset"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.reserveSigningKey"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.resetPassword"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.revokeAppPassword"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.server.updateEmail"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.getBlob"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.getBlocks"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.getCheckout"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.getHead"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.getHostStatus"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.getLatestCommit"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.getRecord"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.getRepo"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.getRepoStatus"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.listBlobs"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.listHosts"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.listRepos"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.sync.listReposByCollection"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.sync.notifyOfUpdate"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.sync.requestCrawl"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.temp.addReservedHandle"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.temp.checkHandleAvailability"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.temp.checkSignupQueue"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.temp.dereferenceScope"
+    },
+    {
+      "method": "GET",
+      "route": "/xrpc/com.atproto.temp.fetchLabels"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.temp.requestPhoneVerification"
+    },
+    {
+      "method": "POST",
+      "route": "/xrpc/com.atproto.temp.revokeAccountCredentials"
+    }
+  ]
+}

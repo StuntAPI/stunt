@@ -24,6 +24,10 @@ adapters:
       - "simulate_fail flag on /v68/payments forces Refused (simulator-only failure injection)"
       - "paymentLinks url is synthetic — no hosted checkout page; pay via the link reference"
       - "paymentMethods serves a fixed 5-method catalog with empty storedPaymentMethods"
+      - "Webhook HMAC signs the base64-encoded signing string with eventCode in field 7; deliveries go to the first matching hook only"
+      - "Idempotency replay re-renders the payment's current state, not the original response"
+      - "Modification pspReferences carry CAP/REF/REV/CAN prefixes; real Adyen's are numeric"
+      - "paymentMethods accepts any merchantAccount; real Adyen 403s on unknown accounts"
     missing:
       - "No Payouts, Disputes, or Terminal API (cloud/POS) endpoints"
       - "No paymentMethods/balance, gift-card, or stored-value endpoints"
@@ -57,6 +61,8 @@ adapters:
       - "Builds settle PROCESSING to VALID at +3s — no separate in-flight state"
       - "simulate_fail extension: app create forces build INVALID, version create REJECTED"
       - "A first build is minted at app create — no build upload path"
+      - "A malformed cursor answers 200 with data null; real ASC answers 400"
+      - "salesReports returns a JSON:API object; real ASC streams a gzip TSV and 400s on missing filters"
     missing:
       - "No TestFlight beta testing (betaGroups, betaTesters, buildBetaDetails)"
       - "No IAP or subscriptions (inAppPurchasesV2, subscriptionGroups)"
@@ -214,6 +220,8 @@ adapters:
       - "webhook deliveries are JSON + bt-* headers, not the real form-encoded bt_* POST"
       - "POST /graphql is served without the Bearer/Basic auth check the REST surface enforces"
       - "simulate_authorization_expiry sim-only flag: auths expire in 1s vs 7 simulated days"
+      - "REST creates answer 200; real Braintree answers 201 Created"
+      - "Client tokens are opaque strings, not the real base64 JSON encoding"
     missing:
       - "No REST customer endpoints: create, get, search, update, delete (/customers)"
       - "No payment method fetch or delete: GET/DELETE /payment_methods/{token}"
@@ -395,6 +403,9 @@ adapters:
   escrow-style:
     deviations:
       - "POST /sim/transaction/{id}/fund is a simulator-only affordance for hosted-page funding"
+      - "List returns {transactions:[...]}; real Escrow.com returns a bare array"
+      - "An unparseable schedule amount stores 0.00 instead of a 400 field error"
+      - "ship/receive/cancel are not gated on agreement or secured funds"
     missing:
       - "No list filters on GET /2017-09-01/transaction (status, date, email)"
       - "No reject or return-item actions (agree/accept/ship/receive/cancel exist)"
@@ -569,6 +580,8 @@ adapters:
     deviations:
       - "Write flow /login + /submit from a reference client; official Firebase API is read-only"
       - "Challenge injection after N submits (anti-abuse) mirrors mock_hn, configurable via KV"
+      - "Firebase REST query params (print=pretty, orderBy, limitToFirst) are accepted and ignored"
+      - "The .json suffix is optional on item reads; real Firebase requires it"
     missing:
       - "No GET /v0/maxitem.json or GET /v0/updates.json endpoints"
       - "No poll or pollopt item types; no deleted or dead item flags"
@@ -584,6 +597,9 @@ adapters:
     deviations:
       - "Container processing fixed at ~3s IN_PROGRESS before FINISHED or ERROR"
       - "simulate_fail=true create flag forces container ERROR; real API has no such switch"
+      - "Cursors are forward-only plain offsets; no before cursor or paging.previous"
+      - "An unknown insights metric returns 200 with empty data; real Graph answers error code 100"
+      - "media_publish does not check container ownership across users"
     missing:
       - "No account-level insights (GET /{ig_user_id}/insights), per-media only"
       - "No stories publishing (media_type=STORIES) or story insights"
@@ -757,6 +773,9 @@ adapters:
       - "No default page size: whole list returns unless $top is set; real Dataverse pages at 5000"
       - "Client-supplied accountid accepted on create; auto ids are acc-<n>, not GUIDs"
       - "Environments with no stored flows list a fallback seeded seeded-flow-001 entry"
+      - "api-version is ignored (version baked into the /v2 path); real Power Platform requires ?api-version="
+      - "$skipToken is camelCase; real Dataverse entity paging uses $skiptoken"
+      - "POST accounts echoes the created record; real Dataverse returns 201 empty with OData-EntityId"
     missing:
       - "No environment lifecycle operations (create, update, delete)"
       - "Only the accounts table is served — no contacts, leads, or other tables"
@@ -810,6 +829,9 @@ adapters:
   qbo-style:
     deviations:
       - "Malformed FROM tokens fall back to substring entity matching instead of erroring"
+      - "Full (non-sparse) update merges like sparse; real QBO replaces and clears omitted fields"
+      - "SyncToken optimistic concurrency is not enforced — stale tokens still update"
+      - "Data is not realm-partitioned: one realm's token reads another realm's records"
     missing:
       - "Only Customer and Invoice — no Payment, Estimate, Item, Vendor, etc."
       - "No QSQL aggregates (COUNT, SUM, MAX, MIN, AVG)"
@@ -1012,6 +1034,8 @@ adapters:
       - "Auth is mock and not enforced; any or no Authorization header is accepted everywhere"
       - "POST /2/oauth2/token always succeeds, minting a fake token (no PKCE or client creds)"
       - "GET /2/tweets list-all is a simulator extension; the real API has no such list endpoint"
+      - "Bare GET /2/tweets/{id} returns the full stored doc, not v2's id+text default"
+      - "since_id/until_id are not honored on the timeline"
     missing:
       - "No tweet search (/2/tweets/search/recent or /all) endpoints"
       - "No likes, reposts, bookmarks, or quote/reply tweet operations"
@@ -1019,7 +1043,6 @@ adapters:
       - "No media upload, polls, or long-form (note) tweet support"
       - "No spaces, lists, DMs, or compliance surfaces"
       - "No filtered or sample stream endpoints"
-      - "No pagination tokens (max_results/pagination_token) on list or timeline"
   walletconnect-style:
     deviations:
       - "Pairing, session approve, and JSON-RPC requests are auto-approved (no wallet device)"
@@ -1060,6 +1083,9 @@ adapters:
     deviations:
       - "No tax-rate registry; line tax is the given TaxAmount, not computed from TaxType"
       - "Responses carry a sim-only nextPage field; real Xero signals the last page by item count"
+      - "GET /connections wraps entries in {connections:[...]} with tenantName; real Xero returns a bare array without it"
+      - "Malformed page falls back to page 1; real Xero answers 400"
+      - "nextPage envelope field is a simulator extension; 401 ErrorNumber is the string TokenExpired, not numeric"
     missing:
       - "No Credit Notes, Quotes, or standalone Payments endpoints"
       - "No Journals, Bank Transfers, Employees, or Expense Claims"

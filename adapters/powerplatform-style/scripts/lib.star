@@ -42,14 +42,20 @@ def _get_query(req, key, default_val):
         v = default_val
     return v
 
+# _ODATA_PARAMS are the non-paging OData options carried into the
+# @odata.nextLink. The skipToken cursor indexes the filtered/sorted list, so
+# a followed link must re-apply the same options or page 2 would slice the
+# wrong rows. $skip is deliberately excluded — the cursor already encodes it.
+_ODATA_PARAMS = ["$filter", "$orderby", "$select", "$count"]
+
 # _list_page reads the Power Platform OData $top (page size) / $skipToken
 # (opaque cursor) query params, slices the already-filtered docs via the
 # paginate() builtin, and returns (page, next_link) where next_link is an
 # @odata.nextLink URL string the client can follow to round-trip
-# $top/$skipToken, or None when there is no further page. Paging is DISABLED
-# (whole list returned, next_link None) when $top is missing or <= 0 —
-# preserving prior unpaginated behavior. base_path is the route used to build
-# the next-link URL.
+# $top/$skipToken plus the caller's other OData options, or None when there
+# is no further page. Paging is DISABLED (whole list returned, next_link
+# None) when $top is missing or <= 0 — preserving prior unpaginated
+# behavior. base_path is the route used to build the next-link URL.
 def _list_page(req, docs, base_path):
     top = _to_int(_get_query(req, "$top", ""))
     skip_token = _get_query(req, "$skipToken", "")
@@ -57,10 +63,16 @@ def _list_page(req, docs, base_path):
         skip_token = ""
 
     page, next_cursor = paginate(docs, top, skip_token)
+    if next_cursor == None:
+        return page, None
 
-    next_link = None
-    if next_cursor != None:
-        next_link = base_path + "?$top=" + str(top) + "&$skipToken=" + next_cursor
+    # Fixed key order keeps the href deterministic; Go maps are unordered.
+    extra = ""
+    for key in _ODATA_PARAMS:
+        v = _get_query(req, key, "")
+        if v != "":
+            extra = extra + key + "=" + v + "&"
+    next_link = base_path + "?" + extra + "$top=" + str(top) + "&$skipToken=" + next_cursor
     return page, next_link
 
 # _seed populates default environments and accounts.

@@ -22,9 +22,13 @@ def on_get_user(req):
         "id": doc.get("id", ""),
         "created": _resolve_created(doc),
         "karma": _to_int(doc.get("karma", "0")),
-        "about": doc.get("about", ""),
         "submitted": _ids_from_list(doc.get("submitted", [])),
     }
+
+    # Firebase omits absent fields; users without a bio carry no "about".
+    about = doc.get("about", "")
+    if about != "":
+        user["about"] = about
 
     return respond(200, user, headers={"content-type": "application/json; charset=utf-8"})
 

@@ -66,7 +66,7 @@ def on_list_users(req):
 
     return respond(200, {
         "data": page,
-        "links": _page_links("/v1/users", next_cursor),
+        "links": _page_links("/v1/users", next_cursor, limit),
         "meta": _page_meta(len(users), limit, next_cursor),
     })
 

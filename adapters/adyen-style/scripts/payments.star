@@ -50,6 +50,11 @@ def on_create_payment(req):
 
     flow = _payment_flow(payment_method)
 
+    # simulate_fail refuses an instant payment outright too (README/matrix),
+    # not just at 3DS completion; 3DS cards keep their challenge rounds.
+    if simulate_fail and flow == "auth":
+        flow = "refused"
+
     psp_ref = _psp_reference()
 
     # Build additionalData with card details.
@@ -373,7 +378,10 @@ def _do_modification(req, mod_type, prefix):
             doc["lifecycle"] = "PartiallyCaptured"
 
     elif mod_type == "refund":
-        if lifecycle != "Captured" and lifecycle != "PartiallyCaptured" and lifecycle != "PartiallyRefunded":
+        # Refunded is a captured payment with an empty balance: fall through
+        # to the 705 balance check so the message names the balance, not a
+        # missing capture.
+        if lifecycle != "Captured" and lifecycle != "PartiallyCaptured" and lifecycle != "PartiallyRefunded" and lifecycle != "Refunded":
             return _adyen_err(422, "704", "Payment has not been captured", "modification")
 
         remaining = captured - refunded

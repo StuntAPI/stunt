@@ -22,12 +22,15 @@ client uses:
   `POST /v21.0/{ig_user_id}/media_publish` once its processing status is
   `FINISHED`. (Route ordering matters: `media_publish`
   is declared before `media` so it matches first.)
-- **List media:** `GET /v21.0/{ig_user_id}/media` returns the user's published media.
+- **List media:** `GET /v21.0/{ig_user_id}/media` returns the user's published
+  media, newest first (reverse chronological, by `timestamp`).
 - **Insights:** `GET /v21.0/{media_id}/insights` returns per-media engagement
   metrics.
 
-The API routes check only that a Bearer token is **present** (401 if absent);
-they do not validate the token value.
+API routes **validate** the Bearer token: it must be known and unexpired (see
+Auth below). A missing, unknown or expired token answers
+`401 {"error": {"message": "Missing or invalid access token", "type":
+"OAuthException", "code": 190, "fbtrace_id": ...}}` — the Graph error envelope.
 
 State persists in SQLite-backed collections, so a media container created in one
 request is visible when publishing in the next, within the same `stunt up` session.

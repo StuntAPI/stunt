@@ -63,6 +63,28 @@ def on_transaction_create(req):
         amount = 0
         for s in schedule:
             amount = amount + s["amount"]
+        # Honour a caller-supplied fee split (escrow.com lets you say who
+        # pays); otherwise default the whole escrow fee to the buyer.
+        fees = item.get("fees")
+        if fees == None:
+            fees = [{
+                "type": "escrow",
+                "amount": amount * ESCROW_FEE_RATE // 10000,
+                "payer_customer": buyer.get("customer"),
+            }]
+        else:
+            # Caller fee amounts share the schedule's dollar units — normalize
+            # to cents or present() renders them 100x off.
+            norm = []
+            for fee in fees:
+                nf = {}
+                for k in fee:
+                    if k == "amount":
+                        nf[k] = _to_cents(fee[k]) or 0
+                    else:
+                        nf[k] = fee[k]
+                norm.append(nf)
+            fees = norm
         stored_items.append({
             "id": next_id("items"),
             "title": item.get("title"),
@@ -71,13 +93,7 @@ def on_transaction_create(req):
             "inspection_period": item.get("inspection_period", 259200),
             "quantity": item.get("quantity", 1),
             "schedule": schedule,
-            # Honour a caller-supplied fee split (escrow.com lets you say who
-            # pays); otherwise default the whole escrow fee to the buyer.
-            "fees": item.get("fees", [{
-                "type": "escrow",
-                "amount": amount * ESCROW_FEE_RATE // 10000,
-                "payer_customer": buyer.get("customer"),
-            }]),
+            "fees": fees,
             "status": {
                 "accepted": False,
                 "received": False,

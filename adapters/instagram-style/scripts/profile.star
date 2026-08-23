@@ -30,10 +30,18 @@ def on_profile(req):
         ig_user_id = "ig_1"
         username = "mock_user_1"
 
+    # media_count is derived on read: the real node reports the user's
+    # published media, not a constant.
+    mc = store_collection("media")
+    media_count = 0
+    for doc in mc.list():
+        if doc.get("user_id") == ig_user_id:
+            media_count = media_count + 1
+
     return respond(200, {
         "id": ig_user_id,
         "username": username,
         "followers_count": 1000,
-        "media_count": 0,
+        "media_count": media_count,
         "account_type": "BUSINESS",
     })

@@ -84,7 +84,7 @@ Fault envelope below (`code:"32001"`).
 |--------|-------|---------|-------------|
 | GET | `/oauth/v2/authorize` | `oauth.star#on_authorize` | 302 redirect with code+state+realmId |
 | POST | `/oauth/v2/tokens/bearer` | `oauth.star#on_token` | Token exchange + refresh |
-| GET/POST | `/v3/company/{realmId}/query` | `query.star#on_query` | SQL-like query (honors `WHERE` = != > >= < <= LIKE IN, `ORDER BY` ASC/DESC and `MAXRESULTS n`) |
+| GET/POST | `/v3/company/{realmId}/query` | `query.star#on_query` | SQL-like query (honors `WHERE` = != > >= < <= LIKE IN, `ORDER BY` ASC/DESC, `STARTPOSITION` and `MAXRESULTS n`) |
 | POST | `/v3/company/{realmId}/customer` | `customer.star#on_create_customer` | Create customer (with `Id`: update / sparse deactivation) |
 | GET | `/v3/company/{realmId}/customer` | `customer.star#on_read_customer` | List/get customer (list returns active only) |
 | GET | `/v3/company/{realmId}/customer/{id}` | `customer.star#on_read_customer_by_id` | Get customer by ID (also inactive) |

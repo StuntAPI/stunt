@@ -39,9 +39,11 @@ endpoints:
   - route: /v2/environments/{env}/api/data/v9.2/accounts({accountid})
     method: PATCH
     handler: scripts/dataverse.star#on_update_account
+    concurrency_key: accountid # get→merge→update is read-modify-write
   - route: /v2/environments/{env}/api/data/v9.2/accounts({accountid})
     method: DELETE
     handler: scripts/dataverse.star#on_delete_account
+    concurrency_key: accountid # check→delete is read-modify-write
 
   # --- Flows (literal 5th segment) ---
   - route: /v2/environments/{env}/flows

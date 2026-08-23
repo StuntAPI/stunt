@@ -45,7 +45,10 @@ def _unauthorized():
 # is non-empty but not decodable JSON (callers answer 400, never 500).
 def body_of(req):
     b = req.get("body")
-    if b == None:
+    # The engine hands a failed JSON parse as an EMPTY body dict with the raw
+    # bytes still on raw_body — a non-blank raw there means invalid JSON, and
+    # only re-decoding it can tell "no body" from "unparseable body".
+    if b == None or len(b) == 0:
         raw = req.get("raw_body", "")
         if raw == None or raw == "":
             return {}, True
@@ -107,7 +110,11 @@ def _parse_int(s):
     return n
 
 # _fmt_cents renders integer cents as the decimal string the real API uses.
+# Cents are ints at create but floats once round-tripped through the store
+# (JSON); coerce first — float // and % would str() as "1000.0.00.0".
 def _fmt_cents(cents):
+    if type(cents) == "float":
+        cents = int(cents)
     neg = cents < 0
     if neg:
         cents = -cents

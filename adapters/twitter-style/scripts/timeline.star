@@ -4,22 +4,14 @@
 # (newest first). If the collection has stateful tweets (created via
 # POST /2/tweets), those are included.
 
-# _reverse returns a new list with elements in reverse order.
-# _reverse is preloaded from scripts/lib.star.
+# _reverse, _csv, _paged_tweets and query_select are preloaded from
+# scripts/lib.star (query_select is a builtin).
 
 # GET /2/users/{id}/timelines/reverse_chronological — return tweets.
 def on_timeline(req):
     c = store_collection("tweets")
     docs = c.list()
-    tweets = _reverse(docs)
-    tweets = _apply_timeline_filters(req, tweets)
-    page, next_cursor = _list_page(req, tweets)
-    if page == None:
-        return respond(400, {"title": "Invalid Request", "detail": "Invalid pagination_token.", "type": "about:blank"})
-    meta = {"result_count": len(page)}
-    if next_cursor != None:
-        meta["next_token"] = next_cursor
-    return respond(200, {"data": page, "meta": meta})
+    return _paged_tweets(req, _apply_timeline_filters(req, _reverse(docs)))
 
 # --- helpers ---
 
@@ -34,19 +26,12 @@ def _apply_timeline_filters(req, tweets):
     if q == None:
         q = {}
 
-    exclude = q.get("exclude", "")
-    if exclude != None and exclude != "":
-        parts = []
-        for p in exclude.split(","):
-            p = p.strip()
-            if p != "":
-                parts.append(p)
-        if "replies" in parts:
-            kept = []
-            for t in tweets:
-                if t.get("in_reply_to_tweet_id", None) == None:
-                    kept.append(t)
-            tweets = kept
+    if "replies" in _csv(q.get("exclude", "")):
+        kept = []
+        for t in tweets:
+            if t.get("in_reply_to_tweet_id", None) == None:
+                kept.append(t)
+        tweets = kept
 
     f = []
     start_time = q.get("start_time", "")

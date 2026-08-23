@@ -45,8 +45,9 @@ All endpoints require the Bearer token; a missing token returns `401` with
   accounts (before paging).
 - **`$top` / `$skipToken`** (all list endpoints): OData cursor pagination. Pass
   `$top` for the page size; the response includes `@odata.nextLink` (round-trips
-  `$top`/`$skipToken`) when there is a further page. Paging is disabled when
-  `$top` is missing or `<= 0` — the whole list is returned with no next link.
+  `$top`/`$skipToken` plus the caller's other OData options) when there is a
+  further page. Paging is disabled when `$top` is missing or `<= 0` — the whole
+  list is returned with no next link.
 
 ## Key shapes
 

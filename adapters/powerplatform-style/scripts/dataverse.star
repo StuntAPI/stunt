@@ -19,6 +19,13 @@ def _accounts():
         store_kv_set("pp", "accounts_seeded", "1")
     return c
 
+# _public drops the collection storage key ("id") before a doc is echoed —
+# Dataverse addresses accounts by accountid; "id" is simulator housekeeping
+# the real API never returns.
+def _public(a):
+    a.pop("id", None)
+    return a
+
 # _select_fields projects each doc to the OData $select comma-separated fields.
 def _select_fields(docs, sel):
     if sel == None or sel == "":
@@ -63,7 +70,7 @@ def on_list_accounts(req):
 
     resp = {
         "@odata.context": "https://example.api.crm.dynamics.com/api/data/v9.2/$metadata#accounts",
-        "value": _select_fields(page, sel),
+        "value": [_public(d) for d in _select_fields(page, sel)],
     }
     if q != None and q.get("$count") == "true":
         resp["@odata.count"] = total
@@ -193,7 +200,7 @@ def on_retrieve_account(req):
     a = _accounts().get(id)
     if a == None:
         return respond(404, {"error": {"code": "0x80040217", "message": "account With Id = " + id + " Does Not Exist"}})
-    return respond(200, a)
+    return respond(200, _public(a))
 
 # POST .../accounts
 def on_create_account(req):
@@ -208,7 +215,7 @@ def on_create_account(req):
         body["accountid"] = "acc-" + str(store_kv_incr("pp", "account_seq"))
     body["id"] = body["accountid"]
     _accounts().insert(body)
-    return respond(201, body, {
+    return respond(201, _public(body), {
         "Location": "/v2/environments/" + req["params"]["env"] + "/api/data/v9.2/accounts(" + body["accountid"] + ")",
         "OData-Version": "4.0",
     })

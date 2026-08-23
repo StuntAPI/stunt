@@ -21,18 +21,18 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**98 adapters** — 2 SDK+VM, 34 SDK-only, 18 VM-only, 44 boot-tier.
+**98 adapters** — 2 SDK+VM, 34 SDK-only, 28 VM-only, 34 boot-tier.
 
-**43 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.
+**45 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.
 
 Behavior columns come in two kinds: **verified** (an official SDK was driven against the adapter and the check passed — the Behaviors counts in the matrix above) and **derived** (static analysis of the handler scripts — every adapter's *Derived behavior tags* block below says what the code does, not that a client confirmed it).
 
 | Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |
 |---|---|---|---|---|---|---|---|
-| [adyen-style](adapters/adyen-style/) | Adyen Checkout + Notification API `v68` | 14 | boot | — | — | [4](#adyen-style) | [4](#adyen-style) |
+| [adyen-style](adapters/adyen-style/) | Adyen Checkout + Notification API `v68` | 14 | VM | — | — | [4](#adyen-style) | [8](#adyen-style) |
 | [anaplan-style](adapters/anaplan-style/) | Anaplan API `2.0` | 18 | VM | — | — | [4](#anaplan-style) | [5](#anaplan-style) |
 | [apple-apns-style](adapters/apple-apns-style/) | Apple Push Notification service (APNs) `v2` | 2 | boot | — | — | [4](#apple-apns-style) | [2](#apple-apns-style) |
-| [apple-appstoreconnect-style](adapters/apple-appstoreconnect-style/) | App Store Connect API `v3` | 15 | boot | — | — | [7](#apple-appstoreconnect-style) | [5](#apple-appstoreconnect-style) |
+| [apple-appstoreconnect-style](adapters/apple-appstoreconnect-style/) | App Store Connect API `v3` | 15 | VM | — | — | [7](#apple-appstoreconnect-style) | [7](#apple-appstoreconnect-style) |
 | [apple-music-style](adapters/apple-music-style/) | Apple Music API `1.0` | 18 | VM | — | — | [5](#apple-music-style) | [5](#apple-music-style) |
 | [apple-searchads-style](adapters/apple-searchads-style/) | Apple Search Ads API `v4` | 12 | boot | — | — | [4](#apple-searchads-style) | [3](#apple-searchads-style) |
 | [apps-script-style](adapters/apps-script-style/) | Google Apps Script API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 6 | [2](#apps-script-style) | [3](#apps-script-style) |
@@ -46,7 +46,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [azure-storage-style](adapters/azure-storage-style/) | Azure Storage Blob REST API `2024-08-04` | 9 | VM | — | — | [6](#azure-storage-style) | [3](#azure-storage-style) |
 | [blog-style](adapters/blog-style/) | GraphQL demo `1.0` | 0 +GQL | boot | — | — | — | — |
 | [bluesky-style](adapters/bluesky-style/) | Bluesky AT Protocol `com.atproto (2024-Q4)` | 7 | SDK | atproto @ 0.20.41 (floor) | 8 | [7](#bluesky-style) | [4](#bluesky-style) |
-| [braintree-style](adapters/braintree-style/) | Braintree GraphQL + REST API `2024-09-01` | 15 +GQL | boot | — | — | [8](#braintree-style) | [5](#braintree-style) |
+| [braintree-style](adapters/braintree-style/) | Braintree GraphQL + REST API `2024-09-01` | 15 +GQL | VM | — | — | [8](#braintree-style) | [7](#braintree-style) |
 | [braze-style](adapters/braze-style/) | Braze REST API `2.0` | 12 | boot | — | — | [8](#braze-style) | [4](#braze-style) |
 | [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | VM | — | — | [6](#chainlink-style) | [7](#chainlink-style) |
 | [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | SDK | cloudflare-go @ v0.117.0 | 7 | [8](#cloudflare-style) | [6](#cloudflare-style) |
@@ -60,7 +60,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [emailoctopus-style](adapters/emailoctopus-style/) | EmailOctopus API `2.0.0` | 21 | VM | — | — | [2](#emailoctopus-style) | [3](#emailoctopus-style) |
 | [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 8 | [8](#entra-id-style) | [3](#entra-id-style) |
 | [erc4337-style](adapters/erc4337-style/) | ERC-4337 Bundler RPC `0.7` | 2 | boot | — | — | [5](#erc4337-style) | [4](#erc4337-style) |
-| [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | boot | — | — | [3](#escrow-style) | [1](#escrow-style) |
+| [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | VM | — | — | [3](#escrow-style) | [4](#escrow-style) |
 | [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | SDK | go-ethereum @ v1.17.5 | 5 | [5](#eth-jsonrpc-style) | [4](#eth-jsonrpc-style) |
 | [etherscan-style](adapters/etherscan-style/) | Etherscan API `1.0` | 1 | boot | — | — | [3](#etherscan-style) | [1](#etherscan-style) |
 | [fattureincloud-style](adapters/fattureincloud-style/) | Fatture in Cloud API v2 `2.0.29` | 42 | VM | — | — | [3](#fattureincloud-style) | [6](#fattureincloud-style) |
@@ -77,9 +77,9 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [gsheets-style](adapters/gsheets-style/) | Google Sheets API `v4` | 10 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#gsheets-style) | [3](#gsheets-style) |
 | [gtasks-style](adapters/gtasks-style/) | Google Tasks API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 8 | [3](#gtasks-style) | [2](#gtasks-style) |
 | [helius-style](adapters/helius-style/) | Helius Solana RPC + Enhanced API `v0` | 11 | boot | — | — | [3](#helius-style) | [4](#helius-style) |
-| [hn-style](adapters/hn-style/) | Hacker News Firebase API `v0` | 11 | boot | — | — | [3](#hn-style) | [2](#hn-style) |
+| [hn-style](adapters/hn-style/) | Hacker News Firebase API `v0` | 11 | VM | — | — | [3](#hn-style) | [4](#hn-style) |
 | [hubspot-style](adapters/hubspot-style/) | HubSpot CRM API `v3` | 33 | SDK | hubspot-node @ 14.0.1 (floor) | 5 | [4](#hubspot-style) | — |
-| [instagram-style](adapters/instagram-style/) | Instagram Graph API `v21.0` | 10 | boot | — | — | [4](#instagram-style) | [2](#instagram-style) |
+| [instagram-style](adapters/instagram-style/) | Instagram Graph API `v21.0` | 10 | VM | — | — | [4](#instagram-style) | [5](#instagram-style) |
 | [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 32 | SDK | jira-js @ 6.1.0 (floor) | 7 | [5](#jira-style) | [6](#jira-style) |
 | [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | boot | — | — | [3](#jumio-style) | [4](#jumio-style) |
 | [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | boot | — | — | [4](#linkedin-style) | [1](#linkedin-style) |
@@ -95,12 +95,12 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [photos-style](adapters/photos-style/) | Google Photos Library API `v1` | 12 | boot | — | — | [5](#photos-style) | [2](#photos-style) |
 | [pinata-style](adapters/pinata-style/) | Pinata API `1.0` | 6 | boot | — | — | [4](#pinata-style) | — |
 | [plaid-style](adapters/plaid-style/) | Plaid API `2020-09-14` | 13 | SDK | plaid-node @ 32.0.0 (floor) | 4 | [5](#plaid-style) | [3](#plaid-style) |
-| [powerplatform-style](adapters/powerplatform-style/) | Microsoft Power Platform API `2` | 9 | boot | — | — | [4](#powerplatform-style) | [3](#powerplatform-style) |
+| [powerplatform-style](adapters/powerplatform-style/) | Microsoft Power Platform API `2` | 9 | VM | — | — | [4](#powerplatform-style) | [6](#powerplatform-style) |
 | [printful-style](adapters/printful-style/) | Printful API `v2` | 13 | boot | — | — | [5](#printful-style) | [1](#printful-style) |
 | [printify-style](adapters/printify-style/) | Printify API `v1` | 16 | VM | — | — | [5](#printify-style) | [4](#printify-style) |
 | [producthunt-style](adapters/producthunt-style/) | Product Hunt GraphQL API `2` | 0 +GQL | boot | — | — | [3](#producthunt-style) | [2](#producthunt-style) |
 | [psd2-style](adapters/psd2-style/) | Open Banking / PSD2 (Berlin Group NextGenPSD2) `1.3.6` | 19 | VM | — | — | [6](#psd2-style) | [7](#psd2-style) |
-| [qbo-style](adapters/qbo-style/) | QuickBooks Online API `v3` | 11 | boot | — | — | [6](#qbo-style) | [1](#qbo-style) |
+| [qbo-style](adapters/qbo-style/) | QuickBooks Online API `v3` | 11 | VM | — | — | [6](#qbo-style) | [4](#qbo-style) |
 | [reddit-style](adapters/reddit-style/) | Reddit API `1.0` | 2 | boot | — | — | [5](#reddit-style) | [1](#reddit-style) |
 | [resend-style](adapters/resend-style/) | Resend API `1.0.0` | 6 | SDK | resend-node @ 6.22.0 (floor) | 4 | [6](#resend-style) | [3](#resend-style) |
 | [revenuecat-style](adapters/revenuecat-style/) | RevenueCat API `v1` | 7 | boot | — | — | [5](#revenuecat-style) | [4](#revenuecat-style) |
@@ -118,12 +118,12 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [thegraph-style](adapters/thegraph-style/) | The Graph (GraphQL over subgraphs) `1.0` | 1 +GQL | boot | — | — | [3](#thegraph-style) | [1](#thegraph-style) |
 | [threads-style](adapters/threads-style/) | Threads API (Meta) `v1.0` | 8 | boot | — | — | [3](#threads-style) | [3](#threads-style) |
 | [twilio-style](adapters/twilio-style/) | Twilio API `2010-04-01` | 6 | SDK | twilio-go @ v1.30.9<br>twilio-node @ 6.1.0 (floor) | 8 | [6](#twilio-style) | [4](#twilio-style) |
-| [twitter-style](adapters/twitter-style/) | Twitter/X API `v2` | 9 | boot | — | — | [7](#twitter-style) | [3](#twitter-style) |
+| [twitter-style](adapters/twitter-style/) | Twitter/X API `v2` | 9 | VM | — | — | [6](#twitter-style) | [5](#twitter-style) |
 | [walletconnect-style](adapters/walletconnect-style/) | WalletConnect (Relay Protocol v2) `2.0` | 7 | boot | — | — | [3](#walletconnect-style) | [2](#walletconnect-style) |
 | [whatsapp-style](adapters/whatsapp-style/) | WhatsApp Business Cloud API (Meta) `v21.0` | 8 | boot | — | — | [5](#whatsapp-style) | [4](#whatsapp-style) |
 | [workday-style](adapters/workday-style/) | Workday REST API `v40.0` | 8 | boot | — | — | [4](#workday-style) | [1](#workday-style) |
 | [x-articles-style](adapters/x-articles-style/) | X (Twitter) Articles API `v2` | 8 | boot | — | — | [4](#x-articles-style) | [1](#x-articles-style) |
-| [xero-style](adapters/xero-style/) | Xero Accounting API `2.0` | 15 | boot | — | — | [6](#xero-style) | [2](#xero-style) |
+| [xero-style](adapters/xero-style/) | Xero Accounting API `2.0` | 15 | VM | — | — | [6](#xero-style) | [5](#xero-style) |
 | [youtube-style](adapters/youtube-style/) | YouTube Data API `v3` | 14 | SDK | google-api-go-client @ v0.293.0 | 8 | [7](#youtube-style) | [2](#youtube-style) |
 | [zendesk-style](adapters/zendesk-style/) | Zendesk REST API `2` | 37 | SDK | node-zendesk @ 6.0.1 (floor) | 6 | [8](#zendesk-style) | [5](#zendesk-style) |
 | [zuora-style](adapters/zuora-style/) | Zuora REST API `v1` | 20 | VM | — | — | [8](#zuora-style) | [5](#zuora-style) |
@@ -542,6 +542,48 @@ What the engine-level suites in `adapters/<name>_style_test.go` assert — the
 adapter's real handlers execute against the real engine; no SDK is involved.
 Named by their `// =====` section markers.
 
+**adyen-style**
+
+- a missing X-API-Key is a 401 security envelope
+- an unseeded API key is rejected identically
+- the seeded test key authorises; header spelling does not matter
+- the gate spans the whole surface, not just /payments
+- a plain card authorises instantly with a 16-digit 881 pspReference
+- the refused test card (...0002) answers Refused with refusalReason, still 200
+- simulate_fail refuses an instant payment outright
+- Idempotency-Key replays the same pspReference; a fresh call mints a new one
+- GET ?reference= returns the payment object; unknown references are 422 010
+- the unfiltered list is cursor-paginated; a garbage cursor is a 400
+- a 3DS card returns IdentifyShopper with a threeDS2 action and no pspReference yet
+- submitting the fingerprint authorises and mints the pspReference
+- paymentData tokens are single-use
+- challenge cards (...0081) add a ChallengeShopper round with a fresh token
+- simulate_fail refuses at completion with threeDSError
+- a missing paymentData or missing fingerprint is a 422 validation error
+- an idempotent replay re-renders the payment's CURRENT state, not the original response (deviation, asserted as-is)
+- the catalogue is scheme/ideal/paypal/applepay/googlepay, storedPaymentMethods empty
+- merchantAccount is required
+- any merchantAccount string is accepted — no account registry (deviation, asserted as-is)
+- creating a link assigns PL-N, defaults expiresAt to +24h, starts active
+- a zero amount or missing reference is a 422
+- an unknown link id is a 404 with errorCode 191
+- authorising a payment on the link's reference completes the link on read
+- a past expiresAt flips the link to expired on read, and terminal statuses persist
+- capture chains a CAP-prefixed pspReference and returns status received
+- a partial capture keeps the remainder capturable; over-capture is 422 702
+- refunds draw down the captured balance; over-refund is 422 705
+- refund before capture is 704, currency mismatch 708, zero amount 703
+- cancel is only for uncaptured payments; reversal is terminal from captured
+- a cancelled payment rejects every later modification
+- an unknown pspReference is a 422 010
+- webhook registration masks the hmacKey in every view
+- an authorisation delivers the standard envelope signed with the hook's own key
+- a capture chains originalReference and signs with the mock key via the events filter
+- a refused payment notifies AUTHORISATION with success "false"
+- only the first matching hook receives an event (deviation, asserted as-is)
+- deleting a hook silences it; the next matching hook takes over
+- the merchant-side receiver answers [accepted] and tolerates redelivery
+
 **anaplan-style**
 
 - missing or unrecognized credentials draw the 401 failure envelope
@@ -559,6 +601,29 @@ Named by their `// =====` section markers.
 - unknown import, export, and task ids get 404 failure envelopes
 - catalog ids resolve only within their model
 - task status is scoped to its workspace and model
+
+**apple-appstoreconnect-style**
+
+- a rejected credential answers Apple's 401 errors array, not a bare status
+- the JOSE header must declare ES256 and carry a kid
+- structural validity is not enough: the exact JWT string must be registered
+- the seeded app reads back through list and single-get, with 404 NOT_FOUND for unknown ids
+- create assigns numeric ids, persists into the list, and dedupes bundleId
+- bracketed filter[...], leading-dash sort, and fields[apps] projections apply before paging
+- PATCH /v1/apps/{id} renames and refuses bundleId collisions
+- limit/cursor paging surfaces meta.paging and a links.next cursor
+- limit defaults to 50 and clamps at the documented maximum 200
+- a malformed cursor is total: 200 with data null (Apple answers 400 — deviation)
+- versionString is required and duplicate versionStrings collide per app
+- the app's first version adopts its unattached build
+- PATCH works only in the editable states (PREPARE_FOR_SUBMISSION, REJECTED)
+- submission drives WAITING_FOR_REVIEW → IN_REVIEW → READY_FOR_SALE on the clock
+- simulate_fail rejects, and a REJECTED version stays editable and resubmittable
+- a fresh app's build reads PROCESSING and the processingState filter agrees
+- the 3s window settles VALID and GET /v1/builds/{id} agrees
+- a simulate_fail app settles its build INVALID
+- users seed once and answer the bracketed role/username filters and sort
+- salesReports echoes the bracketed report filters with DAILY/SALES defaults
 
 **apple-music-style**
 
@@ -671,6 +736,28 @@ Named by their `// =====` section markers.
 - a tampered signature gets the 403 AuthenticationFailed XML envelope
 - an account outside the key table fails closed with 403
 
+**braintree-style**
+
+- ping answers true and introspection names the query root
+- unknown fields and operations fail validation before execution
+- createCustomer assigns an id and the customer query reads it back
+- a charge is born SUBMITTED_FOR_SETTLEMENT; an authorization is AUTHORIZED
+- resolver failures surface as errors[] with a null field, not an HTTP status
+- searchTransactions speaks the criteria vocabulary with enum normalization
+- the charge settles at +3s, derived on read
+- REST handlers require credentials; Bearer or Basic both unlock
+- client tokens and vaulted payment methods come back in Braintree shapes
+- the transaction lifecycle derives on the clock
+- guard failures carry the real Braintree error codes
+- refunds default to the unrefunded balance and cap at it
+- an uncaptured authorization expires past its window
+- an Idempotency-Key replays the original create
+- advanced_search maps the search-criteria vocabulary onto typed filters
+- registration stores the hook and delivers a signed check
+- settled transactions fire one signed notification per new state, filtered by kind
+- subscriptions bill per cycle, expire at the last, and cancel only while Active
+- inbound verification splits 200/400
+
 **chainlink-style**
 
 - the five default feeds seed on first read and narrow by network
@@ -730,6 +817,40 @@ Named by their `// =====` section markers.
 - get by contact id round-trips the email
 - delete removes the contact; reads 404 after
 
+**escrow-style**
+
+- missing, Bearer, and malformed Authorization are 401s with the challenge header
+- the documented credentials unlock the customer record
+- the gate covers the transaction and webhook surfaces alike
+- create assigns the first numeric id, stamps creation_date, and defaults currency
+- the initiating party is auto-agreed; the counterparty is not
+- items carry the 2017-09-01 defaults and schedule amounts as decimal strings
+- the default escrow fee is 3.25% charged to the buyer
+- get by id returns the same shape — amounts survive the store round trip
+- unknown ids are 404s keyed on the id field
+- party validation answers the nested Escrow field errors
+- amounts parse from decimal strings identically to numbers
+- multi-entry schedules sum into the default fee
+- a caller-supplied fee split is honored, in the schedule's dollar units
+- an unparseable amount stores 0.00 rather than 400ing (deviation, asserted as-is)
+- a non-JSON body is a 400 body error, not a 500
+- the default page returns every transaction in creation order
+- per_page slices; page walks the remainder; past the end is empty
+- junk pagination params fall back to the defaults (page 1, per_page 10)
+- a reference resolves to its transaction
+- an unknown reference is a 404 keyed on the reference field
+- agree needs a party's email and rejects strangers
+- funding waits for every party's agreement
+- the counterparty's agreement unlocks funding; every schedule entry secures
+- accept flips every item and stamps close_date off the virtual clock
+- PATCH actions and funding on unknown ids are 404s
+- ship marks the item shipped, receive marks it received
+- cancel flags every item and the transaction itself, without closing it
+- unknown or missing actions are 400s on the action field
+- registration assigns integer ids and echoes the URL
+- the list carries every registered webhook
+- a missing or blank url is the can't-be-blank field error
+
 **fattureincloud-style**
 
 - auth failures answer the flat OAuth envelope; any non-empty bearer passes
@@ -773,6 +894,66 @@ Named by their `// =====` section markers.
 - topic and condition sends fan out to the subscribed tokens
 - unsubscribing shrinks the fanout and a bare subscribe is a 400
 - the stored message list is project-scoped
+
+**hn-style**
+
+- item reads resolve the .json route capture into the full Firebase story shape
+- comments link up via parent and kids, omit story-only fields, and count their subtree in descendants
+- unknown items and users answer 200 with the literal null, not a 404
+- story lists are bare integer arrays: top and best rank by score, new is newest-first
+- ask and show partition the story set by title prefix; jobs stay type-only and off the story lists
+- Firebase REST query params (print=pretty, orderBy, limitToFirst) are accepted and ignored
+- user reads resolve .json ids into created/karma/about/submitted with by/submitted agreeing
+- users without a bio omit about, matching the sparse Firebase shape
+- reads are public: no credential is required and a stray bearer gates nothing
+- maxitem and updates are not modeled: the read surface is the six lists plus item and user
+
+**instagram-style**
+
+- authorize without redirect_uri, state or client_id is invalid_request
+- authorize redirects back with a fresh code and the state echoed
+- a redirect_uri that already carries a query is joined with &
+- the exchange demands grant_type=authorization_code
+- an unknown code is 400 invalid_grant
+- a good exchange mints a token bound to a fresh IG user
+- the code is single-use: a replay is invalid_grant
+- client mismatches are 400 invalid_client
+- a mismatched attempt must not burn the code
+- a second flow mints a distinct user
+- a missing bearer is 401 in the Graph error envelope
+- wrong schemes and unknown bearers answer the same 190
+- every API route enforces the same gate
+- a bearer dies at its clock-derived 60-day expiry
+- me returns the OAuth-bound profile
+- media_count starts at 0 and tracks published media
+- a second user's profile counts only its own media
+- a container without image_url or video_url is a code-100 400
+- create assigns a c_* container id
+- a fresh container polls IN_PROGRESS and publish is gated
+- the status derives FINISHED after the ~3s window
+- publishing a FINISHED container assigns an m_* media id
+- simulate_fail ends in ERROR and never publishes
+- unknown container ids answer the catch-all 404
+- a video container publishes VIDEO media carrying the video url
+- the media edge lists newest first (reverse chronological)
+- ?fields= projects each row and drops unknown fields
+- limit pages through after cursors with a next that keeps the query
+- a malformed after cursor is a code-100 400
+- the list is scoped to the path user
+- all four manifest metrics return in canonical order
+- values are deterministic across reads
+- ?metric= filters to the requested names
+- an unknown metric name empties the data set (deviation, as-is)
+- insights for an unknown media id are the catch-all 404
+- comments authorize via the access_token query param
+- the bearer header authorizes the identical read
+- a bad query token is the 190 envelope
+- since hides comments at-or-before the cutoff
+- comments on an unknown media id are a code-100 OAuthException 404
+- refresh demands a token (query param or bearer)
+- an unknown token is rejected with 190
+- refresh mints a fresh 60-day token; the old one keeps working
+- the refreshed token outlives the original's expiry
 
 **marketo-style**
 
@@ -823,6 +1004,28 @@ Named by their `// =====` section markers.
 - signature verification answers SUCCESS only for known webhook ids
 - deletion is 204, and repeats are 404
 
+**powerplatform-style**
+
+- every route sits behind the entra bearer gate: a missing, non-bearer, or empty token answers 401 in the microsoft error envelope
+- the gate does not validate the token: any well-formed bearer passes (as-is)
+- environments list as the odata value envelope with arm resource ids and nested properties
+- the api-version query convention is not modeled: the param is ignored (version is baked into the /v2 path — reported)
+- environment lifecycle is not modeled: states are static and nothing moves on the clock (reported)
+- the collection lazily seeds two dataverse accounts on first read
+- create answers 201 with a location entity uri and OData-Version header, echoing the record
+- the accounts({accountid}) key convention retrieves and 404s with the dataverse 0x80040217 envelope
+- a client-supplied accountid is honored and targeted by later reads
+- patch is a partial merge answering 204; delete answers 204 and a second delete 404s
+- $filter supports eq/contains with AND and numeric comparisons on unquoted literals
+- $orderby sorts asc and desc; $skip applies before paging
+- $select projects fields and $count=true reports the post-filter pre-paging total
+- $top/$skipToken walk every account exactly once with @odata.nextLink only between pages
+- a nextLink round-trips the caller's $filter and $select so a paged walk stays filtered
+- paging is disabled without $top and an invalid skipToken answers 400 badrequest
+- an environment with no flows falls back to the seeded welcome flow
+- creating a flow persists it per environment behind arm flow ids; other environments keep the seeded fallback
+- connectors are static arm api resources with tiers
+
 **printify-style**
 
 - a missing or non-Bearer Authorization is a flat 401 at every surface
@@ -862,6 +1065,32 @@ Named by their `// =====` section markers.
 - the payment SCA chain mirrors the consent chain and finalises on read
 - the transaction status walks RCVD → ACTC → ACSC on the clock and terminal payments refuse cancellation
 - a non-terminal payment cancels to 204/CANC and simulate_fail drives RJCT
+
+**qbo-style**
+
+- authorize without client_id/redirect_uri/state is invalid_request
+- authorize 302s back to the redirect_uri with code, state and a fresh realmId
+- the auth code exchanges once into a token pair; reuse is invalid_grant
+- refresh rotates the refresh token and kills the old one (the QBO churn)
+- unknown grants and unknown codes are OAuth 400s
+- v3 calls demand a live bearer: absent, unknown and expired tokens are 401 fault 32001
+- the bearer is realm-bound: another company's path is 401
+- DisplayName is required: a 400 fault 610
+- customer create assigns Id, SyncToken 0 and QBO defaults
+- reads by path id and ?id= round-trip; unknown ids are 404 fault 620
+- POST with Id updates: a sparse merge bumps SyncToken and leaves unspecified fields alone
+- DELETE deactivates: the record stays readable by id but leaves the active list
+- invoice create prices its Line items into TotalAmt/Balance and mints a DocNumber
+- a Line is required: a 400 fault 610
+- void flips status Voided and zeroes Balance, keeping the record
+- DELETE is a hard delete: the record is gone afterwards
+- entity detection follows the FROM token, so CustomerRef.value reads Invoices
+- WHERE filters by equality, LIKE and IN over stored fields
+- ORDER BY DESC with MAXRESULTS caps the page and reports maxResults
+- the POST query endpoint takes the statement from the body
+- default reads hide deactivated customers; WHERE Active = False surfaces them
+- an unknown entity answers an empty QueryResponse; a statement without one is a 400 fault
+- STARTPOSITION pages with MAXRESULTS: row 2 of the sorted set
 
 **servicenow-style**
 
@@ -925,6 +1154,53 @@ Named by their `// =====` section markers.
 - SetQueueAttributes persists; unknown names are InvalidAttributeName
 - DeleteQueue tears the queue down for its messages too
 - the throttled profile alternates empty receives deterministically
+
+**twitter-style**
+
+- the mock oauth2 endpoint mints a bearer and the bearer gate is never enforced
+- create enforces the 280-char limit and reply-chain integrity with v2 400 envelopes
+- create answers 201 {data:{id,text}} with kv-sequence ids and clock-stamped created_at
+- read by id projects tweet.fields and expands author_id into includes
+- delete answers {data:{deleted:true}} and later reads are 404s
+- /me resolves the literal route before /2/users/{id} and returns v2's default field set
+- show by id and lookup by username round-trip the seeded users
+- unknown users are resource-not-found 404s in the v2 envelope
+- the timeline is newest-first and loses nothing by default
+- start_time/end_time bound created_at and exclude=replies drops threads
+- max_results pages via meta.next_token; an invalid pagination_token is a 400
+- the tweet list shares the same v2 paging and stays unpaged without max_results
+
+**xero-style**
+
+- a missing or unknown bearer gets the same 401 TokenExpired envelope; the seeded static token passes
+- GET /connections needs only the bearer and lists the two demo tenants
+- api.xro calls without xero-tenant-id are 400 TenantRequired, and the header matches case-insensitively
+- the seeded static token expires on the virtual clock, and the bearer gate outranks the tenant gate
+- PUT /Invoices sums every line into the totals and echoes each computed LineAmount
+- a single-object body creates one invoice with clock-derived Date and DueDate defaults
+- GET /Invoices/{id} round-trips the stored invoice; unknown ids are the 404 envelope
+- payments accumulate on the ledger and are echoed with their own PaymentID
+- a negative amount is a refund bounded by what was paid
+- over-payment (and an over-refund) is Xero's validation error and leaves the ledger untouched
+- the invoice flips to PAID exactly at a zero balance and then refuses further payments
+- DRAFT invoices are not payable and unknown ids are the 404 envelope
+- DELETE voids to 204 and the record survives with Status VOIDED and a zeroed balance
+- the voided invoice stays listable via the Statuses filter
+- re-voiding, voiding a PAID invoice, and unknown ids are rejected
+- PUT /Contacts creates with Xero defaults and reads back by id
+- the Contacts array upserts by ContactID and ContactNumber, merging over the stored record
+- duplicate active names are Xero's real validation error, in Elements
+- archive is an update: the contact stays readable and releases its name
+- invalid statuses and unknown ids are the plain ValidationError / NotFound envelopes
+- where ANDs clauses in Xero's grammar, and Statuses/InvoiceNumber/ContactID filter the invoice list
+- order sorts by any field in both directions (dates sort as instants)
+- contacts search matches name and email case-blind, while where Name.Contains is case-sensitive
+- the seeded chart of accounts and the static catalogs speak the same grammar
+- page/pageSize walk every contact exactly once, with nextPage only between pages
+- without pageSize paging is off; a page past the end is an empty 200 page
+- a malformed page falls back to page 1 (as-is: no 400)
+- a delivery signed with base64(HMAC-SHA256(key, raw bytes)) is accepted
+- missing, tampered, and wrong-key signatures all answer the 401 envelope Xero requires
 
 **zuora-style**
 
@@ -1013,12 +1289,16 @@ behavior notes live in each adapter's README.
 - No amountUpdates, technicalCancels, or auto-rescue modification routes
 - No stored payment method lifecycle — tokens cannot be stored, listed, or disabled
 
-**Deviations** (4)
+**Deviations** (8)
 
 - Per-hook hmacKey and events filter are local extensions — real Adyen hides the key
 - simulate_fail flag on /v68/payments forces Refused (simulator-only failure injection)
 - paymentLinks url is synthetic — no hosted checkout page; pay via the link reference
 - paymentMethods serves a fixed 5-method catalog with empty storedPaymentMethods
+- Webhook HMAC signs the base64-encoded signing string with eventCode in field 7; deliveries go to the first matching hook only
+- Idempotency replay re-renders the payment's current state, not the original response
+- Modification pspReferences carry CAP/REF/REV/CAN prefixes; real Adyen's are numeric
+- paymentMethods accepts any merchantAccount; real Adyen 403s on unknown accounts
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -1233,13 +1513,15 @@ behavior notes live in each adapter's README.
 - No user invitations or user CRUD (GET /v1/users list only)
 - No App Analytics (analyticsReportRequests, metrics) — salesReports only
 
-**Deviations** (5)
+**Deviations** (7)
 
 - JWT signature crypto NOT verified — structural plus registry check only
 - Review is clock-driven: WAITING_FOR_REVIEW +1s to IN_REVIEW, +3s to READY_FOR_SALE
 - Builds settle PROCESSING to VALID at +3s — no separate in-flight state
 - simulate_fail extension: app create forces build INVALID, version create REJECTED
 - A first build is minted at app create — no build upload path
+- A malformed cursor answers 200 with data null; real ASC answers 400
+- salesReports returns a JSON:API object; real ASC streams a gzip TSV and 400s on missing filters
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -2015,6 +2297,65 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec atproto lexicons app.bsky.* + com.atproto.* (XRPC: query=GET, procedure=POST; records/objects/subscriptions skipped): 202 real routes · 7 covered · 3% · 195 not implemented
+
+<details><summary>not implemented (195)</summary>
+
+- `GET` `/xrpc/app.bsky.actor.getPreferences`
+- `GET` `/xrpc/app.bsky.actor.getProfiles`
+- `GET` `/xrpc/app.bsky.actor.getSuggestions`
+- `POST` `/xrpc/app.bsky.actor.putPreferences`
+- `GET` `/xrpc/app.bsky.actor.searchActors`
+- `GET` `/xrpc/app.bsky.actor.searchActorsTypeahead`
+- `POST` `/xrpc/app.bsky.ageassurance.begin`
+- `GET` `/xrpc/app.bsky.ageassurance.getConfig`
+- `GET` `/xrpc/app.bsky.ageassurance.getState`
+- `POST` `/xrpc/app.bsky.bookmark.createBookmark`
+- `POST` `/xrpc/app.bsky.bookmark.deleteBookmark`
+- `GET` `/xrpc/app.bsky.bookmark.getBookmarks`
+- `POST` `/xrpc/app.bsky.contact.dismissMatch`
+- `GET` `/xrpc/app.bsky.contact.getMatches`
+- `GET` `/xrpc/app.bsky.contact.getSyncStatus`
+- `POST` `/xrpc/app.bsky.contact.importContacts`
+- `POST` `/xrpc/app.bsky.contact.removeData`
+- `POST` `/xrpc/app.bsky.contact.sendNotification`
+- `POST` `/xrpc/app.bsky.contact.startPhoneVerification`
+- `POST` `/xrpc/app.bsky.contact.verifyPhone`
+- `POST` `/xrpc/app.bsky.draft.createDraft`
+- `POST` `/xrpc/app.bsky.draft.deleteDraft`
+- `GET` `/xrpc/app.bsky.draft.getDrafts`
+- `POST` `/xrpc/app.bsky.draft.updateDraft`
+- `GET` `/xrpc/app.bsky.embed.getEmbedExternalView`
+- `GET` `/xrpc/app.bsky.feed.describeFeedGenerator`
+- `GET` `/xrpc/app.bsky.feed.getActorFeeds`
+- `GET` `/xrpc/app.bsky.feed.getActorLikes`
+- `GET` `/xrpc/app.bsky.feed.getAuthorFeed`
+- `GET` `/xrpc/app.bsky.feed.getFeed`
+- `GET` `/xrpc/app.bsky.feed.getFeedGenerator`
+- `GET` `/xrpc/app.bsky.feed.getFeedGenerators`
+- `GET` `/xrpc/app.bsky.feed.getFeedSkeleton`
+- `GET` `/xrpc/app.bsky.feed.getLikes`
+- `GET` `/xrpc/app.bsky.feed.getListFeed`
+- `GET` `/xrpc/app.bsky.feed.getPostThread`
+- `GET` `/xrpc/app.bsky.feed.getPosts`
+- `GET` `/xrpc/app.bsky.feed.getQuotes`
+- `GET` `/xrpc/app.bsky.feed.getRepostedBy`
+- `GET` `/xrpc/app.bsky.feed.getSuggestedFeeds`
+- `GET` `/xrpc/app.bsky.feed.getTimeline`
+- `GET` `/xrpc/app.bsky.feed.searchPostsV2`
+- `POST` `/xrpc/app.bsky.feed.sendInteractions`
+- `GET` `/xrpc/app.bsky.graph.getActorStarterPacks`
+- `GET` `/xrpc/app.bsky.graph.getBlocks`
+- `GET` `/xrpc/app.bsky.graph.getFollowers`
+- `GET` `/xrpc/app.bsky.graph.getFollows`
+- `GET` `/xrpc/app.bsky.graph.getKnownFollowers`
+- `GET` `/xrpc/app.bsky.graph.getList`
+- `GET` `/xrpc/app.bsky.graph.getListBlocks`
+… and 145 more
+
+
+</details>
+
 **Missing** (7)
 
 - No repo reads: com.atproto.repo getRecord, listRecords, describeRepo, uploadBlob
@@ -2081,13 +2422,15 @@ behavior notes live in each adapter's README.
 - GraphQL subset: no paymentMethod, clientToken, PayPal, or dispute operations
 - No Braintree Auth OAuth endpoints (token exchange, merchant onboarding)
 
-**Deviations** (5)
+**Deviations** (7)
 
 - timings compressed: transactions settle at +3s, subscriptions bill a cycle every 2s
 - webhook registration exposed at POST /webhooks; real Braintree is Control Panel only
 - webhook deliveries are JSON + bt-* headers, not the real form-encoded bt_* POST
 - POST /graphql is served without the Bearer/Basic auth check the REST surface enforces
 - simulate_authorization_expiry sim-only flag: auths expire in 1s vs 7 simulated days
+- REST creates answer 200; real Braintree answers 201 Created
+- Client tokens are opaque strings, not the real base64 JSON encoding
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -2734,6 +3077,65 @@ behavior notes live in each adapter's README.
 
 </details>
 
+**Provider surface** — derived from spec dropbox-api-spec files.stone + users.stone (every route POST — API v2 is RPC-style, Stone declares no verb): 72 real routes · 8 covered · 11% · 64 not implemented
+
+<details><summary>not implemented (64)</summary>
+
+- `POST` `/2/files/alpha/get_metadata`
+- `POST` `/2/files/alpha/upload`
+- `POST` `/2/files/copy`
+- `POST` `/2/files/copy_batch`
+- `POST` `/2/files/copy_batch/check`
+- `POST` `/2/files/copy_batch/check_v2`
+- `POST` `/2/files/copy_batch_v2`
+- `POST` `/2/files/copy_reference/get`
+- `POST` `/2/files/copy_reference/save`
+- `POST` `/2/files/copy_v2`
+- `POST` `/2/files/create_folder_batch`
+- `POST` `/2/files/create_folder_batch/check`
+- `POST` `/2/files/create_folder_v2`
+- `POST` `/2/files/delete_batch`
+- `POST` `/2/files/delete_batch/check`
+- `POST` `/2/files/delete_v2`
+- `POST` `/2/files/download_zip`
+- `POST` `/2/files/export`
+- `POST` `/2/files/get_file_lock_batch`
+- `POST` `/2/files/get_preview`
+- `POST` `/2/files/get_temporary_upload_link`
+- `POST` `/2/files/get_thumbnail`
+- `POST` `/2/files/get_thumbnail_batch`
+- `POST` `/2/files/get_thumbnail_v2`
+- `POST` `/2/files/list_folder/continue`
+- `POST` `/2/files/list_folder/get_latest_cursor`
+- `POST` `/2/files/list_folder/longpoll`
+- `POST` `/2/files/list_revisions`
+- `POST` `/2/files/lock_file_batch`
+- `POST` `/2/files/move`
+- `POST` `/2/files/move_batch`
+- `POST` `/2/files/move_batch/check`
+- `POST` `/2/files/move_batch/check_v2`
+- `POST` `/2/files/move_batch_v2`
+- `POST` `/2/files/move_v2`
+- `POST` `/2/files/paper/create`
+- `POST` `/2/files/paper/update`
+- `POST` `/2/files/permanently_delete`
+- `POST` `/2/files/properties/add`
+- `POST` `/2/files/properties/overwrite`
+- `POST` `/2/files/properties/update`
+- `POST` `/2/files/restore`
+- `POST` `/2/files/save_url`
+- `POST` `/2/files/save_url/check_job_status`
+- `POST` `/2/files/search`
+- `POST` `/2/files/search/continue_v2`
+- `POST` `/2/files/search_v2`
+- `POST` `/2/files/tags/add`
+- `POST` `/2/files/tags/get`
+- `POST` `/2/files/tags/remove`
+… and 14 more
+
+
+</details>
+
 **Missing** (8)
 
 - No move or copy endpoints (/2/files/move_v2, /2/files/copy_v2)
@@ -3096,9 +3498,12 @@ behavior notes live in each adapter's README.
 - No reject or return-item actions (agree/accept/ship/receive/cancel exist)
 - No fee calculation endpoint (/2017-09-01/transaction/fees)
 
-**Deviations** (1)
+**Deviations** (4)
 
 - POST /sim/transaction/{id}/fund is a simulator-only affordance for hosted-page funding
+- List returns {transactions:[...]}; real Escrow.com returns a bare array
+- An unparseable schedule amount stores 0.00 instead of a 400 field error
+- ship/receive/cancel are not gated on agreement or secured funds
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -4438,10 +4843,12 @@ behavior notes live in each adapter's README.
 - No poll or pollopt item types; no deleted or dead item flags
 - No realtime updates (Firebase SSE watch) on item or list reads
 
-**Deviations** (2)
+**Deviations** (4)
 
 - Write flow /login + /submit from a reference client; official Firebase API is read-only
 - Challenge injection after N submits (anti-abuse) mirrors mock_hn, configurable via KV
+- Firebase REST query params (print=pretty, orderBy, limitToFirst) are accepted and ignored
+- The .json suffix is optional on item reads; real Firebase requires it
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -4635,10 +5042,13 @@ behavior notes live in each adapter's README.
 - No hashtag search (ig_hashtag_search, top_media, recent_media)
 - No comment replies, delete, hide, or moderation endpoints
 
-**Deviations** (2)
+**Deviations** (5)
 
 - Container processing fixed at ~3s IN_PROGRESS before FINISHED or ERROR
 - simulate_fail=true create flag forces container ERROR; real API has no such switch
+- Cursors are forward-only plain offsets; no before cursor or paging.previous
+- An unknown insights metric returns 200 with empty data; real Graph answers error code 100
+- media_publish does not check container ownership across users
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -5963,11 +6373,14 @@ behavior notes live in each adapter's README.
 - No flow update, delete, or run operations
 - No $expand, $apply, or $search query options
 
-**Deviations** (3)
+**Deviations** (6)
 
 - No default page size: whole list returns unless $top is set; real Dataverse pages at 5000
 - Client-supplied accountid accepted on create; auto ids are acc-<n>, not GUIDs
 - Environments with no stored flows list a fallback seeded seeded-flow-001 entry
+- api-version is ignored (version baked into the /v2 path); real Power Platform requires ?api-version=
+- $skipToken is camelCase; real Dataverse entity paging uses $skiptoken
+- POST accounts echoes the created record; real Dataverse returns 201 empty with OData-EntityId
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -6312,9 +6725,12 @@ behavior notes live in each adapter's README.
 - No reports endpoints (Profit and Loss, Balance Sheet, Trial Balance)
 - No Intuit webhooks (QBO event notifications)
 
-**Deviations** (1)
+**Deviations** (4)
 
 - Malformed FROM tokens fall back to substring entity matching instead of erroring
+- Full (non-sparse) update merges like sparse; real QBO replaces and clears omitted fields
+- SyncToken optimistic concurrency is not enforced — stale tokens still update
+- Data is not realm-partitioned: one realm's token reads another realm's records
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -7912,7 +8328,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Missing** (7)
+**Missing** (6)
 
 - No tweet search (/2/tweets/search/recent or /all) endpoints
 - No likes, reposts, bookmarks, or quote/reply tweet operations
@@ -7920,22 +8336,23 @@ behavior notes live in each adapter's README.
 - No media upload, polls, or long-form (note) tweet support
 - No spaces, lists, DMs, or compliance surfaces
 - No filtered or sample stream endpoints
-- No pagination tokens (max_results/pagination_token) on list or timeline
 
-**Deviations** (3)
+**Deviations** (5)
 
 - Auth is mock and not enforced; any or no Authorization header is accepted everywhere
 - POST /2/oauth2/token always succeeds, minting a fake token (no PKCE or client creds)
 - GET /2/tweets list-all is a simulator extension; the real API has no such list endpoint
+- Bare GET /2/tweets/{id} returns the full stored doc, not v2's id+text default
+- since_id/until_id are not honored on the timeline
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
 - `POST` `/2/oauth2/token` — —
-- `GET` `/2/users/me` — stateful
-- `GET` `/2/users/by/username/{username}` — params, stateful, errors
-- `GET` `/2/users/{id}` — params, stateful, errors
-- `POST` `/2/tweets` — body, stateful, errors
-- `GET` `/2/tweets/{id}` — params, stateful, errors
+- `GET` `/2/users/me` — query, stateful
+- `GET` `/2/users/by/username/{username}` — query, params, stateful, errors
+- `GET` `/2/users/{id}` — query, params, stateful, errors
+- `POST` `/2/tweets` — body, stateful, errors, clock
+- `GET` `/2/tweets/{id}` — query, params, stateful, errors
 - `GET` `/2/tweets` — query, stateful, paginate, errors
 - `DELETE` `/2/tweets/{id}` — params, stateful, errors
 - `GET` `/2/users/{id}/timelines/reverse_chronological` — query, stateful, paginate, filter, errors
@@ -8269,10 +8686,13 @@ behavior notes live in each adapter's README.
 - No attachments or history/notes endpoints
 - No invoice update, email, or repeating-invoice endpoints
 
-**Deviations** (2)
+**Deviations** (5)
 
 - No tax-rate registry; line tax is the given TaxAmount, not computed from TaxType
 - Responses carry a sim-only nextPage field; real Xero signals the last page by item count
+- GET /connections wraps entries in {connections:[...]} with tenantName; real Xero returns a bare array without it
+- Malformed page falls back to page 1; real Xero answers 400
+- nextPage envelope field is a simulator extension; 401 ErrorNumber is the string TokenExpired, not numeric
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 

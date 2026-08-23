@@ -1,0 +1,296 @@
+{
+  "source": "spec dropbox-api-spec files.stone + users.stone (every route POST — API v2 is RPC-style, Stone declares no verb)",
+  "url": "https://raw.githubusercontent.com/dropbox/dropbox-api-spec/main/files.stone https://raw.githubusercontent.com/dropbox/dropbox-api-spec/main/users.stone",
+  "fetched": "2026-08-23",
+  "license": "MIT",
+  "routes": [
+    {
+      "method": "POST",
+      "route": "/2/files/alpha/get_metadata"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/alpha/upload"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/copy"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/copy_batch"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/copy_batch/check"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/copy_batch/check_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/copy_batch_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/copy_reference/get"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/copy_reference/save"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/copy_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/create_folder"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/create_folder_batch"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/create_folder_batch/check"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/create_folder_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/delete"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/delete_batch"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/delete_batch/check"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/delete_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/download"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/download_zip"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/export"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/get_file_lock_batch"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/get_metadata"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/get_preview"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/get_temporary_link"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/get_temporary_upload_link"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/get_thumbnail"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/get_thumbnail_batch"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/get_thumbnail_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/list_folder"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/list_folder/continue"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/list_folder/get_latest_cursor"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/list_folder/longpoll"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/list_revisions"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/lock_file_batch"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/move"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/move_batch"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/move_batch/check"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/move_batch/check_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/move_batch_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/move_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/paper/create"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/paper/update"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/permanently_delete"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/properties/add"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/properties/overwrite"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/properties/update"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/restore"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/save_url"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/save_url/check_job_status"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/search"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/search/continue_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/search_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/tags/add"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/tags/get"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/tags/remove"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/unlock_file_batch"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/upload"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/upload_session/append"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/upload_session/append_batch"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/upload_session/append_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/upload_session/finish"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/upload_session/finish_batch"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/upload_session/finish_batch/check"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/upload_session/finish_batch_v2"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/upload_session/start"
+    },
+    {
+      "method": "POST",
+      "route": "/2/files/upload_session/start_batch"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/features/get_values"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/get_account"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/get_account_batch"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/get_current_account"
+    },
+    {
+      "method": "POST",
+      "route": "/2/users/get_space_usage"
+    }
+  ]
+}
