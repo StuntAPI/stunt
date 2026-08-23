@@ -85,19 +85,19 @@ Each line's `details` array shows the per-jurisdiction breakdown (rate + tax).
 ```json
 // Tax calculation
 {
-  "totalTax": "9.5",
-  "totalTaxable": "100.0",
+  "totalTax": 9.5,
+  "totalTaxable": 100.0,
   "totalRate": 0.095,
   "lines": [{
     "number": "1",
-    "tax": "9.5",
+    "tax": 9.5,
     "details": [
-      { "jurisdiction": "CA", "jurisdictionType": "State", "rate": 0.0475, "tax": "4.75" },
-      { "jurisdiction": "CA County", "jurisdictionType": "County", "rate": 0.0238, "tax": "2.38" },
+      { "jurisdiction": "CA", "jurisdictionType": "State", "rate": 0.0475, "tax": 4.75 },
+      { "jurisdiction": "CA County", "jurisdictionType": "County", "rate": 0.0238, "tax": 2.38 },
       ...
     ]
   }],
-  "summary": [{ "jurisName": "CA", "jurisdictionType": "State", "rate": 0.0475, "tax": "4.75" }]
+  "summary": [{ "jurisName": "CA", "jurisdictionType": "State", "rate": 0.0475, "tax": 4.75 }]
 }
 
 // Error

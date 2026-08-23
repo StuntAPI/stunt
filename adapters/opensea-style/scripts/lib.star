@@ -14,7 +14,8 @@ def _require_xapikey(req):
     # Go canonicalizes header keys: X-API-KEY becomes X-Api-Key.
     apikey = headers.get("X-Api-Key", headers.get("X-API-KEY", headers.get("x-api-key", "")))
     if apikey == None or apikey == "":
-        return respond(401, {"error": "X-API-KEY header is required"})
+        # Real API 401s use the V1ErrorWrapper envelope ({"errors": [...]}).
+        return respond(401, {"errors": ["X-API-KEY header is required"]})
     return None
 
 # --- deterministic hashing (consistent with eth-jsonrpc / etherscan adapters) ---
@@ -181,7 +182,7 @@ def _make_listing(slug, nft_addr, nft_id, price_wei, offerer):
         "parameters": {
             "offerer": offerer,
             "zone": "0x0000000000000000000000000000000000000000",
-            "zone_hash": "0x" + _hex32(0) * 2,
+            "zone_hash": "0x" + _hex32(0) * 8,  # Seaport zone_hash is bytes32 (64 hex).
             "offer": [{
                 "itemType": _ITEM_ERC721,
                 "token": nft_addr,
@@ -220,7 +221,7 @@ def _make_offer(slug, nft_addr, nft_id, offer_amount, offerer):
         "parameters": {
             "offerer": offerer,
             "zone": "0x0000000000000000000000000000000000000000",
-            "zone_hash": "0x" + _hex32(0) * 2,
+            "zone_hash": "0x" + _hex32(0) * 8,  # Seaport zone_hash is bytes32 (64 hex).
             "offer": [{
                 "itemType": _ITEM_NATIVE,
                 "token": "0x0000000000000000000000000000000000000000",

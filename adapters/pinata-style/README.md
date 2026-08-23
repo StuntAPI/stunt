@@ -47,20 +47,27 @@ Requests without auth return `401`.
 
 | Method | Route | Description |
 |--------|-------|-------------|
-| POST | `/pinning/pinFileToIPFS` | Pin a file (multipart upload) → CID |
+| POST | `/pinning/pinFileToIPFS` | Pin a file (multipart upload, file part required) → CID |
 | POST | `/pinning/pinJSONToIPFS` | Pin a JSON object → CID |
 | DELETE | `/pinning/unpin/{cid}` | Unpin by CID |
-| GET | `/data/pinList` | List pins (params: `hashContains`, `pinStart`/`pinEnd`, `pinSizeMin`/`pinSizeMax`, `status`, `metadata` name, `pageLimit`/`pageOffset`) |
+| GET | `/data/pinList` | List pins (params: `hashContains`, `pinStart`/`pinEnd`, `pinSizeMin`/`pinSizeMax`, `status`, `metadata` name, `pageLimit` default 10, `pageOffset`) |
 | GET | `/data/testAuthentication` | Verify auth |
-| GET | `/data/pinByHash` | Lookup pin by hash |
+| GET | `/data/pinByHash` | Lookup pin by hash (`hash` query param required) |
 
 ## Stateful behavior
 
-Pins are stored in a local collection. `pinList` shows all previously pinned
-CIDs and honors the real pinList filters (`hashContains`, `pinStart`/`pinEnd`
-date range, `pinSizeMin`/`pinSizeMax`, `status`, `metadata` name) plus
-`pageLimit`/`pageOffset` paging, applied before slicing with `count` still
-reflecting the filtered total. Unpinning removes them.
+Pins are stored in a local collection. CIDs are real CIDv0 values — base58 of
+the sha2-256 multihash of the pinned bytes (the compact, key-sorted JSON
+serialization for `pinJSONToIPFS`, the file part's bytes for
+`pinFileToIPFS`) — so pinning identical content returns the same `IpfsHash`
+with `isDuplicate: true` and adds no row. `PinSize` is that content's byte
+length; `Timestamp`/`date_pinned` are the request time.
+
+`pinList` shows all previously pinned CIDs and honors the real pinList
+filters (`hashContains`, `pinStart`/`pinEnd` date range,
+`pinSizeMin`/`pinSizeMax`, `status`, `metadata` name) plus
+`pageLimit`/`pageOffset` paging at the real default of 10 rows, with `count`
+still reflecting the filtered total before slicing. Unpinning removes them.
 
 ## Response shapes
 
@@ -68,8 +75,8 @@ reflecting the filtered total. Unpinning removes them.
 // Pin result (pinFileToIPFS / pinJSONToIPFS)
 {
   "IpfsHash": "Qm...",
-  "PinSize": 1024,
-  "Timestamp": "2024-06-15T12:30:00.000Z",
+  "PinSize": 17,
+  "Timestamp": "2026-02-03T12:00:00.000Z",
   "isDuplicate": false
 }
 
@@ -79,8 +86,8 @@ reflecting the filtered total. Unpinning removes them.
   "rows": [{
     "id": "7000000001",
     "ipfs_pin_hash": "Qm...",
-    "size": 1024,
-    "date_pinned": "2024-06-15T12:30:00.000Z",
+    "size": 17,
+    "date_pinned": "2026-02-03T12:00:00.000Z",
     "metadata": { "name": "my-pin" }
   }]
 }

@@ -34,7 +34,7 @@ def on_get_subscriber(req):
 # into subscriber.attributes and optionally seeds entitlements /
 # subscriptions / non_subscriptions. Returns the subscriber state.
 def on_post_subscriber(req):
-    err = _require_auth(req)
+    err = _require_auth(req, True)  # subscriber writes are secret-key only
     if err != None:
         return err
 
@@ -79,7 +79,7 @@ def on_post_subscriber(req):
 # on_delete_subscriber deletes the subscriber (RevenueCat's
 # DELETE /v1/subscribers/{app_user_id}).
 def on_delete_subscriber(req):
-    err = _require_auth(req)
+    err = _require_auth(req, True)  # deleting subscribers is restricted to secret keys
     if err != None:
         return err
 
@@ -97,7 +97,7 @@ def on_delete_subscriber(req):
 # on_revoke_subscription refunds a subscription (RevenueCat v2-shaped revoke):
 # lapses it immediately, drops the entitlement it granted, fires CANCELLATION.
 def on_revoke_subscription(req):
-    err = _require_auth(req)
+    err = _require_auth(req, True)  # revoke is a server-side restricted action
     if err != None:
         return err
 

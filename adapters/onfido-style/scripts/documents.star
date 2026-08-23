@@ -26,7 +26,12 @@ def on_upload_document(req):
     if ac.get(applicant_id) == None:
         return respond(404, _err("not_found", "Applicant not found", None))
 
-    doc_type = body.get("type", "passport")
+    # v3.6 requires type on document uploads; only side defaults to front.
+    doc_type = body.get("type", "")
+    if doc_type == "":
+        return respond(422, _err("validation_error", "type is required", {
+            "type": ["can't be blank"],
+        }))
     side = body.get("side", "front")
     file_name = body.get("file_name", "document.jpg")
 

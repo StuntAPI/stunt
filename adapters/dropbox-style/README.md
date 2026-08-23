@@ -29,7 +29,7 @@ create in one request is visible in subsequent requests within the same
 
 | Method | Route | Handler | Description |
 |--------|-------|---------|-------------|
-| POST | `/2/files/upload` | `files.star#on_upload` | Upload a file (JSON `{path, content}`) |
+| POST | `/2/files/upload` | `files.star#on_upload` | Upload a file (JSON `{path, content}`; an existing path → `409 path/conflict`, like the real default `mode: add`) |
 | POST | `/2/files/download` | `files.star#on_download` | Download file content (`{path}` or `{id}`) |
 | POST | `/2/files/list_folder` | `files.star#on_list_folder` | List entries under a path prefix (missing path → `409 path/not_found`; file path → `409 path/not_folder`) |
 | POST | `/2/files/get_metadata` | `files.star#on_get_metadata` | Get entry metadata (`{path}`) |

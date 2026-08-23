@@ -119,12 +119,14 @@ def on_access_token(req):
     if code_doc == None:
         return respond(400, {"error": "invalid_grant", "error_description": "invalid/used code"})
 
-    cc.delete(code)
-
     want_cid = code_doc.get("client_id", "")
     want_uri = code_doc.get("redirect_uri", "")
     if client_id != want_cid or redirect_uri != want_uri or client_secret == "":
+        # Consume only on the matched path: a wrong client must not burn the
+        # code for the right one.
         return respond(400, {"error": "invalid_client", "error_description": "client mismatch"})
+
+    cc.delete(code)
 
     return respond(200, _issue_tokens(_mint_member()))
 

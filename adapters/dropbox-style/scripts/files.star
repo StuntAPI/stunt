@@ -80,12 +80,34 @@ def on_upload(req):
     if body == None:
         body = {}
 
-    # path: JSON body wins, else the Dropbox-API-Arg header.
+    # path and write mode: JSON body wins, else the Dropbox-API-Arg header.
+    arg = _api_arg(req)
     path = body.get("path", "")
     if path == None or path == "":
-        path = _api_arg(req).get("path", "")
+        path = arg.get("path", "")
     if path == None or path == "":
         return respond(409, _error("path"))
+
+    mode = body.get("mode", arg.get("mode", ""))
+    if type(mode) == "dict":
+        mode = mode.get(".tag", "add")
+    if mode == None or mode == "":
+        mode = "add"
+    autorename = body.get("autorename", arg.get("autorename", False))
+    if autorename == None:
+        autorename = False
+
+    # Real upload defaults to mode "add": an existing path is a 409 conflict.
+    # Inserting anyway would fork the path (two rows at one path_display) and
+    # strand the older row ahead of every later path read — a stale download.
+    existing = _find_by_path(path)
+    if existing != None:
+        if mode == "overwrite" or mode == "update":
+            pass # replace in place below
+        elif autorename:
+            path = _renamed_path(path)
+        else:
+            return respond(409, _error("path/conflict"))
 
     # content: JSON body wins, else the raw request body (real octet-stream).
     content = body.get("content", None)
@@ -95,6 +117,10 @@ def on_upload(req):
         content = ""
 
     file_id = _next_id()
+    if existing != None and (mode == "overwrite" or mode == "update"):
+        # Replace in place: keep the existing id so revisions and the blob
+        # stay anchored to the same file.
+        file_id = existing.get("id", file_id)
     b = store_blob("dropbox")
     b.put(file_id, content)
 
@@ -121,8 +147,29 @@ def on_upload(req):
         "content_hash": _content_hash(content),
     }
     c = store_collection("entries")
-    c.insert(doc)
+    if existing != None and (mode == "overwrite" or mode == "update"):
+        c.update(file_id, doc)
+    else:
+        c.insert(doc)
     return respond(200, doc)
+
+# _renamed_path suffixes " (1)", " (2)"... before the extension until the
+# path is free — the autorename contract.
+def _renamed_path(path):
+    c = store_collection("entries")
+    stem = path
+    ext = ""
+    dot = path.rfind(".")
+    slash = path.rfind("/")
+    if dot > slash:
+        stem = path[:dot]
+        ext = path[dot:]
+    n = 1
+    while True:
+        candidate = stem + " (" + str(n) + ")" + ext
+        if _find_by_path(candidate) == None:
+            return candidate
+        n = n + 1
 
 # POST /2/files/download — download file content.
 #
@@ -203,7 +250,9 @@ def on_list_folder(req):
 
     page, next_cursor = _list_page(req, entries)
     if page == None:
-        return respond(400, {"error_summary": "invalid_cursor", "error": {".tag": "invalid_cursor"}})
+        # Real invalid_cursor carries the same summary+tag envelope as the
+        # 409s (list_folder/continue answers exactly this shape on a bad cursor).
+        return respond(400, _error("invalid_cursor"))
     return respond(200, {
         "entries": page,
         "cursor": next_cursor if next_cursor != None else "",

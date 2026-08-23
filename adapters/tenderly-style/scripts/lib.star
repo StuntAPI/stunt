@@ -83,6 +83,10 @@ def _build_simulation_result(body, account, project):
     gas_used = 21000 + (input_len // 2 % 200000)
 
     sim_id = _gen_sim_id()
+    # hash derives from the sim sequence: every simulation must get its own
+    # transaction hash (real Tenderly hashes the tx contents; passing the
+    # "sim_NNNNNN" id itself through _to_int collapses every sim to 0x..01)
+    sim_num = _to_int(sim_id[4:])
 
     # Revert detection: an explicit body flag, or the Error(string) selector
     # (0x08c379a0) in the calldata prefix — the canonical "revert with reason".
@@ -116,7 +120,7 @@ def _build_simulation_result(body, account, project):
 
     return {
         "transaction": {
-            "hash": "0x" + _hex_pad(_to_int_or_float(sim_id), 64),
+            "hash": "0x" + _hex_pad(sim_num, 64),
             "block_number": block_number,
             "block_hash": "0x" + _hex_pad(_to_int_or_float(block_number) + 100, 64),
             "status": status,
@@ -159,23 +163,27 @@ def _str_to_hex(s):
         out = out + hexchars[code // 16] + hexchars[code % 16]
     return out
 
-# _topic_addr formats an address as a 32-byte left-padded topic (64 hex chars).
+# _topic_addr formats an address as a 32-byte left-padded topic (64 hex
+# chars, lowercase — EVM log topics are raw hex, never checksummed case).
 def _topic_addr(addr):
     a = addr
     if a[:2] == "0x":
         a = a[2:]
+    a = a.lower()
     while len(a) < 64:
         a = "0" + a
     return "0x" + a
 
 # _abi_error_string ABI-encodes an Error(string) revert output for a reason:
-# selector 0x08c379a0 + offset(0x20) + length + data padded to 32 bytes.
+# selector 0x08c379a0 + offset(0x20) + length + data padded to whole 32-byte
+# words (the ABI always pads to a word boundary, so reasons longer than one
+# word need the full next word, not just a minimum of 64 hex chars).
 def _abi_error_string(reason):
     selector = "08c379a0"
     offset = "0000000000000000000000000000000000000000000000000000000000000020"
     length = _hex_pad(len(reason), 64)
     data = _str_to_hex(reason)
-    while len(data) < 64:
+    while len(data) % 64 != 0:
         data = data + "0"
     return "0x" + selector + offset + length + data
 
@@ -218,15 +226,18 @@ def _to_int_or_float(v):
     return _to_int(v)
 
 # _hex_pad converts a number to a zero-padded hex string of given length.
+# Zero renders as a real zero ("0"/all-zero padding): EVM hex quantities and
+# ABI length words must be exact, so the old coerce-0-to-1 made a 0-value
+# trace read "0x1" and an empty string's length word read 1.
 def _hex_pad(n, length):
     hexchars = "0123456789abcdef"
     s = ""
     v = n
-    if v == 0:
-        v = 1
     while v > 0:
         s = hexchars[v % 16] + s
         v = v // 16
+    if s == "":
+        s = "0"
     while len(s) < length:
         s = "0" + s
     return s

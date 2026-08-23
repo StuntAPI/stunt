@@ -36,22 +36,23 @@ def on_pin_list(req):
         "rows": rows,
     })
 
-# on_pin_by_hash looks up a pin by its hash (cid query parameter).
+# on_pin_by_hash looks up a pin by its hash (hash query parameter —
+# required, as in the real API).
 def on_pin_by_hash(req):
     err = _require_auth(req)
     if err != None:
         return err
 
     cid = req["query"].get("hash", "")
-    if cid == None:
-        cid = ""
+    if cid == None or cid == "":
+        return _p_err(400, "BAD_REQUEST", "hash query parameter is required")
 
     c = store_collection("pins")
     docs = c.list()
 
     rows = []
     for doc in docs:
-        if cid == "" or doc.get("ipfs_pin_hash", "") == cid:
+        if doc.get("ipfs_pin_hash", "") == cid:
             rows.append(_pin_row(doc))
 
     return respond(200, {
@@ -106,10 +107,11 @@ def _apply_pin_list_query(req, rows):
     rows = query_select(rows, f if len(f) > 0 else None, None, "", None, None, None)
 
     count = len(rows)
+    # Real API pages at 10 rows by default; count stays the filtered total.
     page_limit = _to_int(_get_query(req, "pageLimit"))
-    page_offset = _to_int(_get_query(req, "pageOffset"))
-    if page_limit > 0 or page_offset > 0:
-        rows = query_select(rows, None, "", "", page_limit if page_limit > 0 else None, page_offset, None)
+    if page_limit <= 0:
+        page_limit = 10
+    rows = query_select(rows, None, "", "", page_limit, _to_int(_get_query(req, "pageOffset")), None)
     return count, rows
 
 # _meta_name extracts the "name" value from a metadata query-param string

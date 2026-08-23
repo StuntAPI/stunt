@@ -283,14 +283,17 @@ def _csv_field(v):
 # _next_uri mints the absolute continuation URL Dune returns when more rows
 # remain beyond the requested page (offset carries the position, limit the
 # page size). The host is the simulator's own request host so clients can
-# follow the URL directly.
+# follow the URL directly; behind a TLS proxy the forwarded proto is
+# honored so the absolute URL stays followable.
 def _next_uri(req, exec_id, offset, limit):
     host = req.get("host", "")
     if host == None:
         host = ""
     scheme = req.get("headers", {}).get("x-forwarded-proto", "")
     if scheme == None or scheme == "":
-        scheme = "http" if host.startswith("127.0.0.1") or host.startswith("localhost") else "http"
+        # direct simulator traffic is plain http — never guess https, the
+        # local listener does not speak it
+        scheme = "http"
     return (scheme + "://" + host + "/api/v1/execution/" + exec_id
             + "/results?offset=" + str(offset) + "&limit=" + str(limit))
 

@@ -14,7 +14,7 @@
 
 # on_create_webhook registers a webhook subscription.
 def on_create_webhook(req):
-    err = _require_auth(req)
+    err = _require_auth(req, True)  # management surface: secret keys only
     if err != None:
         return err
 
@@ -61,7 +61,7 @@ def on_create_webhook(req):
 
 # on_list_webhooks returns registered webhook subscriptions.
 def on_list_webhooks(req):
-    err = _require_auth(req)
+    err = _require_auth(req, True)  # management surface: secret keys only
     if err != None:
         return err
 

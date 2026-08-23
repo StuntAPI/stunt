@@ -67,9 +67,11 @@ def on_resolve_post(req):
         return respond(404, {"status": 404, "message": "post not found"})
 
     seq = doc.get("seq", 0)
+    # The post's own author, not the caller: any member may resolve any post.
+    # Collections round-trip ints as floats; the URN needs bare digits.
     return respond(200, {
-        "id": "urn:li:share:" + str(seq),
-        "author": "urn:li:person:" + member["sub"],
+        "id": "urn:li:share:" + str(int(seq)),
+        "author": doc.get("author", ""),
     })
 
 def _extract_text(body):

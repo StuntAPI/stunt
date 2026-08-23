@@ -181,7 +181,8 @@ def _do_update(rc, record):
 def _do_delete(rc, name):
     for doc in rc.list():
         if doc.get("recordName") == name:
-            rc.delete(doc)
+            # delete takes the stored id string, not the doc (like update).
+            rc.delete(doc.get("id", ""))
             return
 
 # _matches_filters is retained for the legacy EQUALS-only shape; the query

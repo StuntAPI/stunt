@@ -36,10 +36,10 @@ def on_create_transaction(req):
     state = _address_state(addresses)
     tax_result = _compute_tax(lines, state)
 
-    # Compute total amount = totalTaxable + totalTax.
+    # Compute total amount = totalTaxable + totalTax (decimals are numbers).
     total_taxable = tax_result["totalTaxable"]
     total_tax = tax_result["totalTax"]
-    total_amount = _fmt(_to_float(total_taxable) + _to_float(total_tax))
+    total_amount = total_taxable + total_tax
 
     txn_id = _txn_id()
     code = _txn_code()
@@ -103,8 +103,8 @@ def on_list_transactions(req):
             "id": doc.get("id", ""),
             "code": doc.get("code", ""),
             "type": doc.get("type", "SalesInvoice"),
-            "totalAmount": doc.get("totalAmount", "0"),
-            "totalTax": doc.get("totalTax", "0"),
+            "totalAmount": doc.get("totalAmount", 0),
+            "totalTax": doc.get("totalTax", 0),
             "status": doc.get("status", "Saved"),
         })
 

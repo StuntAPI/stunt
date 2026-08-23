@@ -400,6 +400,7 @@ func TestSignInWithAppleStyleAdapter(t *testing.T) {
 	respMal := siwaGetNoRedirect(t, base+"/auth/authorize?"+
 		url.Values{"client_id": {"com.test"}, "redirect_uri": {"http://localhost/cb"},
 			"response_type": {"code"}, "scope": {"email"}, "state": {"s-mal"}}.Encode())
+	defer respMal.Body.Close()
 	codeMal := siwaExtractParam(respMal.Header.Get("Location"), "code")
 	malBody, malStatus := siwaPostForm(t, base+"/auth/token", url.Values{
 		"grant_type":    {"authorization_code"},

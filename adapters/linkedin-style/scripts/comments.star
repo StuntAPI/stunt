@@ -39,7 +39,13 @@ def on_list_comments(req):
     start = _to_int(req["query"].get("start", ""))
     links = []
     if next_cursor != None:
-        links.append({"rel": "next", "href": "/rest/comments?start=" + next_cursor})
+        # Real LinkedIn next links carry the whole query; a bare start link
+        # would 400 on the q=author check as soon as it is followed.
+        count = _to_int(req["query"].get("count", ""))
+        links.append({
+            "rel": "next",
+            "href": "/rest/comments?q=author&count=" + str(count) + "&start=" + next_cursor,
+        })
 
     return respond(200, {
         "elements": page,
@@ -64,6 +70,14 @@ def on_post_comment(req):
     if actor == "urn:li:person:me":
         actor = "urn:li:person:" + member["sub"]
 
+    # A comment is authored by the caller, like ugcPosts' author check.
+    if actor != "urn:li:person:" + member["sub"]:
+        return respond(403, {
+            "status": 403,
+            "code": "FIELDS_DATA_VALIDATION_EXCEPTION",
+            "message": "actor " + actor + " is not the authenticated member",
+        })
+
     # Verify the target post exists.
     pc = store_collection("posts")
     post = pc.get(object_urn)
@@ -79,7 +93,8 @@ def on_post_comment(req):
         "actor": actor,
         "object": object_urn,
         "text": text,
-        "ts_ms": 1700000000000,
+        # Engine clock, not a frozen stamp: createdOn tracks when it posted.
+        "ts_ms": clock.now_unix() * 1000,
     })
 
     return respond(201, {"id": comment_urn})

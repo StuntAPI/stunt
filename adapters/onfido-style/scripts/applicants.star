@@ -18,9 +18,13 @@ def on_create_applicant(req):
     dob = body.get("dob", "")
 
     if first_name == "" or last_name == "":
-        return respond(422, _err("validation_error", "first_name and last_name are required", {
-            "first_name": ["can't be blank"],
-        }))
+        # Real Onfido flags exactly the blank fields, not a fixed list.
+        fields = {}
+        if first_name == "":
+            fields["first_name"] = ["can't be blank"]
+        if last_name == "":
+            fields["last_name"] = ["can't be blank"]
+        return respond(422, _err("validation_error", "first_name and last_name are required", fields))
 
     seq = store_kv_incr("onfido", "applicant_seq")
     applicant_id = _gen_id("app", seq)
