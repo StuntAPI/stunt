@@ -25,7 +25,11 @@ def _view_from(req, body):
 def _normalize_http(hr):
     if type(hr) != "dict":
         return None, _invalid("task.httpRequest must be an object.")
-    url = hr.get("url", "")
+    url = hr.get("url", None)
+    if url == None:
+        url = ""
+    if type(url) != "string":
+        return None, _invalid("Invalid value at 'task.httpRequest.url'.")
     if url == "" or url[:7] != "http://" and url[:8] != "https://":
         return None, _invalid("HttpRequest.url must start with \"http://\" or \"https://\".")
     method = hr.get("httpMethod", None)
@@ -41,7 +45,11 @@ def _normalize_http(hr):
 def _normalize_appengine(ae):
     if type(ae) != "dict":
         return None, _invalid("task.appEngineHttpRequest must be an object.")
-    uri = ae.get("relativeUri", "")
+    uri = ae.get("relativeUri", None)
+    if uri == None:
+        uri = ""
+    if type(uri) != "string":
+        return None, _invalid("Invalid value at 'task.appEngineHttpRequest.relativeUri'.")
     if uri == "" or uri[:1] != "/":
         return None, _invalid("AppEngineHttpRequest.relativeUri must begin with \"/\".")
     method = ae.get("httpMethod", None)
@@ -70,8 +78,12 @@ def _insert_task(queue_name, task, task_id):
 
     now = clock.now_unix()
     if task_id == None:
-        task_id = task.get("name", "")
+        task_id = task.get("name", None)
+        if task_id == None:
+            task_id = ""
         if task_id != "":
+            if type(task_id) != "string":
+                return None, _invalid("Invalid value at 'task.name'.")
             prefix = queue_name + "/tasks/"
             if task_id[:len(prefix)] != prefix:
                 return None, _invalid("task.name must have the form " + prefix + "TASK_ID.")
@@ -97,7 +109,11 @@ def _insert_task(queue_name, task, task_id):
             return None, merr
         message_type = "appengine"
 
-    schedule_time = task.get("scheduleTime", "")
+    schedule_time = task.get("scheduleTime", None)
+    if schedule_time == None:
+        schedule_time = ""
+    if schedule_time != "" and type(schedule_time) != "string":
+        return None, _invalid("Invalid value at 'task.scheduleTime'.")
     # Absent or past-due scheduleTime is clamped to now (documented).
     if schedule_time == "" or schedule_time <= clock.now_rfc3339():
         schedule_time = clock.unix_to_rfc3339(now)
@@ -247,25 +263,31 @@ def _buffer(req, task_id):
 
     uri = ""
     uo = ht.get("uriOverride", None)
-    if uo != None:
-        scheme = uo.get("scheme", "HTTPS")
-        if scheme == "HTTP":
-            scheme = "http"
-        else:
+    if type(uo) == "dict":
+        scheme = uo.get("scheme", None)
+        if type(scheme) != "string" or scheme == "" or scheme == "HTTPS":
             scheme = "https"
-        host = uo.get("host", "")
+        elif scheme == "HTTP":
+            scheme = "http"
+        host = uo.get("host", None)
+        if type(host) != "string":
+            host = ""
         if host == "":
             return _invalid("HttpTarget.uriOverride.host is required for tasks.buffer.")
-        port = str(uo.get("port", ""))
         uri = scheme + "://" + host
-        if port != "" and port != "0":
-            uri = uri + ":" + port
+        # The port round-trips through the store as a float; render as an
+        # int (8080, never 8080.0) and treat <= 0 as absent.
+        port = _to_int(uo.get("port", None))
+        if port > 0:
+            uri = uri + ":" + str(port)
         po = uo.get("pathOverride", None)
-        if po != None and po.get("path", "") != "":
-            uri = uri + po.get("path")
+        path = po.get("path", None) if type(po) == "dict" else None
+        if type(path) == "string" and path != "":
+            uri = uri + path
         qo = uo.get("queryOverride", None)
-        if qo != None and qo.get("queryParams", "") != "":
-            uri = uri + "?" + qo.get("queryParams")
+        qp = qo.get("queryParams", None) if type(qo) == "dict" else None
+        if type(qp) == "string" and qp != "":
+            uri = uri + "?" + qp
 
     hr = {"url": uri}
     method = ht.get("httpMethod", None)

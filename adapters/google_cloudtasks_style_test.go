@@ -535,8 +535,8 @@ func TestCTTaskCreateViewsAndDedup(t *testing.T) {
 	f := newCTFixture(t, time.Unix(1770000000, 0), nil)
 	f.ctCreateQueue(t, map[string]any{})
 
-	// FULL view round-trips the payload.
-	r, body := f.ctCreateTask(t, map[string]any{
+	// email-1 with a future schedule: created cleanly under the default view.
+	r, b0 := f.ctCreateTask(t, map[string]any{
 		"name": ctQueueName() + "/tasks/email-1",
 		"httpRequest": map[string]any{
 			"url": "https://worker.example/h", "httpMethod": "POST",
@@ -549,7 +549,14 @@ func TestCTTaskCreateViewsAndDedup(t *testing.T) {
 		},
 		"scheduleTime": "2030-01-01T00:00:00Z",
 	})
-	// (create defaults to BASIC; ask for FULL via the query param)
+	if r.Status != 200 || b0["scheduleTime"] != "2030-01-01T00:00:00Z" {
+		t.Fatalf("create email-1: %d %v", r.Status, r.Body)
+	}
+	if _, has := b0["httpRequest"].(map[string]any)["body"]; has {
+		t.Fatalf("default BASIC view leaked body: %v", b0)
+	}
+
+	// FULL view round-trips the payload.
 	r = f.call(f.vmT, "on_create_task", "POST", "/v2/"+ctQueueName()+"/tasks",
 		map[string]string{"project": ctProject, "location": ctLocation, "queue": ctQueue},
 		map[string]string{"responseView": "FULL"},
@@ -560,12 +567,11 @@ func TestCTTaskCreateViewsAndDedup(t *testing.T) {
 	if r.Status != 200 {
 		t.Fatalf("create FULL: %d %v", r.Status, r.Body)
 	}
-	body = ctBody(t, r)
+	body := ctBody(t, r)
 	hr := body["httpRequest"].(map[string]any)
 	if hr["body"] != "eA==" || body["view"] != "FULL" {
 		t.Fatalf("FULL view dropped payload: %v", body)
 	}
-	_ = body
 
 	// BASIC omits the body but keeps the rest.
 	r = f.call(f.vmT, "on_get_task", "GET", "/v2/"+ctQueueName()+"/tasks/email-2",
@@ -710,8 +716,8 @@ func TestCTTaskRunFailingWorkerRetries(t *testing.T) {
 	if r.Status != 200 {
 		t.Fatalf("create: %d %v", r.Status, r.Body)
 	}
-	created := ctBody(t, r)["createTime"].(string)
-
+	// The virtual clock pins the whole retry schedule: create at
+	// 2026-02-02T02:40:00Z, run 1 reschedules to +10s, run 2 to +30s.
 	verb := map[string]string{"project": ctProject, "location": ctLocation, "queue": ctQueue, "task_verb": "flaky:run"}
 	r = f.call(f.vmT, "on_task_verb", "POST", "/v2/x", verb, nil,
 		map[string]any{"responseView": "FULL"})
@@ -727,21 +733,20 @@ func TestCTTaskRunFailingWorkerRetries(t *testing.T) {
 	if ctNum(status["code"]) != 500 {
 		t.Fatalf("run 1 responseStatus: %v", status)
 	}
-	// Rescheduled: minBackoff=10s after createTime.
-	if sched := b["scheduleTime"].(string); sched <= created {
-		t.Fatalf("run 1 schedule not advanced: %v", sched)
+	// Rescheduled at exactly createTime+10s (minBackoff; virtual clock).
+	if sched, want := b["scheduleTime"].(string), "2026-02-02T02:40:10Z"; sched != want {
+		t.Fatalf("run 1 schedule: got %s want %s", sched, want)
 	}
 
-	// Run 2: still queued, +20s (doubled once).
+	// Run 2: still queued, +20s (doubled once) from the run-2 moment.
 	f.vc.Advance(10 * time.Second)
 	r = f.call(f.vmT, "on_task_verb", "POST", "/v2/x", verb, nil, map[string]any{})
 	b = ctBody(t, r)
 	if ctNum(b["dispatchCount"]) != 2 {
 		t.Fatalf("run 2 counters: %v", b)
 	}
-	prev := b["scheduleTime"].(string)
-	if prev <= created {
-		t.Fatalf("run 2 schedule not advanced: %v", prev)
+	if sched, want := b["scheduleTime"].(string), "2026-02-02T02:40:30Z"; sched != want {
+		t.Fatalf("run 2 schedule: got %s want %s", sched, want)
 	}
 
 	// Run 3: attempts exhausted -> permanent failure, task deleted.
@@ -1004,5 +1009,124 @@ func TestCTAuthRequired(t *testing.T) {
 	}
 	if resp.Status != 401 || ctErrStatus(t, resp) != "UNAUTHENTICATED" {
 		t.Fatalf("no bearer: %d %v", resp.Status, resp.Body)
+	}
+}
+
+// TestCTAdversarialTypes pins the never-a-500 contract: null / numeric /
+// wrong-typed fields where strings or objects are expected must 400, not
+// crash the handler.
+func TestCTAdversarialTypes(t *testing.T) {
+	f := newCTFixture(t, time.Unix(1770000000, 0), nil)
+	f.ctCreateQueue(t, map[string]any{})
+
+	queueCases := []struct {
+		name string
+		body map[string]any
+	}{
+		{"null name", map[string]any{"name": nil}},
+		{"numeric name", map[string]any{"name": 123}},
+		{"object name", map[string]any{"name": map[string]any{}}},
+		{"rateLimits string", map[string]any{"rateLimits": "fast"}},
+		{"rateLimits list", map[string]any{"rateLimits": []any{1}}},
+		{"retryConfig string", map[string]any{"retryConfig": "soon"}},
+		{"httpTarget string", map[string]any{"httpTarget": "oops"}},
+		{"uriOverride string", map[string]any{"httpTarget": map[string]any{"uriOverride": "x"}}},
+		{"uriOverride host null", map[string]any{"httpTarget": map[string]any{"uriOverride": map[string]any{"host": nil}}}},
+		{"uriOverride host numeric", map[string]any{"httpTarget": map[string]any{"uriOverride": map[string]any{"host": 12}}}},
+		{"pathOverride string", map[string]any{"httpTarget": map[string]any{"uriOverride": map[string]any{"host": "w.example", "pathOverride": "/x"}}}},
+		{"queryParams numeric", map[string]any{"httpTarget": map[string]any{"uriOverride": map[string]any{"host": "w.example", "queryOverride": map[string]any{"queryParams": 7}}}}},
+		{"port object", map[string]any{"httpTarget": map[string]any{"uriOverride": map[string]any{"host": "w.example", "port": map[string]any{}}}}},
+	}
+	for _, tc := range queueCases {
+		r := f.call(f.vmQ, "on_create_queue", "POST", "/v2/projects/demo/locations/us-central1/queues",
+			map[string]string{"project": ctProject, "location": ctLocation},
+			map[string]string{"queueId": "adv-" + tc.name}, tc.body)
+		if r.Status != 400 {
+			t.Fatalf("queue create %s: got %d (%v), want 400", tc.name, r.Status, r.Body)
+		}
+	}
+
+	taskCases := []struct {
+		name string
+		task map[string]any
+	}{
+		{"numeric name", map[string]any{"name": 9, "httpRequest": map[string]any{"url": "https://w.example/"}}},
+		{"object name", map[string]any{"name": map[string]any{}, "httpRequest": map[string]any{"url": "https://w.example/"}}},
+		{"null url", map[string]any{"httpRequest": map[string]any{"url": nil}}},
+		{"numeric url", map[string]any{"httpRequest": map[string]any{"url": 5}}},
+		{"null relativeUri", map[string]any{"appEngineHttpRequest": map[string]any{"relativeUri": nil}}},
+		{"numeric scheduleTime", map[string]any{"httpRequest": map[string]any{"url": "https://w.example/"}, "scheduleTime": 0}},
+	}
+	for _, tc := range taskCases {
+		r, _ := f.ctCreateTask(t, tc.task)
+		if r.Status != 400 {
+			t.Fatalf("task create %s: got %d (%v), want 400", tc.name, r.Status, r.Body)
+		}
+	}
+
+	// A null name is proto-JSON "absent": the task is created with a
+	// generated ID, exactly like a missing name (rejected creates above
+	// already consumed sequence numbers, so assert the shape only).
+	r, b := f.ctCreateTask(t, map[string]any{"name": nil, "httpRequest": map[string]any{"url": "https://w.example/"}})
+	if r.Status != 200 {
+		t.Fatalf("task create null name: %d %v", r.Status, r.Body)
+	}
+	gen := b["name"].(string)
+	prefix := ctQueueName() + "/tasks/"
+	if len(gen) != len(prefix)+19 || gen[:len(prefix)] != prefix {
+		t.Fatalf("null name should fall back to a generated ID: %v", gen)
+	}
+
+	// Queue patch with wrong-typed immutable name.
+	r = f.call(f.vmQ, "on_patch_queue", "PATCH", "/v2/"+ctQueueName(),
+		map[string]string{"project": ctProject, "location": ctLocation, "queue": ctQueue}, nil,
+		map[string]any{"name": nil})
+	if r.Status != 200 {
+		t.Fatalf("patch null name should be a no-op: %d %v", r.Status, r.Body)
+	}
+	r = f.call(f.vmQ, "on_patch_queue", "PATCH", "/v2/"+ctQueueName(),
+		map[string]string{"project": ctProject, "location": ctLocation, "queue": ctQueue}, nil,
+		map[string]any{"name": 12})
+	if r.Status != 400 {
+		t.Fatalf("patch numeric name: %d %v", r.Status, r.Body)
+	}
+	r = f.call(f.vmQ, "on_patch_queue", "PATCH", "/v2/"+ctQueueName(),
+		map[string]string{"project": ctProject, "location": ctLocation, "queue": ctQueue},
+		map[string]string{"updateMask": "rateLimits"},
+		map[string]any{"rateLimits": "faster"})
+	if r.Status != 400 {
+		t.Fatalf("patch rateLimits string: %d %v", r.Status, r.Body)
+	}
+}
+
+// TestCTBufferPortRendering pins the integer port rendering (the value
+// round-trips through the store as a float; the URL must not grow a .0).
+func TestCTBufferPortRendering(t *testing.T) {
+	f := newCTFixture(t, time.Unix(1770000000, 0), nil)
+	f.ctCreateQueue(t, map[string]any{"httpTarget": map[string]any{
+		"uriOverride": map[string]any{"host": "worker.example", "port": 8080, "scheme": "HTTPS"},
+	}})
+	r := f.call(f.vmT, "on_buffer_task", "POST", "/v2/x",
+		map[string]string{"project": ctProject, "location": ctLocation, "queue": ctQueue}, nil,
+		map[string]any{"body": map[string]any{"data": "eA=="}})
+	if r.Status != 200 {
+		t.Fatalf("buffer: %d %v", r.Status, r.Body)
+	}
+	hr := ctBody(t, r)["task"].(map[string]any)["httpRequest"].(map[string]any)
+	if hr["url"] != "https://worker.example:8080" {
+		t.Fatalf("port rendering: %v", hr["url"])
+	}
+
+	// port 0 clears the port (documented UriOverride semantics).
+	f2 := newCTFixture(t, time.Unix(1770000000, 0), nil)
+	f2.ctCreateQueue(t, map[string]any{"httpTarget": map[string]any{
+		"uriOverride": map[string]any{"host": "worker.example", "port": 0, "scheme": "HTTPS"},
+	}})
+	r = f2.call(f2.vmT, "on_buffer_task", "POST", "/v2/x",
+		map[string]string{"project": ctProject, "location": ctLocation, "queue": ctQueue}, nil,
+		map[string]any{"body": map[string]any{"data": "eA=="}})
+	hr = ctBody(t, r)["task"].(map[string]any)["httpRequest"].(map[string]any)
+	if hr["url"] != "https://worker.example" {
+		t.Fatalf("port 0 should clear: %v", hr["url"])
 	}
 }

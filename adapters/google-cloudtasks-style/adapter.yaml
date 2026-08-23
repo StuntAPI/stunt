@@ -52,6 +52,9 @@ endpoints:
     handler: scripts/queues.star#on_delete_queue
     concurrency_key: queue
   # :pause :resume :purge :getIamPolicy :setIamPolicy :testIamPermissions
+  # NOTE: the concurrency key is the raw "<queueId>:<verb>" param — the
+  # engine keys on the route param value, so these verbs serialize among
+  # themselves but not with the sibling {queue} routes.
   - route: /v2/projects/{project}/locations/{location}/queues/{queue_verb}
     method: POST
     handler: scripts/queues.star#on_queue_verb
@@ -70,7 +73,9 @@ endpoints:
     method: POST
     handler: scripts/tasks.star#on_buffer_task
     concurrency_key: queue
-  # {task}:run and {taskId}:buffer — verb rides the last segment.
+  # {task}:run and {taskId}:buffer — verb rides the last segment. The
+  # concurrency key is the raw "<taskId>:<verb>" param (same caveat as the
+  # queue verbs above).
   - route: /v2/projects/{project}/locations/{location}/queues/{queue}/tasks/{task_verb}
     method: POST
     handler: scripts/tasks.star#on_task_verb

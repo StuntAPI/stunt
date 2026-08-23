@@ -31,7 +31,11 @@ def on_create_queue(req):
     if jerr != None:
         return jerr
     queue_id = _query_get(req, "queueId", "")
-    provided_name = body.get("name", "")
+    provided_name = body.get("name", None)
+    if provided_name == None:
+        provided_name = ""
+    if provided_name != "" and type(provided_name) != "string":
+        return _invalid("Invalid value at 'queue.name'.")
     if queue_id == "":
         if provided_name == "":
             return _invalid("queueId is required unless queue.name is set.")
@@ -64,6 +68,9 @@ def on_create_queue(req):
         "rate_limits": rate,
         "retry_config": retry,
     }
+    hterr = _validate_http_target(body.get("httpTarget", None))
+    if hterr != None:
+        return hterr
     for field in ("httpTarget", "appEngineRoutingOverride", "stackdriverLoggingConfig"):
         if body.get(field, None) != None:
             doc[_snake(field)] = body.get(field)
@@ -183,7 +190,11 @@ def on_patch_queue(req):
     body, jerr = _json_body(req)
     if jerr != None:
         return jerr
-    provided_name = body.get("name", "")
+    provided_name = body.get("name", None)
+    if provided_name == None:
+        provided_name = ""
+    if provided_name != "" and type(provided_name) != "string":
+        return _invalid("Invalid value at 'queue.name'.")
     if provided_name != "" and provided_name != name:
         return _invalid("Queue.name is immutable (" + provided_name + " vs " + name + ").")
 
@@ -205,11 +216,17 @@ def on_patch_queue(req):
             src = body.get(top, None)
             if src == None:
                 continue
+            if type(src) != "dict":
+                return _invalid("Queue." + top + " must be an object.")
             for k in ("maxDispatchesPerSecond", "maxBurstSize", "maxConcurrentDispatches", "maxAttempts", "maxRetryDuration", "minBackoff", "maxBackoff", "maxDoublings"):
                 if k in target and src.get(k, None) != None and (e == top or e == top + "." + k):
                     target[k] = src.get(k)
         elif top == "httpTarget" or top == "appEngineRoutingOverride" or top == "stackdriverLoggingConfig":
             v = body.get(top, None)
+            if top == "httpTarget":
+                hterr = _validate_http_target(v)
+                if hterr != None:
+                    return hterr
             key = _snake(top)
             if v == None:
                 doc.pop(key, None)

@@ -257,6 +257,39 @@ def _location_entity(project, loc):
 # Queue rateLimits / retryConfig
 # ====================================================================
 
+# _validate_http_target rejects an httpTarget that is not a usable object
+# graph (checked at queue write time so tasks:buffer can never trip on a
+# malformed stored value). None passes (field absent).
+def _validate_http_target(ht):
+    if ht == None:
+        return None
+    if type(ht) != "dict":
+        return _invalid("Queue.httpTarget must be an object.")
+    uo = ht.get("uriOverride", None)
+    if uo == None:
+        return None
+    if type(uo) != "dict":
+        return _invalid("HttpTarget.uriOverride must be an object.")
+    host = uo.get("host", None)
+    if host != None and type(host) != "string":
+        return _invalid("HttpTarget.uriOverride.host must be a string.")
+    scheme = uo.get("scheme", None)
+    if scheme != None and type(scheme) != "string":
+        return _invalid("HttpTarget.uriOverride.scheme must be a string.")
+    port = uo.get("port", None)
+    if port != None and type(port) != "int" and type(port) != "float" and type(port) != "string":
+        return _invalid("HttpTarget.uriOverride.port must be a number.")
+    for f, leaf in (("pathOverride", "path"), ("queryOverride", "queryParams")):
+        sub = uo.get(f, None)
+        if sub == None:
+            continue
+        if type(sub) != "dict":
+            return _invalid("HttpTarget.uriOverride." + f + " must be an object.")
+        v = sub.get(leaf, None)
+        if v != None and type(v) != "string":
+            return _invalid("HttpTarget.uriOverride." + f + "." + leaf + " must be a string.")
+    return None
+
 # Defaults the real service fills in on create when fields are unset.
 _DEFAULT_RATE = {"maxDispatchesPerSecond": 500.0, "maxBurstSize": 100, "maxConcurrentDispatches": 1000}
 _DEFAULT_RETRY = {
@@ -283,6 +316,8 @@ def _burst_for(rate):
 def _coerce_rate(body):
     if body == None:
         return dict(_DEFAULT_RATE), None
+    if type(body) != "dict":
+        return None, _invalid("Queue.rateLimits must be an object.")
     rate = _to_float(body.get("maxDispatchesPerSecond", None))
     if rate == None:
         rate = _DEFAULT_RATE["maxDispatchesPerSecond"]
@@ -306,6 +341,8 @@ def _coerce_rate(body):
 def _coerce_retry(body):
     if body == None:
         return dict(_DEFAULT_RETRY), None
+    if type(body) != "dict":
+        return None, _invalid("Queue.retryConfig must be an object.")
     out = dict(_DEFAULT_RETRY)
     if body.get("maxAttempts", None) != None:
         attempts = _to_int(body.get("maxAttempts"))

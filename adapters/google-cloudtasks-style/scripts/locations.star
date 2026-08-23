@@ -73,6 +73,8 @@ def on_update_cmek(req):
         return jerr
     if body.get("kmsKey", None) == None:
         return _invalid("CmekConfig.kmsKey is required.")
+    if type(body.get("kmsKey")) != "string":
+        return _invalid("Invalid value at 'cmek_config.kms_key'.")
     if body.get("name", "") != "" and body.get("name") != name:
         return _invalid("CmekConfig.name must be " + name)
 
