@@ -12,11 +12,11 @@ network**. You describe services in a YAML manifest; stunt serves them on local 
 over real TLS with subdomain routing). Stateful behavior (databases, tokens, webhooks) comes from
 adapters written in a **sandboxed Starlark** scripting layer.
 
-**Install:** `brew install stuntapi/tap/stunt` · **Run from source:** `go run ./cmd/stunt` ·
+**Install:** `brew install --cask stuntapi/tap/stunt` · **Run from source:** `go run ./cmd/stunt` ·
 **One-shot demo:** `stunt demo`
 
-> **Adapters are embedded.** All reference adapters ship INSIDE the binary
-> (3.4 MB). `stunt catalog search` lists all 91 offline, and
+> **Adapters are embedded.** All reference adapters ship INSIDE the binary.
+> `stunt catalog search` lists all of them offline, and
 > `stunt adapter add <name>` resolves a bundled adapter to an `embedded:<name>`
 > source that `stunt up` extracts from the binary — no git clone, no network.
 > Use `git:` / local-path sources for community or custom adapters.
