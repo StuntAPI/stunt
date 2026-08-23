@@ -272,6 +272,10 @@ The dashboard's **profiles** panel does the same with one click, and the read co
   `stunt reset <service>` for a fully fresh sequence. Details in the
   [determinism contract](#determinism).
 
+Use-case guide — chaos testing, revoked credentials on demand, the one broken
+customer, hanging dependencies, flipping worlds between test cases:
+**[`docs/profiles.md`](docs/profiles.md)**.
+
 ---
 
 ## Adapters
@@ -511,5 +515,6 @@ Found a security issue? See **[SECURITY.md](SECURITY.md)** — do not open a pub
   manifest schema, CLI reference, and the complete Starlark handler API.
 - **Adapter authoring:** `adapters/README.md` — the `adapter.yaml` schema and the complete
   Starlark builtins reference with exact signatures.
+- **Profiles use-case guide:** `docs/profiles.md`.
 - **Dashboard guide:** `docs/dashboard.md`.
 - **Contributing:** see `CONTRIBUTING.md`.
