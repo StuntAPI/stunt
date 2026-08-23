@@ -4,6 +4,73 @@ All notable changes to **stunt** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.52.0] — 2026-08-24
+
+The conformance campaign: every real API adapter now carries a real test
+suite — 36 driven by official provider SDKs through the real stunt binary,
+59 by engine-level suites executing the adapters' actual Starlark handlers
+(2 overlap). 95 of 98 adapters; the remaining 3 are the zero-route demos.
+109 → 231 SDK checks, plus 1,079 named VM behaviors, all published in the
+generated CONFORMANCE.md and on stuntapi.com/conformance.
+
+### Conformance
+
+- **SDK wave 5–11 — 16 more official-SDK suites.** slack, plaid, hubspot,
+  square, openai, resend, discord (@discordjs/rest), jsforce, node-zendesk,
+  jira.js, the google-api-go-client family (gmail, calendar, drive, sheets,
+  tasks, admin, youtube, ga4, searchconsole, apps-script, docs, IAM),
+  @microsoft/microsoft-graph-client (Graph + entra-id), cloudflare-go,
+  @atproto/api, and go-ethereum. Each suite drives the provider's own
+  client — its serialization, signing, and client-side validation — at a
+  booted adapter and asserts business outcomes: full OAuth2 code flows
+  with WebCrypto/JWKS verification of the minted tokens, SDK pagination
+  walking, provider error envelopes decoded through the client's types.
+- **VM waves 12–15 — 59 engine-level suites.** Handler-level tests for
+  every remaining adapter, from servicenow to signin-with-apple (whose
+  ES256 id_tokens verify against the adapter-served JWKS with real
+  ecdsa.Verify). Behaviors are named by `// =====` markers in the suites
+  and harvested into the matrix automatically.
+- **~145 adapter fidelity fixes the suites forced.** The standouts:
+  avalara computed zero tax on its own documented SDK decimal-string
+  requests; firebase's runQuery crashed on any array/map field (recursive
+  helper vs the VM's recursion ban); cloudkit's every record delete 500'd;
+  smartbill payments registered with a JSON number were invisible;
+  printify priced quantity 2 as quantity 1 and leaked its webhook signing
+  secret on GET; photos let any authenticated user read and delete another
+  user's albums; twitter stamped every tweet with a constant created_at;
+  hn's ask/show lists returned every story; tenderly rendered zero values
+  as 0x1; pinata's CIDs are now real CIDv0 multihashes; dropbox re-uploads
+  forked the path and now honor the full write-mode contract. OAuth
+  authorization codes now survive a failed client-mismatch exchange in
+  every adapter that mints them.
+- **The matrix updates itself.** Coverage is derived, not curated: the
+  route tables embedded in the pinned SDKs (Google's Discovery docs ship
+  inside google.golang.org/api) and vendored official specs — OpenAPI,
+  AWS botocore models, Dropbox Stone, Bluesky Lexicons — diff against the
+  adapter manifests to produce per-adapter real-API coverage percentages
+  (45 adapters), network-free and enforced fresh by CI. Every endpoint
+  also carries statically-derived behavior tags (reads body? gates auth?
+  paginates?) clearly labeled as analysis, not verification.
+- **`just ci-full`** runs the exact GitHub CI job locally — including the
+  conformance suites and the generated-artifact freshness gate.
+
+### Adapters
+
+- google-admin seeds insert-once (create-first clients see the seeded
+  directory); zendesk serves the canonical .json paths first; jira speaks
+  the v2 aliases and enhanced-search; salesforce echoes the request host
+  in instance_url across all grants; bluesky CIDs are real CIDv1;
+  marketo auth failures use the real 403/601 shape; netsuite's SuiteQL
+  envelope carries hasMore/offset/totalResults; linkedin resolves post
+  authors correctly and rejects forged comment actors.
+
+### Fixed
+
+- Engine test-hygiene round: response bodies closed in the
+  signin-with-apple and sendgrid suites; two leaked httptest connections.
+- CI: the conformance-matrix freshness gate now also covers
+  conformance/matrix.json consumed by stuntapi.com.
+
 ## [0.51.0] — 2026-08-21
 
 ### Engine
