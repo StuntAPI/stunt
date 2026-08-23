@@ -25,6 +25,8 @@ Verification tiers:
 
 **43 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.
 
+Behavior columns come in two kinds: **verified** (an official SDK was driven against the adapter and the check passed — the Behaviors counts in the matrix above) and **derived** (static analysis of the handler scripts — every adapter's *Derived behavior tags* block below says what the code does, not that a client confirmed it).
+
 | Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |
 |---|---|---|---|---|---|---|---|
 | [adyen-style](adapters/adyen-style/) | Adyen Checkout + Notification API `v68` | 14 | boot | — | — | [4](#adyen-style) | [4](#adyen-style) |
@@ -604,6 +606,25 @@ behavior notes live in each adapter's README.
 - paymentLinks url is synthetic — no hosted checkout page; pay via the link reference
 - paymentMethods serves a fixed 5-method catalog with empty storedPaymentMethods
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v68/payments` — body, stateful, webhooks, clock
+- `POST` `/v68/payments/details` — body, stateful, webhooks, clock
+- `GET` `/v68/payments` — query, stateful, paginate, clock
+- `POST` `/v68/paymentMethods` — body, stateful, clock
+- `POST` `/v68/paymentLinks` — body, stateful, clock
+- `GET` `/v68/paymentLinks/{linkId}` — params, stateful, clock
+- `POST` `/v68/payments/{paymentPspReference}/captures` — body, params, stateful, webhooks, clock
+- `POST` `/v68/payments/{paymentPspReference}/refunds` — body, params, stateful, webhooks, clock
+- `POST` `/v68/payments/{paymentPspReference}/reversals` — body, params, stateful, webhooks, clock
+- `POST` `/v68/payments/{paymentPspReference}/cancels` — body, params, stateful, webhooks, clock
+- `POST` `/v68/notifications/test` — body, stateful, clock
+- `POST` `/v68/webhooks` — body, stateful, clock
+- `GET` `/v68/webhooks` — stateful, clock
+- `DELETE` `/v68/webhooks/{webhookId}` — params, stateful, clock
+
+</details>
+
 ### anaplan-style
 
 **Covered** — 18 routes
@@ -646,6 +667,29 @@ behavior notes live in each adapter's README.
 - simulate_fail in the task body is a simulator-only trigger (real Anaplan has none)
 - PUT file upload is the same surface as POST; /jobs aliases /tasks
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/2/0/workspaces` — query, auth, stateful, paginate, errors
+- `GET` `/2/0/workspaces/{workspaceId}/models` — query, params, auth, paginate, errors
+- `GET` `/2/0/workspaces/{workspaceId}/models/{modelId}/modules` — query, params, auth, paginate, errors
+- `GET` `/2/0/workspaces/{workspaceId}/models/{modelId}/files` — query, params, auth, stateful, paginate, errors
+- `GET` `/2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}` — params, auth, stateful, errors
+- `POST` `/2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}` — params, auth, stateful, errors
+- `PUT` `/2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}` — params, auth, stateful, errors
+- `GET` `/2/0/workspaces/{workspaceId}/models/{modelId}/files/{fileId}/chunks` — query, params, auth, stateful, paginate, errors
+- `GET` `/2/0/workspaces/{workspaceId}/models/{modelId}/imports` — query, params, auth, stateful, paginate, errors
+- `GET` `/2/0/workspaces/{workspaceId}/models/{modelId}/exports` — query, params, auth, stateful, paginate, errors
+- `GET` `/2/0/workspaces/{workspaceId}/models/{modelId}/actions` — query, params, auth, stateful, paginate, errors
+- `GET` `/2/0/workspaces/{workspaceId}/models/{modelId}/processes` — query, params, auth, stateful, paginate, errors
+- `POST` `/2/0/workspaces/{workspaceId}/models/{modelId}/imports/{importId}/tasks` — body, params, auth, stateful, errors, clock
+- `POST` `/2/0/workspaces/{workspaceId}/models/{modelId}/imports/{importId}/jobs` — body, params, auth, stateful, errors, clock
+- `POST` `/2/0/workspaces/{workspaceId}/models/{modelId}/exports/{exportId}/tasks` — body, params, auth, stateful, errors, clock
+- `POST` `/2/0/workspaces/{workspaceId}/models/{modelId}/exports/{exportId}/jobs` — body, params, auth, stateful, errors, clock
+- `GET` `/2/0/workspaces/{workspaceId}/models/{modelId}/tasks/{taskId}` — params, auth, stateful, errors, clock
+- `GET` `/2/0/workspaces/{workspaceId}/models/{modelId}` — params, auth, errors
+
+</details>
+
 ### apple-apns-style
 
 **Covered** — 2 routes
@@ -670,6 +714,13 @@ behavior notes live in each adapter's README.
 
 - Provider JWT verified against one fixed P-256 key whose private half is published
 - GET /3/device/{token}/notifications is a simulator-only endpoint (no real fetch API)
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/3/device/{deviceToken}` — body, params, auth, stateful, errors, clock
+- `GET` `/3/device/{deviceToken}/notifications` — params, auth, stateful, clock
+
+</details>
 
 ### apple-appstoreconnect-style
 
@@ -774,6 +825,26 @@ behavior notes live in each adapter's README.
 - simulate_fail extension: app create forces build INVALID, version create REJECTED
 - A first build is minted at app create — no build upload path
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/v1/apps` — query, auth, stateful, paginate, filter, clock
+- `POST` `/v1/apps` — body, auth, stateful, clock
+- `POST` `/v1/appStoreVersionSubmissions` — body, auth, stateful, clock
+- `GET` `/v1/users` — query, auth, stateful, paginate, filter, clock
+- `GET` `/v1/salesReports` — query, auth, stateful, clock
+- `GET` `/v1/apps/{id}` — params, auth, stateful, clock
+- `PATCH` `/v1/apps/{id}` — body, params, auth, stateful, clock
+- `GET` `/v1/apps/{id}/appStoreVersions` — query, params, auth, stateful, filter, clock
+- `POST` `/v1/apps/{id}/appStoreVersions` — body, params, auth, stateful, clock
+- `GET` `/v1/apps/{id}/builds` — query, params, auth, stateful, filter, clock
+- `GET` `/v1/apps/{id}/appPrices` — params, auth, stateful, clock
+- `GET` `/v1/builds/{id}` — params, auth, stateful, clock
+- `GET` `/v1/appStoreVersions/{id}` — params, auth, stateful, clock
+- `PATCH` `/v1/appStoreVersions/{id}` — body, params, auth, stateful, clock
+- `GET` `/v1/appStoreVersions/{id}/builds` — query, params, auth, stateful, filter, clock
+
+</details>
+
 ### apple-music-style
 
 **Covered** — 18 routes
@@ -816,6 +887,29 @@ behavior notes live in each adapter's README.
 - Developer JWT signature not verified — structural check plus exact-string token registry
 - Music-User-Token accepts any non-empty value — no real user-token validation
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/v1/catalog/{storefront}/search` — query, params, stateful, paginate, clock
+- `GET` `/v1/catalog/{storefront}/charts` — query, params, stateful, paginate, filter, clock
+- `GET` `/v1/catalog/{storefront}/songs` — query, params, stateful, paginate, clock
+- `GET` `/v1/catalog/{storefront}/albums` — query, params, stateful, paginate, clock
+- `GET` `/v1/catalog/{storefront}/artists` — query, params, stateful, paginate, clock
+- `GET` `/v1/catalog/{storefront}/playlists` — query, params, stateful, paginate, clock
+- `GET` `/v1/catalog/{storefront}/songs/{id}` — params, stateful, clock
+- `GET` `/v1/catalog/{storefront}/albums/{id}` — params, stateful, clock
+- `GET` `/v1/catalog/{storefront}/artists/{id}` — params, stateful, clock
+- `GET` `/v1/me/library/songs` — query, stateful, paginate, clock
+- `GET` `/v1/me/library/albums` — query, params, stateful, paginate, clock
+- `GET` `/v1/me/library/playlists` — query, stateful, paginate, clock
+- `GET` `/v1/me/library/recently-added` — query, params, stateful, paginate, filter, clock
+- `POST` `/v1/me/library` — body, query, params, stateful, clock
+- `DELETE` `/v1/me/library/{type}/{id}` — params, stateful, clock
+- `POST` `/v1/me/played` — body, query, stateful, clock
+- `GET` `/v1/me/ratings/{type}/{id}` — params, stateful, clock
+- `PUT` `/v1/me/ratings/{type}/{id}` — body, params, stateful, clock
+
+</details>
+
 ### apple-searchads-style
 
 **Covered** — 12 routes
@@ -851,6 +945,23 @@ behavior notes live in each adapter's README.
 - ES256 client-secret JWT is not signature-verified — structural checks only
 - Reports group by campaign only; any other groupBy key returns 400
 - Selector conditions cover a fixed field set per resource (id, name, budget, status, times)
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/api/oauth2/token` — body, stateful, errors, clock
+- `POST` `/api/v4/campaigns/find` — body, auth, stateful, filter, clock
+- `POST` `/api/v4/campaigns` — body, auth, stateful, errors, clock
+- `POST` `/api/v4/reports/campaigns` — body, auth, stateful, filter, errors, clock
+- `GET` `/api/v4/campaigns/{campaign_id}` — params, auth, stateful, errors, clock
+- `PUT` `/api/v4/campaigns/{campaign_id}` — body, params, auth, stateful, errors, clock
+- `POST` `/api/v4/campaigns/{campaign_id}/ads` — body, params, auth, stateful, errors, clock
+- `POST` `/api/v4/campaigns/{campaign_id}/keywords/targeting/find` — body, params, auth, stateful, filter, errors, clock
+- `PUT` `/api/v4/campaigns/{campaign_id}/keywords/targeting/bulk` — body, params, auth, stateful, errors, clock
+- `POST` `/api/v4/campaigns/{campaign_id}/keywords/targeting` — body, params, auth, stateful, errors, clock
+- `PUT` `/api/v4/campaigns/{campaign_id}/keywords/targeting/{keyword_id}` — body, params, auth, stateful, errors, clock
+- `DELETE` `/api/v4/campaigns/{campaign_id}/keywords/targeting/{keyword_id}` — params, auth, stateful, errors, clock
+
+</details>
 
 ### apps-script-style
 
@@ -900,6 +1011,22 @@ behavior notes live in each adapter's README.
 - :run never executes code — known patterns return canned results, others echo parameters
 - scripts.run also served at a legacy path form (projects/{id}/scripts/{fn}/run)
 - content update accepts POST as well as the real API's PUT
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/v1/projects` — query, auth, stateful, paginate, clock
+- `POST` `/v1/projects` — body, auth, stateful, clock
+- `GET` `/v1/projects/{scriptId}` — params, auth, stateful, clock
+- `DELETE` `/v1/projects/{scriptId}` — params, auth, stateful, clock
+- `GET` `/v1/projects/{scriptId}/content` — params, auth, stateful, clock
+- `PUT` `/v1/projects/{scriptId}/content` — body, params, auth, stateful, clock
+- `POST` `/v1/projects/{scriptId}/content` — body, params, auth, stateful, clock
+- `POST` `/v1/projects/{scriptId}/deployments` — body, params, auth, stateful, clock
+- `GET` `/v1/projects/{scriptId}/deployments` — params, auth, stateful, clock
+- `POST` `/v1/scripts/{scriptId}:run` — body, params, auth, stateful, clock
+- `POST` `/v1/projects/{scriptId}/scripts/{functionName}/run` — body, params, auth, stateful, clock
+
+</details>
 
 ### auth0-style
 
@@ -1001,6 +1128,28 @@ behavior notes live in each adapter's README.
 - q is exact-match or substring only (no Lucene)
 - No scope enforcement — any valid RS256 token may call /api/v2/*
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/.well-known/openid-configuration` — —
+- `GET` `/.well-known/jwks.json` — —
+- `GET` `/authorize` — query, stateful, filter, clock
+- `POST` `/oauth/token` — body, stateful, clock
+- `GET` `/userinfo` — stateful, clock
+- `POST` `/oauth/revoke` — body, stateful
+- `POST` `/dbconnections/signup` — body, stateful, clock
+- `GET` `/api/v2/users` — query, stateful, paginate, filter, clock
+- `POST` `/api/v2/users` — body, stateful, clock
+- `GET` `/api/v2/roles` — query, stateful, paginate, filter, clock
+- `POST` `/api/v2/roles` — body, stateful, clock
+- `GET` `/api/v2/users/{id}` — params, stateful, clock
+- `PATCH` `/api/v2/users/{id}` — body, params, stateful, clock
+- `DELETE` `/api/v2/users/{id}` — params, stateful, clock
+- `GET` `/api/v2/users/{id}/roles` — params, stateful, clock
+- `POST` `/api/v2/users/{id}/roles` — body, params, stateful, clock
+- `DELETE` `/api/v2/users/{id}/roles` — body, params, stateful, clock
+
+</details>
+
 ### avalara-style
 
 **Covered** — 8 routes
@@ -1031,6 +1180,19 @@ behavior notes live in each adapter's README.
 **Deviations** (1)
 
 - Tax is a deterministic split — State 50%, County 25%, City 20%, Special 5% of the rate
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v2/tax/calculate` — body
+- `POST` `/v2/transactions/create` — body, stateful, clock
+- `GET` `/v2/transactions` — query, stateful, paginate, filter
+- `GET` `/v2/transactions/{id}` — params, stateful
+- `POST` `/v2/transactions/{id}/void` — params, stateful
+- `GET` `/v2/companies` — query, stateful, paginate, filter
+- `GET` `/v2/definitions/nexuses` — query, paginate, filter
+- `GET` `/v2/definitions/taxcodes` — query, paginate, filter
+
+</details>
 
 ### aws-cognito-style
 
@@ -1065,6 +1227,18 @@ behavior notes live in each adapter's README.
 - Verification/reset codes are the last 6 digits of the username, zero-padded
 - Hosted UI has no login page — authorize auto-binds login_hint user or seeded demo-user
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/oauth2/authorize` — query, stateful, errors
+- `POST` `/oauth2/token` — body, stateful, errors, clock
+- `GET` `/oauth2/userInfo` — auth, stateful, clock
+- `GET` `/login` — query
+- `GET` `/logout` — query
+- `POST` `/` — body, stateful, errors, clock
+- `GET` `/{userPoolId}/.well-known/jwks.json` — —
+
+</details>
+
 ### aws-iam-sts-style
 
 **Covered** — 2 routes
@@ -1089,6 +1263,13 @@ behavior notes live in each adapter's README.
 - Canonical path/query rebuilt from decoded values — duplicate query keys indistinguishable
 - RFC 1123 Date header fallback not parsed — x-amz-date is required
 - Only the documented example AKID/secret validates (single credential pair)
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/` — body, query, auth, stateful, paginate, filter, errors, clock
+- `POST` `/` — body, query, auth, stateful, paginate, filter, errors, clock
+
+</details>
 
 ### aws-s3-style
 
@@ -1124,6 +1305,19 @@ behavior notes live in each adapter's README.
 - DELETE of a missing bucket is an idempotent 204 (real S3: 404 NoSuchBucket)
 - SigV4 canonical URI/query rebuilt from decoded values — duplicates indistinguishable
 - No RFC 1123 Date fallback; canonical header whitespace collapsing not applied
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/{bucket}` — query, params, stateful, paginate, filter, errors, clock
+- `PUT` `/{bucket}` — body, query, params, stateful, errors, clock
+- `DELETE` `/{bucket}` — query, params, stateful, errors, clock
+- `PUT` `/{bucket}/{key+}` — query, params, stateful, errors, clock
+- `GET` `/{bucket}/{key+}` — query, params, stateful, errors, clock
+- `HEAD` `/{bucket}/{key+}` — query, params, stateful, errors, clock
+- `DELETE` `/{bucket}/{key+}` — query, params, stateful, errors, clock
+- `POST` `/{bucket}/{key+}` — query, params, stateful, errors, clock
+
+</details>
 
 ### azure-devops-style
 
@@ -1228,6 +1422,28 @@ behavior notes live in each adapter's README.
 - simulate_fail run parameter (templateParameters or top-level) forces result failed
 - Run-state webhooks may double-emit when list/bulk reads race single-run polls
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/{org}/_apis/projects` — query, auth, stateful, paginate, errors, clock
+- `GET` `/{org}/{project}/_apis/pipelines` — query, auth, stateful, paginate, errors, clock
+- `GET` `/{org}/{project}/_apis/pipelines/{pipelineId}` — params, auth, stateful, clock
+- `GET` `/{org}/{project}/_apis/pipelines/{pipelineId}/runs` — query, params, auth, stateful, paginate, webhooks, errors, clock
+- `POST` `/{org}/{project}/_apis/pipelines/{pipelineId}/runs` — body, params, auth, stateful, clock
+- `GET` `/{org}/{project}/_apis/pipelines/{pipelineId}/runs/{runId}` — params, auth, stateful, webhooks, clock
+- `GET` `/{org}/{project}/_apis/git/repositories` — query, params, auth, stateful, paginate, errors, clock
+- `GET` `/{org}/{project}/_apis/git/repositories/{repoId}/items` — query, params, auth, stateful, clock
+- `GET` `/{org}/{project}/_apis/git/repositories/{repoId}/commits` — query, params, auth, stateful, paginate, errors, clock
+- `POST` `/{org}/{project}/_apis/git/repositories/{repoId}/pushes` — body, params, auth, stateful, webhooks, clock
+- `GET` `/{org}/{project}/_apis/work/teamsettings/iterations` — query, auth, stateful, paginate, errors, clock
+- `GET` `/{org}/{project}/_apis/wit/workitems` — query, auth, stateful, clock
+- `GET` `/{org}/{project}/_apis/wit/workitems/{id}` — params, auth, stateful, errors, clock
+- `PATCH` `/{org}/{project}/_apis/wit/workitems/{id}` — body, params, auth, stateful, webhooks, clock
+- `POST` `/{org}/{project}/_apis/wit/workitems/{type}` — body, params, auth, stateful, webhooks, clock
+- `POST` `/{org}/{project}/_apis/wit/wiql` — body, query, auth, stateful, filter, clock
+- `POST` `/{org}/_apis/hooks/subscriptions` — body, auth, stateful, clock
+
+</details>
+
 ### azure-servicebus-style
 
 **Covered** — 18 routes
@@ -1271,6 +1487,29 @@ behavior notes live in each adapter's README.
 - Default 30s peek-lock, overridable via simulator-only lockduration query param
 - Bearer auth accepted with any non-empty token — only SAS is verified
 - Storage queue send accepts JSON MessageText in place of the real XML body
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/{queue}/messages` — body, query, params, stateful, clock
+- `DELETE` `/{queue}/messages/head` — params, stateful, clock
+- `POST` `/{queue}/messages/{lockToken}/{action}` — query, params, stateful, clock
+- `GET` `/$topicInfo` — query, stateful, clock
+- `GET` `/topics` — stateful, clock
+- `PUT` `/topics/{topic}` — body, params, stateful, clock
+- `GET` `/topics/{topic}` — params, stateful, clock
+- `DELETE` `/topics/{topic}` — params, stateful, clock
+- `POST` `/topics/{topic}/messages` — body, params, stateful, clock
+- `GET` `/topics/{topic}/subscriptions` — params, stateful, clock
+- `PUT` `/topics/{topic}/subscriptions/{sub}` — body, params, stateful, clock
+- `GET` `/topics/{topic}/subscriptions/{sub}` — params, stateful, clock
+- `DELETE` `/topics/{topic}/subscriptions/{sub}` — params, stateful, clock
+- `POST` `/topics/{topic}/subscriptions/{sub}/messages` — query, params, stateful, clock
+- `POST` `/topics/{topic}/subscriptions/{sub}/messages/{lockToken}/{action}` — query, params, stateful, clock
+- `POST` `/{account}/{queue}/messages` — body, params, stateful, clock
+- `GET` `/{account}/{queue}/messages` — query, params, stateful, clock
+- `DELETE` `/{account}/{queue}/messages/{messageid}` — query, params, stateful, clock
+
+</details>
 
 ### azure-storage-style
 
@@ -1317,6 +1556,20 @@ behavior notes live in each adapter's README.
 - SAS checked structurally (sv/sig/se present) and any non-empty bearer accepted
 - PUT on an existing container updates it in place 201 (real Azure: 409 conflict)
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/` — query, stateful, paginate, clock
+- `PUT` `/{container}` — query, params, stateful, clock
+- `GET` `/{container}` — query, params, stateful, paginate, errors, clock
+- `HEAD` `/{container}` — query, params, stateful, errors, clock
+- `DELETE` `/{container}` — query, params, stateful
+- `PUT` `/{container}/{blob}` — query, params, stateful, errors, clock
+- `GET` `/{container}/{blob}` — query, params, stateful, errors, clock
+- `HEAD` `/{container}/{blob}` — query, params, stateful, errors, clock
+- `DELETE` `/{container}/{blob}` — query, params, stateful
+
+</details>
+
 ### blog-style
 
 **Covered** — 0 routes · GraphQL schema
@@ -1354,6 +1607,18 @@ behavior notes live in each adapter's README.
 - searchPosts returns seeded synthetic results, not an index over created records
 - createSession mints tokens for any identifier/password pair; no credential check
 - refreshSession invalidates the old accessJwt too; real AT Protocol leaves it valid to exp
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/xrpc/com.atproto.server.createSession` — body, stateful, errors
+- `POST` `/xrpc/com.atproto.server.refreshSession` — auth, stateful
+- `POST` `/xrpc/com.atproto.repo.createRecord` — body, auth, stateful, errors
+- `POST` `/xrpc/com.atproto.repo.deleteRecord` — body, auth, stateful
+- `GET` `/xrpc/com.atproto.identity.resolveHandle` — query, stateful, errors
+- `GET` `/xrpc/app.bsky.actor.getProfile` — query, stateful, errors
+- `GET` `/xrpc/app.bsky.feed.searchPosts` — query, stateful
+
+</details>
 
 ### braintree-style
 
@@ -1400,6 +1665,26 @@ behavior notes live in each adapter's README.
 - POST /graphql is served without the Bearer/Basic auth check the REST surface enforces
 - simulate_authorization_expiry sim-only flag: auths expire in 1s vs 7 simulated days
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/merchants/{merchantId}/transactions/advanced_search` — body, stateful, filter, webhooks, clock
+- `POST` `/merchants/{merchantId}/transactions` — body, stateful, webhooks, clock
+- `GET` `/merchants/{merchantId}/transactions/{id}` — params, stateful, webhooks, clock
+- `POST` `/merchants/{merchantId}/transactions/{id}/settle` — body, params, stateful, webhooks, clock
+- `POST` `/merchants/{merchantId}/transactions/{id}/void` — params, stateful, webhooks, clock
+- `POST` `/merchants/{merchantId}/transactions/{id}/refund` — body, params, stateful, webhooks, clock
+- `POST` `/merchants/{merchantId}/payment_methods` — body, stateful
+- `POST` `/merchants/{merchantId}/client_token` — stateful
+- `POST` `/merchants/{merchantId}/plans` — body, stateful, clock
+- `GET` `/merchants/{merchantId}/plans` — stateful
+- `GET` `/merchants/{merchantId}/plans/{id}` — params, stateful
+- `POST` `/merchants/{merchantId}/subscriptions` — body, stateful, clock
+- `GET` `/merchants/{merchantId}/subscriptions/{id}` — params, stateful, webhooks, clock
+- `POST` `/merchants/{merchantId}/subscriptions/{id}/cancel` — params, stateful, webhooks, clock
+- `POST` `/webhooks` — body, stateful, webhooks, errors, clock
+
+</details>
+
 ### braze-style
 
 **Covered** — 12 routes
@@ -1440,6 +1725,23 @@ behavior notes live in each adapter's README.
 - message.sent webhook payloads use a synthetic shape; Braze has no documented scheme
 - scheduled sends flip to sent on first read past the time; message.sent fires once then
 - key store models expiry for app-group keys; real Braze keys do not expire
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/messages/send` — body, auth, stateful, webhooks, errors, clock
+- `POST` `/messages/schedule/create` — body, auth, stateful, errors, clock
+- `POST` `/users/track` — body, auth, stateful, errors, clock
+- `POST` `/users/alias/new` — body, auth, stateful, errors, clock
+- `POST` `/users/identify` — body, auth, stateful, errors, clock
+- `POST` `/users/delete` — body, auth, stateful, errors, clock
+- `POST` `/users/export/ids` — body, auth, stateful, filter, errors, clock
+- `POST` `/campaigns/trigger/send` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/segments/list` — query, auth, stateful, paginate, errors, clock
+- `GET` `/messages/scheduled` — query, auth, stateful, filter, webhooks, errors, clock
+- `POST` `/webhooks` — body, auth, stateful, clock
+- `GET` `/webhooks` — auth, stateful, clock
+
+</details>
 
 ### chainlink-style
 
@@ -1489,6 +1791,32 @@ behavior notes live in each adapter's README.
 - Functions requests: queued 0-1s, running 1-3s, fulfilled at +3s (derive-on-read)
 - createRequest accepts simulate_fail to inject failures; real sandbox has no trigger
 - keeper performs are derived on read per elapsed cadence tick; real network performs on-chain
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/feeds` — query, stateful, paginate, clock
+- `GET` `/feeds/{feedID}` — params, stateful, clock
+- `GET` `/feeds/{feedID}/latestRoundData` — params, stateful, clock
+- `GET` `/feeds/{feedID}/rounds` — query, params, stateful, paginate, clock
+- `GET` `/feeds/{feedID}/rounds/{roundId}` — params, stateful, clock
+- `POST` `/v2/functions/createSecrets` — body, stateful, clock
+- `POST` `/v2/functions/encryptSecrets` — body, stateful, clock
+- `POST` `/v2/functions/createRequest` — body, stateful, clock
+- `GET` `/v2/functions/request/{requestID}` — params, stateful, clock
+- `GET` `/v2/functions/secrets/{secretID}` — params, stateful, clock
+- `POST` `/v2/automation/registerUpkeep` — body, stateful, clock
+- `GET` `/v2/automation/upkeeps` — query, stateful, paginate, clock
+- `GET` `/v2/automation/{id}` — params, stateful, clock
+- `POST` `/v2/automation/{id}/fund` — body, params, stateful, clock
+- `POST` `/v2/automation/{id}/cancel` — params, stateful, clock
+- `POST` `/v2/automation/{id}/withdraw` — body, params, stateful, clock
+- `GET` `/v2/automation/{id}/check` — params, stateful, clock
+- `POST` `/v2/automation/{id}/perform` — params, stateful, clock
+- `GET` `/v2/automation/{id}/performs` — query, params, stateful, paginate, clock
+- `GET` `/v2/ccip/messages` — query, stateful, paginate, clock
+- `GET` `/v2/ccip/lane/{src}/{dst}` — params, stateful, clock
+
+</details>
 
 ### cloudflare-style
 
@@ -1615,6 +1943,46 @@ behavior notes live in each adapter's README.
 - simulate_fail on zone create / worker deploy injects moved or failed; no real trigger
 - D1 query runs a small SQL subset; DROP/ALTER and other statements return 400
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/zones` — query, stateful, paginate, filter, clock
+- `POST` `/zones` — body, stateful, clock
+- `GET` `/zones/{zone_id}` — params, stateful, clock
+- `DELETE` `/zones/{zone_id}` — params, stateful, clock
+- `GET` `/zones/{zone_id}/dns_records` — query, params, stateful, paginate, filter, clock
+- `POST` `/zones/{zone_id}/dns_records` — body, params, stateful, clock
+- `GET` `/zones/{zone_id}/dns_records/{dns_record_id}` — params, stateful, clock
+- `PUT` `/zones/{zone_id}/dns_records/{dns_record_id}` — body, params, stateful, clock
+- `PATCH` `/zones/{zone_id}/dns_records/{dns_record_id}` — body, params, stateful, clock
+- `DELETE` `/zones/{zone_id}/dns_records/{dns_record_id}` — params, stateful
+- `GET` `/zones/{zone_id}/firewall/rules` — query, params, stateful, paginate, clock
+- `POST` `/zones/{zone_id}/firewall/rules` — body, params, stateful, clock
+- `GET` `/zones/{zone_id}/firewall/rules/{rule_id}` — params, stateful, clock
+- `PUT` `/zones/{zone_id}/firewall/rules/{rule_id}` — body, params, stateful, clock
+- `PATCH` `/zones/{zone_id}/firewall/rules/{rule_id}` — body, params, stateful, clock
+- `DELETE` `/zones/{zone_id}/firewall/rules/{rule_id}` — params, stateful
+- `GET` `/zones/{zone_id}/page_rules` — query, params, stateful, paginate, filter, clock
+- `POST` `/zones/{zone_id}/page_rules` — body, params, stateful, clock
+- `GET` `/zones/{zone_id}/page_rules/{rule_id}` — params, stateful, clock
+- `PUT` `/zones/{zone_id}/page_rules/{rule_id}` — body, params, stateful, clock
+- `PATCH` `/zones/{zone_id}/page_rules/{rule_id}` — body, params, stateful, clock
+- `DELETE` `/zones/{zone_id}/page_rules/{rule_id}` — params, stateful
+- `POST` `/zones/{zone_id}/purge_cache` — body, params, stateful, clock
+- `GET` `/accounts/{account_id}/workers/scripts` — query, params, stateful, paginate, clock
+- `PUT` `/accounts/{account_id}/workers/scripts/{script_name}` — body, params, stateful, clock
+- `GET` `/accounts/{account_id}/workers/scripts/{script_name}` — params, stateful, clock
+- `DELETE` `/accounts/{account_id}/workers/scripts/{script_name}` — params, stateful
+- `GET` `/accounts/{account_id}/workers/scripts/{script_name}/deployments` — params, stateful, clock
+- `GET` `/accounts/{account_id}/r2/buckets` — query, params, stateful, paginate, clock
+- `POST` `/accounts/{account_id}/r2/buckets` — body, params, stateful, clock
+- `DELETE` `/accounts/{account_id}/r2/buckets/{bucket_name}` — params, stateful
+- `GET` `/accounts/{account_id}/d1/database` — query, params, stateful, paginate, clock
+- `POST` `/accounts/{account_id}/d1/database` — body, params, stateful, clock
+- `DELETE` `/accounts/{account_id}/d1/database/{database_id}` — params, stateful
+- `POST` `/accounts/{account_id}/d1/database/{database_id}/query` — body, params, stateful, filter
+
+</details>
+
 ### cloudkit-style
 
 **Covered** — 5 routes
@@ -1644,6 +2012,16 @@ behavior notes live in each adapter's README.
 
 - records/lookup and records/query are GET-with-body; real CloudKit specifies POST
 - query comparators are a limited subset; FULL_TEXT, LIKE, and list variants missing
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/database/1/{container}/{env}/public/users/current` — query, auth, clock
+- `GET` `/database/1/{container}/{env}/public/zones/list` — body, query, auth, stateful, paginate, filter, clock
+- `GET` `/database/1/{container}/{env}/public/records/lookup` — body, query, auth, stateful, clock
+- `GET` `/database/1/{container}/{env}/public/records/query` — body, query, auth, stateful, paginate, filter, clock
+- `POST` `/database/1/{container}/{env}/public/records/modify` — body, query, auth, stateful, clock
+
+</details>
 
 ### discord-style
 
@@ -1761,6 +2139,37 @@ behavior notes live in each adapter's README.
 - posted messages emit signed MESSAGE_CREATE webhooks; real Discord dispatches via gateway
 - message listing pages via opaque after cursors + Link headers, not snowflake ids
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/oauth2/authorize` — query, stateful, errors
+- `POST` `/oauth2/token` — body, stateful, errors, clock
+- `GET` `/oauth2/@me` — auth, stateful, clock
+- `GET` `/users/@me/guilds` — auth, stateful, clock
+- `GET` `/users/@me` — auth, stateful, clock
+- `GET` `/guilds/{guild_id}` — params, auth, stateful, errors, clock
+- `GET` `/guilds/{guild_id}/channels` — query, params, auth, stateful, paginate, errors, clock
+- `POST` `/channels/{channel_id}/messages` — body, params, auth, stateful, webhooks, clock
+- `GET` `/channels/{channel_id}/messages` — query, params, auth, stateful, paginate, errors, clock
+- `GET` `/channels/{channel_id}/messages/{message_id}` — params, auth, stateful, errors, clock
+- `GET` `/v10/channels/{channel_id}/messages/{message_id}` — params, auth, stateful, errors, clock
+- `PUT` `/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` — auth, stateful, clock
+- `POST` `/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` — auth, stateful, clock
+- `POST` `/interactions` — body, auth
+- `GET` `/v10/oauth2/authorize` — query, stateful, errors
+- `POST` `/v10/oauth2/token` — body, stateful, errors, clock
+- `GET` `/v10/oauth2/@me` — auth, stateful, clock
+- `GET` `/v10/users/@me/guilds` — auth, stateful, clock
+- `GET` `/v10/users/@me` — auth, stateful, clock
+- `GET` `/v10/guilds/{guild_id}` — params, auth, stateful, errors, clock
+- `GET` `/v10/guilds/{guild_id}/channels` — query, params, auth, stateful, paginate, errors, clock
+- `POST` `/v10/channels/{channel_id}/messages` — body, params, auth, stateful, webhooks, clock
+- `GET` `/v10/channels/{channel_id}/messages` — query, params, auth, stateful, paginate, errors, clock
+- `PUT` `/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` — auth, stateful, clock
+- `POST` `/v10/channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me` — auth, stateful, clock
+- `POST` `/v10/interactions` — body, auth
+
+</details>
+
 ### drive-style
 
 **Covered** — 13 routes
@@ -1862,6 +2271,24 @@ behavior notes live in each adapter's README.
 - metadata-only files.create defaults mimeType to the folder type when absent; real Drive defaults to a plain file
 - ?alt=media on a content-less file returns 404; real Drive serves 200 with an empty body
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/o/oauth2/auth` — query, stateful, errors
+- `POST` `/o/oauth2/token` — body, stateful, errors, clock
+- `POST` `/upload/drive/v3/files` — body, query, stateful, clock
+- `PUT` `/upload/drive/v3/files/{upload_id}` — query, params, stateful, clock
+- `DELETE` `/upload/drive/v3/files/{upload_id}` — query, params, stateful, errors
+- `GET` `/drive/v3/files` — query, stateful, paginate, filter, clock
+- `POST` `/drive/v3/files` — body, stateful, clock
+- `GET` `/drive/v3/files/{id}` — query, params, stateful, errors, clock
+- `PATCH` `/drive/v3/files/{id}` — body, params, stateful, errors, clock
+- `DELETE` `/drive/v3/files/{id}` — params, stateful, errors, clock
+- `GET` `/drive/v3/about` — stateful, clock
+- `GET` `/drive/v3/changes/startPageToken` — stateful, clock
+- `GET` `/drive/v3/changes` — query, stateful, paginate, filter, clock
+
+</details>
+
 ### dropbox-style
 
 **Covered** — 8 routes
@@ -1899,6 +2326,19 @@ behavior notes live in each adapter's README.
 - list_folder returns the entire path-prefix subtree in one response
 - get_temporary_link mints a synthetic URL that does not serve the content
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/2/files/upload` — body, auth, stateful, errors, clock
+- `POST` `/2/files/download` — body, auth, stateful, errors, clock
+- `POST` `/2/files/list_folder` — body, auth, stateful, paginate, errors, clock
+- `POST` `/2/files/get_metadata` — body, auth, stateful, errors, clock
+- `POST` `/2/files/create_folder` — body, auth, stateful, errors, clock
+- `POST` `/2/files/delete` — body, auth, stateful, errors, clock
+- `POST` `/2/files/get_temporary_link` — body, auth, stateful, errors, clock
+- `POST` `/2/users/get_current_account` — auth, stateful, clock
+
+</details>
+
 ### dune-style
 
 **Covered** — 6 routes
@@ -1930,6 +2370,17 @@ behavior notes live in each adapter's README.
 - queries come from a static 3-entry catalog; no real SQL is executed
 - simulate_fail body flag forces QUERY_STATE_FAILED; real API has no failure trigger
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/api/v1/query/{query_id}/execute` — body, params, auth, stateful, errors, clock
+- `POST` `/api/v1/query/{query_id}/result` — body, params, auth, stateful, errors, clock
+- `GET` `/api/v1/auth/validate` — auth
+- `GET` `/api/v1/execution/{execution_id}/status` — params, auth, stateful, errors, clock
+- `GET` `/api/v1/execution/{execution_id}/results/csv` — query, params, auth, stateful, errors, clock
+- `GET` `/api/v1/execution/{execution_id}/results` — query, params, auth, stateful, errors, clock
+
+</details>
+
 ### dynamodb-style
 
 **Covered** — 1 routes
@@ -1960,6 +2411,12 @@ behavior notes live in each adapter's README.
 - UnprocessedKeys/UnprocessedItems always empty; no throttling, ConsumedCapacity fixed at 1
 - Query/Scan Limit caps returned post-filter items; real caps items evaluated
 - UpdateItem REMOVE on a key attribute silently no-ops instead of erroring
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/` — body, query, stateful, paginate, errors, clock
+
+</details>
 
 ### echo-style
 
@@ -2015,6 +2472,32 @@ behavior notes live in each adapter's README.
 - any non-empty bearer token is accepted; real keys are dashboard-issued API keys
 - contact ids use truncated SHA-256 of the email; the real API uses MD5
 - v2 has no webhooks; adapter emits unsigned lifecycle events as a local extension
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/lists` — query, stateful, paginate, filter
+- `POST` `/lists` — body, stateful, filter, webhooks, clock
+- `GET` `/lists/{list_id}` — params, stateful, filter
+- `PUT` `/lists/{list_id}` — body, params, stateful, filter, webhooks, clock
+- `DELETE` `/lists/{list_id}` — params, stateful, filter, webhooks, clock
+- `POST` `/lists/{list_id}/fields` — body, params, stateful, webhooks, clock
+- `PUT` `/lists/{list_id}/fields/{tag}` — body, params, stateful, filter, webhooks, clock
+- `DELETE` `/lists/{list_id}/fields/{tag}` — params, stateful, filter, webhooks, clock
+- `GET` `/lists/{list_id}/contacts` — query, params, stateful, paginate, filter
+- `POST` `/lists/{list_id}/contacts` — body, params, stateful, filter, webhooks, clock
+- `PUT` `/lists/{list_id}/contacts` — body, params, stateful, filter, webhooks, clock
+- `PUT` `/lists/{list_id}/contacts/batch` — body, params, stateful, webhooks, clock
+- `GET` `/lists/{list_id}/contacts/{contact_id}` — params, stateful
+- `PUT` `/lists/{list_id}/contacts/{contact_id}` — body, params, stateful, webhooks, clock
+- `DELETE` `/lists/{list_id}/contacts/{contact_id}` — params, stateful, webhooks, clock
+- `GET` `/campaigns` — query, stateful, paginate, filter, clock
+- `GET` `/campaigns/{campaign_id}` — params, stateful, clock
+- `GET` `/campaigns/{campaign_id}/reports/summary` — params, stateful, clock
+- `GET` `/campaigns/{campaign_id}/reports/links` — params, stateful, clock
+- `GET` `/campaigns/{campaign_id}/reports` — query, params, stateful, paginate, clock
+- `POST` `/automations/{automation_id}/queue` — body, params, stateful, webhooks, clock
+
+</details>
 
 ### entra-id-style
 
@@ -2112,6 +2595,20 @@ behavior notes live in each adapter's README.
 - nextLink cursor param is $skipToken (camelCase); real Graph emits $skiptoken
 - users create ignores mailNickname; mail defaults to the UPN
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/common/oauth2/v2.0/authorize` — query, stateful, errors
+- `POST` `/common/oauth2/v2.0/token` — body, stateful, errors, clock
+- `GET` `/common/discovery/v2.0/keys` — —
+- `GET` `/v1.0/me` — auth, stateful, clock
+- `GET` `/v1.0/users` — query, auth, stateful, paginate, errors, clock
+- `POST` `/v1.0/users` — body, auth, stateful, clock
+- `GET` `/v1.0/users/{id}` — params, auth, stateful, errors, clock
+- `GET` `/v1.0/applications` — query, auth, stateful, paginate, errors, clock
+- `GET` `/v1.0/servicePrincipals` — query, auth, stateful, paginate, errors, clock
+
+</details>
+
 ### erc4337-style
 
 **Covered** — 2 routes
@@ -2139,6 +2636,13 @@ behavior notes live in each adapter's README.
 - inclusion runs on a fixed clock: mempool 0-1s, bundled 1-3s, included at >=3s
 - eth_sendUserOperation accepts {simulate_fail:true} as a third params element
 - mock paymaster POST /paymaster/sign mints synthetic sponsorship signatures
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/` — body, stateful, clock
+- `POST` `/paymaster/sign` — body, errors
+
+</details>
 
 ### escrow-style
 
@@ -2170,6 +2674,20 @@ behavior notes live in each adapter's README.
 
 - POST /sim/transaction/{id}/fund is a simulator-only affordance for hosted-page funding
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/2017-09-01/customer/me` — auth
+- `GET` `/2017-09-01/transaction` — query, auth, stateful, paginate
+- `POST` `/2017-09-01/transaction` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/2017-09-01/transaction/reference/{reference}` — params, auth, stateful, errors
+- `GET` `/2017-09-01/transaction/{id}` — params, auth, stateful, errors
+- `PATCH` `/2017-09-01/transaction/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/2017-09-01/customer/me/webhook` — body, auth, stateful, errors
+- `GET` `/2017-09-01/customer/me/webhook` — auth, stateful
+- `POST` `/sim/transaction/{id}/fund` — params, auth, stateful, webhooks, errors
+
+</details>
+
 ### eth-jsonrpc-style
 
 **Covered** — 1 routes
@@ -2197,6 +2715,12 @@ behavior notes live in each adapter's README.
 - Mining delay fixed at 3s; blockNumber advances one block per sent tx
 - eth_sendRawTransaction accepts simulator-only {simulate_fail: true} for a revert
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/` — body, stateful, clock
+
+</details>
+
 ### etherscan-style
 
 **Covered** — 1 routes
@@ -2218,6 +2742,12 @@ behavior notes live in each adapter's README.
 **Deviations** (1)
 
 - Auth accepts any non-empty apikey; only a missing key yields the error envelope
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/api` — query, stateful, filter
+
+</details>
 
 ### fattureincloud-style
 
@@ -2343,6 +2873,53 @@ behavior notes live in each adapter's README.
 - POST /entities/{c}/archive takes JSON; the real endpoint is multipart
 - Webhook HMAC uses fixed secret fic-stunt-webhook-signing-secret
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/user/companies` — stateful
+- `GET` `/c/{company_id}/company/info` — params, stateful
+- `PUT` `/c/{company_id}/company/info` — body, params, stateful
+- `GET` `/c/{company_id}/received_documents` — query, params, stateful, paginate, filter
+- `POST` `/c/{company_id}/received_documents` — body, params, stateful, webhooks
+- `GET` `/c/{company_id}/received_documents/info` — params, stateful
+- `GET` `/c/{company_id}/received_documents/{id}` — params, stateful
+- `PUT` `/c/{company_id}/received_documents/{id}` — body, params, stateful, webhooks
+- `DELETE` `/c/{company_id}/received_documents/{id}` — params, stateful
+- `GET` `/c/{company_id}/issued_documents` — query, params, stateful, paginate, filter
+- `POST` `/c/{company_id}/issued_documents` — body, params, stateful, webhooks
+- `GET` `/c/{company_id}/issued_documents/info` — params, stateful
+- `GET` `/c/{company_id}/issued_documents/{id}` — params, stateful
+- `PUT` `/c/{company_id}/issued_documents/{id}` — body, params, stateful, webhooks
+- `DELETE` `/c/{company_id}/issued_documents/{id}` — params, stateful
+- `GET` `/c/{company_id}/suppliers` — query, params, stateful, paginate, filter
+- `POST` `/c/{company_id}/suppliers` — body, params, stateful, webhooks
+- `GET` `/c/{company_id}/suppliers/{id}` — params, stateful
+- `PUT` `/c/{company_id}/suppliers/{id}` — body, params, stateful, webhooks
+- `DELETE` `/c/{company_id}/suppliers/{id}` — params, stateful
+- `GET` `/c/{company_id}/clients` — query, params, stateful, paginate, filter
+- `POST` `/c/{company_id}/clients` — body, params, stateful, webhooks
+- `GET` `/c/{company_id}/clients/{id}` — params, stateful
+- `PUT` `/c/{company_id}/clients/{id}` — body, params, stateful, webhooks
+- `DELETE` `/c/{company_id}/clients/{id}` — params, stateful
+- `GET` `/c/{company_id}/products` — query, params, stateful, paginate, filter
+- `POST` `/c/{company_id}/products` — body, params, stateful, webhooks
+- `GET` `/c/{company_id}/products/{id}` — params, stateful
+- `PUT` `/c/{company_id}/products/{id}` — body, params, stateful, webhooks
+- `DELETE` `/c/{company_id}/products/{id}` — params, stateful
+- `GET` `/c/{company_id}/taxes` — query, params, stateful, paginate, filter
+- `POST` `/c/{company_id}/taxes` — body, params, stateful, webhooks, clock
+- `GET` `/c/{company_id}/taxes/{id}` — params, stateful
+- `PUT` `/c/{company_id}/taxes/{id}` — body, params, stateful, webhooks
+- `DELETE` `/c/{company_id}/taxes/{id}` — params, stateful
+- `GET` `/c/{company_id}/cashbook/{year}/{month}` — params, stateful
+- `POST` `/c/{company_id}/archive` — body, params, stateful
+- `GET` `/c/{company_id}/subscriptions` — query, params, stateful, paginate, filter
+- `POST` `/c/{company_id}/subscriptions` — body, params, stateful
+- `GET` `/c/{company_id}/subscriptions/{id}` — params, stateful
+- `PUT` `/c/{company_id}/subscriptions/{id}` — body, params, stateful, webhooks
+- `DELETE` `/c/{company_id}/subscriptions/{id}` — params, stateful
+
+</details>
+
 ### firebase-style
 
 **Covered** — 22 routes
@@ -2390,6 +2967,33 @@ behavior notes live in each adapter's README.
 - Auth checks credential presence only; Bearer or key value never validated
 - FCM topic :subscribe/:unsubscribe stand in for the Instance ID API
 - GET .../messages lists sent messages — simulator extension, no real endpoint
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v1/accounts:signInWithPassword` — body, query, auth, stateful, clock
+- `POST` `/v1/accounts:signUp` — body, query, auth, stateful, clock
+- `POST` `/v1/accounts:signInWithIdp` — body, query, auth, stateful, clock
+- `POST` `/v1/accounts:getAccountInfo` — body, query, auth, stateful, clock
+- `POST` `/v1/accounts:lookup` — body, query, auth, stateful, clock
+- `POST` `/identitytoolkit/v3/relyingparty/{action}` — body, query, params, auth, stateful, clock
+- `POST` `/v1/token` — body, query, auth, stateful, clock
+- `POST` `/v1/projects/{project}/databases/(default)/documents:runQuery` — body, query, params, auth, stateful, filter, clock
+- `GET` `/v1/projects/{project}/databases/(default)/documents/{collection}` — body, query, params, auth, stateful, paginate, clock
+- `POST` `/v1/projects/{project}/databases/(default)/documents/{collection}` — body, query, params, auth, stateful, clock
+- `GET` `/v1/projects/{project}/databases/(default)/documents/{collection}/{id}` — body, query, params, auth, stateful, clock
+- `PATCH` `/v1/projects/{project}/databases/(default)/documents/{collection}/{id}` — body, query, params, auth, stateful, clock
+- `DELETE` `/v1/projects/{project}/databases/(default)/documents/{collection}/{id}` — body, query, params, auth, stateful
+- `GET` `/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}` — body, query, params, auth, stateful, paginate, clock
+- `POST` `/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}` — body, query, params, auth, stateful, clock
+- `GET` `/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}/{id}` — body, query, params, auth, stateful, clock
+- `PATCH` `/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}/{id}` — body, query, params, auth, stateful, clock
+- `DELETE` `/v1/projects/{project}/databases/(default)/documents/{collection}/{document}/{sub}/{id}` — body, query, params, auth, stateful
+- `POST` `/v1/projects/{project}/messages:send` — body, query, params, auth, stateful
+- `GET` `/v1/projects/{project}/messages` — body, query, params, auth, stateful, paginate
+- `POST` `/v1/projects/{project}/topics/{topic}:subscribe` — body, query, params, auth, stateful
+- `POST` `/v1/projects/{project}/topics/{topic}:unsubscribe` — body, query, params, auth, stateful
+
+</details>
 
 ### ga4-style
 
@@ -2481,6 +3085,18 @@ behavior notes live in each adapter's README.
 - properties.list honors only the filter=parent:<account> form
 - Admin API served at both /v1admin (GA) and /v1beta (the shipped Go client's version); shapes shared
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/v1beta/accounts` — query, auth, stateful, paginate, errors, clock
+- `GET` `/v1beta/properties` — query, auth, stateful, paginate, errors, clock
+- `GET` `/v1beta/properties/{property}/dataStreams` — query, params, auth, stateful, paginate, errors, clock
+- `GET` `/v1admin/accounts` — query, auth, stateful, paginate, errors, clock
+- `GET` `/v1admin/properties` — query, auth, stateful, paginate, errors, clock
+- `GET` `/v1admin/properties/{property}/dataStreams` — query, params, auth, stateful, paginate, errors, clock
+- `POST` `/v1beta/properties/{resource}` — body, params, auth, stateful, filter, errors, clock
+
+</details>
+
 ### gcalendar-style
 
 **Covered** — 10 routes
@@ -2550,6 +3166,21 @@ behavior notes live in each adapter's README.
 - Event create without start/end defaults them (now+30m, +90m); real API requires both
 - quickAdd uses the text verbatim as the summary with a now+30m slot; real Calendar parses natural-language dates
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/calendar/v3/users/me/calendarList` — query, auth, stateful, paginate, clock
+- `GET` `/calendar/v3/calendars/primary` — auth, stateful, clock
+- `POST` `/calendar/v3/calendars/{calendarId}/events/quickAdd` — query, params, auth, stateful, clock
+- `POST` `/calendar/v3/calendars/{calendarId}/events/import` — body, params, auth, stateful, clock
+- `GET` `/calendar/v3/calendars/{calendarId}/events` — query, params, auth, stateful, paginate, filter, clock
+- `POST` `/calendar/v3/calendars/{calendarId}/events` — body, params, auth, stateful, clock
+- `GET` `/calendar/v3/calendars/{calendarId}/events/{eventId}/instances` — query, params, auth, stateful, paginate, filter, clock
+- `GET` `/calendar/v3/calendars/{calendarId}/events/{eventId}` — params, auth, stateful, clock
+- `PATCH` `/calendar/v3/calendars/{calendarId}/events/{eventId}` — body, params, auth, stateful, clock
+- `DELETE` `/calendar/v3/calendars/{calendarId}/events/{eventId}` — params, auth, stateful, clock
+
+</details>
+
 ### gdocs-style
 
 **Covered** — 5 routes
@@ -2581,6 +3212,16 @@ behavior notes live in each adapter's README.
 - GET revisions endpoint is extra-API; the real Docs API v1 has none
 - Inserted text adopts the style of the run it lands in
 - Inserting newline continues bullet/named style into the new paragraph
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v1/documents` — body, auth, stateful, clock
+- `GET` `/v1/documents/{documentId}/revisions` — params, auth, stateful, clock
+- `POST` `/v1/documents/{documentId}:batchUpdate` — body, params, auth, stateful, clock
+- `POST` `/v1/documents/{documentId}/batchUpdate` — body, params, auth, stateful, clock
+- `GET` `/v1/documents/{documentId}` — params, auth, stateful, clock
+
+</details>
 
 ### github-style
 
@@ -2695,6 +3336,37 @@ behavior notes live in each adapter's README.
 - Webhook body is a stunt {type, payload} envelope, not GitHub's bare event body
 - Runs advance on fixed clock (queued+1s, in_progress+3s); dispatch takes simulate_fail
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/app` — auth, stateful, clock
+- `GET` `/app/installations` — query, auth, stateful, paginate, clock
+- `POST` `/app/installations/{installation_id}/access_tokens` — params, auth, stateful, clock
+- `GET` `/installation` — auth, stateful, clock
+- `GET` `/repos/{owner}/{repo}` — params, auth, stateful, errors, clock
+- `GET` `/repos/{owner}/{repo}/issues` — query, params, auth, stateful, paginate, filter, clock
+- `POST` `/repos/{owner}/{repo}/issues` — body, params, auth, stateful, webhooks, errors, clock
+- `GET` `/repos/{owner}/{repo}/issues/{issue_number}` — params, auth, stateful, errors, clock
+- `PATCH` `/repos/{owner}/{repo}/issues/{issue_number}` — body, params, auth, stateful, webhooks, errors, clock
+- `GET` `/repos/{owner}/{repo}/issues/{issue_number}/comments` — query, params, auth, stateful, paginate, filter, errors, clock
+- `POST` `/repos/{owner}/{repo}/issues/{issue_number}/comments` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/repos/{owner}/{repo}/issues/{issue_number}/labels/{name}` — params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/repos/{owner}/{repo}/issues/{issue_number}/labels/{name}` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/repos/{owner}/{repo}/issues/{issue_number}/events` — query, params, auth, stateful, paginate, filter, errors, clock
+- `GET` `/repos/{owner}/{repo}/pulls` — query, params, auth, stateful, paginate, filter, clock
+- `POST` `/repos/{owner}/{repo}/pulls` — body, params, auth, stateful, webhooks, errors, clock
+- `GET` `/repos/{owner}/{repo}/pulls/{pull_number}` — params, auth, stateful, errors, clock
+- `PATCH` `/repos/{owner}/{repo}/pulls/{pull_number}` — body, params, auth, stateful, webhooks, errors, clock
+- `PUT` `/repos/{owner}/{repo}/pulls/{pull_number}/merge` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/repos/{owner}/{repo}/pulls/{pull_number}/reviews` — query, params, auth, stateful, paginate, filter, errors, clock
+- `POST` `/repos/{owner}/{repo}/pulls/{pull_number}/reviews` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/repos/{owner}/{repo}/dispatches` — body, params, auth, stateful, webhooks, errors, clock
+- `GET` `/repos/{owner}/{repo}/actions/runs` — query, params, auth, stateful, paginate, filter, webhooks, clock
+- `GET` `/repos/{owner}/{repo}/actions/runs/{run_id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/repos/{owner}/{repo}/hooks` — body, params, auth, stateful, errors, clock
+- `POST` `/webhooks/receive` — stateful
+
+</details>
+
 ### gmail-style
 
 **Covered** — 16 routes
@@ -2796,6 +3468,27 @@ behavior notes live in each adapter's README.
 - Omitted/0 maxResults returns everything; real API defaults to 100
 - Label create is idempotent on existing name; real Gmail returns 409
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/gmail/v1/users/{userId}/labels` — auth, stateful
+- `POST` `/gmail/v1/users/{userId}/labels` — body, auth, stateful
+- `DELETE` `/gmail/v1/users/{userId}/labels/{id}` — params, auth, stateful
+- `POST` `/gmail/v1/users/{userId}/messages/send` — body, auth, stateful
+- `GET` `/gmail/v1/users/{userId}/messages` — query, params, auth, stateful, paginate
+- `POST` `/gmail/v1/users/{userId}/messages` — body, auth, stateful
+- `POST` `/gmail/v1/users/{userId}/messages/batchModify` — body, auth, stateful
+- `POST` `/gmail/v1/users/{userId}/messages/{messageId}/trash` — params, auth, stateful
+- `POST` `/gmail/v1/users/{userId}/messages/{messageId}/modify` — body, params, auth, stateful
+- `GET` `/gmail/v1/users/{userId}/messages/{messageId}/attachments/{attachmentId}` — params, auth, stateful
+- `GET` `/gmail/v1/users/{userId}/messages/{messageId}` — query, params, auth, stateful
+- `DELETE` `/gmail/v1/users/{userId}/messages/{messageId}` — params, auth, stateful
+- `GET` `/gmail/v1/users/{userId}/drafts` — query, auth, stateful, paginate
+- `POST` `/gmail/v1/users/{userId}/drafts` — body, auth, stateful
+- `DELETE` `/gmail/v1/users/{userId}/drafts/{id}` — params, auth, stateful
+- `GET` `/gmail/v1/users/{userId}/threads/{threadId}` — params, auth, stateful
+
+</details>
+
 ### google-admin-style
 
 **Covered** — 13 routes
@@ -2893,6 +3586,24 @@ behavior notes live in each adapter's README.
 - Static convenience tokens (ya29.mock-admin-token, conformance-token) seeded far-future
 - users.list ignores customer/domain exactly-one-of enforcement; real Directory requires one
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/admin/directory/v1/users` — query, auth, stateful, paginate, filter, errors, clock
+- `POST` `/admin/directory/v1/users` — body, auth, stateful, errors, clock
+- `GET` `/admin/directory/v1/users/{userKey}` — params, auth, stateful, errors, clock
+- `PUT` `/admin/directory/v1/users/{userKey}` — body, params, auth, stateful, errors, clock
+- `DELETE` `/admin/directory/v1/users/{userKey}` — params, auth, stateful, errors, clock
+- `GET` `/admin/directory/v1/users/{userKey}/tokens` — query, params, auth, stateful, paginate, errors, clock
+- `GET` `/admin/directory/v1/groups` — query, auth, stateful, paginate, filter, errors, clock
+- `POST` `/admin/directory/v1/groups` — body, auth, stateful, errors, clock
+- `GET` `/admin/directory/v1/groups/{groupKey}` — params, auth, stateful, errors, clock
+- `DELETE` `/admin/directory/v1/groups/{groupKey}` — params, auth, stateful, errors, clock
+- `GET` `/admin/directory/v1/groups/{groupKey}/members` — query, params, auth, stateful, paginate, filter, errors, clock
+- `POST` `/admin/directory/v1/groups/{groupKey}/members` — body, params, auth, stateful, errors, clock
+- `DELETE` `/admin/directory/v1/groups/{groupKey}/members/{memberKey}` — params, auth, stateful, errors, clock
+
+</details>
+
 ### google-iam-style
 
 **Covered** — 10 routes
@@ -2985,6 +3696,21 @@ behavior notes live in each adapter's README.
 - JWKS serves one fixed synthetic RSA-2048 key (kid mock-google-key-1)
 - roles:queryGrantableRoles also served project-scoped (extra form; the real path is project-less)
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/oauth2/v4/token` — body, stateful, errors, clock
+- `GET` `/oauth2/v3/certs` — —
+- `GET` `/v1/projects/{project}/serviceAccounts` — query, params, auth, stateful, paginate, errors, clock
+- `POST` `/v1/projects/{project}/serviceAccounts` — body, params, auth, stateful, errors, clock
+- `GET` `/v1/projects/{project}/serviceAccounts/{sa}` — params, auth, stateful, errors, clock
+- `DELETE` `/v1/projects/{project}/serviceAccounts/{sa}` — params, auth, stateful, errors, clock
+- `GET` `/v1/projects/{project}/serviceAccounts/{sa}/keys` — query, params, auth, stateful, paginate, errors, clock
+- `POST` `/v1/projects/{project}/serviceAccounts/{sa_verb}` — body, params, auth, stateful, errors, clock
+- `POST` `/v1/roles:queryGrantableRoles` — body, auth, stateful, errors, clock
+- `POST` `/v1/projects/{project}/roles:queryGrantableRoles` — body, auth, stateful, errors, clock
+
+</details>
+
 ### google-style
 
 **Covered** — 4 routes
@@ -3009,6 +3735,15 @@ behavior notes live in each adapter's README.
 
 - Authorize auto-approves with an instant 302; no consent screen
 - id_tokens signed by a fixed synthetic RSA key (kid mock-google-key-1)
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/o/oauth2/auth` — query, stateful, errors
+- `POST` `/o/oauth2/token` — body, stateful, errors, clock
+- `GET` `/oauth2/v3/certs` — —
+- `GET` `/oauth2/v3/userinfo` — auth, stateful, clock
+
+</details>
 
 ### gsearchconsole-style
 
@@ -3051,6 +3786,22 @@ behavior notes live in each adapter's README.
 - Site verification completes ~2s after sites.add via derive-on-read clock
 - Inspection verdicts keyed to magic path tokens (noindex, soft404, servererror)
 - URL-prefix sites/sitemaps addressed by single-segment paths (decoded routing)
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/webmasters/v3/sites` — query, auth, stateful, paginate, clock
+- `GET` `/webmasters/v3/sites/{siteUrl}` — params, auth, stateful, clock
+- `PUT` `/webmasters/v3/sites/{siteUrl}` — params, auth, stateful, clock
+- `DELETE` `/webmasters/v3/sites/{siteUrl}` — params, auth, stateful, clock
+- `POST` `/webmasters/v3/sites/{siteUrl}/searchAnalytics/query` — body, params, auth, stateful, filter, clock
+- `GET` `/webmasters/v3/sites/{siteUrl}/sitemaps` — query, params, auth, stateful, paginate, clock
+- `GET` `/webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}` — params, auth, stateful, clock
+- `PUT` `/webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}` — params, auth, stateful, clock
+- `DELETE` `/webmasters/v3/sites/{siteUrl}/sitemaps/{feedpath}` — params, auth, stateful, clock
+- `POST` `/v1/urlInspection/index:inspect` — body, auth, stateful, clock
+- `POST` `/webmasters/v3/sites/{siteUrl}/inspect` — body, params, auth, stateful, clock
+
+</details>
 
 ### gsheets-style
 
@@ -3100,6 +3851,21 @@ behavior notes live in each adapter's README.
 - Cell values always come back as strings; numeric cells stringify as floats (42 -> "42.0"), no USER_ENTERED/RAW typing
 - Spreadsheet get ignores fields= and returns the full object
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v4/spreadsheets` — body, auth, stateful
+- `GET` `/v4/spreadsheets/{spreadsheetId}/values:batchGet` — body, query, params, auth, stateful
+- `POST` `/v4/spreadsheets/{spreadsheetId}/values:batchGet` — body, query, params, auth, stateful
+- `POST` `/v4/spreadsheets/{spreadsheetId}/values:batchUpdate` — body, params, auth, stateful
+- `POST` `/v4/spreadsheets/{spreadsheetId}/sheets` — body, params, auth, stateful
+- `POST` `/v4/spreadsheets/{ss_id_or_verb}` — body, params, auth, stateful
+- `GET` `/v4/spreadsheets/{spreadsheetId}` — query, params, auth, stateful
+- `GET` `/v4/spreadsheets/{spreadsheetId}/values/{range}` — query, params, auth, stateful
+- `PUT` `/v4/spreadsheets/{spreadsheetId}/values/{range}` — body, params, auth, stateful
+- `POST` `/v4/spreadsheets/{spreadsheetId}/values/{range_verb}` — body, params, auth, stateful
+
+</details>
+
 ### gtasks-style
 
 **Covered** — 11 routes
@@ -3145,6 +3911,22 @@ behavior notes live in each adapter's README.
 - Responses omit the kind field (tasks#task, tasks#taskList); SDKs decode fine without it
 - tasks.insert ignores a client-sent status/completed (always needsAction); due is stored verbatim
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/tasks/v1/users/@me/lists` — query, auth, stateful, paginate, clock
+- `POST` `/tasks/v1/users/@me/lists` — body, auth, stateful, clock
+- `GET` `/tasks/v1/lists` — query, auth, stateful, paginate, clock
+- `POST` `/tasks/v1/lists` — body, auth, stateful, clock
+- `POST` `/tasks/v1/lists/{tasklistId}/tasks/{taskId}/move` — body, query, params, auth, stateful, clock
+- `GET` `/tasks/v1/lists/{tasklistId}/tasks` — query, params, auth, stateful, paginate, filter, clock
+- `POST` `/tasks/v1/lists/{tasklistId}/tasks` — body, params, auth, stateful, clock
+- `GET` `/tasks/v1/lists/{tasklistId}/tasks/{taskId}` — params, auth, stateful, clock
+- `PUT` `/tasks/v1/lists/{tasklistId}/tasks/{taskId}` — body, params, auth, stateful, clock
+- `PATCH` `/tasks/v1/lists/{tasklistId}/tasks/{taskId}` — body, params, auth, stateful, clock
+- `DELETE` `/tasks/v1/lists/{tasklistId}/tasks/{taskId}` — params, auth, stateful
+
+</details>
+
 ### helius-style
 
 **Covered** — 11 routes
@@ -3180,6 +3962,22 @@ behavior notes live in each adapter's README.
 - sendTransaction config takes simulate_fail/simulate_type/simulate_address
 - Enhanced transactions limit capped at 100 (real API max 1000)
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/` — body, query, auth, stateful, webhooks, clock
+- `POST` `/v0/transactions` — body, query, auth, errors, clock
+- `GET` `/v0/addresses/{address}/transactions` — query, params, auth, stateful, filter, webhooks, clock
+- `GET` `/v0/addresses/{address}/balances` — query, params, auth
+- `GET` `/v0/addresses/{address}/nfts` — query, params, auth
+- `POST` `/v0/names` — body, query, auth
+- `POST` `/v0/webhooks` — body, query, auth, stateful, clock
+- `GET` `/v0/webhooks` — query, auth, stateful
+- `GET` `/v0/webhooks/{webhookId}` — query, params, auth, stateful, errors
+- `PUT` `/v0/webhooks/{webhookId}` — body, query, params, auth, stateful, errors
+- `DELETE` `/v0/webhooks/{webhookId}` — query, params, auth, stateful, errors
+
+</details>
+
 ### hn-style
 
 **Covered** — 11 routes
@@ -3212,6 +4010,22 @@ behavior notes live in each adapter's README.
 
 - Write flow /login + /submit from a reference client; official Firebase API is read-only
 - Challenge injection after N submits (anti-abuse) mirrors mock_hn, configurable via KV
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/v0/topstories.json` — stateful
+- `GET` `/v0/newstories.json` — stateful
+- `GET` `/v0/beststories.json` — stateful
+- `GET` `/v0/askstories.json` — stateful
+- `GET` `/v0/showstories.json` — stateful
+- `GET` `/v0/jobstories.json` — stateful
+- `POST` `/login` — body, stateful, errors
+- `GET` `/logout` — —
+- `POST` `/submit` — body, auth, stateful
+- `GET` `/v0/item/{id}` — params, stateful
+- `GET` `/v0/user/{id}` — params, stateful
+
+</details>
 
 ### hubspot-style
 
@@ -3323,6 +4137,44 @@ behavior notes live in each adapter's README.
 - No engagements (calls, emails, meetings, notes, tasks) endpoints
 - No properties, pipelines, or import/export endpoints
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/crm/v3/objects/contacts` — query, auth, stateful, filter, clock
+- `POST` `/crm/v3/objects/contacts` — query, auth, stateful, clock
+- `GET` `/crm/v3/objects/contacts/{id}` — query, params, auth, stateful, clock
+- `PATCH` `/crm/v3/objects/contacts/{id}` — query, params, auth, stateful, clock
+- `DELETE` `/crm/v3/objects/contacts/{id}` — query, params, auth, stateful, clock
+- `POST` `/crm/v3/objects/contacts/{id}/associations/{toObjectType}/batch/create` — query, params, auth, stateful, clock
+- `POST` `/crm/v3/objects/contacts/{id}/associations/{toObjectType}/batch/archive` — query, params, auth, stateful, clock
+- `PUT` `/crm/v3/objects/contacts/{id}/associations/{toObjectType}/{toObjectId}/{associationType}` — query, params, auth, stateful, clock
+- `GET` `/crm/v3/objects/contacts/{id}/associations/{toObjectType}` — query, params, auth, stateful, clock
+- `GET` `/crm/v3/objects/companies` — query, auth, stateful, filter, clock
+- `POST` `/crm/v3/objects/companies` — query, auth, stateful, clock
+- `GET` `/crm/v3/objects/companies/{id}` — query, params, auth, stateful, clock
+- `PATCH` `/crm/v3/objects/companies/{id}` — query, params, auth, stateful, clock
+- `DELETE` `/crm/v3/objects/companies/{id}` — query, params, auth, stateful, clock
+- `GET` `/crm/v3/objects/deals` — query, auth, stateful, filter, clock
+- `POST` `/crm/v3/objects/deals` — query, auth, stateful, clock
+- `GET` `/crm/v3/objects/deals/{id}` — query, params, auth, stateful, clock
+- `PATCH` `/crm/v3/objects/deals/{id}` — query, params, auth, stateful, clock
+- `DELETE` `/crm/v3/objects/deals/{id}` — query, params, auth, stateful, clock
+- `GET` `/crm/v3/objects/tickets` — query, auth, stateful, filter, clock
+- `POST` `/crm/v3/objects/tickets` — query, auth, stateful, clock
+- `GET` `/crm/v3/objects/tickets/{id}` — query, params, auth, stateful, clock
+- `PATCH` `/crm/v3/objects/tickets/{id}` — query, params, auth, stateful, clock
+- `DELETE` `/crm/v3/objects/tickets/{id}` — query, params, auth, stateful, clock
+- `POST` `/crm/v3/objects/{objectType}/search` — query, auth, stateful, filter, clock
+- `POST` `/crm/v3/objects/{objectType}/batch/create` — query, auth, stateful, clock
+- `POST` `/crm/v3/objects/{objectType}/batch/read` — query, auth, stateful, clock
+- `POST` `/crm/v3/objects/{objectType}/batch/update` — query, auth, stateful, clock
+- `POST` `/crm/v3/objects/{objectType}/batch/archive` — query, auth, stateful, clock
+- `POST` `/crm/v3/objects/{objectType}/{id}/restore` — query, params, auth, stateful, clock
+- `POST` `/crm/v3/objects/{objectType}/{id}/associations/{toObjectType}/batch/create` — query, params, auth, stateful, clock
+- `POST` `/crm/v3/objects/{objectType}/{id}/associations/{toObjectType}/batch/archive` — query, params, auth, stateful, clock
+- `DELETE` `/crm/v3/objects/{objectType}/{id}/associations/{toObjectType}/{toObjectId}/{associationType}` — query, params, auth, stateful, clock
+
+</details>
+
 ### instagram-style
 
 **Covered** — 10 routes
@@ -3355,6 +4207,21 @@ behavior notes live in each adapter's README.
 
 - Container processing fixed at ~3s IN_PROGRESS before FINISHED or ERROR
 - simulate_fail=true create flag forces container ERROR; real API has no such switch
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/oauth/authorize` — query, stateful, errors
+- `POST` `/oauth/access_token` — body, stateful, errors, clock
+- `GET` `/v21.0/me` — auth, stateful, clock
+- `GET` `/v21.0/refresh_access_token` — query, stateful, errors, clock
+- `GET` `/v21.0/{container_id}` — query, params, auth, stateful, errors, clock
+- `GET` `/v21.0/{media_id}/comments` — query, params, auth, stateful, errors, clock
+- `GET` `/v21.0/{media_id}/insights` — query, params, auth, stateful, filter, errors, clock
+- `POST` `/v21.0/{ig_user_id}/media_publish` — query, params, auth, stateful, errors, clock
+- `POST` `/v21.0/{ig_user_id}/media` — body, params, auth, stateful, errors, clock
+- `GET` `/v21.0/{ig_user_id}/media` — query, params, auth, stateful, paginate, filter, errors, clock
+
+</details>
 
 ### jira-style
 
@@ -3475,6 +4342,43 @@ behavior notes live in each adapter's README.
 - Single fixed simplified workflow for all projects; real workflows are configurable
 - GET /rest/api/3/webhook (list registrations) marked simulator-only
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/rest/api/3/myself` — auth
+- `GET` `/rest/api/3/serverInfo` — auth
+- `GET` `/rest/api/3/project` — auth, stateful
+- `GET` `/rest/api/3/project/search` — auth, stateful
+- `GET` `/rest/api/3/project/{key}` — params, auth, stateful, errors
+- `POST` `/rest/api/3/search/jql` — body, auth, stateful, filter, errors
+- `GET` `/rest/api/3/search` — query, auth, stateful, filter, errors
+- `POST` `/rest/api/3/issue` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/rest/api/3/issue/{key}` — params, auth, stateful, errors
+- `PUT` `/rest/api/3/issue/{key}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/rest/api/3/issue/{key}` — params, auth, stateful, errors
+- `GET` `/rest/api/3/issue/{key}/transitions` — params, auth, stateful, errors
+- `POST` `/rest/api/3/issue/{key}/transitions` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/rest/api/2/issue` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/rest/api/2/issue/{key}` — params, auth, stateful, errors
+- `PUT` `/rest/api/2/issue/{key}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/rest/api/2/issue/{key}` — params, auth, stateful, errors
+- `GET` `/rest/api/2/issue/{key}/transitions` — params, auth, stateful, errors
+- `POST` `/rest/api/2/issue/{key}/transitions` — body, params, auth, stateful, webhooks, errors, clock
+- `GET` `/rest/api/2/issue/{key}/comment` — query, params, auth, stateful, errors
+- `GET` `/rest/api/2/issue/{key}/comment/{id}` — params, auth, stateful, errors
+- `POST` `/rest/api/2/issue/{key}/comment` — body, params, auth, stateful, webhooks, errors, clock
+- `PUT` `/rest/api/2/issue/{key}/comment/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/rest/api/2/issue/{key}/comment/{id}` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/rest/api/3/issue/{key}/comment` — query, params, auth, stateful, errors
+- `GET` `/rest/api/3/issue/{key}/comment/{id}` — params, auth, stateful, errors
+- `POST` `/rest/api/3/issue/{key}/comment` — body, params, auth, stateful, webhooks, errors, clock
+- `PUT` `/rest/api/3/issue/{key}/comment/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/rest/api/3/issue/{key}/comment/{id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/rest/api/3/webhook` — body, auth, stateful
+- `GET` `/rest/api/3/webhook` — query, auth, stateful
+- `DELETE` `/rest/api/3/webhook` — body, auth, stateful
+
+</details>
+
 ### jumio-style
 
 **Covered** — 5 routes
@@ -3503,6 +4407,16 @@ behavior notes live in each adapter's README.
 - simulate_fail and simulate_reject_reason create fields are stunt-only hooks
 - Webhook HMAC secret is the public constant stunt_jumio_mock_signing_key
 - POST /netverify/v2/webhooks is a local stand-in receiver, not a Jumio endpoint
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/netverify/v2/scans` — body, auth, stateful, errors, clock
+- `GET` `/netverify/v2/scans/{scan_reference}` — params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/netverify/v2/scans/{scan_reference}` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/netverify/v2/scans/{scan_reference}/data` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/netverify/v2/webhooks` — auth, stateful, clock
+
+</details>
 
 ### linkedin-style
 
@@ -3533,6 +4447,19 @@ behavior notes live in each adapter's README.
 **Deviations** (1)
 
 - Rate-limit injection on POST /v2/ugcPosts publish is a simulator test hook
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/oauth/v2/authorization` — query, stateful, errors
+- `POST` `/oauth/v2/accessToken` — body, stateful, errors, clock
+- `GET` `/v2/userinfo` — auth, stateful, clock
+- `POST` `/v2/ugcPosts` — body, auth, stateful, errors, clock
+- `GET` `/rest/comments` — query, auth, stateful, paginate, errors, clock
+- `POST` `/rest/comments` — body, auth, stateful, errors, clock
+- `GET` `/rest/posts/{urn}` — params, auth, stateful, errors, clock
+- `GET` `/rest/memberCreatorPostAnalytics` — query, auth, stateful, errors, clock
+
+</details>
 
 ### llm-style
 
@@ -3620,6 +4547,14 @@ behavior notes live in each adapter's README.
 - Reply derived solely from the last user message; earlier history ignored
 - stream:true (OpenAI) returns one SSE chunk plus [DONE], not token-by-token
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v1/chat/completions` — body, auth, stateful, clock
+- `GET` `/v1/models` — query, auth, stateful, paginate, errors, clock
+- `POST` `/v1/messages` — body, auth, stateful, clock
+
+</details>
+
 ### marketo-style
 
 **Covered** — 21 routes
@@ -3665,6 +4600,32 @@ behavior notes live in each adapter's README.
 - Export job timing fixed: Processing after ~1s, Completed after ~3s
 - Signed completion webhook (X-Stunt-Signature, fixed secret) is a simulator extension
 - Daily quota 602 modeled but threshold set to 100k so tests are unaffected
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/identity/oauth/token` — query, stateful, errors, clock
+- `POST` `/rest/v1/leads.json` — body, query, auth, stateful, clock
+- `GET` `/rest/v1/leads` — query, auth, stateful, paginate, filter, clock
+- `POST` `/rest/v1/leads` — body, query, auth, stateful, clock
+- `GET` `/rest/v1/leads/describe` — query, auth, stateful, clock
+- `GET` `/rest/v1/leads/{id}` — query, params, auth, stateful, errors, clock
+- `GET` `/rest/v1/leads/{id}.json` — query, params, auth, stateful, errors, clock
+- `POST` `/rest/v1/campaigns/{id}/trigger` — body, query, params, auth, stateful, errors, clock
+- `GET` `/rest/v1/campaigns` — query, auth, stateful, paginate, clock
+- `GET` `/rest/v1/programs` — query, auth, stateful, paginate, clock
+- `GET` `/rest/v1/folders` — query, auth, stateful, paginate, clock
+- `GET` `/rest/v1/activities/pagingtoken` — query, auth, stateful, clock
+- `GET` `/rest/v1/activities` — query, auth, stateful, paginate, clock
+- `POST` `/bulk/v1/leads/export/create` — body, query, auth, stateful, clock
+- `POST` `/bulk/v1/leads/export/create.json` — body, query, auth, stateful, clock
+- `GET` `/bulk/v1/leads/export/{exportId}/status` — query, params, auth, stateful, webhooks, errors, clock
+- `GET` `/bulk/v1/leads/export/{exportId}/status.json` — query, params, auth, stateful, webhooks, errors, clock
+- `GET` `/bulk/v1/leads/export/{exportId}/file` — query, params, auth, stateful, webhooks, errors, clock
+- `GET` `/bulk/v1/leads/export/{exportId}/file.json` — query, params, auth, stateful, webhooks, errors, clock
+- `POST` `/bulk/v1/leads/export/{exportId}/cancel` — query, params, auth, stateful, webhooks, errors, clock
+- `POST` `/bulk/v1/leads/export/{exportId}/cancel.json` — query, params, auth, stateful, webhooks, errors, clock
+
+</details>
 
 ### microsoft-graph-style
 
@@ -3811,6 +4772,66 @@ behavior notes live in each adapter's README.
 - @odata.nextLink/@odata.context point at graph.microsoft.com, not the serving host (prod-faithful; a local SDK harness must rebase)
 - Resumable upload session URLs are absolute http:// — the JS SDK's OneDriveLargeFileUploadTask urlJoins them into a broken path
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/v1.0/me` — auth, stateful, clock
+- `POST` `/v1.0/subscriptions` — body, auth, stateful, webhooks, clock
+- `GET` `/v1.0/subscriptions` — auth, stateful, clock
+- `GET` `/v1.0/subscriptions/{id}` — params, auth, stateful, clock
+- `DELETE` `/v1.0/subscriptions/{id}` — params, auth, stateful, clock
+- `GET` `/v1.0/users` — query, auth, stateful, paginate, clock
+- `GET` `/v1.0/users/{id}` — params, auth, stateful, clock
+- `GET` `/v1.0/me/mailFolders` — query, auth, stateful, paginate, clock
+- `GET` `/v1.0/me/mailFolders/{id}/messages` — query, params, auth, stateful, paginate, clock
+- `GET` `/v1.0/me/messages` — query, auth, stateful, paginate, clock
+- `POST` `/v1.0/me/messages` — body, auth, stateful, webhooks, clock
+- `POST` `/v1.0/me/messages/{id}/send` — params, auth, stateful, webhooks, clock
+- `GET` `/v1.0/me/messages/{id}` — params, auth, stateful, clock
+- `PATCH` `/v1.0/me/messages/{id}` — body, params, auth, stateful, webhooks, clock
+- `DELETE` `/v1.0/me/messages/{id}` — params, auth, stateful, clock
+- `POST` `/v1.0/me/sendMail` — body, auth, stateful, webhooks, clock
+- `GET` `/v1.0/me/calendarView` — query, auth, stateful, paginate, clock
+- `GET` `/v1.0/me/calendar/calendarView` — query, auth, stateful, paginate, clock
+- `GET` `/v1.0/me/events` — query, auth, stateful, paginate, clock
+- `POST` `/v1.0/me/events` — body, auth, stateful, webhooks, clock
+- `POST` `/v1.0/me/events/{id}/accept` — params, auth, stateful, webhooks, clock
+- `POST` `/v1.0/me/events/{id}/decline` — params, auth, stateful, webhooks, clock
+- `POST` `/v1.0/me/events/{id}/tentativelyAccept` — params, auth, stateful, webhooks, clock
+- `GET` `/v1.0/me/events/{id}` — params, auth, stateful, clock
+- `DELETE` `/v1.0/me/events/{id}` — params, auth, stateful, webhooks, clock
+- `PATCH` `/v1.0/me/events/{id}` — body, params, auth, stateful, webhooks, clock
+- `GET` `/v1.0/me/drive` — auth, stateful, clock
+- `GET` `/v1.0/me/drive/root/children` — query, auth, stateful, paginate, clock
+- `POST` `/v1.0/me/drive/root/children` — body, auth, stateful, clock
+- `GET` `/v1.0/me/drive/items/{id}/children` — query, params, auth, stateful, paginate, clock
+- `POST` `/v1.0/me/drive/items/{id}/children` — body, params, auth, stateful, clock
+- `GET` `/v1.0/me/drive/items/{id}/content` — params, auth, stateful, clock
+- `POST` `/v1.0/me/drive/items/{id}/restore` — params, auth, stateful, clock
+- `GET` `/v1.0/me/drive/items/{id}` — params, auth, stateful, clock
+- `DELETE` `/v1.0/me/drive/items/{id}` — params, auth, stateful, clock
+- `PUT` `/v1.0/me/drive/root:/{item}/content` — query, params, auth, stateful, clock
+- `PUT` `/v1.0/me/drive/items/{parent}/{item}/content` — query, params, auth, stateful, clock
+- `POST` `/v1.0/me/drive/root:/{item}/createUploadSession` — body, params, auth, stateful, clock
+- `POST` `/v1.0/me/drive/items/{parent}/{item}/createUploadSession` — body, params, auth, stateful, clock
+- `PUT` `/v1.0/_upload/{session}` — params, stateful, clock
+- `GET` `/v1.0/me/drive/root:/{item}` — query, params, auth, stateful, clock
+- `GET` `/v1.0/groups/{id}/sites` — query, params, auth, stateful, paginate, clock
+- `GET` `/v1.0/me/chats` — query, auth, stateful, paginate, clock
+- `POST` `/v1.0/me/chats` — body, auth, stateful, clock
+- `DELETE` `/v1.0/chats/{id}` — params, auth, stateful, clock
+- `GET` `/v1.0/chats/{id}/messages` — query, params, auth, stateful, paginate, clock
+- `POST` `/v1.0/chats/{id}/messages` — body, params, auth, stateful, webhooks, clock
+- `DELETE` `/v1.0/chats/{id}/messages/{messageId}` — params, auth, stateful, clock
+- `GET` `/v1.0/me/drive/items/{id}/workbook/worksheets` — query, params, auth, stateful, paginate, clock
+- `POST` `/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/add` — body, params, auth, stateful, clock
+- `GET` `/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows` — query, params, auth, stateful, paginate, clock
+- `POST` `/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows` — body, params, auth, stateful, clock
+- `PATCH` `/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/{index}` — body, params, auth, stateful, clock
+- `DELETE` `/v1.0/me/drive/items/{id}/workbook/tables/{name}/rows/{index}` — params, auth, stateful, clock
+- `GET` `/v1.0/me/drive/items/{id}/workbook/tables/{name}/range` — params, auth, stateful, clock
+
+</details>
+
 ### netsuite-style
 
 **Covered** — 9 routes
@@ -3843,6 +4864,20 @@ behavior notes live in each adapter's README.
 - TBA/NLAuth/Bearer only structurally checked; OAuth 1.0a HMAC not validated
 - SuiteQL matches only the FROM table; WHERE and ORDER BY clauses are ignored
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/services/rest/query/v1/suiteql` — query, auth, stateful, filter
+- `POST` `/services/rest/v1/suiteql` — query, auth, stateful, filter
+- `GET` `/services/rest/record/v1/metadata-catalog` — auth
+- `GET` `/services/rest/record/v1/{recordType}` — query, auth, stateful, filter
+- `POST` `/services/rest/record/v1/{recordType}` — auth, stateful
+- `GET` `/services/rest/record/v1/{recordType}/{id}` — params, auth, stateful
+- `PATCH` `/services/rest/record/v1/{recordType}/{id}` — params, auth, stateful
+- `DELETE` `/services/rest/record/v1/{recordType}/{id}` — params, auth, stateful
+- `POST` `/services/rest/record/v1/{recordType}/{id}/!transform/{target}` — params, auth, stateful, clock
+
+</details>
+
 ### oneinch-style
 
 **Covered** — 5 routes
@@ -3868,6 +4903,16 @@ behavior notes live in each adapter's README.
 **Deviations** (1)
 
 - Quotes deterministic from src/dst/amount; same input yields same toAmount and split
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/v6.0/1/approve/spender` — —
+- `GET` `/v6.0/1/approve/calldata` — query, errors
+- `GET` `/v6.0/1/tokens` — —
+- `GET` `/v6.0/1/quote` — query, errors
+- `GET` `/v6.0/1/swap` — query, errors
+
+</details>
 
 ### onfido-style
 
@@ -3961,6 +5006,18 @@ behavior notes live in each adapter's README.
 - Webhook HMAC secret is the public constant stunt_onfido_mock_signing_key
 - POST /v3.6/webhooks is a local stand-in receiver, not an Onfido endpoint
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v3.6/applicants` — body, auth, stateful, errors, clock
+- `POST` `/v3.6/documents` — body, auth, stateful, errors, clock
+- `POST` `/v3.6/live_photos` — body, auth, stateful, errors, clock
+- `POST` `/v3.6/checks` — body, auth, stateful, errors, clock
+- `GET` `/v3.6/applicants/{applicant_id}` — params, auth, stateful, errors
+- `GET` `/v3.6/checks/{check_id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v3.6/webhooks` — auth, stateful, clock
+
+</details>
+
 ### opensea-style
 
 **Covered** — 7 routes
@@ -4049,6 +5106,18 @@ behavior notes live in each adapter's README.
 
 - X-API-KEY accepted as any non-empty value; no real key validation
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/api/v2/assets` — query, auth, stateful, paginate, errors
+- `GET` `/api/v2/assets/{chain}/{address}/{identifier}` — params, auth, stateful, errors
+- `GET` `/api/v2/collections/{slug}` — params, auth, stateful, errors
+- `GET` `/api/v2/events` — query, auth, stateful, paginate, errors
+- `GET` `/api/v2/orders/{chain}/{protocol}/listings` — query, params, auth, stateful, paginate, errors
+- `GET` `/api/v2/orders/{chain}/{protocol}/offers` — query, params, auth, stateful, paginate, errors
+- `POST` `/api/v2/offers` — body, auth, stateful
+
+</details>
+
 ### paypal-style
 
 **Covered** — 17 routes
@@ -4105,6 +5174,28 @@ behavior notes live in each adapter's README.
 - Webhook deliveries unsigned; real PayPal uses a certificate-based signature scheme
 - verify-webhook-signature returns SUCCESS for any known webhook_id, no real check
 - Refund derives terminal state on read after fixed ~3s (PENDING to COMPLETED/FAILED)
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v1/oauth2/token` — body, stateful, clock
+- `POST` `/v2/checkout/orders` — body, stateful, clock
+- `GET` `/v2/checkout/orders/{id}` — params, stateful, clock
+- `POST` `/v2/checkout/orders/{id}/approve` — body, params, stateful, webhooks, clock
+- `POST` `/v2/checkout/orders/{id}/capture` — params, stateful, webhooks, clock
+- `POST` `/v2/checkout/orders/{id}/authorize` — params, stateful, webhooks, clock
+- `GET` `/v2/payments/authorizations/{id}` — params, stateful, clock
+- `POST` `/v2/payments/authorizations/{id}/reauthorize` — params, stateful, clock
+- `POST` `/v2/payments/authorizations/{id}/void` — params, stateful, webhooks, clock
+- `POST` `/v2/payments/authorizations/{id}/capture` — body, params, stateful, webhooks, clock
+- `GET` `/v2/payments/captures/{id}` — params, stateful, filter, webhooks, clock
+- `POST` `/v2/payments/captures/{capture_id}/refund` — body, params, stateful, filter, clock
+- `GET` `/v2/payments/refunds/{id}` — params, stateful, webhooks, clock
+- `POST` `/v1/notifications/webhooks` — body, stateful, clock
+- `GET` `/v1/notifications/webhooks` — stateful, clock
+- `DELETE` `/v1/notifications/webhooks/{id}` — params, stateful, clock
+- `POST` `/v1/notifications/verify-webhook-signature` — body, stateful, clock
+
+</details>
 
 ### persona-style
 
@@ -4196,6 +5287,16 @@ behavior notes live in each adapter's README.
 - Webhook HMAC secret is the public constant stunt_persona_mock_signing_key
 - POST /api/inquiry/v1/webhooks is a local stand-in receiver with 5-minute replay window
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/api/inquiry/v1/inquiries` — body, auth, stateful, errors, clock
+- `GET` `/api/inquiry/v1/inquiries/{inquiry_id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/api/inquiry/v1/inquiries/{inquiry_id}/resume` — params, auth, stateful, errors, clock
+- `GET` `/api/inquiry/v1/inquiries/{inquiry_id}/verifications` — params, auth, stateful, errors
+- `POST` `/api/inquiry/v1/webhooks` — auth, stateful, clock
+
+</details>
+
 ### photos-style
 
 **Covered** — 12 routes
@@ -4232,6 +5333,23 @@ behavior notes live in each adapter's README.
 - Bare-id media download returns derivative bytes; =d/=dv return original upload
 - search honors mediaTypeFilter and dateFilter only (no contentFilter or album filters)
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/o/oauth2/auth` — query, stateful, errors
+- `POST` `/o/oauth2/token` — body, stateful, errors, clock
+- `POST` `/v1/uploads` — auth, stateful, clock
+- `POST` `/v1/mediaItems:batchCreate` — body, auth, stateful, clock
+- `POST` `/v1/mediaItems:search` — body, auth, stateful, filter, clock
+- `GET` `/v1/mediaItems` — query, auth, stateful, clock
+- `GET` `/v1/mediaItems/{id}` — params, auth, stateful, errors, clock
+- `GET` `/v1/media-dl/{id}` — params, stateful, errors
+- `GET` `/v1/albums` — query, auth, stateful, clock
+- `POST` `/v1/albums` — body, auth, stateful, clock
+- `GET` `/v1/albums/{id}` — params, auth, stateful, errors, clock
+- `DELETE` `/v1/albums/{id}` — params, auth, stateful, errors, clock
+
+</details>
+
 ### pinata-style
 
 **Covered** — 6 routes
@@ -4255,6 +5373,17 @@ behavior notes live in each adapter's README.
 - No pin-jobs listing (GET /pinning/pinJobs)
 - No metadata update or pin-policy change (POST /pinning/hashMetadata)
 - No pinned-data-usage endpoint (GET /data/userPinnedDataTotal)
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/pinning/pinFileToIPFS` — body, stateful
+- `POST` `/pinning/pinJSONToIPFS` — body, stateful
+- `DELETE` `/pinning/unpin/{cid}` — params, stateful
+- `GET` `/data/pinList` — query, stateful, filter
+- `GET` `/data/testAuthentication` — —
+- `GET` `/data/pinByHash` — query, stateful
+
+</details>
 
 ### plaid-style
 
@@ -4353,6 +5482,24 @@ behavior notes live in each adapter's README.
 - fire_webhook SYNC_UPDATES_AVAILABLE doubles as transaction mutation (one posted, one removed)
 - client_id/secret credentials are presence-checked only, never validated
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/link/token/create` — body, auth, stateful, clock
+- `POST` `/item/public_token/exchange` — body, auth, stateful, errors
+- `POST` `/accounts/balance/get` — body, auth, stateful, filter, errors
+- `POST` `/accounts/get` — body, auth, stateful, filter, errors
+- `POST` `/transactions/sync` — body, auth, stateful, filter, webhooks, errors
+- `POST` `/identity/get` — body, auth, stateful, filter, errors
+- `POST` `/item/get` — body, auth, stateful, errors
+- `POST` `/item/remove` — body, auth, stateful, errors
+- `POST` `/institutions/get` — body, auth, stateful, filter
+- `POST` `/institutions/get_by_id` — body, auth, stateful, errors
+- `POST` `/sandbox/public_token/create` — body, auth, stateful, errors, clock
+- `POST` `/sandbox/item/reset_login` — body, auth, stateful, webhooks, errors
+- `POST` `/sandbox/item/fire_webhook` — body, auth, stateful, filter, webhooks, errors
+
+</details>
+
 ### powerplatform-style
 
 **Covered** — 9 routes
@@ -4385,6 +5532,20 @@ behavior notes live in each adapter's README.
 - No default page size: whole list returns unless $top is set; real Dataverse pages at 5000
 - Client-supplied accountid accepted on create; auto ids are acc-<n>, not GUIDs
 - Environments with no stored flows list a fallback seeded seeded-flow-001 entry
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/v2/environments` — query, auth, paginate, errors
+- `GET` `/v2/environments/{env}/connectors` — query, params, auth, paginate, errors
+- `GET` `/v2/environments/{env}/api/data/v9.2/accounts` — query, params, auth, stateful, paginate, filter, errors
+- `POST` `/v2/environments/{env}/api/data/v9.2/accounts` — body, params, auth, stateful
+- `GET` `/v2/environments/{env}/api/data/v9.2/accounts({accountid})` — params, auth, stateful, errors
+- `PATCH` `/v2/environments/{env}/api/data/v9.2/accounts({accountid})` — body, params, auth, stateful, errors
+- `DELETE` `/v2/environments/{env}/api/data/v9.2/accounts({accountid})` — params, auth, stateful, errors
+- `GET` `/v2/environments/{env}/flows` — query, params, auth, stateful, paginate, errors
+- `POST` `/v2/environments/{env}/flows` — body, params, auth, stateful
+
+</details>
 
 ### printful-style
 
@@ -4479,6 +5640,24 @@ behavior notes live in each adapter's README.
 
 - Webhook set without a secret signs with built-in mock secret stunt_mock_pful_webhook_secret
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/v2/store/products` — query, auth, stateful, paginate, errors
+- `POST` `/v2/store/products` — body, auth, stateful
+- `GET` `/v2/store/products/{product_id}` — params, auth, stateful, errors
+- `POST` `/orders` — body, auth, stateful, webhooks, clock
+- `GET` `/orders/{order_id}` — params, auth, stateful, errors
+- `GET` `/v2/store/orders` — query, auth, stateful, paginate, filter, errors
+- `POST` `/v2/store/orders` — body, auth, stateful, webhooks, clock
+- `POST` `/v2/store/orders/{order_id}` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v2/shipping/rates` — body, auth
+- `GET` `/webhooks` — auth, stateful
+- `POST` `/webhooks` — body, auth, stateful, errors
+- `PUT` `/webhooks` — body, auth, stateful, errors
+- `DELETE` `/webhooks` — auth, stateful
+
+</details>
+
 ### printify-style
 
 **Covered** — 16 routes
@@ -4554,6 +5733,27 @@ behavior notes live in each adapter's README.
 
 - Webhook without a secret signs with built-in mock secret stunt_mock_potify_webhook_secret
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/v1/catalog/blueprints.json` — query, auth, paginate, errors
+- `GET` `/v1/catalog/blueprints/{blueprint_id}/variants.json` — query, params, auth, paginate, errors
+- `GET` `/v1/shops/{shop_id}/products.json` — query, params, auth, stateful, paginate, errors
+- `POST` `/v1/shops/{shop_id}/products.json` — body, params, auth, stateful, webhooks, clock
+- `GET` `/v1/shops/{shop_id}/products/{product_id}` — params, auth, stateful, errors
+- `PUT` `/v1/shops/{shop_id}/products/{product_id}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/v1/shops/{shop_id}/products/{product_id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/shops/{shop_id}/orders.json` — body, params, auth, stateful, webhooks, clock
+- `GET` `/v1/shops/{shop_id}/orders/{order_id}` — params, auth, stateful, errors
+- `GET` `/v1/orders.json` — query, auth, stateful, paginate, errors
+- `POST` `/v1/orders.json` — body, params, auth, stateful, webhooks, clock
+- `POST` `/v1/orders/{order_id}/send.json` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/shops/{shop_id}/webhooks.json` — params, auth, stateful
+- `POST` `/v1/shops/{shop_id}/webhooks.json` — body, params, auth, stateful, errors, clock
+- `GET` `/v1/shops/{shop_id}/webhooks/{webhook_id}` — params, auth, stateful, errors
+- `DELETE` `/v1/shops/{shop_id}/webhooks/{webhook_id}` — params, auth, stateful, errors
+
+</details>
+
 ### producthunt-style
 
 **Covered** — 0 routes · GraphQL schema
@@ -4616,6 +5816,30 @@ behavior notes live in each adapter's README.
 - Signed transition webhooks are a simulator extension; NextGenPSD2 defines none
 - scaRedirect _links URL is synthetic — no real bank SCA login page behind it
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v1/oauth/token` — body, stateful, clock
+- `POST` `/v1/consents` — body, stateful, clock
+- `GET` `/v1/consents/{consentId}` — params, stateful, clock
+- `DELETE` `/v1/consents/{consentId}` — params, stateful, clock
+- `POST` `/v1/consents/{consentId}/authorisations` — params, stateful, clock
+- `GET` `/v1/consents/{consentId}/authorisations/{authorisationId}` — params, stateful, webhooks, clock
+- `PUT` `/v1/consents/{consentId}/authorisations/{authorisationId}` — body, params, stateful, clock
+- `POST` `/v1/consents/{consentId}/authorisations/{authorisationId}` — body, params, stateful, clock
+- `GET` `/v1/accounts` — query, stateful, paginate, webhooks, clock
+- `GET` `/v1/accounts/{resourceId}/balances` — params, stateful, webhooks, clock
+- `GET` `/v1/accounts/{resourceId}/transactions` — query, params, stateful, filter, webhooks, clock
+- `POST` `/v1/payments/{product}` — body, params, stateful, webhooks, clock
+- `GET` `/v1/payments/{product}/{paymentId}/status` — params, stateful, webhooks, clock
+- `POST` `/v1/payments/{product}/{paymentId}/authorisations` — params, stateful, clock
+- `GET` `/v1/payments/{product}/{paymentId}/authorisations/{authorisationId}` — params, stateful, webhooks, clock
+- `PUT` `/v1/payments/{product}/{paymentId}/authorisations/{authorisationId}` — body, params, stateful, clock
+- `POST` `/v1/payments/{product}/{paymentId}/authorisations/{authorisationId}` — body, params, stateful, clock
+- `GET` `/v1/payments/{product}/{paymentId}` — params, stateful, webhooks, clock
+- `DELETE` `/v1/payments/{product}/{paymentId}` — params, stateful, webhooks, clock
+
+</details>
+
 ### qbo-style
 
 **Covered** — 11 routes
@@ -4651,6 +5875,22 @@ behavior notes live in each adapter's README.
 
 - Malformed FROM tokens fall back to substring entity matching instead of erroring
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/oauth/v2/authorize` — query, stateful, errors
+- `POST` `/oauth/v2/tokens/bearer` — body, stateful, errors, clock
+- `GET` `/v3/company/{realmId}/query` — body, query, params, auth, stateful, filter, clock
+- `POST` `/v3/company/{realmId}/query` — body, query, params, auth, stateful, filter, clock
+- `GET` `/v3/company/{realmId}/customer` — query, params, auth, stateful, filter, clock
+- `POST` `/v3/company/{realmId}/customer` — body, params, auth, stateful, clock
+- `GET` `/v3/company/{realmId}/customer/{id}` — params, auth, stateful, clock
+- `DELETE` `/v3/company/{realmId}/customer/{id}` — params, auth, stateful, clock
+- `POST` `/v3/company/{realmId}/invoice` — body, query, params, auth, stateful, clock
+- `GET` `/v3/company/{realmId}/invoice/{id}` — params, auth, stateful, clock
+- `DELETE` `/v3/company/{realmId}/invoice/{id}` — params, auth, stateful, clock
+
+</details>
+
 ### reddit-style
 
 **Covered** — 2 routes
@@ -4675,6 +5915,13 @@ behavior notes live in each adapter's README.
 **Deviations** (1)
 
 - User-Agent gate simplified: any UA containing / and ( passes, else 429
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/api/v1/access_token` — body, auth, stateful, errors, clock
+- `POST` `/api/submit` — body, auth, stateful, errors, clock
+
+</details>
 
 ### resend-style
 
@@ -4733,6 +5980,17 @@ behavior notes live in each adapter's README.
 - simulate_fail: true in POST /emails forces bounced terminal (simulator extension)
 - Webhook events fire exactly once on the first deriving read, not on real delivery
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/emails` — body, auth, stateful, clock
+- `GET` `/emails` — query, auth, stateful, paginate, webhooks, errors, clock
+- `GET` `/emails/{id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/webhooks` — body, auth, stateful, clock
+- `GET` `/webhooks` — auth, stateful
+- `DELETE` `/webhooks/{id}` — params, auth, stateful, errors
+
+</details>
+
 ### revenuecat-style
 
 **Covered** — 7 routes
@@ -4783,6 +6041,18 @@ behavior notes live in each adapter's README.
 - fetch_token prefixed with invalid is the deterministic bad-receipt 400 path
 - Subscription expiry is derive-on-read; first read past it fires EXPIRATION
 - POST /v1/subscribers accepts _expires_at seeding to drive EXPIRATION in tests
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v1/receipts` — body, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/webhooks` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/webhooks` — auth, stateful, clock
+- `POST` `/v1/subscribers/{app_user_id}/subscriptions/{product_id}/revoke` — body, params, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/subscribers/{app_user_id}` — params, auth, stateful, webhooks, clock
+- `POST` `/v1/subscribers/{app_user_id}` — body, params, auth, stateful, webhooks, clock
+- `DELETE` `/v1/subscribers/{app_user_id}` — params, auth, stateful, errors, clock
+
+</details>
 
 ### salesforce-style
 
@@ -4840,6 +6110,40 @@ behavior notes live in each adapter's README.
 - Governor limits (100 SOQL/txn, 10k DML rows) documented but not enforced
 - SOQL WHERE subset: no parenthesized grouping; date literals compared lexically
 - Password grant accepted for convenience; real SF requires web-server or JWT flow
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/services/oauth2/token` — body, stateful, errors, clock
+- `GET` `/services/data/v60.0/sobjects` — auth, stateful, clock
+- `GET` `/services/data/v60.0/sobjects/Account` — auth, stateful, clock
+- `GET` `/services/data/v60.0/sobjects/Contact` — auth, stateful, clock
+- `GET` `/services/data/v60.0/sobjects/Opportunity` — auth, stateful, clock
+- `GET` `/services/data/v60.0/sobjects/Lead` — auth, stateful, clock
+- `GET` `/services/data/v60.0/sobjects/User` — auth, stateful, clock
+- `POST` `/services/data/v60.0/sobjects/Account` — body, auth, stateful, clock
+- `GET` `/services/data/v60.0/sobjects/Account/{id}` — params, auth, stateful, clock
+- `PATCH` `/services/data/v60.0/sobjects/Account/{id}` — body, params, auth, stateful, clock
+- `DELETE` `/services/data/v60.0/sobjects/Account/{id}` — params, auth, stateful, clock
+- `PATCH` `/services/data/v60.0/sobjects/Account/{extIdField}/{extIdValue}` — body, params, auth, stateful, clock
+- `POST` `/services/data/v60.0/sobjects/Contact` — body, auth, stateful, clock
+- `GET` `/services/data/v60.0/sobjects/Contact/{id}` — params, auth, stateful, clock
+- `PATCH` `/services/data/v60.0/sobjects/Contact/{id}` — body, params, auth, stateful, clock
+- `DELETE` `/services/data/v60.0/sobjects/Contact/{id}` — params, auth, stateful, clock
+- `PATCH` `/services/data/v60.0/sobjects/Contact/{extIdField}/{extIdValue}` — body, params, auth, stateful, clock
+- `POST` `/services/data/v60.0/sobjects/Opportunity` — body, auth, stateful, clock
+- `GET` `/services/data/v60.0/sobjects/Opportunity/{id}` — params, auth, stateful, clock
+- `PATCH` `/services/data/v60.0/sobjects/Opportunity/{id}` — body, params, auth, stateful, clock
+- `DELETE` `/services/data/v60.0/sobjects/Opportunity/{id}` — params, auth, stateful, clock
+- `PATCH` `/services/data/v60.0/sobjects/Opportunity/{extIdField}/{extIdValue}` — body, params, auth, stateful, clock
+- `GET` `/services/data/v60.0/query` — query, auth, stateful, clock
+- `GET` `/services/data/v60.0/queryAll` — query, auth, stateful, clock
+- `GET` `/services/data/v60.0/query/{queryLocator}` — params, auth, stateful, clock
+- `POST` `/services/data/v60.0/composite` — body, auth, stateful, clock
+- `POST` `/services/data/v60.0/composite/sobjects` — body, auth, stateful, clock
+- `PATCH` `/services/data/v60.0/composite/sobjects` — body, auth, stateful, clock
+- `DELETE` `/services/data/v60.0/composite/sobjects` — query, auth, stateful, clock
+
+</details>
 
 ### sendgrid-style
 
@@ -4903,6 +6207,16 @@ behavior notes live in each adapter's README.
 - delivered derives at fixed +3s on first list read, not real async delivery
 - Webhook deliveries are single stunt-enveloped objects; real SendGrid POSTs a JSON array
 - Email Activity query subset: =, !=, CONTAINS terms AND-ed over six fields
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v3/mail/send` — body, auth, stateful, webhooks, clock
+- `GET` `/v3/messages` — query, auth, stateful, paginate, filter, webhooks, errors, clock
+- `POST` `/v3/user/webhooks/event/settings` — body, auth, stateful, clock
+- `GET` `/v3/user/webhooks/event/settings` — auth, stateful, clock
+- `POST` `/v3/user/webhooks/event/test` — auth, stateful, webhooks, errors, clock
+
+</details>
 
 ### servicenow-style
 
@@ -4971,6 +6285,55 @@ behavior notes live in each adapter's README.
 
 - sysparm_query supports an operator subset; NOT LIKE and similar 400-rejected
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/api/now/table/incident` — query, auth, stateful, paginate, filter, clock
+- `POST` `/api/now/table/incident` — body, auth, stateful, clock
+- `GET` `/api/now/table/incident/{sys_id}` — params, auth, stateful, clock
+- `PUT` `/api/now/table/incident/{sys_id}` — body, params, auth, stateful, clock
+- `PATCH` `/api/now/table/incident/{sys_id}` — body, params, auth, stateful, clock
+- `DELETE` `/api/now/table/incident/{sys_id}` — params, auth, stateful, clock
+- `GET` `/api/now/table/task` — query, auth, stateful, paginate, filter, clock
+- `POST` `/api/now/table/task` — body, auth, stateful, clock
+- `GET` `/api/now/table/task/{sys_id}` — params, auth, stateful, clock
+- `PUT` `/api/now/table/task/{sys_id}` — body, params, auth, stateful, clock
+- `PATCH` `/api/now/table/task/{sys_id}` — body, params, auth, stateful, clock
+- `DELETE` `/api/now/table/task/{sys_id}` — params, auth, stateful, clock
+- `GET` `/api/now/table/change_request` — query, auth, stateful, paginate, filter, clock
+- `POST` `/api/now/table/change_request` — body, auth, stateful, clock
+- `GET` `/api/now/table/change_request/{sys_id}` — params, auth, stateful, clock
+- `PUT` `/api/now/table/change_request/{sys_id}` — body, params, auth, stateful, clock
+- `PATCH` `/api/now/table/change_request/{sys_id}` — body, params, auth, stateful, clock
+- `DELETE` `/api/now/table/change_request/{sys_id}` — params, auth, stateful, clock
+- `GET` `/api/now/table/cmdb_ci` — query, auth, stateful, paginate, filter, clock
+- `POST` `/api/now/table/cmdb_ci` — body, auth, stateful, clock
+- `GET` `/api/now/table/cmdb_ci/{sys_id}` — params, auth, stateful, clock
+- `PUT` `/api/now/table/cmdb_ci/{sys_id}` — body, params, auth, stateful, clock
+- `PATCH` `/api/now/table/cmdb_ci/{sys_id}` — body, params, auth, stateful, clock
+- `DELETE` `/api/now/table/cmdb_ci/{sys_id}` — params, auth, stateful, clock
+- `GET` `/api/now/table/sys_user` — query, auth, stateful, paginate, filter, clock
+- `POST` `/api/now/table/sys_user` — body, auth, stateful, clock
+- `GET` `/api/now/table/sys_user/{sys_id}` — params, auth, stateful, clock
+- `PUT` `/api/now/table/sys_user/{sys_id}` — body, params, auth, stateful, clock
+- `PATCH` `/api/now/table/sys_user/{sys_id}` — body, params, auth, stateful, clock
+- `DELETE` `/api/now/table/sys_user/{sys_id}` — params, auth, stateful, clock
+- `GET` `/api/now/table/sys_user_group` — query, auth, stateful, paginate, filter, clock
+- `POST` `/api/now/table/sys_user_group` — body, auth, stateful, clock
+- `GET` `/api/now/table/sys_user_group/{sys_id}` — params, auth, stateful, clock
+- `PUT` `/api/now/table/sys_user_group/{sys_id}` — body, params, auth, stateful, clock
+- `PATCH` `/api/now/table/sys_user_group/{sys_id}` — body, params, auth, stateful, clock
+- `DELETE` `/api/now/table/sys_user_group/{sys_id}` — params, auth, stateful, clock
+- `GET` `/api/now/table/sc_req_item` — query, auth, stateful, paginate, filter, clock
+- `POST` `/api/now/table/sc_req_item` — body, auth, stateful, clock
+- `GET` `/api/now/table/sc_req_item/{sys_id}` — params, auth, stateful, clock
+- `PUT` `/api/now/table/sc_req_item/{sys_id}` — body, params, auth, stateful, clock
+- `PATCH` `/api/now/table/sc_req_item/{sys_id}` — body, params, auth, stateful, clock
+- `DELETE` `/api/now/table/sc_req_item/{sys_id}` — params, auth, stateful, clock
+- `GET` `/api/now/table/sys_metadata` — query, auth, stateful, paginate, filter, clock
+- `POST` `/api/now/import/u_my_table` — body, auth, stateful, clock
+
+</details>
+
 ### shopify-style
 
 **Covered** — 21 routes · GraphQL schema
@@ -5020,6 +6383,32 @@ behavior notes live in each adapter's README.
 - OAuth authorize redirect omits the hmac query-param signature it documents
 - GraphQL query arg subset: bare substring plus field:value equality tokens only
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/admin/oauth/authorize` — query, stateful, errors
+- `POST` `/admin/oauth/access_token` — body, stateful, errors
+- `GET` `/admin/api/2024-10/products.json` — query, auth, stateful, paginate, clock
+- `POST` `/admin/api/2024-10/products.json` — body, auth, stateful, webhooks, clock
+- `GET` `/admin/api/2024-10/products/{product_id}` — params, auth, stateful, errors, clock
+- `PUT` `/admin/api/2024-10/products/{product_id}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/admin/api/2024-10/products/{product_id}` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/admin/api/2024-10/orders.json` — query, auth, stateful, paginate, filter, clock
+- `POST` `/admin/api/2024-10/orders.json` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/admin/api/2024-10/orders/{order_id}` — params, auth, stateful, errors, clock
+- `POST` `/admin/api/2024-10/orders/{order_id}/cancel.json` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/admin/api/2024-10/orders/{order_id}/close.json` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/admin/api/2024-10/orders/{order_id}/fulfillments.json` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/admin/api/2024-10/orders/{order_id}/transactions.json` — body, params, auth, stateful, errors, clock
+- `GET` `/admin/api/2024-10/customers.json` — query, auth, stateful, paginate, clock
+- `POST` `/admin/api/2024-10/customers.json` — body, auth, stateful, webhooks, errors, clock
+- `PUT` `/admin/api/2024-10/customers/{customer_id}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/admin/api/2024-10/customers/{customer_id}` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/admin/api/2024-10/webhooks.json` — query, auth, stateful, paginate, clock
+- `POST` `/admin/api/2024-10/webhooks.json` — body, auth, stateful, clock
+- `DELETE` `/admin/api/2024-10/webhooks/{webhook_id}` — params, auth, stateful, errors, clock
+
+</details>
+
 ### signin-with-apple-style
 
 **Covered** — 3 routes
@@ -5044,6 +6433,14 @@ behavior notes live in each adapter's README.
 
 - JWKS serves one fixed synthetic P-256 key (kid mock-siwa-key-1) — no rotation
 - client_secret checks alg, signature, aud, exp only — iss/sub claims not enforced
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/auth/authorize` — query, stateful, errors
+- `POST` `/auth/token` — body, stateful, errors, clock
+- `GET` `/auth/keys` — —
+
+</details>
 
 ### slack-style
 
@@ -5136,6 +6533,18 @@ behavior notes live in each adapter's README.
 - apps.events.url config endpoint is simulator-only; real Slack sets it in the app dashboard
 - Events deliveries wrap Slack event_callback payloads in an extra stunt envelope
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/api/auth.test` — auth, stateful, clock
+- `POST` `/api/chat.postMessage` — body, auth, stateful, webhooks, clock
+- `POST` `/api/conversations.create` — body, auth, stateful, webhooks, clock
+- `` `/api/conversations.list` — body, query, auth, stateful, paginate, clock
+- `` `/api/conversations.history` — body, query, auth, stateful, paginate, clock
+- `POST` `/api/reactions.add` — body, auth, stateful, webhooks, clock
+- `POST` `/api/apps.events.url` — body, auth, stateful, webhooks, clock
+
+</details>
+
 ### smartbill-style
 
 **Covered** — 18 routes
@@ -5178,6 +6587,29 @@ behavior notes live in each adapter's README.
 - paymentId on POST /invoice/payment is a simulator extension for the delete flow
 - Payment create skips the real {payment:{companyVatCode,value,type,isCash}} envelope
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/invoice` — body, query, stateful, clock
+- `GET` `/invoice` — query, stateful
+- `PUT` `/invoice/cancel` — body, query, stateful
+- `PUT` `/invoice/restore` — body, query, stateful
+- `GET` `/invoice/paymentstatus` — query, stateful
+- `POST` `/estimate` — body, query, stateful, clock
+- `GET` `/estimate` — query, stateful
+- `PUT` `/estimate/cancel` — body, query, stateful
+- `POST` `/purchase` — body, query, stateful, clock
+- `GET` `/purchase` — query, stateful
+- `POST` `/payment` — body, query, stateful, clock
+- `DELETE` `/payment/v2` — body, query, stateful
+- `GET` `/stocks` — query, stateful
+- `POST` `/document/send` — body, query, stateful, clock
+- `GET` `/tax` — —
+- `GET` `/series` — —
+- `POST` `/sim/company` — body, stateful
+- `POST` `/sim/stocks/movement` — body, query, stateful
+
+</details>
+
 ### sqs-style
 
 **Covered** — 2 routes
@@ -5205,6 +6637,13 @@ behavior notes live in each adapter's README.
 - MD5OfMessageAttributes omitted (compound encoding not reproduced), only body MD5
 - PurgeQueue is immediate, not async; the one-purge-per-60s rule is still enforced
 - Message ids and receipt handles are synthetic deterministic strings, not real AWS ids
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/` — body, query, stateful, clock
+- `POST` `/{queueName}` — body, query, params, stateful, clock
+
+</details>
 
 ### square-style
 
@@ -5308,6 +6747,29 @@ behavior notes live in each adapter's README.
 
 - DELETE /v2/payments/{id} and DELETE /v2/orders/{id} are stunt extensions, not real Square
 - Square-Version header is required (400 when absent); real Square defaults it
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/oauth2/token` — body, stateful, clock
+- `GET` `/v2/payments` — query, stateful, paginate, filter, clock
+- `POST` `/v2/payments` — body, stateful, webhooks, clock
+- `GET` `/v2/payments/{id}` — params, stateful, clock
+- `DELETE` `/v2/payments/{id}` — params, stateful, clock
+- `POST` `/v2/payments/{id}/complete` — params, stateful, webhooks, clock
+- `POST` `/v2/payments/{id}/capture` — params, stateful, webhooks, clock
+- `GET` `/v2/refunds` — query, stateful, paginate, filter, clock
+- `POST` `/v2/refunds` — body, stateful, webhooks, clock
+- `GET` `/v2/locations` — query, stateful, paginate, clock
+- `POST` `/v2/catalog/search` — body, stateful, clock
+- `POST` `/v2/orders` — body, stateful, clock
+- `POST` `/v2/orders/calculate` — body, stateful, clock
+- `GET` `/v2/orders/{id}` — params, stateful, clock
+- `PUT` `/v2/orders/{id}` — body, params, stateful, clock
+- `DELETE` `/v2/orders/{id}` — params, stateful, clock
+- `POST` `/v2/orders/{id}/pay` — body, params, stateful, webhooks, clock
+- `POST` `/v2/orders/{id}/complete` — params, stateful, clock
+
+</details>
 
 ### stripe-style
 
@@ -5555,6 +7017,169 @@ behavior notes live in each adapter's README.
 - Webhooks go to one sink; registered endpoints gate event types, not per-endpoint URLs
 - Lifecycles compressed: refunds settle at +3s, payouts at +60s, disputes in 1 day
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v1/tokens` — body, auth, stateful, errors, clock
+- `GET` `/v1/events` — query, auth, stateful, paginate, filter, errors
+- `GET` `/v1/events/{id}` — params, auth, stateful, errors
+- `POST` `/v1/test_clocks` — body, auth, stateful, errors, clock
+- `GET` `/v1/test_clocks` — query, auth, stateful, paginate, filter, errors
+- `POST` `/v1/test_clocks/{id}/advance` — body, params, auth, stateful, errors, clock
+- `GET` `/v1/test_clocks/{id}` — params, auth, stateful, errors
+- `DELETE` `/v1/test_clocks/{id}` — params, auth, stateful, errors
+- `POST` `/v1/test_helpers/test_clocks` — body, auth, stateful, errors, clock
+- `GET` `/v1/test_helpers/test_clocks` — query, auth, stateful, paginate, filter, errors
+- `POST` `/v1/test_helpers/test_clocks/{id}/advance` — body, params, auth, stateful, errors, clock
+- `GET` `/v1/test_helpers/test_clocks/{id}` — params, auth, stateful, errors
+- `DELETE` `/v1/test_helpers/test_clocks/{id}` — params, auth, stateful, errors
+- `POST` `/v1/charges` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/charges/{id}` — params, auth, stateful, errors
+- `GET` `/v1/charges` — query, auth, stateful, paginate, filter, errors
+- `POST` `/v1/charges/{id}/capture` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/charges/{id}/refund` — body, params, auth, stateful, filter, webhooks, errors, clock
+- `POST` `/v1/payment_intents` — body, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/payment_intents/{id}/confirm` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/payment_intents/{id}/capture` — body, params, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/payment_intents/{id}` — params, auth, stateful, errors
+- `GET` `/v1/payment_intents` — query, auth, stateful, paginate, filter, errors
+- `POST` `/v1/payment_methods` — body, auth, stateful
+- `POST` `/v1/payment_methods/{id}/attach` — body, params, auth, stateful, errors
+- `POST` `/v1/payment_methods/{id}/detach` — params, auth, stateful, errors
+- `GET` `/v1/payment_methods/{id}` — params, auth, stateful, errors
+- `GET` `/v1/payment_methods` — query, auth, stateful, paginate, filter, errors
+- `POST` `/v1/refunds` — body, auth, stateful, filter, webhooks, errors, clock
+- `GET` `/v1/refunds/{id}` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/refunds` — query, auth, stateful, paginate, filter, webhooks, errors, clock
+- `POST` `/v1/refunds/{id}/cancel` — params, auth, stateful, filter, webhooks, errors, clock
+- `POST` `/v1/customers` — body, auth, stateful
+- `GET` `/v1/customers/{id}` — params, auth, stateful, errors
+- `GET` `/v1/customers` — query, auth, stateful, paginate, filter, errors
+- `POST` `/v1/customers/{id}` — body, params, auth, stateful, errors
+- `DELETE` `/v1/customers/{id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/products` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/products` — query, auth, stateful, paginate, filter, errors
+- `GET` `/v1/products/{id}` — params, auth, stateful, errors
+- `POST` `/v1/products/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/v1/products/{id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/prices` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/prices` — query, auth, stateful, paginate, filter, errors
+- `GET` `/v1/prices/{id}` — params, auth, stateful, errors
+- `POST` `/v1/prices/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/subscriptions` — body, auth, stateful, filter, webhooks, errors, clock
+- `GET` `/v1/subscriptions` — query, auth, stateful, paginate, filter, webhooks, errors, clock
+- `GET` `/v1/subscriptions/{id}` — params, auth, stateful, filter, webhooks, errors, clock
+- `POST` `/v1/subscriptions/{id}` — body, params, auth, stateful, filter, webhooks, errors, clock
+- `POST` `/v1/subscriptions/{id}/cancel` — body, params, auth, stateful, filter, webhooks, errors, clock
+- `GET` `/v1/subscription_items` — query, auth, stateful, paginate, errors
+- `POST` `/v1/subscription_items` — body, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/subscription_items/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/v1/subscription_items/{id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/subscription_items/{id}/usage_records` — body, params, auth, stateful, filter, errors, clock
+- `GET` `/v1/subscription_items/{id}/usage_records` — query, params, auth, stateful, paginate, filter, errors
+- `POST` `/v1/invoices` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/invoices` — query, auth, stateful, paginate, filter, errors
+- `GET` `/v1/invoices/upcoming` — query, auth, stateful, filter, errors, clock
+- `GET` `/v1/invoices/{id}` — params, auth, stateful, errors
+- `POST` `/v1/invoices/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/v1/invoices/{id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/invoices/{id}/finalize` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/invoices/{id}/pay` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/invoices/{id}/send` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/invoices/{id}/void` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/invoices/{id}/mark_uncollectible` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/invoices/{id}/lines` — query, params, auth, stateful, paginate, errors
+- `POST` `/v1/invoice_items` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/invoice_items` — query, auth, stateful, paginate, filter, errors
+- `GET` `/v1/invoice_items/{id}` — params, auth, stateful, errors
+- `POST` `/v1/invoice_items/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/v1/invoice_items/{id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/credit_notes` — body, auth, stateful, filter, webhooks, errors, clock
+- `GET` `/v1/credit_notes` — query, auth, stateful, paginate, filter, errors
+- `GET` `/v1/credit_notes/preview` — body, query, auth, stateful, filter, webhooks, errors, clock
+- `GET` `/v1/credit_notes/{id}` — params, auth, stateful, errors
+- `POST` `/v1/credit_notes/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/credit_notes/{id}/void` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/coupons` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/coupons` — query, auth, stateful, paginate, filter, errors
+- `GET` `/v1/coupons/{id}` — params, auth, stateful, errors
+- `POST` `/v1/coupons/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/v1/coupons/{id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/promotion_codes` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/promotion_codes` — query, auth, stateful, paginate, filter, errors
+- `GET` `/v1/promotion_codes/{id}` — params, auth, stateful, errors
+- `POST` `/v1/promotion_codes/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/tax_rates` — body, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/tax_rates` — query, auth, stateful, paginate, filter, errors
+- `GET` `/v1/tax_rates/{id}` — params, auth, stateful, errors
+- `POST` `/v1/tax_rates/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/v1/tax_rates/{id}` — params, auth, stateful, errors
+- `GET` `/v1/balance` — auth, stateful
+- `GET` `/v1/balance_transactions` — query, auth, stateful, paginate, filter, errors
+- `GET` `/v1/balance_transactions/{id}` — params, auth, stateful, errors
+- `GET` `/v1/disputes` — query, auth, stateful, paginate, filter, webhooks, errors, clock
+- `GET` `/v1/disputes/{id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/disputes/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/disputes/{id}/close` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/application_fees` — query, auth, stateful, paginate, filter, errors
+- `GET` `/v1/application_fees/{id}` — params, auth, stateful, errors
+- `GET` `/v1/application_fees/{id}/refunds` — params, auth, stateful, errors
+- `POST` `/v1/application_fees/{id}/refunds` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/application_fees/{id}/refund` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/checkout/sessions` — body, auth, stateful, errors, clock
+- `GET` `/v1/checkout/sessions` — query, auth, stateful, paginate, filter, webhooks, errors, clock
+- `GET` `/v1/checkout/sessions/{id}/line_items` — query, params, auth, stateful, paginate, webhooks, errors, clock
+- `POST` `/v1/checkout/sessions/{id}/expire` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/checkout/sessions/{id}` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/c/pay/{id}` — query, params, stateful, webhooks, errors, clock
+- `POST` `/v1/setup_intents` — body, auth, stateful, webhooks, clock
+- `GET` `/v1/setup_intents` — query, auth, stateful, paginate, filter, errors
+- `POST` `/v1/setup_intents/{id}/confirm` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/setup_intents/{id}/cancel` — body, params, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/setup_intents/{id}` — params, auth, stateful, errors
+- `POST` `/v1/setup_intents/{id}` — body, params, auth, stateful, errors
+- `POST` `/v1/webhook_endpoints` — body, auth, stateful, errors, clock
+- `GET` `/v1/webhook_endpoints` — query, auth, stateful, paginate, errors
+- `GET` `/v1/webhook_endpoints/{id}` — params, auth, stateful, errors
+- `POST` `/v1/webhook_endpoints/{id}` — body, params, auth, stateful, errors
+- `DELETE` `/v1/webhook_endpoints/{id}` — params, auth, stateful, errors
+- `POST` `/v1/files` — auth, stateful, filter, errors, clock
+- `GET` `/v1/files` — query, auth, stateful, paginate, filter, errors, clock
+- `GET` `/v1/files/{id}` — params, auth, stateful, filter, errors, clock
+- `POST` `/v1/file_links` — body, auth, stateful, errors, clock
+- `GET` `/v1/file_links` — query, auth, stateful, paginate, filter, errors, clock
+- `GET` `/v1/file_links/{id}` — params, auth, stateful, errors, clock
+- `POST` `/v1/file_links/{id}` — body, params, auth, stateful, errors, clock
+- `POST` `/v1/accounts` — body, auth, stateful, filter, webhooks, clock
+- `GET` `/v1/accounts/{id}` — params, auth, stateful, filter, webhooks, errors, clock
+- `POST` `/v1/accounts/{id}` — body, params, auth, stateful, filter, webhooks, errors, clock
+- `GET` `/v1/accounts` — query, auth, stateful, paginate, filter, webhooks, errors, clock
+- `POST` `/v1/accounts/{id}/persons` — body, params, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/accounts/{id}/persons` — query, params, auth, stateful, paginate, filter, errors
+- `GET` `/v1/accounts/{id}/persons/{person_id}` — params, auth, stateful, errors
+- `POST` `/v1/accounts/{id}/persons/{person_id}` — body, params, auth, stateful, webhooks, errors, clock
+- `DELETE` `/v1/accounts/{id}/persons/{person_id}` — params, auth, stateful, webhooks, errors, clock
+- `GET` `/v1/persons/{id}` — params, auth, stateful, errors
+- `POST` `/v1/persons/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/accounts/{id}/external_accounts` — body, params, auth, stateful, filter, webhooks, errors, clock
+- `GET` `/v1/accounts/{id}/external_accounts` — query, params, auth, stateful, paginate, filter, errors
+- `GET` `/v1/accounts/{id}/external_accounts/{ea_id}` — params, auth, stateful, errors
+- `DELETE` `/v1/accounts/{id}/external_accounts/{ea_id}` — params, auth, stateful, filter, webhooks, errors, clock
+- `POST` `/v1/accounts/{id}/login_links` — params, auth, stateful, errors, clock
+- `POST` `/v1/account_links` — body, auth, stateful, errors
+- `POST` `/v1/transfers` — body, auth, stateful, filter, webhooks, errors, clock
+- `GET` `/v1/transfers/{id}` — params, auth, stateful, filter, errors
+- `GET` `/v1/transfers` — query, auth, stateful, paginate, filter, errors
+- `POST` `/v1/transfers/{id}/reversals` — body, params, auth, stateful, filter, webhooks, errors, clock
+- `GET` `/v1/transfers/{id}/reversals` — query, params, auth, stateful, paginate, filter, errors
+- `GET` `/v1/transfers/{id}/reversals/{tr_id}` — params, auth, stateful, errors
+- `POST` `/v1/payouts` — body, auth, stateful, filter, webhooks, errors, clock
+- `GET` `/v1/payouts` — query, auth, stateful, paginate, filter, webhooks, errors, clock
+- `GET` `/v1/payouts/{id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/payouts/{id}` — body, params, auth, stateful, webhooks, errors, clock
+- `POST` `/v1/payouts/{id}/cancel` — params, auth, stateful, webhooks, errors, clock
+
+</details>
+
 ### tenderly-style
 
 **Covered** — 5 routes
@@ -5582,6 +7207,16 @@ behavior notes live in each adapter's README.
 - gas_used is derived from input length, not real EVM execution; status defaults to true
 - An explicit revert:true body flag forces the revert path; real API has no such switch
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/api/v1/account/{account}/project/{project}/simulate` — body, params, auth, stateful, clock
+- `POST` `/api/v1/account/{account}/project/{project}/simulate-bundle` — body, params, auth, stateful, errors, clock
+- `GET` `/api/v1/account/{account}/project/{project}/simulations` — params, auth, stateful, clock
+- `GET` `/api/v1/account/{account}/project/{project}/simulations/{id}` — params, auth, stateful, errors, clock
+- `GET` `/api/v1/networks` — query, auth, stateful, paginate, clock
+
+</details>
+
 ### thegraph-style
 
 **Covered** — 1 routes · GraphQL schema
@@ -5603,6 +7238,12 @@ behavior notes live in each adapter's README.
 **Deviations** (1)
 
 - One merged schema serves Uniswap and ENS entities; real Graph serves one per deployment
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/subgraphs/id/{subgraphId}/graphql` — params, auth, stateful, clock
+
+</details>
 
 ### threads-style
 
@@ -5634,6 +7275,19 @@ behavior notes live in each adapter's README.
 - Container processing is a fixed ~3s clock-derived window; text needs no real poll
 - simulate_fail=true on container create is a simulator-only failure switch
 - Refresh-grant response omits the rotated refresh_token; only the code exchange returns one
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/oauth/authorize` — query, stateful, errors
+- `POST` `/oauth/access_token` — body, stateful, errors, clock
+- `GET` `/v1.0/me` — auth, stateful, clock
+- `GET` `/v1.0/{container_id}` — query, params, auth, stateful, errors, clock
+- `GET` `/v1.0/{id}/insights` — params, auth, stateful, errors, clock
+- `POST` `/v1.0/{id}/threads_publish` — query, params, auth, stateful, errors, clock
+- `POST` `/v1.0/{id}/threads` — body, params, auth, stateful, errors, clock
+- `GET` `/v1.0/{id}/threads` — params, auth, stateful, clock
+
+</details>
 
 ### twilio-style
 
@@ -5726,6 +7380,17 @@ behavior notes live in each adapter's README.
 - Verify codes are deterministic: last 6 digits of the To number, not a random SMS code
 - simulate_fail:true in the POST body is a simulator extension forcing undelivered (30007)
 - PageSize omitted returns all messages in one page; real Twilio defaults to 50
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/2010-04-01/Accounts/{account_sid}/Messages.json` — body, params, auth, stateful, clock
+- `GET` `/2010-04-01/Accounts/{account_sid}/Messages.json` — query, params, auth, stateful, paginate, filter, webhooks, errors, clock
+- `GET` `/2010-04-01/Accounts/{account_sid}/Messages/{sid}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/2010-04-01/Accounts/{account_sid}/Calls.json` — body, params, auth, stateful
+- `POST` `/v2/Services/{service_sid}/Verification` — body, params, auth, stateful
+- `POST` `/v2/Services/{service_sid}/VerificationCheck` — body, params, auth, stateful, errors
+
+</details>
 
 ### twitter-style
 
@@ -5822,6 +7487,20 @@ behavior notes live in each adapter's README.
 - POST /2/oauth2/token always succeeds, minting a fake token (no PKCE or client creds)
 - GET /2/tweets list-all is a simulator extension; the real API has no such list endpoint
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/2/oauth2/token` — —
+- `GET` `/2/users/me` — stateful
+- `GET` `/2/users/by/username/{username}` — params, stateful, errors
+- `GET` `/2/users/{id}` — params, stateful, errors
+- `POST` `/2/tweets` — body, stateful, errors
+- `GET` `/2/tweets/{id}` — params, stateful, errors
+- `GET` `/2/tweets` — query, stateful, paginate, errors
+- `DELETE` `/2/tweets/{id}` — params, stateful, errors
+- `GET` `/2/users/{id}/timelines/reverse_chronological` — query, stateful, paginate, filter, errors
+
+</details>
+
 ### walletconnect-style
 
 **Covered** — 7 routes
@@ -5850,6 +7529,18 @@ behavior notes live in each adapter's README.
 
 - Pairing, session approve, and JSON-RPC requests are auto-approved (no wallet device)
 - personal_sign and eth_sendTransaction return synthetic hashes; nothing is signed
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v1/pairings` — body, stateful, errors
+- `POST` `/v1/sessions` — body, stateful, errors
+- `GET` `/v1/sessions` — query, stateful, paginate, errors
+- `POST` `/v1/sessions/{topic}/approve` — params, stateful, errors
+- `POST` `/v1/sessions/{topic}/request` — body, params, stateful, errors
+- `POST` `/v1/sessions/{topic}/extend` — params, stateful, errors
+- `DELETE` `/v1/sessions/{topic}` — params, stateful, errors
+
+</details>
 
 ### whatsapp-style
 
@@ -5885,6 +7576,19 @@ behavior notes live in each adapter's README.
 - simulate_fail:true on send is a simulator extension forcing terminal failed status
 - Template review is client-driven: POST {template_id} flips PENDING to APPROVED/REJECTED
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `POST` `/v21.0/{phone_number_id}/messages` — body, params, auth, stateful, webhooks, clock
+- `POST` `/v21.0/{phone_number_id}/register` — body, params, auth, stateful, clock
+- `POST` `/v21.0/{phone_number_id}/media` — body, params, auth, stateful, clock
+- `GET` `/v21.0/{media_id}/content` — params, auth, stateful, errors, clock
+- `GET` `/v21.0/{waba_id}/message_templates` — query, params, auth, stateful, paginate, clock
+- `POST` `/v21.0/{waba_id}/message_templates` — body, auth, stateful, clock
+- `GET` `/v21.0/{resource_id}` — params, auth, stateful, webhooks, errors, clock
+- `POST` `/v21.0/{template_id}` — body, params, auth, stateful, errors, clock
+
+</details>
+
 ### workday-style
 
 **Covered** — 8 routes
@@ -5914,6 +7618,19 @@ behavior notes live in each adapter's README.
 **Deviations** (1)
 
 - Auth validates only Authorization header presence; any bearer/basic value passes
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/wbs/v40.0/staffing/workers` — query, auth, stateful
+- `GET` `/wbs/v40.0/staffing/workers/{id}` — params, auth, stateful
+- `GET` `/wbs/v40.0/compensation/workers/{id}/compensation` — params, auth
+- `GET` `/wbs/v40.0/payroll/pay_components` — query, auth, stateful
+- `GET` `/wbs/v40.0/human_resources/positions` — query, auth, stateful
+- `GET` `/wbs/v40.0/financials/accounts` — query, auth, stateful
+- `GET` `/ccx/v1/{tenant}/RaaS/Custom_Report` — auth
+- `POST` `/ccx/v1/{tenant}/staffing/Create_Worker` — body, auth, stateful
+
+</details>
 
 ### x-articles-style
 
@@ -6003,6 +7720,19 @@ behavior notes live in each adapter's README.
 **Deviations** (1)
 
 - PKCE is relaxed: code_verifier must be non-empty but the S256 hash match is not verified
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/2/oauth2/authorize` — query, stateful, errors
+- `POST` `/2/oauth2/token` — body, auth, stateful, errors
+- `POST` `/2/articles/draft` — body, stateful, errors
+- `POST` `/2/articles/{id}/publish` — params, stateful, errors
+- `GET` `/2/articles/{id}` — params, stateful, errors
+- `POST` `/2/media/upload` — stateful
+- `POST` `/2/tweets` — body, stateful, errors
+- `GET` `/2/tweets/{id}` — params, stateful, errors
+
+</details>
 
 ### xero-style
 
@@ -6103,6 +7833,26 @@ behavior notes live in each adapter's README.
 - No tax-rate registry; line tax is the given TaxAmount, not computed from TaxType
 - Responses carry a sim-only nextPage field; real Xero signals the last page by item count
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/connections` — query, stateful, paginate, clock
+- `GET` `/api.xro/2.0/Contacts` — query, stateful, paginate, filter, clock
+- `PUT` `/api.xro/2.0/Contacts` — body, stateful, clock
+- `GET` `/api.xro/2.0/Contacts/{id}` — params, stateful, clock
+- `PUT` `/api.xro/2.0/Contacts/{id}` — body, params, stateful, clock
+- `GET` `/api.xro/2.0/Invoices` — query, stateful, paginate, filter, clock
+- `PUT` `/api.xro/2.0/Invoices` — body, stateful, clock
+- `GET` `/api.xro/2.0/Invoices/{id}` — params, stateful, clock
+- `DELETE` `/api.xro/2.0/Invoices/{id}` — params, stateful, clock
+- `POST` `/api.xro/2.0/Invoices/{id}/Payments` — body, params, stateful, clock
+- `GET` `/api.xro/2.0/Accounts` — query, stateful, paginate, filter, clock
+- `GET` `/api.xro/2.0/BankTransactions` — query, stateful, paginate, filter, clock
+- `GET` `/api.xro/2.0/Items` — query, stateful, paginate, filter, clock
+- `GET` `/api.xro/2.0/TrackingCategories` — query, stateful, paginate, filter, clock
+- `POST` `/webhooks` — —
+
+</details>
+
 ### youtube-style
 
 **Covered** — 14 routes
@@ -6202,6 +7952,25 @@ behavior notes live in each adapter's README.
 - GET /youtube/v3/videos without id lists all user videos; real API requires id or chart
 - maxResults omitted returns everything; real API defaults to 5 per page
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/o/oauth2/auth` — query, stateful, errors
+- `POST` `/o/oauth2/token` — body, stateful, errors, clock
+- `POST` `/upload/youtube/v3/videos` — body, query, auth, stateful, clock
+- `PUT` `/upload/youtube/v3/videos/{upload_id}` — query, params, stateful, clock
+- `DELETE` `/upload/youtube/v3/videos/{upload_id}` — query, params, stateful, errors
+- `GET` `/youtube/v3/videos` — query, auth, stateful, paginate, filter, errors, clock
+- `POST` `/youtube/v3/videos` — body, query, auth, stateful, clock
+- `DELETE` `/youtube/v3/videos` — query, auth, stateful, errors, clock
+- `GET` `/youtube/v3/channels` — auth, stateful, clock
+- `POST` `/youtube/v3/playlists` — body, auth, stateful, clock
+- `GET` `/youtube/v3/playlists` — query, auth, stateful, paginate, filter, errors, clock
+- `DELETE` `/youtube/v3/playlists` — query, auth, stateful, errors, clock
+- `POST` `/youtube/v3/playlistItems` — body, auth, stateful, errors, clock
+- `DELETE` `/youtube/v3/playlistItems` — query, auth, stateful, errors, clock
+
+</details>
+
 ### zendesk-style
 
 **Covered** — 37 routes
@@ -6269,6 +8038,48 @@ behavior notes live in each adapter's README.
 - Webhook signing_secret is caller-supplied (omitted falls back to a public mock secret)
 - per_page <= 0 disables cursor paging: all records returned, links.next null
 
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/api/v2/tickets.json` — query, auth, stateful, paginate, filter, clock
+- `POST` `/api/v2/tickets.json` — body, auth, stateful, webhooks, clock
+- `POST` `/api/v2/tickets/{id}/comments.json` — body, params, auth, stateful, webhooks, clock
+- `GET` `/api/v2/tickets/{id}/comments.json` — query, params, auth, stateful, paginate, clock
+- `POST` `/api/v2/tickets/{id}/tags.json` — body, params, auth, stateful, clock
+- `GET` `/api/v2/tickets/{id}.json` — params, auth, stateful, clock
+- `PUT` `/api/v2/tickets/{id}.json` — body, params, auth, stateful, webhooks, clock
+- `DELETE` `/api/v2/tickets/{id}.json` — params, auth, stateful, clock
+- `GET` `/api/v2/users.json` — query, auth, stateful, paginate, filter, clock
+- `GET` `/api/v2/organizations.json` — query, auth, stateful, paginate, filter, clock
+- `GET` `/api/v2/groups.json` — query, auth, stateful, paginate, filter, clock
+- `GET` `/api/v2/requests.json` — query, auth, stateful, paginate, filter, clock
+- `GET` `/api/v2/views.json` — query, auth, stateful, paginate, clock
+- `GET` `/api/v2/triggers.json` — query, auth, stateful, paginate, filter, clock
+- `GET` `/api/v2/webhooks.json` — query, auth, stateful, paginate, clock
+- `POST` `/api/v2/webhooks.json` — body, auth, stateful, clock
+- `DELETE` `/api/v2/webhooks/{id}.json` — params, auth, stateful, clock
+- `GET` `/api/v2/suspended_tickets.json` — query, auth, stateful, paginate, clock
+- `GET` `/api/v2/tickets` — query, auth, stateful, paginate, filter, clock
+- `POST` `/api/v2/tickets` — body, auth, stateful, webhooks, clock
+- `POST` `/api/v2/tickets/{id}/comments` — body, params, auth, stateful, webhooks, clock
+- `GET` `/api/v2/tickets/{id}/comments` — query, params, auth, stateful, paginate, clock
+- `POST` `/api/v2/tickets/{id}/tags` — body, params, auth, stateful, clock
+- `GET` `/api/v2/tickets/{id}` — params, auth, stateful, clock
+- `PUT` `/api/v2/tickets/{id}` — body, params, auth, stateful, webhooks, clock
+- `DELETE` `/api/v2/tickets/{id}` — params, auth, stateful, clock
+- `GET` `/api/v2/users` — query, auth, stateful, paginate, filter, clock
+- `GET` `/api/v2/organizations` — query, auth, stateful, paginate, filter, clock
+- `GET` `/api/v2/groups` — query, auth, stateful, paginate, filter, clock
+- `GET` `/api/v2/search.json` — query, auth, stateful, paginate, filter, clock
+- `GET` `/api/v2/requests` — query, auth, stateful, paginate, filter, clock
+- `GET` `/api/v2/views` — query, auth, stateful, paginate, clock
+- `GET` `/api/v2/triggers` — query, auth, stateful, paginate, filter, clock
+- `GET` `/api/v2/webhooks` — query, auth, stateful, paginate, clock
+- `POST` `/api/v2/webhooks` — body, auth, stateful, clock
+- `DELETE` `/api/v2/webhooks/{id}` — params, auth, stateful, clock
+- `GET` `/api/v2/suspended_tickets` — query, auth, stateful, paginate, clock
+
+</details>
+
 ### zuora-style
 
 **Covered** — 20 routes
@@ -6318,6 +8129,31 @@ behavior notes live in each adapter's README.
 - Webhook reg via /v1/webhooks (real: Notifications UI only); deliveries JSON not form-encoded
 - List filter[] applies a single condition per request; multiple filters cannot be ANDed
 - Subscriptions become Active immediately on create; no Pending Activation state
+
+<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
+
+- `GET` `/v1/accounts` — body, query, auth, stateful, paginate, filter, clock
+- `POST` `/v1/accounts` — body, auth, stateful, webhooks, clock
+- `GET` `/v1/accounts/{accountKey}` — body, params, auth, stateful, clock
+- `POST` `/v1/subscriptions` — body, auth, stateful, webhooks, clock
+- `POST` `/v1/subscriptions/{subscriptionKey}/cancel` — body, params, auth, stateful, webhooks, clock
+- `PUT` `/v1/subscriptions/{subscriptionKey}` — body, params, auth, stateful, webhooks, clock
+- `GET` `/v1/subscriptions/{subscriptionKey}` — body, params, auth, stateful, webhooks, clock
+- `POST` `/v1/usage` — body, auth, stateful, clock
+- `GET` `/v1/usage` — body, query, auth, stateful, paginate, filter, clock
+- `GET` `/v1/invoices/{invoiceId}` — body, params, auth, stateful, clock
+- `GET` `/v1/payments` — body, query, auth, stateful, paginate, filter, clock
+- `POST` `/v1/payments` — body, auth, stateful, webhooks, clock
+- `POST` `/v1/payments/{paymentId}/unapply` — body, params, auth, stateful, webhooks, clock
+- `GET` `/v1/payments/{paymentId}` — body, params, auth, stateful, clock
+- `POST` `/v1/payment-methods/credit-cards` — body, auth, stateful, clock
+- `POST` `/v1/transactions/billing/preview` — body, auth, stateful, clock
+- `POST` `/v1/action/query` — body, auth, stateful, webhooks, clock
+- `POST` `/v1/webhooks` — body, auth, stateful, clock
+- `GET` `/v1/webhooks` — body, auth, stateful, clock
+- `DELETE` `/v1/webhooks/{id}` — body, params, auth, stateful, clock
+
+</details>
 
 ---
 
