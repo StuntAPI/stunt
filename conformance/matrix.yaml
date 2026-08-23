@@ -189,6 +189,7 @@ adapters:
       - "searchPosts returns seeded synthetic results, not an index over created records"
       - "createSession mints tokens for any identifier/password pair; no credential check"
       - "refreshSession invalidates the old accessJwt too; real AT Protocol leaves it valid to exp"
+      - "cids cycle a fixed pool of 8 real CIDv1 strings rather than hashing record content"
     missing:
       - "No repo reads: com.atproto.repo getRecord, listRecords, describeRepo, uploadBlob"
       - "No com.atproto.server getSession or deleteSession"

@@ -24,7 +24,7 @@ import (
 //   - list campaigns
 //   - trigger campaign for leads
 //   - get paging token for activities
-//   - 401 without auth → Marketo {success:false, errors} envelope
+//   - 403 without auth → Marketo {success:false, errors:601} envelope
 func TestMarketoStyleAdapter(t *testing.T) {
 	adapterDir := filepath.Join("..", "..", "adapters", "marketo-style")
 	absAdapterDir, err := filepath.Abs(adapterDir)
@@ -583,11 +583,12 @@ func TestMarketoStyleAdapter(t *testing.T) {
 		t.Fatalf("unknown export poll -> %d, want 404; body %s", status, body)
 	}
 
-	// ===== 401 without auth → Marketo error envelope =====
+	// ===== 403 without auth → Marketo error envelope (601; real Marketo
+	// reports auth failures as HTTP 403, not 401) =====
 
 	body, status = marketoNoAuthGet(t, base+"/rest/v1/leads")
-	if status != 401 {
-		t.Fatalf("no-auth leads -> %d, want 401; body %s", status, body)
+	if status != 403 {
+		t.Fatalf("no-auth leads -> %d, want 403; body %s", status, body)
 	}
 	var errResp map[string]any
 	if err := json.Unmarshal([]byte(body), &errResp); err != nil {
@@ -608,11 +609,11 @@ func TestMarketoStyleAdapter(t *testing.T) {
 		t.Fatalf("error message = %v, want string", err0["message"])
 	}
 
-	// ===== bogus token → 401 =====
+	// ===== bogus token → 403 (601) =====
 
 	_, status = marketoAuthGet(t, base+"/rest/v1/leads", "synthetic_token_bogus")
-	if status != 401 {
-		t.Fatalf("bogus-token leads -> %d, want 401", status)
+	if status != 403 {
+		t.Fatalf("bogus-token leads -> %d, want 403", status)
 	}
 
 	// ===== access_token query param also works =====

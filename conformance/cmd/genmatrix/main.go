@@ -179,6 +179,7 @@ func parseGoRecords(dir string) ([]check, error) {
 // nodeSuiteSDK maps a node test file to the SDK label its sections are
 // attributed to.
 var nodeSuiteSDK = map[string]string{
+	"bluesky.test.ts":        "atproto",
 	"discord.test.ts":        "discord-node",
 	"entraid.test.ts":        "microsoft-graph-client",
 	"github.test.ts":         "octokit",
@@ -375,6 +376,7 @@ var nodePackages = map[string]string{
 	"plaid-node":             "plaid",
 	"resend-node":            "resend",
 	"slack-node":             "@slack/web-api",
+	"atproto":                "@atproto/api",
 	"microsoft-graph-client": "@microsoft/microsoft-graph-client",
 	"node-zendesk":           "node-zendesk",
 	"square-node":            "square",

@@ -21,7 +21,7 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**98 adapters** — 2 SDK+VM, 33 SDK-only, 4 VM-only, 59 boot-tier.
+**98 adapters** — 2 SDK+VM, 34 SDK-only, 8 VM-only, 54 boot-tier.
 
 **43 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.
 
@@ -45,7 +45,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [azure-servicebus-style](adapters/azure-servicebus-style/) | Azure Service Bus + Storage `2024-01-01` | 18 | VM | — | — | [6](#azure-servicebus-style) | [3](#azure-servicebus-style) |
 | [azure-storage-style](adapters/azure-storage-style/) | Azure Storage Blob REST API `2024-08-04` | 9 | VM | — | — | [6](#azure-storage-style) | [3](#azure-storage-style) |
 | [blog-style](adapters/blog-style/) | GraphQL demo `1.0` | 0 +GQL | boot | — | — | — | — |
-| [bluesky-style](adapters/bluesky-style/) | Bluesky AT Protocol `com.atproto (2024-Q4)` | 7 | boot | — | — | [7](#bluesky-style) | [3](#bluesky-style) |
+| [bluesky-style](adapters/bluesky-style/) | Bluesky AT Protocol `com.atproto (2024-Q4)` | 7 | SDK | atproto @ 0.20.41 (floor) | 8 | [7](#bluesky-style) | [4](#bluesky-style) |
 | [braintree-style](adapters/braintree-style/) | Braintree GraphQL + REST API `2024-09-01` | 15 +GQL | boot | — | — | [8](#braintree-style) | [5](#braintree-style) |
 | [braze-style](adapters/braze-style/) | Braze REST API `2.0` | 12 | boot | — | — | [8](#braze-style) | [4](#braze-style) |
 | [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | boot | — | — | [6](#chainlink-style) | [5](#chainlink-style) |
@@ -57,7 +57,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [dune-style](adapters/dune-style/) | Dune Analytics API `v1` | 6 | boot | — | — | [5](#dune-style) | [3](#dune-style) |
 | [dynamodb-style](adapters/dynamodb-style/) | Amazon DynamoDB API `2012-08-10` | 1 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 8 | [8](#dynamodb-style) | [5](#dynamodb-style) |
 | [echo-style](adapters/echo-style/) | gRPC echo demo `1.0` | 0 (+1 ws) | boot | — | — | — | — |
-| [emailoctopus-style](adapters/emailoctopus-style/) | EmailOctopus API `2.0.0` | 21 | boot | — | — | [2](#emailoctopus-style) | [3](#emailoctopus-style) |
+| [emailoctopus-style](adapters/emailoctopus-style/) | EmailOctopus API `2.0.0` | 21 | VM | — | — | [2](#emailoctopus-style) | [3](#emailoctopus-style) |
 | [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 8 | [8](#entra-id-style) | [3](#entra-id-style) |
 | [erc4337-style](adapters/erc4337-style/) | ERC-4337 Bundler RPC `0.7` | 2 | boot | — | — | [5](#erc4337-style) | [4](#erc4337-style) |
 | [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | boot | — | — | [3](#escrow-style) | [1](#escrow-style) |
@@ -84,7 +84,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | boot | — | — | [3](#jumio-style) | [4](#jumio-style) |
 | [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | boot | — | — | [4](#linkedin-style) | [1](#linkedin-style) |
 | [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | SDK | openai-node @ 7.5.0 (floor) | 2 | [4](#llm-style) | [3](#llm-style) |
-| [marketo-style](adapters/marketo-style/) | Marketo Engage REST API `1.0` | 21 | boot | — | — | [5](#marketo-style) | [3](#marketo-style) |
+| [marketo-style](adapters/marketo-style/) | Marketo Engage REST API `1.0` | 21 | VM | — | — | [5](#marketo-style) | [3](#marketo-style) |
 | [microsoft-graph-style](adapters/microsoft-graph-style/) | Microsoft Graph API `v1.0` | 55 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 10 | [8](#microsoft-graph-style) | [6](#microsoft-graph-style) |
 | [netsuite-style](adapters/netsuite-style/) | NetSuite SuiteTalk REST API `1.0` | 9 | boot | — | — | [4](#netsuite-style) | [2](#netsuite-style) |
 | [oneinch-style](adapters/oneinch-style/) | 1inch Aggregation Protocol API `v6.0` | 5 | boot | — | — | [3](#oneinch-style) | [1](#oneinch-style) |
@@ -106,7 +106,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [revenuecat-style](adapters/revenuecat-style/) | RevenueCat API `v1` | 7 | boot | — | — | [5](#revenuecat-style) | [4](#revenuecat-style) |
 | [salesforce-style](adapters/salesforce-style/) | Salesforce REST API `v60.0` | 29 | SDK | jsforce @ 3.10.22 (floor) | 6 | [7](#salesforce-style) | [4](#salesforce-style) |
 | [sendgrid-style](adapters/sendgrid-style/) | Twilio SendGrid v3 API `v3` | 5 | boot | — | — | [7](#sendgrid-style) | [5](#sendgrid-style) |
-| [servicenow-style](adapters/servicenow-style/) | ServiceNow Table API `2` | 44 | boot | — | — | [5](#servicenow-style) | [1](#servicenow-style) |
+| [servicenow-style](adapters/servicenow-style/) | ServiceNow Table API `2` | 44 | VM | — | — | [5](#servicenow-style) | [1](#servicenow-style) |
 | [shopify-style](adapters/shopify-style/) | Shopify Admin REST + GraphQL API `2024-10` | 21 +GQL | SDK | go-shopify/v4 @ v4.7.0 | 5 | [7](#shopify-style) | [4](#shopify-style) |
 | [signin-with-apple-style](adapters/signin-with-apple-style/) | Sign in with Apple `v2` | 3 | boot | — | — | [3](#signin-with-apple-style) | [2](#signin-with-apple-style) |
 | [slack-style](adapters/slack-style/) | Slack Web API `1.0` | 7 | SDK | slack-node @ 7.19.0 (floor) | 4 | [6](#slack-style) | [2](#slack-style) |
@@ -126,13 +126,26 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [xero-style](adapters/xero-style/) | Xero Accounting API `2.0` | 15 | boot | — | — | [6](#xero-style) | [2](#xero-style) |
 | [youtube-style](adapters/youtube-style/) | YouTube Data API `v3` | 14 | SDK | google-api-go-client @ v0.293.0 | 8 | [7](#youtube-style) | [2](#youtube-style) |
 | [zendesk-style](adapters/zendesk-style/) | Zendesk REST API `2` | 37 | SDK | node-zendesk @ 6.0.1 (floor) | 6 | [8](#zendesk-style) | [5](#zendesk-style) |
-| [zuora-style](adapters/zuora-style/) | Zuora REST API `v1` | 20 | boot | — | — | [8](#zuora-style) | [5](#zuora-style) |
+| [zuora-style](adapters/zuora-style/) | Zuora REST API `v1` | 20 | VM | — | — | [8](#zuora-style) | [5](#zuora-style) |
 
 ## Verified behaviors
 
 What each suite actually asserts, as written in the test sources
 (`Record(...)` literals in `conformance/*_test.go`; `// =====`
 sections in `conformance/node/tests/*.test.ts`).
+
+### atproto @ 0.20.41 (floor)
+
+**bluesky-style**
+
+- login rides createSession and adopts did/handle/tokens
+- agent.post creates an app.bsky.feed.post record
+- searchPosts finds the created post by its text
+- getProfile resolves the session actor with counts
+- resolveHandle is a public read (no session)
+- unauthenticated record writes surface as XRPC 401s
+- deletePost removes the record from search
+- refreshSession rotates the token pair via the SDK
 
 ### aws-sdk-go-v2 @ v1.43.7
 
@@ -1602,11 +1615,12 @@ behavior notes live in each adapter's README.
 - No app.bsky.actor updateProfile or preference endpoints
 - No com.atproto.moderation createReport; no app.bsky.chat conversations
 
-**Deviations** (3)
+**Deviations** (4)
 
 - searchPosts returns seeded synthetic results, not an index over created records
 - createSession mints tokens for any identifier/password pair; no credential check
 - refreshSession invalidates the old accessJwt too; real AT Protocol leaves it valid to exp
+- cids cycle a fixed pool of 8 real CIDv1 strings rather than hashing record content
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -1616,7 +1630,7 @@ behavior notes live in each adapter's README.
 - `POST` `/xrpc/com.atproto.repo.deleteRecord` — body, auth, stateful
 - `GET` `/xrpc/com.atproto.identity.resolveHandle` — query, stateful, errors
 - `GET` `/xrpc/app.bsky.actor.getProfile` — query, stateful, errors
-- `GET` `/xrpc/app.bsky.feed.searchPosts` — query, stateful
+- `GET` `/xrpc/app.bsky.feed.searchPosts` — query, stateful, clock
 
 </details>
 

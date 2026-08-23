@@ -30,34 +30,35 @@ def on_search_posts(req):
 
     return respond(200, {"posts": results})
 
+# searchPosts items are postView objects at the top level (no .post
+# wrapper — that nesting belongs to feed slices) and official clients
+# validate uri/cid/author/record/indexedAt on every one.
 def _post_view(doc):
     record = doc.get("record", {})
     if record == None:
         record = {}
     return {
-        "post": {
-            "uri": doc.get("uri", ""),
-            "cid": doc.get("cid", ""),
-            "author": {"did": doc.get("repo", ""), "handle": "mock.test"},
-            "record": record,
-        },
+        "uri": doc.get("uri", ""),
+        "cid": doc.get("cid", ""),
+        "author": {"did": doc.get("repo", ""), "handle": "mock.test"},
+        "record": record,
+        "indexedAt": clock.now_rfc3339(),
     }
 
 def _seeded_post(seq):
     return {
-        "post": {
-            "uri": "at://did:plc:" + _pad12(seq) + "/app.bsky.feed.post/3k" + _pad12(seq),
-            "cid": _mint_cid(seq),
-            "author": {
-                "did": "did:plc:" + _pad12(seq),
-                "handle": "user" + str(seq) + ".test",
-            },
-            "record": {
-                "$type": "app.bsky.feed.post",
-                "text": "Synthetic post " + str(seq) + " for local testing.",
-                "createdAt": "2024-01-15T10:00:00.000Z",
-            },
+        "uri": "at://did:plc:" + _pad12(seq) + "/app.bsky.feed.post/3kseed" + _pad12(seq),
+        "cid": _mint_cid(seq),
+        "author": {
+            "did": "did:plc:" + _pad12(seq),
+            "handle": "user" + str(seq) + ".test",
         },
+        "record": {
+            "$type": "app.bsky.feed.post",
+            "text": "Synthetic post " + str(seq) + " for local testing.",
+            "createdAt": "2024-01-15T10:00:00.000Z",
+        },
+        "indexedAt": clock.now_rfc3339(),
     }
 
 def _contains(s, substr):
