@@ -1,0 +1,10 @@
+id: fixture-empty-style
+name: "astscan empty fixture"
+version: "0.1.0"
+api:
+  name: "Fixture API"
+  version: "1"
+endpoints:
+  - route: /ping
+    method: GET
+    handler: scripts/ping.star#on_ping

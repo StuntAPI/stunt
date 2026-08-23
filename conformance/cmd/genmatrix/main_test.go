@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/adapter/astscan"
 )
 
 func TestParseGoRecords(t *testing.T) {
@@ -295,7 +296,7 @@ func TestRenderSurfaceDetailBlock(t *testing.T) {
 		},
 	}
 	gaps := map[string]gapEntry{"demo-style": {Deviations: []string{"covered but different"}, Missing: []string{"no DELETE /v9/things"}}}
-	doc, err := render(adapters, nil, map[string]string{}, gaps, map[string]*surfaceOut{}, ".")
+	doc, err := render(adapters, nil, map[string]string{}, gaps, map[string]*surfaceOut{}, map[string][]astscan.EndpointTags{}, ".")
 	if err != nil {
 		t.Fatal(err)
 	}

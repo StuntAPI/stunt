@@ -1,0 +1,22 @@
+id: fixture-style
+name: "astscan fixture"
+version: "0.1.0"
+api:
+  name: "Fixture API"
+  version: "1"
+endpoints:
+  - route: /items
+    method: POST
+    handler: scripts/items.star#on_create
+  - route: /items
+    method: GET
+    handler: scripts/items.star#on_list
+  - route: /items/{id}
+    method: GET
+    handler: scripts/items.star#on_get
+  - route: /loop
+    method: GET
+    handler: scripts/weird.star#on_loop
+resources:
+  - name: items
+    kind: collection

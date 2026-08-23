@@ -34,6 +34,7 @@ import (
 
 	"stuntapi.com/stunt/conformance/sdkmap"
 	"stuntapi.com/stunt/internal/adapter"
+	"stuntapi.com/stunt/internal/adapter/astscan"
 )
 
 func main() {
@@ -81,8 +82,12 @@ func run(root, jsonOut string) error {
 	if err != nil {
 		return err
 	}
+	derived, err := scanBehaviors(adapters)
+	if err != nil {
+		return err
+	}
 
-	doc, err := render(adapters, checks, sdkVer, gaps, surfaces, root)
+	doc, err := render(adapters, checks, sdkVer, gaps, surfaces, derived, root)
 	if err != nil {
 		return err
 	}
@@ -91,7 +96,7 @@ func run(root, jsonOut string) error {
 		return err
 	}
 	if jsonOut != "" {
-		data, err := renderJSON(adapters, checks, sdkVer, gaps, surfaces, root)
+		data, err := renderJSON(adapters, checks, sdkVer, gaps, surfaces, derived, root)
 		if err != nil {
 			return err
 		}
@@ -582,6 +587,24 @@ func deriveSurfaces(adapters []*adapter.Adapter, sdkVer map[string]string, confD
 	return out, nil
 }
 
+// scanBehaviors derives the static tag set for every adapter. Fail-loud:
+// astscan errors (unparseable script, missing handler) propagate — a
+// silent skip would publish an empty behaviors picture that looks like
+// "nothing happens here".
+func scanBehaviors(adapters []*adapter.Adapter) (map[string][]astscan.EndpointTags, error) {
+	out := map[string][]astscan.EndpointTags{}
+	for _, a := range adapters {
+		tags, err := astscan.Scan(a)
+		if err != nil {
+			return nil, err
+		}
+		if len(tags) > 0 {
+			out[a.ID] = tags
+		}
+	}
+	return out, nil
+}
+
 // ---- rendering ----------------------------------------------------------
 
 type sdkGroup struct {
@@ -590,7 +613,7 @@ type sdkGroup struct {
 	byAdapter map[string][]string
 }
 
-func render(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, surfaces map[string]*surfaceOut, root string) (string, error) {
+func render(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, surfaces map[string]*surfaceOut, derived map[string][]astscan.EndpointTags, root string) (string, error) {
 	byAdapterChecks := map[string][]check{}
 	groups := map[string]*sdkGroup{}
 	var groupOrder []string
@@ -674,6 +697,7 @@ Verification tiers:
 	if len(surfaces) > 0 {
 		fmt.Fprintf(&b, "**%d adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.\n\n", len(surfaces))
 	}
+	fmt.Fprintf(&b, "Behavior columns come in two kinds: **verified** (an official SDK was driven against the adapter and the check passed — the Behaviors counts in the matrix above) and **derived** (static analysis of the handler scripts — every adapter's *Derived behavior tags* block below says what the code does, not that a client confirmed it).\n\n")
 
 	b.WriteString("| Adapter | API | Routes | Verification | Official SDK(s) | Behaviors | Missing | Deviations |\n")
 	b.WriteString("|---|---|---|---|---|---|---|---|\n")
@@ -802,6 +826,17 @@ sections in ` + "`conformance/node/tests/*.test.ts`" + `).
 			}
 			b.WriteString("\n")
 		}
+		if dtags, ok := derived[a.ID]; ok && len(dtags) > 0 {
+			fmt.Fprintf(&b, "<details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>\n\n")
+			for _, et := range dtags {
+				tags := astscan.TagsString(et.Tags)
+				if tags == "" {
+					tags = "—"
+				}
+				fmt.Fprintf(&b, "- `%s` `%s` — %s\n", et.Method, et.Route, tags)
+			}
+			fmt.Fprintf(&b, "\n</details>\n\n")
+		}
 	}
 
 	b.WriteString(`---
@@ -872,6 +907,16 @@ type adapterJSON struct {
 	// table diffed against the manifest), present only where the pinned
 	// SDK embeds a trustworthy table.
 	Surface *surfaceJSON `json:"surface,omitempty"`
+	// DerivedBehaviorTags are STATIC findings from the handler scripts —
+	// what each endpoint's code does. Distinct from Behaviors, which are
+	// SDK-verified outcomes; never merge the two.
+	DerivedBehaviorTags []derivedJSON `json:"derived_behaviors,omitempty"`
+}
+
+type derivedJSON struct {
+	Method string   `json:"method"`
+	Route  string   `json:"route"`
+	Tags   []string `json:"tags"`
 }
 
 type surfaceJSON struct {
@@ -893,7 +938,7 @@ type sdkJSON struct {
 	Version string `json:"version"`
 }
 
-func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, surfaces map[string]*surfaceOut, root string) ([]byte, error) {
+func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, surfaces map[string]*surfaceOut, derived map[string][]astscan.EndpointTags, root string) ([]byte, error) {
 	byAdapterChecks := map[string][]check{}
 	for _, c := range checks {
 		byAdapterChecks[c.Adapter] = append(byAdapterChecks[c.Adapter], c)
@@ -955,6 +1000,16 @@ func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]s
 		}
 		for _, ws := range a.Websockets {
 			row.Covered = append(row.Covered, routeJSON{Method: "WS", Route: ws.Route})
+		}
+		if dtags, ok := derived[a.ID]; ok && len(dtags) > 0 {
+			row.DerivedBehaviorTags = []derivedJSON{}
+			for _, et := range dtags {
+				tags := make([]string, len(et.Tags))
+				for i, t := range et.Tags {
+					tags[i] = string(t)
+				}
+				row.DerivedBehaviorTags = append(row.DerivedBehaviorTags, derivedJSON{Method: et.Method, Route: et.Route, Tags: tags})
+			}
 		}
 		if s, ok := surfaces[a.ID]; ok {
 			sj := &surfaceJSON{

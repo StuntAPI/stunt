@@ -1,0 +1,10 @@
+id: fixture-broken-style
+name: "astscan broken fixture"
+version: "0.1.0"
+api:
+  name: "Fixture API"
+  version: "1"
+endpoints:
+  - route: /x
+    method: GET
+    handler: scripts/x.star#on_missing
