@@ -1683,7 +1683,7 @@ Named by their `// =====` section markers.
 
 **walletconnect-style**
 
-- every route answers without a projectId (the gate is not wired)
+- every route demands a projectId — body, query, or bearer all pass
 - a wc: URI pairing round-trips its topic, relay protocol, and symKey
 - an auto pairing mints a fresh topic and a 64-hex symKey
 - proposing requires pairingTopic — and accepts one never paired
@@ -9029,19 +9029,19 @@ behavior notes live in each adapter's README.
 
 - Pairing, session approve, and JSON-RPC requests are auto-approved (no wallet device)
 - personal_sign and eth_sendTransaction return synthetic hashes; nothing is signed
-- The projectId gate ships but is never wired — every route answers without a credential
+- Any non-empty projectId passes the gate — no validation against a project registry
 - Expiry fields are TTL constants, not absolute unix timestamps; extend persists nothing
 - Unacknowledged sessions serve JSON-RPC requests immediately (no approval gate)
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
-- `POST` `/v1/pairings` — body, stateful, errors
-- `POST` `/v1/sessions` — body, stateful, errors
-- `GET` `/v1/sessions` — query, stateful, paginate, errors
-- `POST` `/v1/sessions/{topic}/approve` — params, stateful, errors
-- `POST` `/v1/sessions/{topic}/request` — body, params, stateful, errors
-- `POST` `/v1/sessions/{topic}/extend` — params, stateful, errors
-- `DELETE` `/v1/sessions/{topic}` — params, stateful, errors
+- `POST` `/v1/pairings` — body, query, auth, stateful, errors
+- `POST` `/v1/sessions` — body, query, auth, stateful, errors
+- `GET` `/v1/sessions` — body, query, auth, stateful, paginate, errors
+- `POST` `/v1/sessions/{topic}/approve` — body, query, params, auth, stateful, errors
+- `POST` `/v1/sessions/{topic}/request` — body, query, params, auth, stateful, errors
+- `POST` `/v1/sessions/{topic}/extend` — body, query, params, auth, stateful, errors
+- `DELETE` `/v1/sessions/{topic}` — body, query, params, auth, stateful, errors
 
 </details>
 

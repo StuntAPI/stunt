@@ -21,6 +21,9 @@
 # on_create_pairing establishes a pairing from either a wc: URI or an
 # explicit topic. Returns the pairing object.
 def on_create_pairing(req):
+    if _require_project_id(req) == None:
+        return respond(401, {"error": "unauthorized", "message": "a valid projectId is required (body, query, or bearer)"})
+
     body = req.get("body")
     if body == None:
         body = {}
@@ -61,6 +64,9 @@ def on_create_pairing(req):
 
 # on_propose_session proposes a new session from a pairing.
 def on_propose_session(req):
+    if _require_project_id(req) == None:
+        return respond(401, {"error": "unauthorized", "message": "a valid projectId is required (body, query, or bearer)"})
+
     body = req.get("body")
     if body == None:
         body = {}
@@ -102,6 +108,9 @@ def on_propose_session(req):
 # field for a continuation cursor, so cursor-based paging is not surfaced here;
 # `limit` still caps the page size.
 def on_list_sessions(req):
+    if _require_project_id(req) == None:
+        return respond(401, {"error": "unauthorized", "message": "a valid projectId is required (body, query, or bearer)"})
+
     sc = store_collection("sessions")
     result = []
     for s in sc.list():
@@ -114,6 +123,9 @@ def on_list_sessions(req):
 # on_approve_session acknowledges (approves) a session, simulating the
 # wallet's approval response.
 def on_approve_session(req):
+    if _require_project_id(req) == None:
+        return respond(401, {"error": "unauthorized", "message": "a valid projectId is required (body, query, or bearer)"})
+
     topic = req["params"]["topic"]
 
     sc = store_collection("sessions")
@@ -142,6 +154,9 @@ def on_approve_session(req):
 # on_session_request handles a wallet JSON-RPC request (e.g.
 # eth_requestAccounts, personal_sign, eth_sendTransaction).
 def on_session_request(req):
+    if _require_project_id(req) == None:
+        return respond(401, {"error": "unauthorized", "message": "a valid projectId is required (body, query, or bearer)"})
+
     topic = req["params"]["topic"]
 
     sc = store_collection("sessions")
@@ -191,6 +206,9 @@ def on_session_request(req):
 
 # on_extend_session refreshes the session expiry.
 def on_extend_session(req):
+    if _require_project_id(req) == None:
+        return respond(401, {"error": "unauthorized", "message": "a valid projectId is required (body, query, or bearer)"})
+
     topic = req["params"]["topic"]
 
     sc = store_collection("sessions")
@@ -205,6 +223,9 @@ def on_extend_session(req):
 
 # on_disconnect_session disconnects (deletes) a session.
 def on_disconnect_session(req):
+    if _require_project_id(req) == None:
+        return respond(401, {"error": "unauthorized", "message": "a valid projectId is required (body, query, or bearer)"})
+
     topic = req["params"]["topic"]
 
     sc = store_collection("sessions")
