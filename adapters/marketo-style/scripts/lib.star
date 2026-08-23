@@ -77,10 +77,11 @@ def _signed_emit(event_type, payload):
 def _marketo_unauth():
     return _marketo_auth_err("Access token not provided")
 
-# _marketo_auth_err returns the Marketo 601 401 error envelope with the
+# _marketo_auth_err returns the Marketo 601 error envelope with the
 # given message (missing / invalid / expired access token).
 def _marketo_auth_err(message):
-    return respond(401, {
+    # Real Marketo reports auth failures (601/602/...) as HTTP 403.
+    return respond(403, {
         "success": False,
         "requestId": _request_id(),
         "errors": [{"code": "601", "message": message}],

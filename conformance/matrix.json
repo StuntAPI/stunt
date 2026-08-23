@@ -1,12 +1,12 @@
 {
   "summary": {
     "adapters": 98,
-    "checks": 223,
+    "checks": 231,
     "tiers": {
       "sdk_and_vm": 2,
-      "sdk_only": 33,
-      "vm_only": 4,
-      "boot": 59
+      "sdk_only": 34,
+      "vm_only": 8,
+      "boot": 54
     }
   },
   "adapters": [
@@ -11141,9 +11141,23 @@
       "api_name": "Bluesky AT Protocol",
       "api_version": "com.atproto (2024-Q4)",
       "routes": 7,
-      "verification": "boot",
-      "sdks": [],
-      "behaviors": [],
+      "verification": "SDK",
+      "sdks": [
+        {
+          "label": "atproto",
+          "version": "0.20.41 (floor)"
+        }
+      ],
+      "behaviors": [
+        "login rides createSession and adopts did/handle/tokens",
+        "agent.post creates an app.bsky.feed.post record",
+        "searchPosts finds the created post by its text",
+        "getProfile resolves the session actor with counts",
+        "resolveHandle is a public read (no session)",
+        "unauthenticated record writes surface as XRPC 401s",
+        "deletePost removes the record from search",
+        "refreshSession rotates the token pair via the SDK"
+      ],
       "missing": [
         "No repo reads: com.atproto.repo getRecord, listRecords, describeRepo, uploadBlob",
         "No com.atproto.server getSession or deleteSession",
@@ -11156,7 +11170,8 @@
       "deviations": [
         "searchPosts returns seeded synthetic results, not an index over created records",
         "createSession mints tokens for any identifier/password pair; no credential check",
-        "refreshSession invalidates the old accessJwt too; real AT Protocol leaves it valid to exp"
+        "refreshSession invalidates the old accessJwt too; real AT Protocol leaves it valid to exp",
+        "cids cycle a fixed pool of 8 real CIDv1 strings rather than hashing record content"
       ],
       "covered": [
         {
@@ -11248,7 +11263,8 @@
           "route": "/xrpc/app.bsky.feed.searchPosts",
           "tags": [
             "query",
-            "stateful"
+            "stateful",
+            "clock"
           ]
         }
       ]
@@ -27996,7 +28012,7 @@
       "api_name": "EmailOctopus API",
       "api_version": "2.0.0",
       "routes": 21,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
       "missing": [
@@ -115388,7 +115404,7 @@
       "api_name": "Marketo Engage REST API",
       "api_version": "1.0",
       "routes": 21,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
       "missing": [
@@ -193351,7 +193367,7 @@
       "api_name": "ServiceNow Table API",
       "api_version": "2",
       "routes": 44,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
       "missing": [
@@ -207289,7 +207305,7 @@
       "api_name": "Zuora REST API",
       "api_version": "v1",
       "routes": 20,
-      "verification": "boot",
+      "verification": "VM",
       "sdks": [],
       "behaviors": [],
       "missing": [

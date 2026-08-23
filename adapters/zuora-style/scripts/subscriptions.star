@@ -216,6 +216,9 @@ def on_update_subscription(req):
     doc = _advance_subscription(doc)
     if doc.get("status", "") != "Active":
         return _zuora_err(400, "50000050", "Subscription is not active: " + doc.get("status", ""))
+    if doc.get("cancellationRequested", False):
+        # Real Zuora rejects a second cancel while one is already queued.
+        return _zuora_err(400, "50000050", "Subscription already has a pending cancellation")
 
     body = _get_body(req)
 
@@ -354,6 +357,9 @@ def on_cancel_subscription(req):
     doc = _advance_subscription(doc)
     if doc.get("status", "") != "Active":
         return _zuora_err(400, "50000050", "Subscription is not active: " + doc.get("status", ""))
+    if doc.get("cancellationRequested", False):
+        # Real Zuora rejects a second cancel while one is already queued.
+        return _zuora_err(400, "50000050", "Subscription already has a pending cancellation")
 
     body = _get_body(req)
 
