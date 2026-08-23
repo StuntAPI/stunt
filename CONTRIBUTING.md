@@ -66,7 +66,7 @@ docs/             # specs + plans
 You need **Go 1.23+**.
 
 ```bash
-git clone https://github.com/deblasis/stunt
+git clone https://github.com/StuntAPI/stunt
 cd stunt
 go build ./...                 # builds everything
 go test ./...                  # runs the suite
