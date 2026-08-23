@@ -123,7 +123,8 @@ services:
         respond: { status: 200, body: { template: '{"message":"hi","id":"{{ faker.ID "k" }}"}' } }
 ```
 
-**Networking modes:** `port` (default — `127.0.0.1:<port>` per service) or `subdomain`
+**Networking modes:** `port` (each service on `127.0.0.1:<port>`; `network.mode` is
+required — pick one explicitly) or `subdomain`
 (real TLS via a locally-generated CA, SNI-routed `https://stripe.localhost`-style hosts;
 see [Networking & TLS](#networking--tls)).
 
@@ -254,8 +255,8 @@ stunt profile deactivate --service sqs
 stunt up --profile launch-day         # boot default (unknown names fail before serving)
 ```
 
-The dashboard's **profiles** panel does the same with one click, and every command has
-`--json` for scripts.
+The dashboard's **profiles** panel does the same with one click, and the read commands
+(`stunt profile list`, `stunt requests`, `stunt ps`, …) print `--json` for scripts.
 
 **Semantics worth knowing:**
 
@@ -390,8 +391,8 @@ Handlers deliver with `events_emit("charge.created", {...})`; adapters whose pro
 sign their webhooks (Stripe, Twilio, Square, GitHub, …) compute the **real signature
 scheme** — HMAC-SHA256, ECDSA, Ed25519 — over the exact bytes, and expose the registered
 target to handlers via `events_target()` (for providers that MAC the destination URL
-into the signature). Delivery retries like a real provider, and the dashboard shows
-every attempt.
+into the signature). Delivery retries with exponential backoff, like a real provider
+would.
 
 ---
 
@@ -426,8 +427,8 @@ runs as root; HTTP/2 and WSS pass through verified.
 
 ## Observability & lifecycle
 
-Every running server serves its **own localhost dashboard** — a live request inspector
-(HTTP/gRPC/WebSocket, bodies, copy-as-curl, replay), a **state browser** (the
+Every running server serves its **own localhost dashboard** — a live request inspector for
+HTTP traffic (bodies, headers, copy-as-curl, replay), a **state browser** (the
 collections/kv/blobs your tests created), **snapshot/restore** for deterministic runs,
 the **profiles** panel, and an **instance manager**. A matching CLI (`--json`) backs
 every feature:

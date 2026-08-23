@@ -43,16 +43,16 @@ running server from there, so you almost never need `--url`/`--token`.
 
 ## 1. Request inspector
 
-The **requests** tab is a live feed of every request hitting your sims — REST,
-gRPC (unary + streaming), and WebSocket — with method, path, status, transport, and
-**sub-microsecond** timing.
+The **requests** tab is a live feed of every HTTP request hitting your sims — with
+method, path, status, and **sub-microsecond** timing. (gRPC and WebSocket traffic is
+served and exercised by your tests, but is not captured in the request log.)
 
 ![Request inspector — live feed](img/dashboard-hero.png)
 
 ### What's captured
 
 Each row records: a monotonic **sequence number** (gap-free ordering), timestamp,
-**service**, **transport** (`http`/`grpc`/`ws`), **method**, **path**, **status**,
+**service**, **method**, **path**, **status**,
 **duration** (microseconds), and the request/response **headers** + **bodies**.
 
 - **Bodies are captured by default.** This is a localhost dev tool whose killer
