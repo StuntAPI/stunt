@@ -8,6 +8,13 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **BREAKING (test double): aws-s3-style ETags are now real MD5.**
+  Single-object and part ETags are the MD5 hex of the verbatim bytes and
+  multipart objects use `md5(concat part-md5 binaries)-N`, like real S3.
+  Fixtures pinning the old 64-hex SHA-256 ETags must be regenerated; abort
+  and re-upload any in-flight multipart upload, since
+  `CompleteMultipartUpload` rejects mixed old and new part ETags with
+  `400 InvalidPart`. MD5 is a compat checksum here, never auth or integrity.
 - **aws-s3-style: conditional requests.** `GET`/`HEAD` honor `If-Match`,
   `If-None-Match`, `If-Modified-Since`, and `If-Unmodified-Since`, returning
   `304` or `412`; `PUT`/`DELETE` honor the ETag conditions.
