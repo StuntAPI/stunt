@@ -2600,7 +2600,7 @@ behavior notes live in each adapter's README.
 
 **Deviations** (6)
 
-- ETags are SHA-256-based (real S3 uses MD5); multipart ETag is sha256(etags)-N
+- ETags are MD5 hex (multipart MD5(binary-concat)-N)
 - Multipart 5 MiB minimum part size not enforced (small parts allowed)
 - DELETE of a missing bucket is an idempotent 204 (real S3: 404 NoSuchBucket)
 - x-amz-meta-* suffixes are lowercased and the first occurrence wins
