@@ -18,6 +18,14 @@ All notable changes to **stunt** are documented here. The format is based on
 - **aws-s3-style: conditional requests.** `GET`/`HEAD` honor `If-Match`,
   `If-None-Match`, `If-Modified-Since`, and `If-Unmodified-Since`, returning
   `304` or `412`; `PUT`/`DELETE` honor the ETag conditions.
+- **aws-s3-style: user metadata.** `x-amz-meta-*` request headers are stored
+  with the object and echoed on GET/HEAD, with control-byte and 2 KB total
+  validation.
+
+### Engine
+
+- **Response headers keep the adapter's casing.** `x-amz-meta-*` is emitted
+  lowercase, as real S3 does, instead of Go's canonical form.
 
 ### Engine
 

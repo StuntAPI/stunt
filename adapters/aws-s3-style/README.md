@@ -123,6 +123,23 @@ Two documented deviations: weak validators (`W/"..."`) compare as strong,
 and a `DELETE` or `GET`/`HEAD` against a missing bucket is `204`/`NoSuchKey`
 where real S3 returns `NoSuchBucket`.
 
+### User metadata
+
+Request headers with the `x-amz-meta-` prefix are stored with the object
+and echoed on `GET` and `HEAD` with status `200`. They are not returned on
+error responses or on `ListObjectsV2`, matching real S3.
+
+For multipart uploads, metadata is captured at `CreateMultipartUpload` and
+propagated at `CompleteMultipartUpload`; `UploadPart` metadata is ignored. A
+`PUT` without metadata clears whatever was stored before.
+
+Validation rejects `\r`, `\n`, NUL, and other C0 bytes except TAB with
+`400 InvalidArgument`, and caps total user metadata at 2048 bytes with
+`400 MetadataTooLarge`. Suffixes are lowercased and the first occurrence
+wins. Response headers are emitted with the adapter's own casing rather
+than Go's canonical form, because real S3 sends them lowercase and SDKs
+preserve the suffix case after stripping the prefix.
+
 ### Streaming uploads (aws-chunked)
 
 A default SDK `PutObject` signs its payload with
@@ -287,10 +304,11 @@ All errors use S3-shaped XML:
 | `InvalidAccessKeyId` | 403 | Access key is not the documented synthetic AKID |
 | `RequestTimeTooSkewed` | 403 | `x-amz-date` outside the ±15-minute window |
 | `XAmzContentSHA256Mismatch` | 400 | `x-amz-content-sha256` header does not match the body bytes |
-| `InvalidArgument` | 400 | `encoding-type` other than `url` on a list request; invalid `x-amz-content-sha256`; `partNumber` outside `1..10000` |
+| `InvalidArgument` | 400 | `encoding-type` other than `url` on a list request; invalid `x-amz-content-sha256`; `partNumber` outside `1..10000`; an `x-amz-meta-*` name is empty or its value holds a rejected control byte |
 | `InvalidPart` | 400 | CompleteMultipartUpload lists a part that was never uploaded, or whose ETag does not match |
 | `InvalidPartOrder` | 400 | CompleteMultipartUpload part list is not in ascending order |
 | `MalformedXML` | 400 | CompleteMultipartUpload body is not valid `CompleteMultipartUpload` XML |
+| `MetadataTooLarge` | 400 | `x-amz-meta-*` exceeds 2048 bytes total |
 | `IncompleteBody` | 400 | `aws-chunked` framing is malformed, truncated, or over the decoder limits |
 | `PreconditionFailed` | 412 | An `If-Match`/`If-None-Match`/`If-Unmodified-Since`/`If-Modified-Since` condition did not hold |
 | `MethodNotAllowed` | 405 | POST to an object without `?uploads`/`?uploadId` |

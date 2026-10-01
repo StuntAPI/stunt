@@ -152,6 +152,7 @@ adapters:
       - "ETags are MD5 hex (multipart MD5(binary-concat)-N)"
       - "Multipart 5 MiB minimum part size not enforced (small parts allowed)"
       - "DELETE of a missing bucket is an idempotent 204 (real S3: 404 NoSuchBucket)"
+      - "x-amz-meta-* suffixes are lowercased and the first occurrence wins"
       - "Per-chunk STREAMING signatures not verified (header SigV4 only)"
       - "Streaming checksum trailers discarded (unsupported-checksum)"
       - "DELETE object against a missing bucket is 204 (real S3: 404 NoSuchBucket)"

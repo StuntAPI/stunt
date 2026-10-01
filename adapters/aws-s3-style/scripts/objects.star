@@ -91,8 +91,12 @@ def on_put_object(req):
 
     # Content-derived ETag (MD5 of the verbatim bytes); the write path
     # (blob + metadata doc) is shared with CompleteMultipartUpload.
+    # User metadata replaces any previous value (PUT without meta clears).
     etag = _etag(raw)
-    _upsert_object(bucket, key, raw, ct, etag, {})
+    meta, merr = _collect_metadata(req)
+    if merr != None:
+        return merr
+    _upsert_object(bucket, key, raw, ct, etag, meta)
 
     return respond(200, "", {
         "ETag": '"' + etag + '"',
@@ -131,13 +135,13 @@ def on_get_object(req):
     if etag == None:
         etag = ""
 
-    return respond(200, content, {
+    return respond(200, content, _meta_response_headers(obj, {
         "Content-Type": ct,
         "ETag": '"' + etag + '"',
         "Last-Modified": _obj_last_modified_rfc1123(obj),
         "Content-Length": str(len(content)),
         "x-amz-request-id": _req_id(),
-    })
+    }))
 
 # on_head_object returns metadata headers only (no body).
 def on_head_object(req):
@@ -166,13 +170,13 @@ def on_head_object(req):
     if size == None:
         size = 0
 
-    return respond(200, "", {
+    return respond(200, "", _meta_response_headers(obj, {
         "Content-Type": ct,
         "ETag": '"' + etag + '"',
         "Last-Modified": _obj_last_modified_rfc1123(obj),
         "Content-Length": _to_int_str(size),
         "x-amz-request-id": _req_id(),
-    })
+    }))
 
 # on_delete_object removes an object, or aborts an in-progress multipart
 # upload when the request carries an uploadId. Returns 204.

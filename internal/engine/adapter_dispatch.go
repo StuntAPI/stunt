@@ -160,7 +160,7 @@ func (e *Engine) runHandler(
 
 	// Write headers.
 	for k, v := range resp.Headers {
-		w.Header().Set(k, v)
+		w.Header()[k] = []string{v}
 	}
 
 	status := resp.Status

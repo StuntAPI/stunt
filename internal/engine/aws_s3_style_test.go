@@ -1139,3 +1139,230 @@ func TestAWSS3Conditionals(t *testing.T) {
 		t.Fatalf("list with If-Match -> status %d, want 200; body %s", st, body)
 	}
 }
+
+func TestAWSS3Metadata(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["s3"]
+	now := time.Now()
+
+	doReq := func(method, rawurl string, body []byte, hdrs map[string]string) (string, int, http.Header) {
+		t.Helper()
+		req := s3SignedReq(t, method, rawurl, body, now, awsStyleAccessKey, awsStyleSecretKey)
+		for k, v := range hdrs {
+			req.Header.Set(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return string(b), resp.StatusCode, resp.Header
+	}
+	hasMeta := func(hdr http.Header) bool {
+		for k := range hdr {
+			if strings.HasPrefix(strings.ToLower(k), "x-amz-meta-") {
+				return true
+			}
+		}
+		return false
+	}
+
+	if _, status := s3Put(t, base+"/metabucket", nil, now); status != 200 {
+		t.Fatalf("create bucket -> %d", status)
+	}
+
+	// PUT with user meta (mixed-case suffix, interior spaces preserved).
+	meta := map[string]string{
+		"X-Amz-Meta-Kind":  "sample",
+		"X-Amz-Meta-Mixed": "VaLue",
+		"X-Amz-Meta-Sp":    "a  b",
+	}
+	if body, st, _ := doReq("PUT", base+"/metabucket/file.txt", []byte("hello"), meta); st != 200 {
+		t.Fatalf("put with meta -> status %d, want 200; body %s", st, body)
+	}
+
+	// GET echoes on 200 (suffix lowercased, values verbatim).
+	body, st, hdr := doReq("GET", base+"/metabucket/file.txt", nil, nil)
+	if st != 200 || body != "hello" {
+		t.Fatalf("get -> status %d body %q, want 200 hello", st, body)
+	}
+	if got := hdr.Get("x-amz-meta-kind"); got != "sample" {
+		t.Fatalf("get x-amz-meta-kind = %q, want %q (customMetadataPreserved:false)", got, "sample")
+	}
+	if got := hdr.Get("x-amz-meta-mixed"); got != "VaLue" {
+		t.Fatalf("get x-amz-meta-mixed = %q, want %q", got, "VaLue")
+	}
+	if got := hdr.Get("x-amz-meta-sp"); got != "a  b" {
+		t.Fatalf("get x-amz-meta-sp = %q, want interior spaces preserved", got)
+	}
+
+	// HEAD echoes too.
+	_, st, hdr = doReq("HEAD", base+"/metabucket/file.txt", nil, nil)
+	if st != 200 {
+		t.Fatalf("head -> status %d, want 200", st)
+	}
+	if got := hdr.Get("x-amz-meta-kind"); got != "sample" {
+		t.Fatalf("head x-amz-meta-kind = %q, want %q", got, "sample")
+	}
+
+	// First-wins: duplicate wire headers collapse to the first value
+	// (engine headerMap v[0]; Starlark keeps the first suffix on collision).
+	req := s3SignedReq(t, "PUT", base+"/metabucket/dup.txt", []byte("hello"), now, awsStyleAccessKey, awsStyleSecretKey)
+	req.Header.Add("x-amz-meta-kind", "first")
+	req.Header.Add("x-amz-meta-kind", "second")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("put dup meta -> status %d, want 200", resp.StatusCode)
+	}
+	_, _, hdr = doReq("GET", base+"/metabucket/dup.txt", nil, nil)
+	if got := hdr.Get("x-amz-meta-kind"); got != "first" {
+		t.Fatalf("get dup x-amz-meta-kind = %q, want first-wins %q", got, "first")
+	}
+
+	// Empty value is allowed (header present, value empty).
+	if body, st, _ := doReq("PUT", base+"/metabucket/empty.txt", []byte("hello"), map[string]string{"x-amz-meta-empty": ""}); st != 200 {
+		t.Fatalf("put empty-value meta -> status %d, want 200; body %s", st, body)
+	}
+	_, st, hdr = doReq("GET", base+"/metabucket/empty.txt", nil, nil)
+	if st != 200 {
+		t.Fatalf("get empty-value -> status %d, want 200", st)
+	}
+	if _, ok := hdr["X-Amz-Meta-Empty"]; !ok {
+		t.Fatal("get empty-value: x-amz-meta-empty header missing, want present-but-empty")
+	}
+	if got := hdr.Get("x-amz-meta-empty"); got != "" {
+		t.Fatalf("get empty-value = %q, want %q", got, "")
+	}
+
+	// Empty suffix (wire name "x-amz-meta-") -> 400 InvalidArgument.
+	if body, st, _ := doReq("PUT", base+"/metabucket/bad.txt", []byte("hello"), map[string]string{"x-amz-meta-": "v"}); st != 400 || !strings.Contains(body, "InvalidArgument") {
+		t.Fatalf("put empty-suffix meta -> %d %q, want 400 InvalidArgument", st, body)
+	}
+
+	// Size cap: sum(len(suffix)+len(value)) over 2048 -> 400 MetadataTooLarge
+	// (prefix excluded, post-dedup byte length; 2048 passes, 2049 fails).
+	if body, st, _ := doReq("PUT", base+"/metabucket/ok2048.txt", []byte("hello"), map[string]string{"x-amz-meta-k": strings.Repeat("a", 2047)}); st != 200 {
+		t.Fatalf("put 2048-total meta -> status %d, want 200; body %s", st, body)
+	}
+	if body, st, _ := doReq("PUT", base+"/metabucket/big.txt", []byte("hello"), map[string]string{"x-amz-meta-k": strings.Repeat("a", 2048)}); st != 400 || !strings.Contains(body, "MetadataTooLarge") {
+		t.Fatalf("put 2049-total meta -> %d %q, want 400 MetadataTooLarge", st, body)
+	}
+	multi := map[string]string{"x-amz-meta-a": strings.Repeat("a", 1024), "x-amz-meta-b": strings.Repeat("b", 1024)}
+	if body, st, _ := doReq("PUT", base+"/metabucket/multi-big.txt", []byte("hello"), multi); st != 400 || !strings.Contains(body, "MetadataTooLarge") {
+		t.Fatalf("put multi-header oversize meta -> %d %q, want 400 MetadataTooLarge", st, body)
+	}
+
+	// Overwrite without meta clears (PUT replaces, not merges).
+	if _, st, _ := doReq("PUT", base+"/metabucket/file.txt", []byte("hello"), nil); st != 200 {
+		t.Fatalf("overwrite no-meta -> status %d, want 200", st)
+	}
+	_, st, hdr = doReq("GET", base+"/metabucket/file.txt", nil, nil)
+	if st != 200 {
+		t.Fatalf("get after overwrite -> status %d, want 200", st)
+	}
+	if hasMeta(hdr) {
+		t.Fatalf("get after overwrite carries meta headers, want cleared: %v", hdr)
+	}
+	// Objects stored without meta carry none (legacy {} fallback: no crash).
+	_, st, hdr = doReq("HEAD", base+"/metabucket/file.txt", nil, nil)
+	if st != 200 || hasMeta(hdr) {
+		t.Fatalf("head after overwrite -> status %d meta %v, want 200 no-meta", st, hdr)
+	}
+
+	// Re-arm meta for the no-meta-on-error paths below.
+	if body, st, _ := doReq("PUT", base+"/metabucket/file.txt", []byte("hello"), map[string]string{"x-amz-meta-kind": "sample"}); st != 200 {
+		t.Fatalf("re-put with meta -> status %d; body %s", st, body)
+	}
+	_, st, hdr = doReq("GET", base+"/metabucket/file.txt", nil, nil)
+	if hdr.Get("x-amz-meta-kind") != "sample" {
+		t.Fatalf("re-put meta echo = %q, want sample", hdr.Get("x-amz-meta-kind"))
+	}
+
+	// List carries no user meta in response headers.
+	_, st, hdr = doReq("GET", base+"/metabucket?list-type=2", nil, nil)
+	if st != 200 {
+		t.Fatalf("list -> status %d, want 200", st)
+	}
+	if hasMeta(hdr) {
+		t.Fatalf("list carries meta headers, want none: %v", hdr)
+	}
+
+	// MPU: Create meta propagates through Complete; UploadPart meta and
+	// Complete-request meta are ignored (no 400, not stored).
+	body, st, _ = doReq("POST", base+"/metabucket/mpu.bin?uploads", nil, map[string]string{"x-amz-meta-kind": "mpuval"})
+	if st != 200 {
+		t.Fatalf("mpu create with meta -> status %d; body %s", st, body)
+	}
+	uploadID := s3XMLTag(t, body, "UploadId")
+	if uploadID == "" {
+		t.Fatalf("mpu create: no UploadId in %s", body)
+	}
+	partURL := base + "/metabucket/mpu.bin?uploadId=" + uploadID
+	if body, st, _ := doReq("PUT", partURL+"&partNumber=1", []byte("hello"), map[string]string{"x-amz-meta-evil": "yes"}); st != 200 {
+		t.Fatalf("upload part with meta -> status %d, want 200 ignored; body %s", st, body)
+	}
+	// The ETag digest algorithm is covered separately; CompleteMultipartUpload
+	// matches on whatever the UploadPart response returned.
+	partETag := awsMD5Hex([]byte("hello"))
+	completeBody := s3CompleteBody([][2]string{{"1", partETag}})
+	if body, st, _ := doReq("POST", partURL, []byte(completeBody), map[string]string{"x-amz-meta-other": "yes"}); st != 200 {
+		t.Fatalf("complete with meta -> status %d, want 200 ignored; body %s", st, body)
+	}
+	_, st, hdr = doReq("GET", base+"/metabucket/mpu.bin", nil, nil)
+	if st != 200 {
+		t.Fatalf("get mpu object -> status %d, want 200", st)
+	}
+	if got := hdr.Get("x-amz-meta-kind"); got != "mpuval" {
+		t.Fatalf("get mpu x-amz-meta-kind = %q, want %q (Create→Complete propagation)", got, "mpuval")
+	}
+	if hasMetaKey(hdr, "x-amz-meta-evil") || hasMetaKey(hdr, "x-amz-meta-other") {
+		t.Fatalf("get mpu carries ignored part/complete meta, want only create meta: %v", hdr)
+	}
+
+	// MPU Create validates too: oversize -> 400 MetadataTooLarge, empty
+	// suffix -> 400 InvalidArgument; no upload is created.
+	if body, st, _ := doReq("POST", base+"/metabucket/mpu-big.bin?uploads", nil, map[string]string{"x-amz-meta-k": strings.Repeat("a", 2048)}); st != 400 || !strings.Contains(body, "MetadataTooLarge") {
+		t.Fatalf("mpu create oversize meta -> %d %q, want 400 MetadataTooLarge", st, body)
+	}
+	if body, st, _ := doReq("POST", base+"/metabucket/mpu-bad.bin?uploads", nil, map[string]string{"x-amz-meta-": "v"}); st != 400 || !strings.Contains(body, "InvalidArgument") {
+		t.Fatalf("mpu create empty-suffix meta -> %d %q, want 400 InvalidArgument", st, body)
+	}
+}
+
+func hasMetaKey(hdr http.Header, key string) bool {
+	for k := range hdr {
+		if strings.ToLower(k) == key {
+			return true
+		}
+	}
+	return false
+}

@@ -620,7 +620,7 @@ func applyDecision(w http.ResponseWriter, r *http.Request, d rules.Decision) {
 		time.Sleep(time.Duration(d.LatencyMS) * time.Millisecond)
 	}
 	for k, v := range d.Headers {
-		w.Header().Set(k, v)
+		w.Header()[k] = []string{v}
 	}
 	if len(d.BodyBytes) > 0 && w.Header().Get("Content-Type") == "" {
 		w.Header().Set("Content-Type", "application/json")
