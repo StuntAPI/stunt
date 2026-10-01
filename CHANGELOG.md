@@ -27,6 +27,11 @@ All notable changes to **stunt** are documented here. The format is based on
 - **Response headers keep the adapter's casing.** `x-amz-meta-*` is emitted
   lowercase, as real S3 does, instead of Go's canonical form.
 
+### Engine
+
+- **aws-chunked request bodies are decoded before dispatch.** SigV4 streaming
+  uploads from AWS SDKs store the object bytes instead of the chunk framing.
+
 ## [0.52.0] — 2026-08-24
 
 The conformance campaign: every real API adapter now carries a real test

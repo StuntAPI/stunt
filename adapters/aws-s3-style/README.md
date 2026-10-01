@@ -140,6 +140,24 @@ wins. Response headers are emitted with the adapter's own casing rather
 than Go's canonical form, because real S3 sends them lowercase and SDKs
 preserve the suffix case after stripping the prefix.
 
+### Streaming uploads (aws-chunked)
+
+A default SDK `PutObject` signs its payload with
+`STREAMING-AWS4-HMAC-SHA256-PAYLOAD` and wraps the bytes in
+`Content-Encoding: aws-chunked` framing. The engine decodes that framing
+before rules, profiles, and handlers run, so the adapter stores the object
+bytes. `Content-Encoding` and `x-amz-content-sha256` pass through untouched,
+since SigV4 signs them.
+
+Framing that is malformed, truncated, or over the limits below returns
+`400 IncompleteBody`; decoded output over `max_body_bytes` returns `413`.
+Limits are 4 KiB per chunk or trailer line, 10,000 data chunks, and 32
+trailers totalling 8 KiB. `x-amz-decoded-content-length` is verified when
+exactly one valid value is present and ignored otherwise.
+
+Two documented deviations: per-chunk signatures are not verified (the
+header signature is), and streaming checksum trailers are discarded.
+
 ## Auth — AWS Signature Version 4 (SigV4), verified for real
 
 Amazon S3 uses **AWS Signature Version 4** (SigV4) for authentication. This
@@ -291,6 +309,7 @@ All errors use S3-shaped XML:
 | `InvalidPartOrder` | 400 | CompleteMultipartUpload part list is not in ascending order |
 | `MalformedXML` | 400 | CompleteMultipartUpload body is not valid `CompleteMultipartUpload` XML |
 | `MetadataTooLarge` | 400 | `x-amz-meta-*` exceeds 2048 bytes total |
+| `IncompleteBody` | 400 | `aws-chunked` framing is malformed, truncated, or over the decoder limits |
 | `PreconditionFailed` | 412 | An `If-Match`/`If-None-Match`/`If-Unmodified-Since`/`If-Modified-Since` condition did not hold |
 | `MethodNotAllowed` | 405 | POST to an object without `?uploads`/`?uploadId` |
 | `NoSuchBucket` | 404 | Bucket doesn't exist |

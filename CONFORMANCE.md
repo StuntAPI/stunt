@@ -40,7 +40,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [avalara-style](adapters/avalara-style/) | Avalara AvaTax REST API `2` | 8 | VM | — | — | [5](#avalara-style) | [3](#avalara-style) |
 | [aws-cognito-style](adapters/aws-cognito-style/) | Amazon Cognito Identity Provider API `2016-04-18` | 7 | VM | — | — | [6](#aws-cognito-style) | [3](#aws-cognito-style) |
 | [aws-iam-sts-style](adapters/aws-iam-sts-style/) | AWS STS + IAM API `2011-06-15` | 2 | SDK | aws-sdk-go-v2 @ v1.43.7 | 2 | [3](#aws-iam-sts-style) | [3](#aws-iam-sts-style) |
-| [aws-s3-style](adapters/aws-s3-style/) | Amazon S3 API `2006-03-01` | 8 | SDK | aws-sdk-go-v2 @ v1.43.7 | 6 | [5](#aws-s3-style) | [8](#aws-s3-style) |
+| [aws-s3-style](adapters/aws-s3-style/) | Amazon S3 API `2006-03-01` | 8 | SDK | aws-sdk-go-v2 @ v1.43.7 | 6 | [5](#aws-s3-style) | [10](#aws-s3-style) |
 | [azure-devops-style](adapters/azure-devops-style/) | Azure DevOps REST API `7.1` | 17 | VM | — | — | [8](#azure-devops-style) | [6](#azure-devops-style) |
 | [azure-servicebus-style](adapters/azure-servicebus-style/) | Azure Service Bus + Storage `2024-01-01` | 18 | VM | — | — | [6](#azure-servicebus-style) | [3](#azure-servicebus-style) |
 | [azure-storage-style](adapters/azure-storage-style/) | Azure Storage Blob REST API `2024-08-04` | 9 | VM | — | — | [6](#azure-storage-style) | [3](#azure-storage-style) |
@@ -2598,12 +2598,14 @@ behavior notes live in each adapter's README.
 - No browser form POST uploads (POST policy)
 - No ListMultipartUploads (GET /{bucket}?uploads)
 
-**Deviations** (8)
+**Deviations** (10)
 
 - ETags are MD5 hex (multipart MD5(binary-concat)-N)
 - Multipart 5 MiB minimum part size not enforced (small parts allowed)
 - DELETE of a missing bucket is an idempotent 204 (real S3: 404 NoSuchBucket)
 - x-amz-meta-* suffixes are lowercased and the first occurrence wins
+- Per-chunk STREAMING signatures not verified (header SigV4 only)
+- Streaming checksum trailers discarded (unsupported-checksum)
 - DELETE object against a missing bucket is 204 (real S3: 404 NoSuchBucket)
 - GET/HEAD object against a missing bucket is 404 NoSuchKey (real S3: 404 NoSuchBucket)
 - SigV4 canonical URI/query rebuilt from decoded values — duplicates indistinguishable
