@@ -96,9 +96,15 @@ func awsSigV4SigningKey(secret, date, region, service string) []byte {
 // x-amz-date are signed and the payload hash covers the body bytes.
 func awsSigV4Sign(t *testing.T, req *http.Request, body []byte, service, accessKey, secretKey string, at time.Time) {
 	t.Helper()
+	awsSigV4SignPayload(t, req, awsSHA256Hex(body), service, accessKey, secretKey, at)
+}
+
+// awsSigV4SignPayload signs req in place with real SigV4 using an explicit
+// payload hash. Streaming (aws-chunked) uploads sign the STREAMING literal
+// rather than the body bytes, so chunked tests pass the literal here.
+func awsSigV4SignPayload(t *testing.T, req *http.Request, payloadHash, service, accessKey, secretKey string, at time.Time) {
 	amzDate := at.UTC().Format("20060102T150405Z")
 	date := amzDate[:8]
-	payloadHash := awsSHA256Hex(body)
 	req.Header.Set("x-amz-date", amzDate)
 
 	signedHeaders := []string{"host", "x-amz-date"}

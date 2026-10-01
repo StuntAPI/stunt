@@ -19,6 +19,11 @@ All notable changes to **stunt** are documented here. The format is based on
   `If-None-Match`, `If-Modified-Since`, and `If-Unmodified-Since`, returning
   `304` or `412`; `PUT`/`DELETE` honor the ETag conditions.
 
+### Engine
+
+- **aws-chunked request bodies are decoded before dispatch.** SigV4 streaming
+  uploads from AWS SDKs store the object bytes instead of the chunk framing.
+
 ## [0.52.0] — 2026-08-24
 
 The conformance campaign: every real API adapter now carries a real test

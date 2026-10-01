@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
@@ -500,19 +501,53 @@ func (e *Engine) serviceHandler(name string, svc manifest.Service) http.Handler 
 
 		var body []byte
 		if r.Body != nil {
+			// S3 aws-chunked (SigV4 streaming) framing arrives as the
+			// request body with Content-Encoding: aws-chunked (or a
+			// STREAMING-* content hash without Content-Encoding from a
+			// malformed client). Peek the headers first: framed reads
+			// need headroom above bodyLimit for extensions/trailers, and
+			// the trigger must see every Content-Encoding value
+			// (headerMap keeps first-only, so Values is used here).
+			readLimit := bodyLimit
+			chunked := shouldDecodeAwsChunked(r.Header)
+			if chunked {
+				readLimit = bodyLimit + awsChunkedReadOverhead
+			}
 			var err error
-			body, err = io.ReadAll(http.MaxBytesReader(w, r.Body, bodyLimit))
+			body, err = io.ReadAll(http.MaxBytesReader(w, r.Body, readLimit))
 			if err != nil {
 				// Never hand truncated data to a handler. Overflow is 413;
 				// any other read failure is a 400.
 				var maxErr *http.MaxBytesError
 				if errors.As(err, &maxErr) {
 					writeStatus(w, http.StatusRequestEntityTooLarge,
-						fmt.Sprintf(`{"error":"request body exceeds %d bytes"}`, bodyLimit))
+						fmt.Sprintf(`{"error":"request body exceeds %d bytes"}`, readLimit))
 					return
 				}
 				writeStatus(w, http.StatusBadRequest, `{"error":"failed to read request body"}`)
 				return
+			}
+			if chunked && len(body) > 0 {
+				decoded, derr := decodeAwsChunked(body, bodyLimit, r.Header.Values("X-Amz-Decoded-Content-Length"))
+				if derr != nil {
+					var cerr *awsChunkedError
+					if errors.As(derr, &cerr) && cerr.status == http.StatusRequestEntityTooLarge {
+						writeStatus(w, http.StatusRequestEntityTooLarge,
+							fmt.Sprintf(`{"error":"request body exceeds %d bytes"}`, bodyLimit))
+					} else {
+						writeIncompleteBody(w)
+					}
+					return
+				}
+				// Decoded bytes replace the body for profiles, rules,
+				// and handlers (r.Body + ContentLength included); the
+				// Content-Encoding and x-amz-content-sha256 headers are
+				// preserved untouched for SigV4. Double aws-chunked
+				// tokens decode once; aws-chunked over gzip stores the
+				// decoded gzip bytes as-is (no further decoding).
+				body = decoded
+				r.Body = io.NopCloser(bytes.NewReader(decoded))
+				r.ContentLength = int64(len(decoded))
 			}
 		}
 
