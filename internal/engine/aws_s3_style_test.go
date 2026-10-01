@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -34,6 +35,11 @@ const (
 
 func awsSHA256Hex(b []byte) string {
 	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
+}
+
+func awsMD5Hex(b []byte) string {
+	sum := md5.Sum(b)
 	return hex.EncodeToString(sum[:])
 }
 
@@ -247,10 +253,19 @@ func TestAwsS3StyleAdapter(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("put object -> status %d, want 200", status)
 	}
-	// ETag is content-derived: the quoted SHA-256 hex digest of the bytes.
-	wantETag := `"` + awsSHA256Hex([]byte(uploadContent)) + `"`
+	// ETag is content-derived: the quoted MD5 hex digest of the bytes.
+	wantETag := `"` + awsMD5Hex([]byte(uploadContent)) + `"`
 	if etag != wantETag {
 		t.Fatalf("put object ETag = %q, want %q", etag, wantETag)
+	}
+
+	// md5("hello") = 5d41402abc4b2a76b9719d911017c592 (S3 compat checksum).
+	helloETag, status := s3PutETag(t, base+"/mybucket/hello.txt", []byte("hello"), now)
+	if status != 200 {
+		t.Fatalf("put hello -> status %d, want 200", status)
+	}
+	if helloETag != `"5d41402abc4b2a76b9719d911017c592"` {
+		t.Fatalf("put hello ETag = %q, want %q", helloETag, `"5d41402abc4b2a76b9719d911017c592"`)
 	}
 
 	// ===== ListObjectsV2 shows the uploaded object (STATEFUL) =====
@@ -579,7 +594,7 @@ func s3Delete(t *testing.T, rawurl string, at time.Time) *http.Response {
 //
 //   - POST ?uploads → 200 InitiateMultipartUploadResult with an UploadId
 //   - UploadPart (out of order: 3, then 1, then 2) → per-part ETags that
-//     equal the quoted SHA-256 of the part bytes
+//     equal the quoted MD5 of the part bytes
 //   - ListParts → parts in ascending order with max-parts /
 //     part-number-marker paging
 //   - CompleteMultipartUpload with a missing part → 400 InvalidPart
@@ -652,7 +667,7 @@ func TestAwsS3StyleMultipartUpload(t *testing.T) {
 		if st != 200 {
 			t.Fatalf("upload part %d -> %d", tc.n, st)
 		}
-		want := `"` + awsSHA256Hex(tc.data) + `"`
+		want := `"` + awsMD5Hex(tc.data) + `"`
 		if etag != want {
 			t.Fatalf("upload part %d ETag = %q, want %q", tc.n, etag, want)
 		}
@@ -705,7 +720,7 @@ func TestAwsS3StyleMultipartUpload(t *testing.T) {
 	}
 
 	// ===== Complete: wrong part ETag → 400 InvalidPart =====
-	wrongEtag := s3CompleteBody([][2]string{{"1", etags[1]}, {"2", strings.Repeat("0", 64)}, {"3", etags[3]}})
+	wrongEtag := s3CompleteBody([][2]string{{"1", etags[1]}, {"2", strings.Repeat("0", 32)}, {"3", etags[3]}})
 	body, status = s3Post(t, partURL, []byte(wrongEtag), now)
 	if status != 400 || !strings.Contains(body, "InvalidPart") {
 		t.Fatalf("complete with wrong etag -> %d %q, want 400 InvalidPart", status, body)
@@ -858,8 +873,8 @@ func TestAWSS3StyleBinaryRoundTrip(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("put binary -> %d", status)
 	}
-	if etag != `"`+awsSHA256Hex(bin)+`"` {
-		t.Fatalf("binary ETag = %q, want quoted sha256 of the bytes", etag)
+	if etag != `"`+awsMD5Hex(bin)+`"` {
+		t.Fatalf("binary ETag = %q, want quoted md5 of the bytes", etag)
 	}
 
 	got, status := s3Get(t, base+"/mybucket/bin.dat", now)

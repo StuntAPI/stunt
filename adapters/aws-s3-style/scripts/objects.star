@@ -18,12 +18,12 @@
 # scripts/lib.star. The POST multipart entry point lives in
 # scripts/multipart.star.
 
-# _etag derives the object ETag from the content itself: the SHA-256 hex
-# digest of the raw body (real S3 uses the MD5 digest for non-multipart
-# uploads; the crypto module has no MD5, so the stronger digest is used —
-# documented deviation). Returned/stored unquoted; rendered quoted.
+# _etag derives the object ETag from the content itself: the MD5 hex
+# digest of the raw body, like real S3 for non-multipart uploads.
+# (MD5 here is a compat checksum only, never auth/integrity.)
+# Returned/stored unquoted; rendered quoted.
 def _etag(raw):
-    return crypto.sha256(raw)
+    return crypto.md5(raw)
 
 # _obj_last_modified_rfc1123 renders the stored upload time as an RFC
 # 1123 Last-Modified header value (falls back to the current clock for
@@ -84,10 +84,10 @@ def on_put_object(req):
     if ct == None:
         ct = "application/octet-stream"
 
-    # Content-derived ETag (SHA-256 of the verbatim bytes); the write path
+    # Content-derived ETag (MD5 of the verbatim bytes); the write path
     # (blob + metadata doc) is shared with CompleteMultipartUpload.
     etag = _etag(raw)
-    _upsert_object(bucket, key, raw, ct, etag)
+    _upsert_object(bucket, key, raw, ct, etag, {})
 
     return respond(200, "", {
         "ETag": '"' + etag + '"',
