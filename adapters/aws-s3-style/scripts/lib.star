@@ -1285,3 +1285,260 @@ def _to_num(v):
     if type(v) == "int":
         return v
     return int(v)
+
+# ====================================================================
+# Conditional preconditions (If-Match / If-None-Match / IMS / IUS)
+# ====================================================================
+# S3 compat: PUT/DELETE ETags-only; GET/HEAD full. Order
+# If-Match -> If-Unmodified-Since -> If-None-Match -> If-Modified-Since.
+# Empty/whitespace/malformed -> absent (ignored); remaining valid
+# header still evaluates. 412 XML carries Condition+Key+RequestId;
+# 304 is empty with ETag+Last-Modified+request-id only.
+
+# _collapse_ows trims ends and collapses interior SP/TAB runs to one SP.
+# _strip handles ends (SP/TAB/\n/\r); interior \n/\r are preserved so
+# date parsing still rejects lone-CR etc.
+def _collapse_ows(s):
+    if s == None:
+        return ""
+    s = _strip(str(s))
+    out = ""
+    prev_sp = False
+    for i in range(len(s)):
+        ch = s[i]
+        if ch == " " or ch == "\t":
+            if not prev_sp:
+                out = out + " "
+            prev_sp = True
+        else:
+            out = out + ch
+            prev_sp = False
+    return out
+
+# _parse_etag_list parses an If-Match/If-None-Match header value into a
+# list of stripped ETags, or None when absent/malformed (to be ignored).
+# Grammar: ","-split, OWS trim + interior collapse, strip one "W/"
+# prefix (bare "W/" -> malformed -> None), strip one quote pair.
+# '""' -> [""] (one empty ETag, no-match, not absent); "*" anywhere ->
+# match-any (caller checks "*" in list); compare is case-sensitive.
+def _parse_etag_list(raw):
+    if raw == None:
+        return None
+    raw = str(raw)
+    if _strip(raw) == "":
+        return None
+    parts = _split(raw, ",")
+    out = []
+    for p in parts:
+        t = _collapse_ows(p)
+        if t == "":
+            continue
+        if t == "W/" or t == "W":
+            return None
+        if _has_prefix(t, "W/"):
+            t = t[2:]
+            t = _collapse_ows(t)
+            if t == "" or t == "W/" or t == "W":
+                return None
+        if len(t) >= 2 and t[0] == '"' and t[len(t) - 1] == '"':
+            t = t[1:len(t) - 1]
+        out.append(t)
+    if len(out) == 0:
+        return None
+    return out
+
+# _rfc1123_to_unix parses a lenient IMF-fixdate subset into Unix seconds,
+# or None when unparseable (to be ignored, never 400).
+# Accepts: "Day, DD Mon YYYY HH:MM:SS GMT|UTC|UT", single-digit day,
+# multiple SP, SP/TAB OWS, month case-insensitive, weekday ignored.
+# Rejects: missing comma, 2-digit year, numeric/missing/named TZ (EST),
+# hour>23/min>59/sec>59, day 00, month overflow, Feb30/Apr31,
+# Feb29 on non-leap years.
+def _rfc1123_to_unix(s):
+    if s == None:
+        return None
+    s = _collapse_ows(str(s))
+    if s == "":
+        return None
+    comma = _find_substr(s, ",")
+    if comma < 0:
+        return None
+    rest = _strip(s[comma + 1:])
+    if rest == "":
+        return None
+    parts = _split(rest, " ")
+    if len(parts) != 5:
+        return None
+    day_s = parts[0]
+    mon_s = parts[1]
+    year_s = parts[2]
+    time_s = parts[3]
+    tz_s = parts[4]
+    if not _is_digits(day_s) or len(day_s) < 1 or len(day_s) > 2:
+        return None
+    d = _to_int(day_s)
+    if d < 1 or d > 31:
+        return None
+    mon_low = mon_s.lower()
+    m = 0
+    if mon_low == "jan":
+        m = 1
+    elif mon_low == "feb":
+        m = 2
+    elif mon_low == "mar":
+        m = 3
+    elif mon_low == "apr":
+        m = 4
+    elif mon_low == "may":
+        m = 5
+    elif mon_low == "jun":
+        m = 6
+    elif mon_low == "jul":
+        m = 7
+    elif mon_low == "aug":
+        m = 8
+    elif mon_low == "sep":
+        m = 9
+    elif mon_low == "oct":
+        m = 10
+    elif mon_low == "nov":
+        m = 11
+    elif mon_low == "dec":
+        m = 12
+    else:
+        return None
+    if len(year_s) != 4 or not _is_digits(year_s):
+        return None
+    y = _to_int(year_s)
+    tparts = _split(time_s, ":")
+    if len(tparts) != 3:
+        return None
+    hs = tparts[0]
+    mis = tparts[1]
+    ses = tparts[2]
+    if len(hs) != 2 or len(mis) != 2 or len(ses) != 2:
+        return None
+    if not _is_digits(hs) or not _is_digits(mis) or not _is_digits(ses):
+        return None
+    h = _to_int(hs)
+    mi = _to_int(mis)
+    se = _to_int(ses)
+    if h > 23 or mi > 59 or se > 59:
+        return None
+    if tz_s != "GMT" and tz_s != "UTC" and tz_s != "UT":
+        return None
+    dim = 31
+    if m == 2:
+        leap = (y % 4 == 0) and ((y % 100 != 0) or (y % 400 == 0))
+        if leap:
+            dim = 29
+        else:
+            dim = 28
+    elif m == 4 or m == 6 or m == 9 or m == 11:
+        dim = 30
+    if d > dim:
+        return None
+    return _days_from_civil(y, m, d) * 86400 + h * 3600 + mi * 60 + se
+
+# _precondition_failed returns the S3 412 PreconditionFailed XML error.
+def _precondition_failed(condition, key):
+    rid = _req_id()
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml = xml + "<Error><Code>PreconditionFailed</Code>"
+    xml = xml + "<Message>At least one of the pre-conditions you specified did not hold</Message>"
+    xml = xml + "<Condition>" + _xml_escape(condition) + "</Condition>"
+    xml = xml + "<Key>" + _xml_escape(key) + "</Key>"
+    xml = xml + "<RequestId>" + _xml_escape(rid) + "</RequestId></Error>"
+    return respond(412, xml, {"Content-Type": "application/xml", "x-amz-request-id": rid})
+
+# _not_modified returns the 304 response (empty, ETag+LM+req-id only).
+def _not_modified(cur_etag, lm_unix, lm_valid):
+    rid = _req_id()
+    lm_str = ""
+    if lm_valid:
+        lm_str = _unix_to_rfc1123(lm_unix)
+    else:
+        lm_str = _unix_to_rfc1123(clock.now_unix())
+    return respond(304, "", {"ETag": '"' + cur_etag + '"', "Last-Modified": lm_str, "x-amz-request-id": rid})
+
+# _check_preconditions evaluates If-Match -> IUS -> If-None-Match -> IMS.
+# op is "put", "delete" (ETags-only) or "get", "head" (full).
+# obj is the stored doc or None. Returns None when the request may
+# proceed, else a 412/304 response. Missing objects: PUT/DELETE with
+# If-Match present -> 412, else pass; GET/HEAD missing -> pass (caller
+# returns 404). Legacy docs (lastModifiedUnix 0/None/absent) ignore TS
+# conds; ETag conds still evaluate.
+def _check_preconditions(req, obj, bucket, key, op):
+    headers = req.get("headers")
+    if headers == None:
+        headers = {}
+    im_raw = headers.get("If-Match", None)
+    inm_raw = headers.get("If-None-Match", None)
+    ius_raw = headers.get("If-Unmodified-Since", None)
+    ims_raw = headers.get("If-Modified-Since", None)
+    im_list = None
+    if im_raw != None:
+        im_list = _parse_etag_list(im_raw)
+    inm_list = None
+    if inm_raw != None:
+        inm_list = _parse_etag_list(inm_raw)
+    ius_ts = None
+    if ius_raw != None and _strip(str(ius_raw)) != "":
+        ius_ts = _rfc1123_to_unix(ius_raw)
+    ims_ts = None
+    if ims_raw != None and _strip(str(ims_raw)) != "":
+        ims_ts = _rfc1123_to_unix(ims_raw)
+    is_write = (op == "put" or op == "delete")
+    exists = (obj != None)
+    if not exists:
+        if is_write:
+            if im_list != None:
+                return _precondition_failed("If-Match", key)
+            return None
+        return None
+    cur_etag = obj.get("etag", "")
+    if cur_etag == None:
+        cur_etag = ""
+    cur_etag = str(cur_etag)
+    lu = obj.get("lastModifiedUnix", 0)
+    if lu == None:
+        lu = 0
+    lu = _to_num(lu)
+    lm_valid = False
+    lm_unix = 0
+    if lu != 0:
+        lm_valid = True
+        lm_unix = lu
+    if im_list != None:
+        match = False
+        for v in im_list:
+            if v == "*":
+                match = True
+                break
+            if v == cur_etag:
+                match = True
+                break
+        if not match:
+            return _precondition_failed("If-Match", key)
+    if not is_write:
+        if ius_ts != None and lm_valid:
+            if lm_unix > ius_ts:
+                return _precondition_failed("If-Unmodified-Since", key)
+    if inm_list != None:
+        matched = False
+        for v in inm_list:
+            if v == "*":
+                matched = True
+                break
+            if v == cur_etag:
+                matched = True
+                break
+        if matched:
+            if is_write:
+                return _precondition_failed("If-None-Match", key)
+            return _not_modified(cur_etag, lm_unix, lm_valid)
+    if not is_write:
+        if ims_ts != None and lm_valid:
+            if lm_unix <= ims_ts:
+                return _not_modified(cur_etag, lm_unix, lm_valid)
+    return None
