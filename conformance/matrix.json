@@ -1,7 +1,7 @@
 {
   "summary": {
     "adapters": 99,
-    "checks": 231,
+    "checks": 238,
     "tiers": {
       "sdk_and_vm": 2,
       "sdk_only": 34,
@@ -9352,11 +9352,11 @@
     {
       "id": "aws-s3-style",
       "display_name": "Amazon S3-style API simulator (unofficial)",
-      "adapter_version": "0.1.0",
+      "adapter_version": "0.2.0",
       "real_hosts": [],
       "api_name": "Amazon S3 API",
       "api_version": "2006-03-01",
-      "routes": 8,
+      "routes": 9,
       "verification": "SDK",
       "sdks": [
         {
@@ -9370,20 +9370,37 @@
         "GetObject byte-exact round-trip (incl. non-UTF-8)",
         "HeadObject metadata",
         "ListObjectsV2 paginator follows continuation (4 over MaxKeys=2)",
-        "DeleteObject"
+        "DeleteObject",
+        "CreateMultipartUpload",
+        "UploadPart",
+        "ListParts",
+        "DeleteBucket refused while a multipart upload is in progress",
+        "AbortMultipartUpload releases the blocked bucket delete",
+        "CompleteMultipartUpload with the SDK's XML-escaped ETag",
+        "Object tagging subresources refused without touching the object"
       ],
       "missing": [
         "No bucket policy, tagging, ACL, CORS, lifecycle, or website subresources",
         "No object versioning (?versions listing, versionId delete) or object lock",
         "No CopyObject (x-amz-copy-source) or UploadPartCopy",
-        "No browser form POST uploads (POST policy)",
-        "No ListMultipartUploads (GET /{bucket}?uploads)"
+        "No browser form POST uploads (POST policy) — POST /{bucket} returns 501 NotImplemented when SigV4-signed, but a real browser form upload (which authenticates with form fields, so carries no Authorization header) is refused earlier with 403 MissingSecurityHeader",
+        "No object-lock configuration subresource (?object-lock) on the bucket",
+        "No ListMultipartUploads (GET /{bucket}?uploads returns 501 NotImplemented)",
+        "No multi-object DeleteObjects (POST /{bucket}?delete returns 501 NotImplemented)",
+        "No object-level subresources: ?acl, ?tagging, ?retention, ?legal-hold, ?torrent, ?attributes, ?annotation, ?encryption — 501 NotImplemented rather than falling through to the object operation",
+        "No SelectObjectContent (?select) or RestoreObject (?restore) — POST verbs, answered 501 NotImplemented (a bare POST /{bucket}/{key} with no query is 405)"
       ],
       "deviations": [
         "ETags are MD5 hex (multipart MD5(binary-concat)-N)",
         "Multipart 5 MiB minimum part size not enforced (small parts allowed)",
         "DELETE of a missing bucket is an idempotent 204 (real S3: 404 NoSuchBucket)",
+        "DeleteBucket is refused with 409 BucketNotEmpty while a multipart upload is in progress — AWS documents and enforces this for directory buckets, while for general-purpose buckets it documents only that all objects must be deleted and says nothing about an upload in progress, so refusing the delete is an inference there",
+        "Unimplemented subresources return 501 NotImplemented rather than falling through to the object operation on the same route. The mutating routes use an allowlist and reject every query parameter except the SigV4 presigned-auth ones and the route's own; the read routes use a denylist. The guard runs before the multipart dispatch",
+        "Starlark handlers are step-bounded: a single ListObjectsV2 or DeleteBucket over a large enough bucket exhausts the budget and returns a JSON 500 rather than S3 XML. The reachable threshold for ListObjectsV2 is a few hundred objects in one un-paginated page; DeleteBucket did not reproduce it in a few hundred rows",
         "x-amz-meta-* suffixes are lowercased and the first occurrence wins",
+        "On mutating routes (bucket PUT/DELETE, object PUT/POST/DELETE) x-id must name an operation this adapter routes; the SDK's x-id=CopyObject, x-id=RestoreObject, x-id=SelectObjectContent, x-id=PutObjectLegalHold and x-id=UploadPartCopy all return 501 rather than falling through. AbortMultipartUpload is routed and must not be refused",
+        "CopyObject selected by the x-amz-copy-source header alone, with no x-id query parameter, still writes a zero-byte object; the query allowlist cannot see a header-selected subresource",
+        "PUT /{bucket}/{key}?partNumber=N without uploadId returns 400 InvalidRequest rather than falling through to PutObject",
         "Per-chunk STREAMING signatures not verified (header SigV4 only)",
         "Streaming checksum trailers discarded (unsupported-checksum)",
         "DELETE object against a missing bucket is 204 (real S3: 404 NoSuchBucket)",
@@ -9394,6 +9411,10 @@
       "covered": [
         {
           "method": "GET",
+          "route": "/{bucket}"
+        },
+        {
+          "method": "POST",
           "route": "/{bucket}"
         },
         {
@@ -9436,6 +9457,16 @@
             "paginate",
             "filter",
             "errors",
+            "clock"
+          ]
+        },
+        {
+          "method": "POST",
+          "route": "/{bucket}",
+          "tags": [
+            "query",
+            "params",
+            "stateful",
             "clock"
           ]
         },

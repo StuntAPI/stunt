@@ -56,8 +56,17 @@ def on_put_object(req):
     bucket = req["params"]["bucket"]
     key = req["params"]["key"]
 
+    # The allowlist runs BEFORE the multipart dispatch. It allows ?uploadId and
+    # ?partNumber through but validates ?x-id, so `?uploadId=U&x-id=UploadPartCopy`
+    # is refused here instead of storing a zero-byte part as UploadPart would.
+    # The dispatch is case-insensitive for the same reason: `?PARTNUMBER` and
+    # `?UPLOADID` must reach this guard rather than bypass it.
+    unsupported = _reject_object_write_query(req, bucket, key, _OBJECT_WRITE_PARAMS, _OBJECT_WRITE_OPS)
+    if unsupported != None:
+        return unsupported
+
     # Multipart upload part (?partNumber=N&uploadId=...).
-    if _query_present(req, "uploadId"):
+    if _query_present_ci(req, "uploadId"):
         return _mpu_upload_part(req, bucket, key)
 
     # Check that the bucket exists.
@@ -113,9 +122,14 @@ def on_get_object(req):
     bucket = req["params"]["bucket"]
     key = req["params"]["key"]
 
-    # ListParts (?uploadId=...).
-    if _query_present(req, "uploadId"):
+    # ListParts (?uploadId=...). Case-insensitive to match the multipart
+    # dispatch on the mutating routes.
+    if _query_present_ci(req, "uploadId"):
         return _mpu_list_parts(req, bucket, key)
+
+    unsupported = _unsupported_object_subresource(req, bucket, key)
+    if unsupported != None:
+        return unsupported
 
     obj = _find_object(bucket, key)
     if obj == None:
@@ -151,6 +165,10 @@ def on_head_object(req):
 
     bucket = req["params"]["bucket"]
     key = req["params"]["key"]
+
+    unsupported = _unsupported_object_subresource(req, bucket, key)
+    if unsupported != None:
+        return unsupported
 
     obj = _find_object(bucket, key)
     if obj == None:
@@ -188,8 +206,15 @@ def on_delete_object(req):
     bucket = req["params"]["bucket"]
     key = req["params"]["key"]
 
+    # Allowlist before the multipart dispatch, for the same reason as
+    # on_put_object: the dispatch must not be reachable with a refused
+    # subresource, and any-cased ?uploadId must not bypass it.
+    unsupported = _reject_object_write_query(req, bucket, key, _OBJECT_DELETE_PARAMS, _OBJECT_DELETE_OPS)
+    if unsupported != None:
+        return unsupported
+
     # AbortMultipartUpload (?uploadId=...).
-    if _query_present(req, "uploadId"):
+    if _query_present_ci(req, "uploadId"):
         return _mpu_abort(req, bucket, key)
 
     obj = _find_object(bucket, key)
@@ -214,7 +239,8 @@ def on_delete_object(req):
         "x-amz-request-id": _req_id(),
     })
 
-# on_list_or_location dispatches between ListObjectsV2 and LocationConstraint
+# on_list_or_location dispatches between the bucket-level operations
+# (LocationConstraint, the unimplemented subresources) and ListObjectsV2,
 # based on query parameters.
 def on_list_or_location(req):
     err = _require_auth(req)
@@ -233,17 +259,24 @@ def on_list_or_location(req):
     if bucket_doc == None:
         return _no_such_bucket_error(bucket)
 
+    # Bucket subresources this simulator does not implement, ?uploads
+    # (ListMultipartUploads) among them. Without this guard they fall through
+    # to ListObjectsV2 and answer with a <ListBucketResult>, which a real SDK
+    # reads as an empty, successful result — so a client checking a bucket
+    # before deleting it is told it is clear when it is not. 501 is a real S3
+    # error code for this case, and it is not retried by any AWS SDK.
+    unsupported = _unsupported_bucket_subresource(req, bucket)
+    if unsupported != None:
+        return unsupported
+
     query = req.get("query")
     if query == None:
         query = {}
 
     # LocationConstraint
-    # ?location may have an empty value; check for key existence
-    has_location = False
-    for k in query:
-        if k == "location":
-            has_location = True
-            break
+    # ?location may have an empty value; check for key existence. Matched
+    # case-insensitively, like the unimplemented-subresource guard below.
+    has_location = _query_present_ci(req, "location")
     if has_location:
         xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
         xml = xml + '<LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/">us-east-1</LocationConstraint>'

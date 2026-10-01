@@ -40,7 +40,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [avalara-style](adapters/avalara-style/) | Avalara AvaTax REST API `2` | 8 | VM | — | — | [5](#avalara-style) | [3](#avalara-style) |
 | [aws-cognito-style](adapters/aws-cognito-style/) | Amazon Cognito Identity Provider API `2016-04-18` | 7 | VM | — | — | [6](#aws-cognito-style) | [3](#aws-cognito-style) |
 | [aws-iam-sts-style](adapters/aws-iam-sts-style/) | AWS STS + IAM API `2011-06-15` | 2 | SDK | aws-sdk-go-v2 @ v1.43.7 | 2 | [3](#aws-iam-sts-style) | [3](#aws-iam-sts-style) |
-| [aws-s3-style](adapters/aws-s3-style/) | Amazon S3 API `2006-03-01` | 8 | SDK | aws-sdk-go-v2 @ v1.43.7 | 6 | [5](#aws-s3-style) | [10](#aws-s3-style) |
+| [aws-s3-style](adapters/aws-s3-style/) | Amazon S3 API `2006-03-01` | 9 | SDK | aws-sdk-go-v2 @ v1.43.7 | 13 | [9](#aws-s3-style) | [16](#aws-s3-style) |
 | [azure-devops-style](adapters/azure-devops-style/) | Azure DevOps REST API `7.1` | 17 | VM | — | — | [8](#azure-devops-style) | [6](#azure-devops-style) |
 | [azure-servicebus-style](adapters/azure-servicebus-style/) | Azure Service Bus + Storage `2024-01-01` | 18 | VM | — | — | [6](#azure-servicebus-style) | [3](#azure-servicebus-style) |
 | [azure-storage-style](adapters/azure-storage-style/) | Azure Storage Blob REST API `2024-08-04` | 9 | VM | — | — | [6](#azure-storage-style) | [3](#azure-storage-style) |
@@ -163,6 +163,13 @@ sections in `conformance/node/tests/*.test.ts`).
 - HeadObject metadata
 - ListObjectsV2 paginator follows continuation (4 over MaxKeys=2)
 - DeleteObject
+- CreateMultipartUpload
+- UploadPart
+- ListParts
+- DeleteBucket refused while a multipart upload is in progress
+- AbortMultipartUpload releases the blocked bucket delete
+- CompleteMultipartUpload with the SDK's XML-escaped ETag
+- Object tagging subresources refused without touching the object
 
 **dynamodb-style**
 
@@ -2573,13 +2580,14 @@ behavior notes live in each adapter's README.
 
 ### aws-s3-style
 
-**Covered** — 8 routes
+**Covered** — 9 routes
 
 <details><summary>Routes</summary>
 
 | Method | Route |
 |---|---|
 | GET | `/{bucket}` |
+| POST | `/{bucket}` |
 | PUT | `/{bucket}` |
 | DELETE | `/{bucket}` |
 | PUT | `/{bucket}/{key+}` |
@@ -2590,20 +2598,30 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Missing** (5)
+**Missing** (9)
 
 - No bucket policy, tagging, ACL, CORS, lifecycle, or website subresources
 - No object versioning (?versions listing, versionId delete) or object lock
 - No CopyObject (x-amz-copy-source) or UploadPartCopy
-- No browser form POST uploads (POST policy)
-- No ListMultipartUploads (GET /{bucket}?uploads)
+- No browser form POST uploads (POST policy) — POST /{bucket} returns 501 NotImplemented when SigV4-signed, but a real browser form upload (which authenticates with form fields, so carries no Authorization header) is refused earlier with 403 MissingSecurityHeader
+- No object-lock configuration subresource (?object-lock) on the bucket
+- No ListMultipartUploads (GET /{bucket}?uploads returns 501 NotImplemented)
+- No multi-object DeleteObjects (POST /{bucket}?delete returns 501 NotImplemented)
+- No object-level subresources: ?acl, ?tagging, ?retention, ?legal-hold, ?torrent, ?attributes, ?annotation, ?encryption — 501 NotImplemented rather than falling through to the object operation
+- No SelectObjectContent (?select) or RestoreObject (?restore) — POST verbs, answered 501 NotImplemented (a bare POST /{bucket}/{key} with no query is 405)
 
-**Deviations** (10)
+**Deviations** (16)
 
 - ETags are MD5 hex (multipart MD5(binary-concat)-N)
 - Multipart 5 MiB minimum part size not enforced (small parts allowed)
 - DELETE of a missing bucket is an idempotent 204 (real S3: 404 NoSuchBucket)
+- DeleteBucket is refused with 409 BucketNotEmpty while a multipart upload is in progress — AWS documents and enforces this for directory buckets, while for general-purpose buckets it documents only that all objects must be deleted and says nothing about an upload in progress, so refusing the delete is an inference there
+- Unimplemented subresources return 501 NotImplemented rather than falling through to the object operation on the same route. The mutating routes use an allowlist and reject every query parameter except the SigV4 presigned-auth ones and the route's own; the read routes use a denylist. The guard runs before the multipart dispatch
+- Starlark handlers are step-bounded: a single ListObjectsV2 or DeleteBucket over a large enough bucket exhausts the budget and returns a JSON 500 rather than S3 XML. The reachable threshold for ListObjectsV2 is a few hundred objects in one un-paginated page; DeleteBucket did not reproduce it in a few hundred rows
 - x-amz-meta-* suffixes are lowercased and the first occurrence wins
+- On mutating routes (bucket PUT/DELETE, object PUT/POST/DELETE) x-id must name an operation this adapter routes; the SDK's x-id=CopyObject, x-id=RestoreObject, x-id=SelectObjectContent, x-id=PutObjectLegalHold and x-id=UploadPartCopy all return 501 rather than falling through. AbortMultipartUpload is routed and must not be refused
+- CopyObject selected by the x-amz-copy-source header alone, with no x-id query parameter, still writes a zero-byte object; the query allowlist cannot see a header-selected subresource
+- PUT /{bucket}/{key}?partNumber=N without uploadId returns 400 InvalidRequest rather than falling through to PutObject
 - Per-chunk STREAMING signatures not verified (header SigV4 only)
 - Streaming checksum trailers discarded (unsupported-checksum)
 - DELETE object against a missing bucket is 204 (real S3: 404 NoSuchBucket)
@@ -2614,6 +2632,7 @@ behavior notes live in each adapter's README.
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
 - `GET` `/{bucket}` — query, params, stateful, paginate, filter, errors, clock
+- `POST` `/{bucket}` — query, params, stateful, clock
 - `PUT` `/{bucket}` — body, query, params, stateful, errors, clock
 - `DELETE` `/{bucket}` — query, params, stateful, errors, clock
 - `PUT` `/{bucket}/{key+}` — query, params, stateful, errors, clock

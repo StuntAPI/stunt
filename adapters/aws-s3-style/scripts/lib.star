@@ -42,9 +42,25 @@ _SIGV4_MAX_EXPIRES = 7 * 86400
 
 # _xml_error returns an S3-shaped XML error response (403 by default;
 # pass status for other codes).
+# _xml_error interpolates `resource` RAW — callers MUST pass _xml_escape(...)
+# for any value derived from the request path or query, or a bucket, key, or
+# query parameter containing XML metacharacters will be reflected into the
+# response document. Every sibling helper (_invalid_argument,
+# _no_such_bucket_error, _mpu_no_such_upload, _bucket_not_empty) escapes
+# internally; this one cannot, because many callers already pass
+# _xml_escape(...) for `resource` and escaping again would double-escape them.
+#
+# `message` IS escaped here, because no caller escapes it and several embed
+# request data (the subresource guards echo the caller's query key).
+#
+# KNOWN UNESCAPED `resource` CALL SITES (pre-existing, still reachable with a
+# bucket or key containing XML metacharacters):
+#   multipart.star on_post_multipart                405 MethodNotAllowed
+#   lib.star Complete-MPU error paths              MalformedXML,
+#                                                 InvalidPartOrder, InvalidPart
 def _xml_error(code, message, resource, status = 403):
     xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-    xml = xml + "<Error><Code>" + code + "</Code><Message>" + message + "</Message>"
+    xml = xml + "<Error><Code>" + code + "</Code><Message>" + _xml_escape(message) + "</Message>"
     if resource != "":
         xml = xml + "<Resource>" + resource + "</Resource>"
     xml = xml + "<RequestId>" + _req_id() + "</RequestId></Error>"
@@ -631,24 +647,45 @@ def _require_auth(req):
 # ====================================================================
 
 # _xml_escape escapes XML special characters in s.
+# XML 1.0 Char is #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD]
+# | [#x10000-#x10FFFF]: C0 other than TAB/LF/CR, the surrogate range, and
+# U+FFFE/U+FFFF are unrepresentable, and reflecting one verbatim yields a
+# document no parser accepts. Bucket names and keys are unvalidated, so these
+# arrive straight off the wire. DEL is legal XML but is dropped too.
+_XML_ENTITY_ESCAPES = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;",
+}
+
 def _xml_escape(s):
     if s == None:
         return ""
     out = ""
     for i in range(len(s)):
         ch = s[i]
-        if ch == "&":
-            out = out + "&amp;"
-        elif ch == "<":
-            out = out + "&lt;"
-        elif ch == ">":
-            out = out + "&gt;"
-        elif ch == '"':
-            out = out + "&quot;"
-        elif ch == "'":
-            out = out + "&#39;"
-        else:
-            out = out + ch
+        esc = _XML_ENTITY_ESCAPES.get(ch)
+        if esc != None:
+            out = out + esc
+            continue
+        if ch < " " or ch > "~":
+            # Not printable ASCII, so it needs the full code-point check. This
+            # branch is deliberately off the hot path: a single-table lookup per
+            # character plus one range test, rather than a chain of comparisons
+            # and an ord() call, keeps _xml_escape affordable when it runs once
+            # per field per entry in a bucket listing.
+            o = ord(ch)
+            if o < 32 and o != 9 and o != 10 and o != 13:
+                continue
+            if o >= 0xD800 and o <= 0xDFFF:
+                continue
+            if o == 0xFFFE or o == 0xFFFF:
+                continue
+            if o == 127:
+                continue
+        out = out + ch
     return out
 
 # _xml_text extracts a string value from a dict, defaulting to "".
@@ -769,6 +806,229 @@ def _upsert_object(bucket, key, raw, ct, etag, meta):
     else:
         oc.insert(doc)
 
+# ====================================================================
+# _unsupported_bucket_subresource rejects bucket-level ?subresource tokens this
+# simulator does not implement. Returns a 501 error response, or None when the
+# request is not an unsupported-subresource call.
+#
+# The caller's query key `k` is echoed in the message. _xml_error escapes
+# `message`, so that stays safe even though this helper rejects parameters the
+# denylist never named.
+def _unsupported_bucket_subresource(req, bucket):
+    query = req.get("query")
+    if query == None:
+        return None
+    for k in query:
+        want = _ascii_lower(k)
+        if want == "uploads":
+            return _xml_error("NotImplemented", "ListMultipartUploads is not implemented by this simulator. Track in-progress multipart uploads with the upload ids your client created.", _xml_escape(bucket), 501)
+        for unsupported in _UNSUPPORTED_BUCKET_SUBRESOURCES:
+            if want == unsupported:
+                return _xml_error("NotImplemented", k + " is not implemented by this simulator.", _xml_escape(bucket), 501)
+    return None
+
+# Query parameters that carry SigV4 presigned authentication rather than
+# selecting a subresource. _require_auth accepts presigned requests, so a
+# presigned bucket or object call must survive the reject-all guards below; the
+# set is fixed by the SigV4 query-auth specification.
+_PRESIGNED_AUTH_PARAMS = [
+    "x-amz-algorithm", "x-amz-credential", "x-amz-date", "x-amz-expires",
+    "x-amz-signedheaders", "x-amz-signature", "x-amz-security-token",
+    "x-amz-content-sha256",
+]
+
+# _reject_bucket_query rejects ANY query parameter on the bucket-level mutating
+# routes. Real S3's PutBucket and DeleteBucket take none: a bucket subresource is
+# selected by GET, or by POST for DeleteObjects. So on a mutating route any
+# parameter at all is an unimplemented subresource call, and rejecting all of
+# them is fail-closed — a denylist would let one token added to S3 later
+# silently re-open bucket creation or destruction. Presigned-auth parameters are
+# exempt because they authenticate the request rather than select a subresource.
+def _reject_bucket_query(req, bucket):
+    query = req.get("query")
+    if query == None:
+        return None
+    for k in query:
+        want = _ascii_lower(k)
+        exempt = False
+        for e in _PRESIGNED_AUTH_PARAMS:
+            if want == e:
+                exempt = True
+                break
+        if exempt:
+            # Skip past presigned auth and keep checking the remaining
+            # parameters; returning here would let a real subresource that
+            # happens to sort after it through unchecked.
+            continue
+        return _xml_error("NotImplemented", "The bucket subresource " + k + " is not implemented by this simulator. PutBucket and DeleteBucket take no query parameters in real S3.", _xml_escape(bucket), 501)
+    return None
+
+# Query parameters a real S3 client may legitimately send on the object write
+# and delete routes. Everything else on those routes selects an unimplemented
+# subresource, so the guard is an allowlist rather than a denylist: PUT and
+# DELETE on an object are the most destructive routes in the API, and a denylist
+# there would let one token added to S3 later silently re-open overwriting or
+# destroying an object. Mirrors _reject_bucket_query for the same reason.
+_OBJECT_WRITE_PARAMS = ["partnumber", "uploadid", "x-id"]
+# versionId is accepted on delete because the real SDK always sends it and,
+# on a bucket with no versioning, any id addresses the single object — which is
+# what real S3 does too. Without it, every versioned delete regressed from 204
+# to 501.
+_OBJECT_DELETE_PARAMS = ["uploadid", "x-id", "versionid"]
+
+# The operations an `x-id` value may name on each mutating object route, matching
+# what adapter.yaml actually routes. Everything else is unimplemented and must
+# be refused rather than falling through to PutObject or DeleteObject.
+# Every AWS SDK sends `x-id=<OperationName>` on every S3 call, so these lists
+# must name every operation this adapter routes on the corresponding verb.
+# AbortMultipartUpload in particular: without it, `x-id=AbortMultipartUpload`
+# returned 501 and the only route to clearing an in-progress upload — the thing
+# that releases the 409 BucketNotEmpty on DeleteBucket — was closed off to
+# every SDK client.
+_OBJECT_WRITE_OPS = ["putobject", "uploadpart"]
+_OBJECT_DELETE_OPS = ["deleteobject", "abortmultipartupload"]
+
+# POST /{bucket}/{key} carries CreateMultipartUpload (?uploads) and
+# CompleteMultipartUpload (?uploadId=...), and nothing else this adapter routes.
+_OBJECT_POST_PARAMS = ["uploads", "uploadid", "x-id"]
+_OBJECT_POST_OPS = ["createmultipartupload", "completemultipartupload"]
+
+# _is_presigned_param reports whether a query key carries presigned SigV4 auth
+# rather than selecting a subresource.
+def _is_presigned_param(name):
+    want = _ascii_lower(name)
+    for e in _PRESIGNED_AUTH_PARAMS:
+        if want == e:
+            return True
+    return False
+
+# _query_val_ci reads a query value with a case-insensitive key, so a client
+# sending ?X-Id= is read the same as ?x-id=.
+def _query_val_ci(req, key):
+    query = req.get("query")
+    if query == None:
+        return ""
+    want = _ascii_lower(key)
+    for k in query:
+        if _ascii_lower(k) == want:
+            v = query[k]
+            if v == None:
+                return ""
+            return v
+    return ""
+
+# Note on `;`: the query map is built by splitting on `&` only, so a `;` in the
+# query string yields an empty map and these guards do not run. That agrees with
+# real S3, which would see one parameter named `tagging;a` and route to
+# PutObject/DeleteObject just the same.
+#
+# _reject_object_write_query allows only `allowed` on a mutating object route,
+# and requires `x-id` to name one of `ops`. Checking the x-id VALUE matters as
+# much as the key: an SDK sends `x-id=<Operation>` on every call, so allowing
+# the key would let `?x-id=CopyObject` or `?x-id=RestoreObject` reach PutObject
+# or DeleteObject and mutate the object behind a mis-selected operation. Call
+# it BEFORE the ?uploadId / ?partNumber multipart dispatch, so that the dispatch
+# cannot be reached with a subresource the allowlist should have refused —
+# `?uploadId=U&x-id=UploadPartCopy` is how a real SDK asks for UploadPartCopy,
+# and with the guard after the dispatch it stored a zero-byte part instead.
+def _reject_object_write_query(req, bucket, key, allowed, ops):
+    query = req.get("query")
+    if query == None:
+        return None
+    for k in query:
+        if _is_presigned_param(k):
+            # Skip past presigned auth and keep checking; see _reject_bucket_query.
+            continue
+        want = _ascii_lower(k)
+        if want not in allowed:
+            return _xml_error("NotImplemented", "The object subresource " + k + " is not implemented by this simulator.", _xml_escape("/" + bucket + "/" + key), 501)
+        if want == "x-id":
+            op = _query_val_ci(req, "x-id")
+            if _ascii_lower(op) not in ops:
+                return _xml_error("NotImplemented", "The operation " + op + " is not implemented by this simulator.", _xml_escape("/" + bucket + "/" + key), 501)
+    # partNumber only selects UploadPart when it accompanies uploadId. Real S3
+    # rejects `PUT /{bucket}/{key}?partNumber=N` on its own with
+    # 400 InvalidRequest; without this it falls through to PutObject and
+    # overwrites the object. The x-id value gets the same treatment, so
+    # `?x-id=UploadPart` without an upload id is refused rather than silently
+    # becoming a PutObject.
+    if not _query_present_ci(req, "partnumber") and not _query_present_ci(req, "uploadid"):
+        op = _ascii_lower(_query_val_ci(req, "x-id"))
+        if op == "uploadpart":
+            return _xml_error("InvalidRequest", "UploadPart requires an upload id and a part number.", _xml_escape("/" + bucket + "/" + key), 400)
+        if op == "abortmultipartupload":
+            return _xml_error("InvalidRequest", "AbortMultipartUpload requires an upload id.", _xml_escape("/" + bucket + "/" + key), 400)
+    if _query_present_ci(req, "partnumber") and not _query_present_ci(req, "uploadid"):
+        return _xml_error("InvalidRequest", "Part number must be specified together with an upload id.", _xml_escape("/" + bucket + "/" + key), 400)
+    return None
+
+# _unsupported_object_subresource rejects object-level ?subresource tokens on
+# the read routes (GET, HEAD), where a fall-through is harmless: it returns the
+# object rather than mutating it. Real S3 selects these instead of
+# GetObject/HeadObject. Must be called after the ?uploadId multipart branch.
+_UNSUPPORTED_OBJECT_SUBRESOURCES = [
+    "acl", "annotation", "attributes", "encryption", "legal-hold",
+    "renameobject", "restore", "retention", "select", "tagging", "torrent",
+]
+
+def _unsupported_object_subresource(req, bucket, key):
+    query = req.get("query")
+    if query == None:
+        return None
+    for k in query:
+        want = _ascii_lower(k)
+        for unsupported in _UNSUPPORTED_OBJECT_SUBRESOURCES:
+            if want == unsupported:
+                return _xml_error("NotImplemented", "The object subresource " + k + " is not implemented by this simulator.", _xml_escape("/" + bucket + "/" + key), 501)
+    return None
+
+# Real S3 bucket subresources that are not implemented here. They are
+# answered with 501 NotImplemented rather than falling through to the object
+# list, because a <ListBucketResult> body reads to an SDK as a successful
+# empty result.
+#
+# The list is deliberately explicit rather than a catch-all: current SDKs
+# send `x-id=<Operation>` on normal calls, and a blanket unknown-parameter
+# rejection would break every listing. It is not exhaustive — a subresource
+# added to S3 later, or one missed here, still falls through to the object
+# list, which is the pre-existing behavior. The engine test derives its
+# expected set from the pinned aws-sdk-go-v2's own SplitURI literals, so a
+# token the SDK can send but this list omits fails there.
+# All entries are lowercase: the guard compares against a lowercased query
+# key, since S3 subresource tokens are not case-sensitive.
+_UNSUPPORTED_BUCKET_SUBRESOURCES = [
+    # Configuration and policy.
+    "policy", "policystatus", "cors", "tagging", "lifecycle", "website", "acl",
+    "notification", "replication", "encryption", "ownershipcontrols",
+    "publicaccessblock", "intelligent-tiering", "accelerate", "logging",
+    "requestpayment", "object-lock", "abac",
+    # Multi-object delete (POST /{bucket}?delete) is not implemented.
+    "delete",
+    # Reporting and inventory.
+    "inventory", "metrics", "analytics", "metadataconfiguration",
+    "metadatatable", "metadatainventorytable", "metadatajournaltable",
+    "metadataannotationtable",
+    # Versioning.
+    "versions", "versioning",
+    # Session (CreateSession presigned URLs).
+    "session",
+]
+
+# _query_present_ci is _query_present with a case-insensitive name, because S3
+# subresource tokens are not case-sensitive and a hand-rolled or presigned
+# client can send ?Versioning or ?VERSIONS.
+def _query_present_ci(req, name):
+    query = req.get("query")
+    if query == None:
+        return False
+    want = _ascii_lower(name)
+    for k in query:
+        if _ascii_lower(k) == want:
+            return True
+    return False
+
+# ====================================================================
+# Bucket subresources
 # ====================================================================
 # User metadata (x-amz-meta-*)
 # ====================================================================
@@ -960,8 +1220,8 @@ def _mpu_create(req, bucket, key):
 # stores the part bytes (out-of-order and re-uploads both fine) and returns
 # the part ETag (MD5 of the verbatim part bytes, like real S3).
 def _mpu_upload_part(req, bucket, key):
-    part_raw = _query_val(req, "partNumber")
-    upload_id = _query_val(req, "uploadId")
+    part_raw = _query_val_ci(req, "partNumber")
+    upload_id = _query_val_ci(req, "uploadId")
     if not _is_digits(part_raw):
         return _invalid_argument("partNumber", part_raw, "Part number must be an integer between 1 and " + str(_MPU_MAX_PART_NUMBER) + ", inclusive")
     n = _to_int(part_raw)
@@ -1051,14 +1311,86 @@ def _xml_tag_text(s, tag):
         return ""
     return s[start:end]
 
-# _strip_quotes removes every double quote from an ETag string (clients may
-# echo the ETag quoted, unquoted, or XML-escaped).
-def _strip_quotes(s):
+# _decimal_ref parses a decimal character reference body (the digits after `&#`),
+# returning -1 when it is not one.
+def _decimal_ref(digits):
+    if digits == "":
+        return -1
+    n = 0
+    for i in range(len(digits)):
+        ch = digits[i]
+        if ch < "0" or ch > "9":
+            return -1
+        n = n * 10 + _to_int(ch)
+    return n
+
+# _xml_unescape decodes the five XML predefined entities. Needed because
+# several SDK XML serializers escape the double quotes around an ETag as a
+# numeric or named character reference — Go's encoding/xml emits `&#34;` and
+# .NET's XmlWriter emits `&quot;` — so an ETag read straight out of the request
+# body would otherwise never match the stored one and Complete would answer
+# 400 InvalidPart. Numeric references for the other four are decoded too.
+def _xml_unescape(s):
+    if s == None:
+        return ""
     out = ""
-    for i in range(len(s)):
-        if s[i] != '"':
-            out = out + s[i]
+    i = 0
+    n = len(s)
+    while i < n:
+        ch = s[i]
+        if ch != "&":
+            out = out + ch
+            i = i + 1
+            continue
+        semi = s.find(";", i)
+        # A named or numeric reference is short; anything longer is a bare
+        # ampersand in the text.
+        if semi < 0 or semi - i > 10:
+            out = out + ch
+            i = i + 1
+            continue
+        ent = s[i + 1:semi]
+        if ent == "quot":
+            out = out + '"'
+        elif ent == "amp":
+            out = out + "&"
+        elif ent == "apos":
+            out = out + "'"
+        elif ent == "lt":
+            out = out + "<"
+        elif ent == "gt":
+            out = out + ">"
+        elif _has_prefix(ent, "#"):
+            digits = ent[1:]
+            cp = _decimal_ref(digits)
+            if cp == 34:
+                out = out + '"'
+            elif cp == 38:
+                out = out + "&"
+            elif cp == 39:
+                out = out + "'"
+            elif cp == 60:
+                out = out + "<"
+            elif cp == 62:
+                out = out + ">"
+            else:
+                out = out + ch
+                i = i + 1
+                continue
+            i = semi + 1
+            continue
+        else:
+            out = out + ch
+            i = i + 1
+            continue
+        i = semi + 1
     return out
+
+# _strip_quotes normalizes an ETag for comparison: XML-unescapes it, then
+# removes every double quote. Clients echo the ETag quoted, unquoted, or
+# XML-escaped, and real S3 compares the value, not its quoting.
+def _strip_quotes(s):
+    return _xml_unescape(s).replace('"', "")
 
 # _strip_weak normalizes a Complete ETag for comparison: strips one W/
 # prefix, removes quotes, lowercases (uppercase hex accepted, like real
@@ -1089,7 +1421,10 @@ def _mpu_parse_complete(raw):
         etag_s = _strip(_xml_tag_text(chunk, "ETag"))
         if not _is_digits(num_s):
             return None
-        parts.append((_to_int(num_s), _strip_quotes(etag_s)))
+        # Left raw on purpose: _strip_weak does the single unescape-and-strip at
+        # comparison time. Unescaping here as well would decode twice and accept
+        # double-escaped quoting that real S3 rejects.
+        parts.append((_to_int(num_s), etag_s))
         pos = end + len("</Part>")
     if _find_substr(raw, "<CompleteMultipartUpload") < 0:
         return None
@@ -1099,7 +1434,7 @@ def _mpu_parse_complete(raw):
 # listed parts against what was actually uploaded, assembles them (in
 # ascending part-number order) into the object, and tears the upload down.
 def _mpu_complete(req, bucket, key):
-    upload_id = _query_val(req, "uploadId")
+    upload_id = _query_val_ci(req, "uploadId")
 
     bc = store_collection("buckets")
     bucket_doc = None
@@ -1196,7 +1531,7 @@ def _mpu_complete(req, bucket, key):
 # _mpu_abort handles DELETE /{bucket}/{key}?uploadId=... — discards every
 # part and the upload itself. Nothing is written to the object store.
 def _mpu_abort(req, bucket, key):
-    upload_id = _query_val(req, "uploadId")
+    upload_id = _query_val_ci(req, "uploadId")
 
     bc = store_collection("buckets")
     bucket_doc = None
@@ -1218,7 +1553,7 @@ def _mpu_abort(req, bucket, key):
 # ListPartsResult XML, parts in ascending part-number order, with the real
 # max-parts / part-number-marker paging.
 def _mpu_list_parts(req, bucket, key):
-    upload_id = _query_val(req, "uploadId")
+    upload_id = _query_val_ci(req, "uploadId")
 
     if _mpu_find_upload(bucket, key, upload_id) == None:
         return _mpu_no_such_upload(upload_id)

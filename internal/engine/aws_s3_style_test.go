@@ -7,6 +7,7 @@ import (
 	"crypto/md5"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/xml"
 	"fmt"
 	"io"
 	"net/http"
@@ -1366,4 +1367,1446 @@ func hasMetaKey(hdr http.Header, key string) bool {
 		}
 	}
 	return false
+}
+
+// TestAWSS3BucketDeleteBlockedByInFlightUpload pins the real S3 rule that a
+// bucket with an in-progress multipart upload cannot be deleted. Without it
+// the upload row and its part blobs survive the delete, leaving an upload
+// that is listable but can never be aborted and has no ListMultipartUploads
+// route to discover it by.
+func TestAWSS3BucketDeleteBlockedByInFlightUpload(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/mpublock", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	// A second bucket stays deletable while the first has an upload pending:
+	// the guard is scoped by bucket name, not "any upload exists".
+	if _, status := s3Put(t, base+"/mpuother", nil, now); status != 200 {
+		t.Fatalf("create second bucket -> status %d, want 200", status)
+	}
+
+	// An initiated upload with no parts uploaded is already in progress, so
+	// it blocks the delete on its own.
+	body, status := s3Post(t, base+"/mpublock/multi.bin?uploads", nil, now)
+	if status != 200 {
+		t.Fatalf("create upload -> status %d, want 200; body %s", status, body)
+	}
+	uploadID := s3XMLTag(t, body, "UploadId")
+	if uploadID == "" {
+		t.Fatalf("no UploadId in %s", body)
+	}
+	partURL := base + "/mpublock/multi.bin?uploadId=" + uploadID
+
+	resp := s3Delete(t, base+"/mpublock", now)
+	delBody, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 409 {
+		t.Fatalf("delete bucket with in-flight upload -> status %d, want 409; body %s", resp.StatusCode, delBody)
+	}
+	if !strings.Contains(string(delBody), "BucketNotEmpty") {
+		t.Fatalf("delete bucket -> body %s, want BucketNotEmpty", delBody)
+	}
+
+	// A second part upload after the refused delete still works, proving the
+	// upload was left intact rather than half-torn-down.
+	partBody, status := s3Put(t, partURL+"&partNumber=1", []byte("hello"), now)
+	if status != 200 {
+		t.Fatalf("upload part after refused delete -> status %d, want 200; body %s", status, partBody)
+	}
+	if body, status := s3Get(t, partURL, now); status != 200 || !strings.Contains(body, "Part") {
+		t.Fatalf("list parts after refused delete -> status %d; body %s", status, body)
+	}
+
+	// Still blocked once a part is staged.
+	resp = s3Delete(t, base+"/mpublock", now)
+	resp.Body.Close()
+	if resp.StatusCode != 409 {
+		t.Fatalf("delete bucket with staged part -> status %d, want 409", resp.StatusCode)
+	}
+
+	// ?uploads is not implemented, so it must fail loudly rather than fall
+	// through to ListObjectsV2: a real SDK parses <ListBucketResult> as
+	// "nothing pending" and would conclude the bucket is clear.
+	body, status = s3Get(t, base+"/mpublock?uploads", now)
+	if status != 501 {
+		t.Fatalf("list multipart uploads -> status %d, want 501; body %s", status, body)
+	}
+	if strings.Contains(body, "ListBucketResult") {
+		t.Fatalf("list multipart uploads fell through to ListObjectsV2: %s", body)
+	}
+
+	// The other bucket was never blocked, before or after the upload existed.
+	resp = s3Delete(t, base+"/mpuother", now)
+	resp.Body.Close()
+	if resp.StatusCode != 204 {
+		t.Fatalf("delete unrelated bucket -> status %d, want 204", resp.StatusCode)
+	}
+
+	// Abort releases the bucket.
+	resp = s3Delete(t, partURL, now)
+	resp.Body.Close()
+	if resp.StatusCode != 204 {
+		t.Fatalf("abort upload -> status %d, want 204", resp.StatusCode)
+	}
+	resp = s3Delete(t, base+"/mpublock", now)
+	resp.Body.Close()
+	if resp.StatusCode != 204 {
+		t.Fatalf("delete bucket after abort -> status %d, want 204", resp.StatusCode)
+	}
+	// The bucket row is really gone, not just refused again.
+	if body, status := s3Get(t, base+"/mpublock?location", now); status != 404 {
+		t.Fatalf("get location after delete -> status %d, want 404; body %s", status, body)
+	}
+}
+
+// TestAWSS3BucketDeleteRefusedUntilEmpty covers the objects path through 409
+// BucketNotEmpty, which had no coverage at all, and is a coverage test rather
+// than a regression test: it passes on the pre-fix commit, where the delete
+// checked only the objects collection. It became load-bearing when DeleteBucket
+// started scanning mpu_uploads too — the final leg holds only if completing an
+// upload removes its row instead of leaving the bucket blocked forever.
+// TestAWSS3BucketDeleteBlockedByInFlightUpload is the regression test.
+func TestAWSS3BucketDeleteRefusedUntilEmpty(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	// A plain object blocks the delete on the objects path.
+	if _, status := s3Put(t, base+"/busy", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	if _, status := s3Put(t, base+"/busy/a.txt", []byte("hello"), now); status != 200 {
+		t.Fatalf("put object -> status %d, want 200", status)
+	}
+	resp := s3Delete(t, base+"/busy", now)
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 409 || !strings.Contains(string(body), "BucketNotEmpty") {
+		t.Fatalf("delete bucket with object -> status %d, want 409 BucketNotEmpty; body %s", resp.StatusCode, body)
+	}
+
+	// Completing an upload clears its upload row; only the resulting object
+	// should still be holding the delete.
+	if body, status := s3Post(t, base+"/busy/multi.bin?uploads", nil, now); status != 200 {
+		t.Fatalf("create upload -> status %d, want 200; body %s", status, body)
+	} else {
+		uploadID := s3XMLTag(t, body, "UploadId")
+		partURL := base + "/busy/multi.bin?uploadId=" + uploadID
+		rawETag, partStatus := s3PutETag(t, partURL+"&partNumber=1", []byte("hello"), now)
+		if partStatus != 200 {
+			t.Fatalf("upload part -> status %d, want 200", partStatus)
+		}
+		partETag := strings.Trim(rawETag, `"`)
+		if body, status := s3Post(t, partURL, []byte(s3CompleteBody([][2]string{{"1", partETag}})), now); status != 200 {
+			t.Fatalf("complete upload -> status %d, want 200; body %s", status, body)
+		}
+	}
+	resp = s3Delete(t, base+"/busy", now)
+	resp.Body.Close()
+	if resp.StatusCode != 409 {
+		t.Fatalf("delete bucket with two objects -> status %d, want 409", resp.StatusCode)
+	}
+
+	// Emptying the bucket releases the delete, which only holds if the
+	// completed upload's row was actually removed.
+	for _, key := range []string{"a.txt", "multi.bin"} {
+		resp = s3Delete(t, base+"/busy/"+key, now)
+		resp.Body.Close()
+		if resp.StatusCode != 204 {
+			t.Fatalf("delete object %s -> status %d, want 204", key, resp.StatusCode)
+		}
+	}
+	resp = s3Delete(t, base+"/busy", now)
+	resp.Body.Close()
+	if resp.StatusCode != 204 {
+		t.Fatalf("delete empty bucket -> status %d, want 204", resp.StatusCode)
+	}
+}
+
+// TestAWSS3ListMultipartUploadsNotImplemented pins that ?uploads answers 501
+// rather than falling through to ListObjectsV2. DeleteBucket refuses with 409
+// while an upload is in progress, so this endpoint is the only route a client
+// has to discover which upload is blocking it. Until it is implemented, the
+// escape hatch is the upload id, or `stunt clean` — documented in the README
+// and CHANGELOG.
+func TestAWSS3ListMultipartUploadsNotImplemented(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/lmu", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	if body, status := s3Post(t, base+"/lmu/multi.bin?uploads", nil, now); status != 200 {
+		t.Fatalf("create upload -> status %d, want 200; body %s", status, body)
+	}
+	// The bucket holds one object so a 200 ListBucketResult would be non-empty.
+	if _, status := s3Put(t, base+"/lmu/a.txt", []byte("hello"), now); status != 200 {
+		t.Fatalf("put object -> status %d, want 200", status)
+	}
+
+	body, status := s3Get(t, base+"/lmu?uploads", now)
+	if status != 501 {
+		t.Fatalf("GET ?uploads -> status %d, want 501; body %s", status, body)
+	}
+	if strings.Contains(body, "ListBucketResult") {
+		t.Fatalf("GET ?uploads fell through to ListObjectsV2: %s", body)
+	}
+	if !strings.Contains(body, "ListMultipartUploads") {
+		t.Fatalf("GET ?uploads -> body %s, want it to name the operation", body)
+	}
+}
+
+// TestAWSS3UnimplementedSubresourcesNotListed pins that every bucket
+// subresource this simulator lacks answers 501 NotImplemented instead of
+// falling through to ListObjectsV2. A <ListBucketResult> body reads to an SDK
+// as a successful empty result, so an unimplemented subresource must fail
+// loudly — ?versions is the worst case, where a client would conclude a
+// versioned bucket holds no versions.
+func TestAWSS3UnimplementedSubresourcesNotListed(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/subs", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	// One object, so a 200 ListBucketResult would be non-empty and obvious.
+	if _, status := s3Put(t, base+"/subs/a.txt", []byte("hello"), now); status != 200 {
+		t.Fatalf("put object -> status %d, want 200", status)
+	}
+
+	for _, sub := range awsS3BucketSubresources() {
+		if sub == "location" || sub == "uploads" {
+			continue
+		}
+		body, status := s3Get(t, base+"/subs?"+sub, now)
+		if status != 501 || !strings.Contains(body, "NotImplemented") {
+			t.Fatalf("GET ?%s -> status %d, want 501 NotImplemented; body %s", sub, status, body)
+		}
+		if strings.Contains(body, "ListBucketResult") {
+			t.Fatalf("GET ?%s fell through to ListObjectsV2: %s", sub, body)
+		}
+		// S3 subresource tokens are not case-sensitive, and a presigned or
+		// hand-rolled client can send any casing. An exact-match guard would
+		// return the bogus 200 ListBucketResult for these.
+		for _, variant := range []string{strings.ToUpper(sub), strings.ToUpper(sub[:1]) + sub[1:]} {
+			body, status := s3Get(t, base+"/subs?"+variant, now)
+			if status != 501 {
+				t.Fatalf("GET ?%s (case variant) -> status %d, want 501; body %s", variant, status, body)
+			}
+		}
+	}
+
+	// ?location and ?uploads are the two bucket tokens the adapter handles
+	// itself; every other SDK token must answer 501.
+	if body, status := s3Get(t, base+"/subs?location", now); status != 200 || !strings.Contains(body, "LocationConstraint") {
+		t.Fatalf("GET ?location -> status %d; body %s", status, body)
+	}
+	if body, status := s3Get(t, base+"/subs?list-type=2", now); status != 200 || !strings.Contains(body, "ListBucketResult") {
+		t.Fatalf("GET ?list-type=2 -> status %d; body %s", status, body)
+	}
+	// A modern SDK's own listing discriminator is not a bucket subresource.
+	if body, status := s3Get(t, base+"/subs?list-type=2&x-id=ListObjectsV2", now); status != 200 {
+		t.Fatalf("GET with x-id -> status %d, want 200; body %s", status, body)
+	}
+}
+
+// TestAWSS3UnimplementedSubresourceEscapesXML pins XML escaping on the 501
+// path. _xml_error interpolates its resource slot raw, so a bucket name
+// carrying XML metacharacters would otherwise reflect them into the response
+// document. Bucket names are not otherwise validated, so this is reachable
+// with no special setup.
+func TestAWSS3UnimplementedSubresourceEscapesXML(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	// Every XML predefined entity, as it appears after path decoding.
+	const metachars = `a<b&c"d'e`
+	if _, status := s3Put(t, base+"/"+metachars, nil, now); status != 200 {
+		t.Fatalf("create bucket with metacharacters -> status %d, want 200", status)
+	}
+
+	for _, probe := range []string{"?versions", "?uploads"} {
+		body, status := s3Get(t, base+"/"+metachars+probe, now)
+		if status != 501 {
+			t.Fatalf("GET %s -> status %d, want 501; body %s", probe, status, body)
+		}
+		for _, raw := range []string{"<Resource>a<b", "a&c", `c"d`, "d'e"} {
+			if strings.Contains(body, raw) {
+				t.Fatalf("GET %s reflected raw metacharacters %q: %s", probe, raw, body)
+			}
+		}
+		if !strings.Contains(body, "&lt;b&amp;c&quot;d&#39;e") {
+			t.Fatalf("GET %s -> body %s, want escaped metacharacters", probe, body)
+		}
+		// The document must still parse.
+		if err := xml.Unmarshal([]byte(body), new(struct {
+			XMLName xml.Name
+		})); err != nil {
+			t.Fatalf("GET %s -> body is not well-formed XML: %v; body %s", probe, err, body)
+		}
+	}
+}
+
+// awsS3BucketSubresources is the set of bucket-level `?subresource` tokens the
+// pinned aws-sdk-go-v2 can emit, taken from the `httpbinding.SplitURI("/?…")`
+// literals in its serializers. The S3 test list is expected to be derived from
+// a source other than the adapter's own denylist, so a token added to the SDK
+// but missed by the adapter fails here rather than silently falling through to
+// ListObjectsV2.
+
+func awsS3BucketSubresources() []string {
+	return []string{
+		"abac", "accelerate", "acl", "analytics", "cors", "delete", "encryption",
+		"inventory", "lifecycle", "location", "logging", "metadataAnnotationTable",
+		"metadataConfiguration", "metadataInventoryTable", "metadataJournalTable",
+		"intelligent-tiering", "metadataTable", "metrics", "notification",
+		"object-lock", "ownershipControls", "policy", "policyStatus",
+		"publicAccessBlock", "replication", "requestPayment", "session",
+		"tagging", "uploads", "versioning", "versions", "website",
+	}
+}
+
+// TestAWSS3SubresourcesDoNotTouchTheBucket pins that an unimplemented
+// subresource is rejected on every method that routes to /{bucket}, not just
+// GET. The guard originally lived only in the ListObjectsV2 path, so
+// `PUT /{bucket}?versioning` created a bucket and `DELETE /{bucket}?tagging`
+// deleted one — real DeleteBucketTagging leaves the bucket in place.
+func TestAWSS3SubresourcesDoNotTouchTheBucket(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/guard", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	if _, status := s3Put(t, base+"/guard/keep.txt", []byte("hello"), now); status != 200 {
+		t.Fatalf("put object -> status %d, want 200", status)
+	}
+
+	// DELETE on a subresource must not delete the bucket. This runs against an
+	// EMPTY bucket on purpose: a non-empty one answers 409 BucketNotEmpty, which
+	// would mask the destruction this is here to catch.
+	if _, status := s3Put(t, base+"/emptyguard", nil, now); status != 200 {
+		t.Fatalf("create empty bucket -> status %d, want 200", status)
+	}
+	for _, sub := range []string{"tagging", "lifecycle", "cors", "policy", "versioning", "acl", "website"} {
+		resp := s3Delete(t, base+"/emptyguard?"+sub, now)
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 501 || !strings.Contains(string(body), "NotImplemented") {
+			t.Fatalf("DELETE ?%s -> status %d, want 501 NotImplemented; body %s", sub, resp.StatusCode, body)
+		}
+		if body, status := s3Get(t, base+"/emptyguard?location", now); status != 200 {
+			t.Fatalf("DELETE ?%s destroyed the bucket -> status %d; body %s", sub, status, body)
+		}
+	}
+
+	// The object must still be there too.
+	if body, status := s3Get(t, base+"/guard/keep.txt", now); status != 200 || !strings.Contains(body, "hello") {
+		t.Fatalf("object lost after subresource DELETEs -> status %d; body %s", status, body)
+	}
+
+	// PUT on a subresource must not create a bucket.
+	for _, sub := range []string{"versioning", "tagging", "policy", "acl"} {
+		if body, status := s3Put(t, base+"/ghost?"+sub, nil, now); status != 501 {
+			t.Fatalf("PUT ?%s -> status %d, want 501; body %s", sub, status, body)
+		}
+		if body, status := s3Get(t, base+"/ghost?location", now); status != 404 {
+			t.Fatalf("PUT ?%s created a bucket -> status %d, want 404; body %s", sub, status, body)
+		}
+	}
+
+	// POST ?delete is S3's multi-object delete, unimplemented here.
+	body, status := s3Post(t, base+"/guard?delete", []byte("<Delete/>"), now)
+	if status != 501 || !strings.Contains(body, "NotImplemented") {
+		t.Fatalf("POST ?delete -> status %d, want 501 NotImplemented; body %s", status, body)
+	}
+
+	// A real create/delete still works.
+	if _, status := s3Put(t, base+"/guard", nil, now); status != 409 {
+		t.Fatalf("create existing bucket -> status %d, want 409", status)
+	}
+	resp := s3Delete(t, base+"/guard/keep.txt", now)
+	resp.Body.Close()
+	resp = s3Delete(t, base+"/guard", now)
+	resp.Body.Close()
+	if resp.StatusCode != 204 {
+		t.Fatalf("delete bucket -> status %d, want 204", resp.StatusCode)
+	}
+}
+
+// TestAWSS3ObjectSubresourcesDoNotTouchTheObject pins that object-level
+// ?subresource calls never fall through to PutObject/GetObject/
+// HeadObject/DeleteObject. Real S3 selects an object subresource with a query
+// parameter on the same routes, so without a guard `DELETE
+// /{bucket}/{key}?tagging` deletes the object and `PUT
+// /{bucket}/{key}?tagging` overwrites its content.
+func TestAWSS3ObjectSubresourcesDoNotTouchTheObject(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/osub", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	if _, status := s3Put(t, base+"/osub/keep.txt", []byte("hello"), now); status != 200 {
+		t.Fatalf("put object -> status %d, want 200", status)
+	}
+
+	for _, sub := range awsS3ObjectSubresources() {
+		resp := s3Delete(t, base+"/osub/keep.txt?"+sub, now)
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 501 || !strings.Contains(string(body), "NotImplemented") {
+			t.Fatalf("DELETE ?%s -> status %d, want 501 NotImplemented; body %s", sub, resp.StatusCode, body)
+		}
+		if body, status := s3Get(t, base+"/osub/keep.txt", now); status != 200 || !strings.Contains(body, "hello") {
+			t.Fatalf("DELETE ?%s destroyed the object -> status %d; body %s", sub, status, body)
+		}
+	}
+
+	// PUT on a subresource must not overwrite the content.
+	for _, sub := range awsS3ObjectSubresources() {
+		if body, status := s3Put(t, base+"/osub/keep.txt?"+sub, []byte("<Tagging/>"), now); status != 501 {
+			t.Fatalf("PUT ?%s -> status %d, want 501; body %s", sub, status, body)
+		}
+		if body, status := s3Get(t, base+"/osub/keep.txt", now); status != 200 || !strings.Contains(body, "hello") {
+			t.Fatalf("PUT ?%s overwrote the object -> status %d; body %s", sub, status, body)
+		}
+		// And must not create a new key either.
+		if body, status := s3Put(t, base+"/osub/ghost.txt?"+sub, []byte("x"), now); status != 501 {
+			t.Fatalf("PUT ?%s on a missing key -> status %d, want 501; body %s", sub, status, body)
+		}
+		if body, status := s3Get(t, base+"/osub/ghost.txt", now); status != 404 {
+			t.Fatalf("PUT ?%s created the key -> status %d, want 404; body %s", sub, status, body)
+		}
+	}
+
+	// GET/HEAD on a subresource must not read the object.
+	for _, sub := range awsS3ObjectSubresources() {
+		body, status := s3Get(t, base+"/osub/keep.txt?"+sub, now)
+		if status != 501 {
+			t.Fatalf("GET ?%s -> status %d, want 501; body %s", sub, status, body)
+		}
+		if strings.Contains(body, "hello") {
+			t.Fatalf("GET ?%s returned the object body: %s", sub, body)
+		}
+		resp := s3Head(t, base+"/osub/keep.txt?"+sub, now)
+		hbody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 501 {
+			t.Fatalf("HEAD ?%s -> status %d, want 501; body %s", sub, resp.StatusCode, hbody)
+		}
+	}
+
+	// The multipart routes and the plain object routes still work.
+	body, status := s3Post(t, base+"/osub/multi.bin?uploads", nil, now)
+	if status != 200 {
+		t.Fatalf("initiate upload -> status %d, want 200; body %s", status, body)
+	}
+	uploadID := s3XMLTag(t, body, "UploadId")
+	rawETag, partStatus := s3PutETag(t, base+"/osub/multi.bin?uploadId="+uploadID+"&partNumber=1", []byte("hello"), now)
+	if partStatus != 200 {
+		t.Fatalf("upload part -> status %d, want 200", partStatus)
+	}
+	if body, status := s3Post(t, base+"/osub/multi.bin?uploadId="+uploadID, []byte(s3CompleteBody([][2]string{{"1", strings.Trim(rawETag, `"`)}})), now); status != 200 {
+		t.Fatalf("complete upload -> status %d, want 200; body %s", status, body)
+	}
+	if body, status := s3Get(t, base+"/osub/keep.txt", now); status != 200 || !strings.Contains(body, "hello") {
+		t.Fatalf("plain object round-trip -> status %d; body %s", status, body)
+	}
+}
+
+// awsS3ObjectSubresources is the set of object-level `?subresource` tokens the
+// pinned aws-sdk-go-v2 can emit, from its `/{Key+}?…` SplitURI literals. Derived
+// independently of the adapter's denylist so a token the SDK can send but the
+// adapter omits fails here rather than falling through to PutObject/
+// DeleteObject.
+func awsS3ObjectSubresources() []string {
+	return []string{
+		"acl", "annotation", "attributes", "encryption", "legal-hold",
+		"renameObject", "restore", "retention", "select", "tagging", "torrent",
+	}
+}
+
+// TestAWSS3ErrorMessageEscapesQueryKey pins that a query parameter's key is
+// escaped before it is echoed into an error document. The bucket subresource
+// guards name the caller's own query key, so a key carrying XML metacharacters
+// must not be able to inject an element, close the <Message> element early, or
+// produce a document no parser accepts.
+func TestAWSS3ErrorMessageEscapesQueryKey(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	// Percent-encoded so the raw metacharacters reach the handler.
+	probes := []string{
+		"a%3Cb%26c=1",        // a<b&c=1
+		"%22x%22=1",          // "x"=1
+		"tagging%3Cx%3E=1",   // tagging<x>=1
+		"%3C%2FError%3E=1",   // </Error>=1
+		"%3C%2FMessage%3E=1", // </Message>=1
+		"%27%27%3Cb%3E=1",    // ''<>=1
+	}
+	for _, probe := range probes {
+		body, status := s3Put(t, base+"/msginj?"+probe, nil, now)
+		if status != 501 {
+			t.Fatalf("PUT ?%s -> status %d, want 501; body %s", probe, status, body)
+		}
+		if err := xml.Unmarshal([]byte(body), new(struct{ XMLName xml.Name })); err != nil {
+			t.Fatalf("PUT ?%s -> response is not well-formed XML: %v; body %q", probe, err, body)
+		}
+		// The envelope legitimately ends with </Message> and </Error>, so the
+		// detector for an injected element or a prematurely closed element is
+		// the parse above. Here we only assert the metacharacters themselves
+		// never appear raw.
+		for _, raw := range []string{"a<b", "a&c", "<x>", "''<", "'<"} {
+			if strings.Contains(body, raw) {
+				t.Fatalf("PUT ?%s reflected %q unescaped: %q", probe, raw, body)
+			}
+		}
+
+		// DELETE /{bucket} takes the same guard and must escape identically.
+		resp := s3Delete(t, base+"/msginj?"+probe, now)
+		delBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 501 {
+			t.Fatalf("DELETE ?%s -> status %d, want 501; body %s", probe, resp.StatusCode, delBody)
+		}
+		if err := xml.Unmarshal([]byte(delBody), new(struct{ XMLName xml.Name })); err != nil {
+			t.Fatalf("DELETE ?%s -> response is not well-formed XML: %v; body %q", probe, err, delBody)
+		}
+	}
+
+	// A plain subresource still produces the normal, readable message.
+	body, status := s3Put(t, base+"/msginj?versioning", nil, now)
+	if status != 501 || !strings.Contains(body, "versioning is not implemented") {
+		t.Fatalf("plain subresource -> status %d, body %s", status, body)
+	}
+}
+
+// TestAWSS3ObjectWriteRoutesAreFailClosed pins that the mutating object routes
+// allowlist rather than denylists query parameters. `?tagging` on PUT and DELETE
+// is covered elsewhere; this pins the forward-comproperty: a token this
+// simulator has never heard of must be refused, not treated as a plain
+// PutObject/DeleteObject. The bucket routes have the same property.
+func TestAWSS3ObjectWriteRoutesAreFailClosed(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/fc", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	if _, status := s3Put(t, base+"/fc/keep.txt", []byte("hello"), now); status != 200 {
+		t.Fatalf("put object -> status %d, want 200", status)
+	}
+
+	// Tokens this adapter has never heard of must not overwrite or destroy.
+	for _, unknown := range []string{"objectLockToken", "someNewSubresource", "checksum", "select-type"} {
+		if body, status := s3Put(t, base+"/fc/keep.txt?"+unknown+"=1", []byte("OVERWRITTEN"), now); status != 501 {
+			t.Fatalf("PUT ?%s -> status %d, want 501; body %s", unknown, status, body)
+		}
+		resp := s3Delete(t, base+"/fc/keep.txt?"+unknown+"=1", now)
+		dbody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 501 {
+			t.Fatalf("DELETE ?%s -> status %d, want 501; body %s", unknown, resp.StatusCode, dbody)
+		}
+		if body, status := s3Get(t, base+"/fc/keep.txt", now); status != 200 || !strings.Contains(body, "hello") {
+			t.Fatalf("?%s mutated the object -> status %d; body %s", unknown, status, body)
+		}
+	}
+
+	// The parameters a real client legitimately sends on those routes still work.
+	if body, status := s3Put(t, base+"/fc/plain.txt?x-id=PutObject", []byte("hello"), now); status != 200 {
+		t.Fatalf("PUT with x-id -> status %d, want 200; body %s", status, body)
+	}
+	if body, status := s3Put(t, base+"/fc/keep.txt?x-id=PutObject", []byte("hello"), now); status != 200 {
+		t.Fatalf("PUT over existing key with x-id -> status %d, want 200; body %s", status, body)
+	}
+	resp := s3Delete(t, base+"/fc/plain.txt?x-id=DeleteObject", now)
+	resp.Body.Close()
+	if resp.StatusCode != 204 {
+		t.Fatalf("DELETE with x-id -> status %d, want 204", resp.StatusCode)
+	}
+
+	// The bucket mutating routes are fail-closed the same way.
+	if body, status := s3Put(t, base+"/fcghost?someNewSubresource=1", nil, now); status != 501 {
+		t.Fatalf("PUT bucket with unknown token -> status %d, want 501; body %s", status, body)
+	}
+	if body, status := s3Get(t, base+"/fcghost?location", now); status != 404 {
+		t.Fatalf("unknown bucket token created a bucket -> status %d; body %s", status, body)
+	}
+}
+
+// TestAWSS3PresignedAuthParamsSurviveGuards pins that the parameters a SigV4
+// presigner puts in the query string are not treated as subresources by the
+// fail-closed guards. The requests here carry a valid header Authorization, so
+// this exercises the guard's parameter handling rather than presigned
+// verification itself: presigned GET is known-broken on this adapter (it
+// answers 403 SignatureDoesNotMatch, identically on the pre-fix commit), which
+// is out of scope here. What these cases pin is that the guards do not treat
+// the presigned parameters as subresources.
+func TestAWSS3PresignedAuthParamsSurviveGuards(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/presign", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	if _, status := s3Put(t, base+"/presign/keep.txt", []byte("hello"), now); status != 200 {
+		t.Fatalf("put object -> status %d, want 200", status)
+	}
+
+	// Every parameter a SigV4 presigner puts in the query, and nothing else.
+	presignedQuery := "X-Amz-Algorithm=AWS4-HMAC-SHA256" +
+		"&X-Amz-Credential=AKIAIOSFODNN7EXAMPLE%2F20260120%2Fus-east-1%2Fs3%2Faws4_request" +
+		"&X-Amz-Date=20260120T120000Z" +
+		"&X-Amz-Expires=900" +
+		"&X-Amz-SignedHeaders=host" +
+		"&X-Amz-Signature=" + strings.Repeat("a", 64)
+
+	// The guard must not fire: these carry every presigned-auth parameter a
+	// SigV4 presigner emits, alongside a legitimate route parameter, and the
+	// operation must still be performed rather than refused as a subresource.
+	if body, status := s3Put(t, base+"/presign/keep.txt?"+presignedQuery+"&x-id=PutObject", []byte("hello"), now); status != 200 {
+		t.Fatalf("PUT with presigned auth params -> status %d, want 200; body %s", status, body)
+	}
+	if body, status := s3Put(t, base+"/presign/second.txt?"+presignedQuery+"&x-id=PutObject", []byte("hello"), now); status != 200 {
+		t.Fatalf("PUT new key with presigned auth params -> status %d, want 200; body %s", status, body)
+	}
+	resp := s3Delete(t, base+"/presign/second.txt?"+presignedQuery+"&x-id=DeleteObject", now)
+	dbody, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 204 {
+		t.Fatalf("DELETE with presigned auth params -> status %d, want 204; body %s", resp.StatusCode, dbody)
+	}
+
+	// Bucket routes too: presigned-auth parameters must not be read as a
+	// subresource, so the create proceeds. A bare presigned PUT carries nothing
+	// but auth, which is what real CreateBucket accepts.
+	if body, status := s3Put(t, base+"/presignghost?"+presignedQuery, nil, now); status != 200 {
+		t.Fatalf("presigned bucket create -> status %d, want 200; body %s", status, body)
+	}
+	if body, status := s3Get(t, base+"/presignghost?location", now); status != 200 {
+		t.Fatalf("presigned bucket create did not take effect -> status %d; body %s", status, body)
+	}
+	// A real subresource alongside the presigned parameters is still refused.
+	if body, status := s3Put(t, base+"/presignother?"+presignedQuery+"&versioning", nil, now); status != 501 {
+		t.Fatalf("presigned create with a real subresource -> status %d, want 501; body %s", status, body)
+	}
+}
+
+// TestAWSS3XIdMustNameAnImplementedOperation pins that the mutating object
+// routes validate the VALUE of x-id, not just the key. An AWS SDK sends
+// `x-id=<Operation>` on every call, so allowing the key by name is not enough:
+// `PUT /{b}/{k}?x-id=CopyObject` and `?x-id=RestoreObject` would otherwise
+// reach PutObject and mutate the object behind an operation this adapter does
+// not implement.
+func TestAWSS3XIdMustNameAnImplementedOperation(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/xid", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	if _, status := s3Put(t, base+"/xid/keep.txt", []byte("ORIGINAL"), now); status != 200 {
+		t.Fatalf("put object -> status %d, want 200", status)
+	}
+
+	// Operations the adapter does not implement, on both mutating verbs.
+	for _, op := range []string{
+		"CopyObject", "RestoreObject", "SelectObjectContent", "PutObjectLegalHold",
+		"GetObjectAttributes", "PutObjectTagging", "UploadPartCopy", "ObjectLockToken",
+	} {
+		if body, status := s3Put(t, base+"/xid/keep.txt?x-id="+op, []byte("OVERWRITTEN"), now); status != 501 {
+			t.Fatalf("PUT ?x-id=%s -> status %d, want 501; body %s", op, status, body)
+		}
+		if b, st := s3Get(t, base+"/xid/keep.txt", now); st != 200 || !strings.Contains(b, "ORIGINAL") {
+			t.Fatalf("PUT ?x-id=%s mutated the object -> status %d; body %s", op, st, b)
+		}
+		resp := s3Delete(t, base+"/xid/keep.txt?x-id="+op, now)
+		dbody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 501 {
+			t.Fatalf("DELETE ?x-id=%s -> status %d, want 501; body %s", op, resp.StatusCode, dbody)
+		}
+		if b, st := s3Get(t, base+"/xid/keep.txt", now); st != 200 || !strings.Contains(b, "ORIGINAL") {
+			t.Fatalf("DELETE ?x-id=%s destroyed the object -> status %d; body %s", op, st, b)
+		}
+		// It must not create a key either.
+		if body, status := s3Put(t, base+"/xid/ghost.txt?x-id="+op, []byte("X"), now); status != 501 {
+			t.Fatalf("PUT ghost ?x-id=%s -> status %d, want 501; body %s", op, status, body)
+		}
+		if b, st := s3Get(t, base+"/xid/ghost.txt", now); st != 404 {
+			t.Fatalf("PUT ghost ?x-id=%s created a key -> status %d; body %s", op, st, b)
+		}
+	}
+
+	// The operations this adapter does implement still work, including mixed
+	// casing on the key and the value.
+	for _, ok := range []string{"x-id=PutObject", "X-Id=PutObject", "x-id=putobject"} {
+		if body, status := s3Put(t, base+"/xid/keep.txt?"+ok, []byte("ORIGINAL"), now); status != 200 {
+			t.Fatalf("PUT ?%s -> status %d, want 200; body %s", ok, status, body)
+		}
+	}
+	resp := s3Delete(t, base+"/xid/keep.txt?x-id=DeleteObject", now)
+	resp.Body.Close()
+	if resp.StatusCode != 204 {
+		t.Fatalf("DELETE ?x-id=DeleteObject -> status %d, want 204", resp.StatusCode)
+	}
+}
+
+// TestAWSS3PartNumberRequiresUploadId pins real S3's rule that partNumber only
+// selects UploadPart when it accompanies uploadId. Without it,
+// `PUT /{bucket}/{key}?partNumber=N` fell through to PutObject and overwrote
+// the object.
+func TestAWSS3PartNumberRequiresUploadId(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/pn", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	if _, status := s3Put(t, base+"/pn/keep.txt", []byte("ORIGINAL"), now); status != 200 {
+		t.Fatalf("put object -> status %d, want 200", status)
+	}
+
+	for _, q := range []string{"partNumber=1", "partNumber", "PARTNUMBER=2"} {
+		body, status := s3Put(t, base+"/pn/keep.txt?"+q, []byte("OVERWRITTEN"), now)
+		if status != 400 || !strings.Contains(body, "InvalidRequest") {
+			t.Fatalf("PUT ?%s -> status %d, want 400 InvalidRequest; body %s", q, status, body)
+		}
+		if b, st := s3Get(t, base+"/pn/keep.txt", now); st != 200 || !strings.Contains(b, "ORIGINAL") {
+			t.Fatalf("PUT ?%s overwrote the object -> status %d; body %s", q, st, b)
+		}
+	}
+
+	// The real multipart pairing still works.
+	body, status := s3Post(t, base+"/pn/multi.bin?uploads", nil, now)
+	if status != 200 {
+		t.Fatalf("initiate upload -> status %d, want 200; body %s", status, body)
+	}
+	uploadID := s3XMLTag(t, body, "UploadId")
+	rawETag, partStatus := s3PutETag(t, base+"/pn/multi.bin?uploadId="+uploadID+"&partNumber=1", []byte("hello"), now)
+	if partStatus != 200 {
+		t.Fatalf("upload part -> status %d, want 200", partStatus)
+	}
+	if body, status := s3Post(t, base+"/pn/multi.bin?uploadId="+uploadID, []byte(s3CompleteBody([][2]string{{"1", strings.Trim(rawETag, `"`)}})), now); status != 200 {
+		t.Fatalf("complete upload -> status %d, want 200; body %s", status, body)
+	}
+	if body, status := s3Get(t, base+"/pn/multi.bin", now); status != 200 || !strings.Contains(body, "hello") {
+		t.Fatalf("completed object -> status %d; body %s", status, body)
+	}
+}
+
+// TestAWSS3MultipartRoutesAreGuarded pins that the multipart dispatch cannot be
+// reached with a subresource the allowlist should have refused. A real SDK asks
+// for UploadPartCopy as `?partNumber=N&uploadId=U&x-id=UploadPartCopy`; with the
+// guard running after the dispatch that stored a zero-byte part and returned a
+// successful response with no result, instead of refusing the operation.
+func TestAWSS3MultipartRoutesAreGuarded(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/mpug", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	body, status := s3Post(t, base+"/mpug/multi.bin?uploads", nil, now)
+	if status != 200 {
+		t.Fatalf("initiate upload -> status %d, want 200; body %s", status, body)
+	}
+	uploadID := s3XMLTag(t, body, "UploadId")
+	if uploadID == "" {
+		t.Fatalf("no UploadId in %s", body)
+	}
+
+	// UploadPartCopy is the real-SDK shape: it must be refused, not stored as a
+	// zero-byte UploadPart.
+	for _, q := range []string{
+		"uploadId=" + uploadID + "&partNumber=1&x-id=UploadPartCopy",
+		"partNumber=1&uploadId=" + uploadID + "&x-id=UploadPartCopy",
+		"uploadId=" + uploadID + "&partNumber=1&x-id=CopyObject",
+		"uploadId=" + uploadID + "&partNumber=1&tagging",
+		"uploadId=" + uploadID + "&partNumber=1&acl",
+		"uploadId=" + uploadID + "&partNumber=1&retention",
+	} {
+		body, status := s3Put(t, base+"/mpug/multi.bin?"+q, []byte("hello"), now)
+		if status != 501 {
+			t.Fatalf("PUT ?%s -> status %d, want 501; body %s", q, status, body)
+		}
+	}
+	// No part was stored by any of them.
+	if body, status := s3Get(t, base+"/mpug/multi.bin?uploadId="+uploadID, now); status != 200 || strings.Contains(body, "<Part>") {
+		t.Fatalf("guarded part uploads stored a part: %s", body)
+	}
+
+	// POST /{bucket}/{key} with a refused subresource must not create or
+	// complete an upload.
+	for _, q := range []string{
+		"uploadId=" + uploadID + "&tagging",
+		"uploadId=" + uploadID + "&acl",
+		"uploadId=" + uploadID + "&x-id=CopyObject",
+		"uploadId=" + uploadID + "&x-id=RestoreObject",
+		"uploads&tagging",
+		"uploads&x-id=SelectObjectContent",
+	} {
+		if body, status := s3Post(t, base+"/mpug/multi.bin?"+q, nil, now); status != 501 {
+			t.Fatalf("POST ?%s -> status %d, want 501; body %s", q, status, body)
+		}
+	}
+	// The upload is untouched: still one upload, still no parts, and the object
+	// was never created.
+	if body, status := s3Get(t, base+"/mpug/multi.bin?uploadId="+uploadID, now); status != 200 {
+		t.Fatalf("list parts -> status %d, want 200; body %s", status, body)
+	}
+	if body, status := s3Get(t, base+"/mpug/multi.bin", now); status != 404 {
+		t.Fatalf("guarded POST completed the upload -> status %d, want 404; body %s", status, body)
+	}
+
+	// The legitimate multipart lifecycle still works end to end.
+	rawETag, partStatus := s3PutETag(t, base+"/mpug/multi.bin?uploadId="+uploadID+"&partNumber=1", []byte("hello"), now)
+	if partStatus != 200 {
+		t.Fatalf("upload part -> status %d, want 200", partStatus)
+	}
+	if body, status := s3Post(t, base+"/mpug/multi.bin?uploadId="+uploadID, []byte(s3CompleteBody([][2]string{{"1", strings.Trim(rawETag, `"`)}})), now); status != 200 {
+		t.Fatalf("complete upload -> status %d, want 200; body %s", status, body)
+	}
+	if body, status := s3Get(t, base+"/mpug/multi.bin", now); status != 200 || !strings.Contains(body, "hello") {
+		t.Fatalf("completed object -> status %d; body %s", status, body)
+	}
+
+	// An any-cased ?uploadId must not bypass the allowlist and overwrite an
+	// object; the dispatch is case-insensitive so it reaches the guard instead.
+	if _, status := s3Put(t, base+"/mpug/plain.txt", []byte("ORIGINAL"), now); status != 200 {
+		t.Fatalf("put plain object -> status %d, want 200", status)
+	}
+	for _, q := range []string{"partNumber=1&UPLOADID=nosuch", "partNumber=1&uploadid=nosuch", "PARTNUMBER=1&uploadId=nosuch"} {
+		if body, status := s3Put(t, base+"/mpug/plain.txt?"+q, []byte("CLOBBER"), now); status == 200 {
+			t.Fatalf("PUT ?%s -> 200, want a refusal; body %s", q, body)
+		}
+		if b, st := s3Get(t, base+"/mpug/plain.txt", now); st != 200 || !strings.Contains(b, "ORIGINAL") {
+			t.Fatalf("PUT ?%s overwrote the object -> status %d; body %s", q, st, b)
+		}
+		resp := s3Delete(t, base+"/mpug/plain.txt?"+q, now)
+		resp.Body.Close()
+		if resp.StatusCode == 204 {
+			t.Fatalf("DELETE ?%q destroyed the object", q)
+		}
+	}
+}
+
+// TestAWSS3CompleteAcceptsXMLEscapedETags pins that CompleteMultipartUpload
+// accepts an ETag however the client quoted it. Go's encoding/xml escapes the
+// quotes around an ETag as `&#34;` and .NET's XmlWriter as `&quot;`, so a real
+// SDK echoing a stored ETag back does not send literal quotes — and reading the
+// entity verbatim made every Complete answer 400 InvalidPart.
+func TestAWSS3CompleteAcceptsXMLEscapedETags(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/esc", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+
+	// Every quoting form an SDK might send, including the ones the engine's own
+	// CompleteMultipartUploadResult emits back to a client that re-serializes it.
+	for _, form := range []struct{ name, wrap string }{
+		{"literal quotes", `"%s"`},
+		{"unquoted", `%s`},
+		{"numeric character reference", `&#34;%s&#34;`},
+		{"named quot entity", `&quot;%s&quot;`},
+		{"weak validator", `W/"%s"`},
+		{"uppercase hex", `"%s"`},
+	} {
+		key := form.name
+		key = strings.ReplaceAll(key, " ", "")
+		body, status := s3Post(t, base+"/esc/"+key+"?uploads", nil, now)
+		if status != 200 {
+			t.Fatalf("initiate %s -> status %d, want 200; body %s", form.name, status, body)
+		}
+		uploadID := s3XMLTag(t, body, "UploadId")
+		rawETag, partStatus := s3PutETag(t, base+"/esc/"+key+"?uploadId="+uploadID+"&partNumber=1", []byte("hello"), now)
+		if partStatus != 200 {
+			t.Fatalf("upload part %s -> status %d, want 200", form.name, partStatus)
+		}
+		hexETag := strings.Trim(rawETag, `"`)
+		if form.name == "uppercase hex" {
+			hexETag = strings.ToUpper(hexETag)
+		}
+		complete := "<CompleteMultipartUpload><Part><ETag>" + fmt.Sprintf(form.wrap, hexETag) + "</ETag><PartNumber>1</PartNumber></Part></CompleteMultipartUpload>"
+		if body, status := s3Post(t, base+"/esc/"+key+"?uploadId="+uploadID, []byte(complete), now); status != 200 {
+			t.Fatalf("complete with %s -> status %d, want 200; body %s", form.name, status, body)
+		}
+		if body, status := s3Get(t, base+"/esc/"+key, now); status != 200 || !strings.Contains(body, "hello") {
+			t.Fatalf("object after %s -> status %d; body %s", form.name, status, body)
+		}
+	}
+}
+
+// TestAWSS3ListObjectsV2Scales pins that a single bucket listing can return a
+// few hundred objects. _xml_escape runs per listed entry, so an unrelated change
+// to it silently moves this ceiling: an inlined control-character check once
+// cost ~40% of the per-entry budget and cut the ceiling from ~290 objects to
+// ~163, which surfaced as a JSON 500 instead of a listing.
+func TestAWSS3ListObjectsV2Scales(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	const objects = 250
+	if _, status := s3Put(t, base+"/scale", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	for i := 0; i < objects; i++ {
+		if _, status := s3Put(t, base+"/scale/"+fmt.Sprintf("dir/prefix/key-%04d.bin", i), []byte("payload"), now); status != 200 {
+			t.Fatalf("put object %d -> status %d, want 200", i, status)
+		}
+	}
+
+	body, status := s3Get(t, base+"/scale?list-type=2", now)
+	if status != 200 {
+		t.Fatalf("list %d objects -> status %d, want 200 (step budget?); body %.400s", objects, status, body)
+	}
+	if got := strings.Count(body, "<Key>"); got != objects {
+		t.Fatalf("listing returned %d keys, want %d", got, objects)
+	}
+	if strings.Contains(body, "too many steps") {
+		t.Fatal("listing exhausted the Starlark step budget")
+	}
+}
+
+// TestAWSS3DeleteObjectAcceptsVersionId pins that a versioned delete is not
+// refused. The real SDK always sends `?versionId` on DeleteObject, and on a
+// bucket with no versioning any id addresses the single object, which is what
+// real S3 does. The query allowlist rejected it, regressing every versioned
+// delete from 204 to 501.
+//
+// Like TestAWSS3BucketDeleteRefusedUntilEmpty, this passes on the pre-fix
+// commit: base had no allowlist, so it already answered 204. The test guards
+// against the allowlist drifting away from that correct behavior rather than
+// introducing it.
+func TestAWSS3DeleteObjectAcceptsVersionId(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/vid", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+	if _, status := s3Put(t, base+"/vid/a.txt", []byte("hello"), now); status != 200 {
+		t.Fatalf("put object -> status %d, want 200", status)
+	}
+
+	// The exact shape the Go SDK sends.
+	for _, q := range []string{
+		"x-id=DeleteObject&versionId=null",
+		"versionId=null",
+		"VERSIONID=null",
+		"versionId=abc123",
+	} {
+		if _, status := s3Put(t, base+"/vid/a.txt", []byte("hello"), now); status != 200 {
+			t.Fatalf("setup put -> status %d, want 200", status)
+		}
+		resp := s3Delete(t, base+"/vid/a.txt?"+q, now)
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 204 {
+			t.Fatalf("DELETE ?%s -> status %d, want 204; body %s", q, resp.StatusCode, body)
+		}
+		if b, st := s3Get(t, base+"/vid/a.txt", now); st != 404 {
+			t.Fatalf("DELETE ?%s did not remove the object -> status %d; body %s", q, st, b)
+		}
+	}
+}
+
+// TestAWSS3CompleteRejectsDoubleEscapedETags pins that the requested ETag is
+// XML-decoded exactly once. Decoding it in both the parser and the comparison
+// accepted double-escaped quoting (`&amp;quot;H&amp;quot;`) that real S3, which
+// decodes once, rejects with InvalidPart.
+func TestAWSS3CompleteRejectsDoubleEscapedETags(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	if _, status := s3Put(t, base+"/deesc", nil, now); status != 200 {
+		t.Fatalf("create bucket -> status %d, want 200", status)
+	}
+
+	for i, form := range []string{
+		`&#34;%s&#34;`,   // Go encoding/xml
+		`&quot;%s&quot;`, // .NET XmlWriter
+		`"%s"`,           // literal quotes
+	} {
+		key := "single" + strconv.Itoa(i)
+		body, status := s3Post(t, base+"/deesc/"+key+"?uploads", nil, now)
+		if status != 200 {
+			t.Fatalf("initiate %s -> status %d, want 200; body %s", form, status, body)
+		}
+		uploadID := s3XMLTag(t, body, "UploadId")
+		rawETag, partStatus := s3PutETag(t, base+"/deesc/"+key+"?uploadId="+uploadID+"&partNumber=1", []byte("hello"), now)
+		if partStatus != 200 {
+			t.Fatalf("upload part -> status %d, want 200", partStatus)
+		}
+		hexETag := strings.Trim(rawETag, `"`)
+		complete := "<CompleteMultipartUpload><Part><ETag>" + fmt.Sprintf(form, hexETag) + "</ETag><PartNumber>1</PartNumber></Part></CompleteMultipartUpload>"
+		if body, status := s3Post(t, base+"/deesc/"+key+"?uploadId="+uploadID, []byte(complete), now); status != 200 {
+			t.Fatalf("complete with %s -> status %d, want 200; body %s", form, status, body)
+		}
+	}
+
+	// Double-escaped forms must be rejected: one decode leaves an entity
+	// reference where real S3 expects the value.
+	for _, form := range []string{`&amp;quot;%s&amp;quot;`, `&#38;quot;%s&#38;quot;`, `&#38;#34;%s&#38;#34;`} {
+		body, status := s3Post(t, base+"/deesc/bad?uploads", nil, now)
+		if status != 200 {
+			t.Fatalf("initiate upload -> status %d, want 200; body %s", status, body)
+		}
+		uploadID := s3XMLTag(t, body, "UploadId")
+		rawETag, partStatus := s3PutETag(t, base+"/deesc/bad?uploadId="+uploadID+"&partNumber=1", []byte("hello"), now)
+		if partStatus != 200 {
+			t.Fatalf("upload part -> status %d, want 200", partStatus)
+		}
+		complete := "<CompleteMultipartUpload><Part><ETag>" + fmt.Sprintf(form, strings.Trim(rawETag, `"`)) + "</ETag><PartNumber>1</PartNumber></Part></CompleteMultipartUpload>"
+		if body, status := s3Post(t, base+"/deesc/bad?uploadId="+uploadID, []byte(complete), now); status != 400 || !strings.Contains(body, "InvalidPart") {
+			t.Fatalf("complete with double-escaped %s -> status %d, want 400 InvalidPart; body %s", form, status, body)
+		}
+	}
 }
