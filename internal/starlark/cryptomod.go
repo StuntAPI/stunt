@@ -37,7 +37,11 @@ var cryptoModule = &starlarkstruct.Module{
 		// md5 exists for PROTOCOL CHECKSUMS only (SQS MD5OfMessage etc.) —
 		// providers validate it client-side; it is not a security primitive
 		// and adapters must not use it for signatures.
-		"md5":               sk.NewBuiltin("crypto.md5", md5Hash),
+		"md5": sk.NewBuiltin("crypto.md5", md5Hash),
+		// md5_hex_concat exists for S3 MPU ETag composition only
+		// (MD5 over concatenated part-MD5 binaries; handler appends -N).
+		// Same compat-checksum charter as md5: never auth/integrity.
+		"md5_hex_concat":    sk.NewBuiltin("crypto.md5_hex_concat", md5HexConcat),
 		"base64_encode":     sk.NewBuiltin("crypto.base64_encode", base64Encode),
 		"base64_decode":     sk.NewBuiltin("crypto.base64_decode", base64Decode),
 		"base64url_encode":  sk.NewBuiltin("crypto.base64url_encode", base64urlEncode),
@@ -134,6 +138,53 @@ func sha256Hash(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (
 		return nil, err
 	}
 	return sk.String(out), nil
+}
+
+// md5HexConcat implements crypto.md5_hex_concat(hex_list) -> hex | None.
+// It hex-decodes each element (case-insensitive, normalized lower), concats
+// the binaries, and returns hex(md5(concat)). The handler appends "-N".
+//
+// Total on any shape mismatch (None, never Error): handlers have no
+// try/except and a Starlark Error surfaces as an unhandled 500
+// (adapter_dispatch.go:155-159), so arity, kwarg, type, length, hex, empty,
+// and >10000 mismatches all return None. Manual arg inspection (not
+// UnpackArgs) keeps extra kwargs and wrong arity total.
+func md5HexConcat(_ *sk.Thread, _ *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
+	if len(kwargs) != 0 {
+		return sk.None, nil
+	}
+	if len(args) != 1 {
+		return sk.None, nil
+	}
+	lst, ok := args[0].(*sk.List)
+	if !ok {
+		return sk.None, nil
+	}
+	n := lst.Len()
+	if n == 0 || n > 10000 {
+		return sk.None, nil
+	}
+	raw := make([]byte, 0, n*16)
+	it := lst.Iterate()
+	defer it.Done()
+	var v sk.Value
+	for it.Next(&v) {
+		s, ok := v.(sk.String)
+		if !ok {
+			return sk.None, nil
+		}
+		str := string(s)
+		if len(str) != 32 {
+			return sk.None, nil
+		}
+		b, err := hex.DecodeString(strings.ToLower(str))
+		if err != nil || len(b) != 16 {
+			return sk.None, nil
+		}
+		raw = append(raw, b...)
+	}
+	sum := md5.Sum(raw)
+	return sk.String(hex.EncodeToString(sum[:])), nil
 }
 
 func base64Encode(_ *sk.Thread, b *sk.Builtin, args sk.Tuple, kwargs []sk.Tuple) (sk.Value, error) {
