@@ -897,3 +897,245 @@ func TestAWSS3StyleBinaryRoundTrip(t *testing.T) {
 		t.Fatalf("HEAD Content-Length = %q, want %d", hdr.Header.Get("Content-Length"), len(bin))
 	}
 }
+
+// TestAWSS3Conditionals exercises S3 conditional preconditions:
+// PUT/DELETE ETag-only, GET/HEAD full with timestamps, 412/304 codes.
+func TestAWSS3Conditionals(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	vc := clock.NewVirtualClock(time.Date(2026, 1, 20, 12, 0, 0, 0, time.UTC))
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+	e, err := New(m, WithClock(vc))
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["s3"]
+	now := vc.Now()
+
+	doCond := func(method, rawurl string, body []byte, cond map[string]string) (string, int, http.Header) {
+		t.Helper()
+		req := s3SignedReq(t, method, rawurl, body, now, awsStyleAccessKey, awsStyleSecretKey)
+		for k, v := range cond {
+			req.Header.Set(k, v)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		b, _ := io.ReadAll(resp.Body)
+		return string(b), resp.StatusCode, resp.Header
+	}
+
+	if _, status := s3Put(t, base+"/condbucket", nil, now); status != 200 {
+		t.Fatalf("create bucket -> %d", status)
+	}
+
+	// The ETag algorithm is covered by its own test; here the returned value
+	// is just the validator these preconditions are compared against.
+	etag, status := s3PutETag(t, base+"/condbucket/file.txt", []byte("hello"), now)
+	if status != 200 {
+		t.Fatalf("put file -> %d", status)
+	}
+	if !strings.HasPrefix(etag, `"`) || !strings.HasSuffix(etag, `"`) {
+		t.Fatalf("put file ETag = %q, want a quoted validator", etag)
+	}
+	wrongETag := `"00000000000000000000000000000000"`
+
+	lastModStr := vc.Now().UTC().Format(http.TimeFormat)
+	futureStr := vc.Now().Add(48 * time.Hour).UTC().Format(http.TimeFormat)
+	pastStr := vc.Now().Add(-48 * time.Hour).UTC().Format(http.TimeFormat)
+	// single-digit future day + UTC/UT variants + TAB OWS + month-ci
+	singleDigitFuture := vc.Now().Add(15 * 24 * time.Hour).UTC().Format("Mon, 2 Jan 2006 15:04:05 GMT")
+	_ = singleDigitFuture
+	utcStr := vc.Now().UTC().Format("Mon, 02 Jan 2006 15:04:05 UTC")
+	utStr := vc.Now().UTC().Format("Mon, 02 Jan 2006 15:04:05 UT")
+	tabStr := "Tue,\t20 Jan 2026 12:00:00 GMT"
+	multiSPStr := "Tue,  20  Jan  2026  12:00:00  GMT"
+	monthCIStr := "Tue, 20 JAN 2026 12:00:00 GMT"
+	weekdayIgnoreFuture := "Frobnicate, " + vc.Now().Add(48*time.Hour).UTC().Format("02 Jan 2006 15:04:05 GMT")
+	feb30Str := "Mon, 30 Feb 2026 00:00:00 GMT"
+	feb29NonLeap := "Sun, 29 Feb 2026 12:00:00 GMT"
+	feb29LeapFuture := "Sat, 29 Feb 2028 12:00:00 GMT"
+
+	// PUT If-None-Match:* on existing -> 412
+	if body, st, _ := doCond("PUT", base+"/condbucket/file.txt", []byte("hello"), map[string]string{"If-None-Match": "*"}); st != 412 {
+		t.Fatalf("put conflict INM:* -> status %d, want 412; body %s", st, body)
+	}
+	// PUT If-Match wrong -> 412
+	if body, st, _ := doCond("PUT", base+"/condbucket/file.txt", []byte("hello"), map[string]string{"If-Match": wrongETag}); st != 412 {
+		t.Fatalf("put If-Match wrong -> status %d, want 412; body %s", st, body)
+	}
+	// PUT missing + If-Match:* -> 412
+	if body, st, _ := doCond("PUT", base+"/condbucket/missing.txt", []byte("x"), map[string]string{"If-Match": "*"}); st != 412 {
+		t.Fatalf("put missing If-Match:* -> status %d, want 412; body %s", st, body)
+	}
+	// PUT missing + INM:* -> 200 (create allowed)
+	if body, st, _ := doCond("PUT", base+"/condbucket/created.txt", []byte("x"), map[string]string{"If-None-Match": "*"}); st != 200 {
+		t.Fatalf("put missing INM:* -> status %d, want 200; body %s", st, body)
+	}
+	// DELETE missing no-cond -> 204
+	if _, st, _ := doCond("DELETE", base+"/condbucket/nokey.txt", nil, nil); st != 204 {
+		t.Fatalf("delete missing no-cond -> status %d, want 204", st)
+	}
+	// DELETE missing + If-Match -> 412
+	if body, st, _ := doCond("DELETE", base+"/condbucket/nokey2.txt", nil, map[string]string{"If-Match": "*"}); st != 412 {
+		t.Fatalf("delete missing If-Match -> status %d, want 412; body %s", st, body)
+	}
+	// DELETE existing wrong If-Match -> 412 (object must survive)
+	if body, st, _ := doCond("DELETE", base+"/condbucket/file.txt", nil, map[string]string{"If-Match": wrongETag}); st != 412 {
+		t.Fatalf("delete If-Match wrong -> status %d, want 412; body %s", st, body)
+	}
+	// GET If-None-Match:etag -> 304 empty + ETag/LM/req-id, no CT
+	body, st, hdr := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-None-Match": etag})
+	if st != 304 {
+		t.Fatalf("get INM etag -> status %d, want 304; body %s", st, body)
+	}
+	if body != "" {
+		t.Fatalf("get 304 body = %q, want empty", body)
+	}
+	if hdr.Get("ETag") != etag {
+		t.Fatalf("get 304 ETag = %q, want %q", hdr.Get("ETag"), etag)
+	}
+	if hdr.Get("Last-Modified") == "" {
+		t.Fatal("get 304 missing Last-Modified")
+	}
+	if hdr.Get("x-amz-request-id") == "" {
+		t.Fatal("get 304 missing x-amz-request-id")
+	}
+	if hdr.Get("Content-Type") != "" {
+		t.Fatalf("get 304 Content-Type = %q, want empty", hdr.Get("Content-Type"))
+	}
+	// GET If-None-Match:* on existing -> 304
+	if _, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-None-Match": "*"}); st != 304 {
+		t.Fatalf("get INM:* -> status %d, want 304", st)
+	}
+	// GET If-Match wrong -> 412 PreconditionFailed
+	body, st, hdr = doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Match": wrongETag})
+	if st != 412 {
+		t.Fatalf("get If-Match wrong -> status %d, want 412; body %s", st, body)
+	}
+	if !strings.Contains(body, "PreconditionFailed") {
+		t.Fatalf("get 412 missing PreconditionFailed; body %s", body)
+	}
+	if !strings.Contains(body, "<Condition>If-Match</Condition>") {
+		t.Fatalf("get 412 missing Condition If-Match; body %s", body)
+	}
+	if hdr.Get("Content-Type") != "application/xml" {
+		t.Fatalf("get 412 CT = %q, want application/xml", hdr.Get("Content-Type"))
+	}
+	if hdr.Get("x-amz-request-id") == "" {
+		t.Fatal("get 412 missing x-amz-request-id")
+	}
+	// GET missing + If-Match -> 404 (not 412)
+	if body, st, _ := doCond("GET", base+"/condbucket/nokey3.txt", nil, map[string]string{"If-Match": "*"}); st != 404 {
+		t.Fatalf("get missing If-Match -> status %d, want 404; body %s", st, body)
+	}
+	// malformed ETag ignored -> 200
+	if body, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Match": "W/"}); st != 200 {
+		t.Fatalf("get malformed If-Match W/ -> status %d, want 200; body %s", st, body)
+	}
+	if body, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": "not-a-date"}); st != 200 {
+		t.Fatalf("get malformed IMS -> status %d, want 200; body %s", st, body)
+	}
+	// combined If-Match fail + INM match -> 412 wins (not 304)
+	if body, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Match": wrongETag, "If-None-Match": etag}); st != 412 {
+		t.Fatalf("get combined If-Match-fail+INM -> status %d, want 412; body %s", st, body)
+	}
+	// *-in-list match-any
+	if _, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-None-Match": `*, "abc"`}); st != 304 {
+		t.Fatalf("get INM *-in-list -> status %d, want 304", st)
+	}
+	// quoted-empty no-match -> 200
+	if body, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-None-Match": `""`}); st != 200 {
+		t.Fatalf("get INM quoted-empty -> status %d, want 200; body %s", st, body)
+	}
+	// W/ weak -> strong match -> 200 for If-Match (pass)
+	weak := `W/` + etag
+	if body, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Match": weak}); st != 200 {
+		t.Fatalf("get If-Match W/etag -> status %d, want 200; body %s", st, body)
+	}
+	// IMS equal -> 304, past -> 200, future -> 304
+	if _, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": lastModStr}); st != 304 {
+		t.Fatalf("get IMS equal -> status %d, want 304", st)
+	}
+	if body, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": pastStr}); st != 200 {
+		t.Fatalf("get IMS past -> status %d, want 200; body %s", st, body)
+	}
+	if _, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": futureStr}); st != 304 {
+		t.Fatalf("get IMS future -> status %d, want 304", st)
+	}
+	// IUS past -> 412, future -> 200, equal -> 200
+	if body, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Unmodified-Since": pastStr}); st != 412 {
+		t.Fatalf("get IUS past -> status %d, want 412; body %s", st, body)
+	}
+	if body, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Unmodified-Since": futureStr}); st != 200 {
+		t.Fatalf("get IUS future -> status %d, want 200; body %s", st, body)
+	}
+	if body, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Unmodified-Since": lastModStr}); st != 200 {
+		t.Fatalf("get IUS equal -> status %d, want 200; body %s", st, body)
+	}
+	// future/weekday-ignore/Feb30-ignore/legacy
+	if _, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": weekdayIgnoreFuture}); st != 304 {
+		t.Fatalf("get IMS weekday-ignore future -> status %d, want 304", st)
+	}
+	if body, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": feb30Str}); st != 200 {
+		t.Fatalf("get IMS Feb30 -> status %d, want 200; body %s", st, body)
+	}
+	if body, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": feb29NonLeap}); st != 200 {
+		t.Fatalf("get IMS Feb29-nonleap -> status %d, want 200; body %s", st, body)
+	}
+	if _, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": feb29LeapFuture}); st != 304 {
+		t.Fatalf("get IMS Feb29-leap-future -> status %d, want 304", st)
+	}
+	if body, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": "0"}); st != 200 {
+		t.Fatalf("get IMS legacy 0 -> status %d, want 200; body %s", st, body)
+	}
+	if _, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": utcStr}); st != 304 {
+		t.Fatalf("get IMS UTC -> status %d, want 304", st)
+	}
+	if _, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": utStr}); st != 304 {
+		t.Fatalf("get IMS UT -> status %d, want 304", st)
+	}
+	if _, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": tabStr}); st != 304 {
+		t.Fatalf("get IMS TAB -> status %d, want 304", st)
+	}
+	if _, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": multiSPStr}); st != 304 {
+		t.Fatalf("get IMS multi-SP -> status %d, want 304", st)
+	}
+	if _, st, _ := doCond("GET", base+"/condbucket/file.txt", nil, map[string]string{"If-Modified-Since": monthCIStr}); st != 304 {
+		t.Fatalf("get IMS month-ci -> status %d, want 304", st)
+	}
+	// PUT timestamps ignored (ETags-only)
+	if body, st, _ := doCond("PUT", base+"/condbucket/file.txt", []byte("hello"), map[string]string{"If-Unmodified-Since": pastStr}); st != 200 {
+		t.Fatalf("put IUS past ignored -> status %d, want 200; body %s", st, body)
+	}
+	// HEAD mirrors GET
+	if _, st, _ := doCond("HEAD", base+"/condbucket/file.txt", nil, map[string]string{"If-None-Match": etag}); st != 304 {
+		t.Fatalf("head INM etag -> status %d, want 304", st)
+	}
+	if body, st, _ := doCond("HEAD", base+"/condbucket/file.txt", nil, map[string]string{"If-Match": wrongETag}); st != 412 {
+		t.Fatalf("head If-Match wrong -> status %d, want 412; body %s", st, body)
+	}
+	// non-object ignore: List with If-Match wrong still 200
+	if body, st, _ := doCond("GET", base+"/condbucket?list-type=2", nil, map[string]string{"If-Match": wrongETag}); st != 200 {
+		t.Fatalf("list with If-Match -> status %d, want 200; body %s", st, body)
+	}
+}

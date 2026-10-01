@@ -107,6 +107,22 @@ all list filters are applied before pagination, as in real S3.
 All XML responses use the correct S3 namespace:
 `http://s3.amazonaws.com/doc/2006-03-01/`.
 
+### Conditional requests
+
+`GET`/`HEAD` honor `If-Match`, `If-None-Match`, `If-Modified-Since`, and
+`If-Unmodified-Since`, evaluated fail-closed in that order. A matching
+`If-None-Match` or `If-Modified-Since` on a read is `304 Not Modified` with
+an empty body; any other failed precondition is `412 PreconditionFailed`
+XML carrying `<Condition>` and `<Key>`. `PUT`/`DELETE` honor the ETag
+conditions only, including `*`; timestamp conditions are ignored on writes.
+`If-None-Match` suppresses `If-Modified-Since` and `If-Match` suppresses
+`If-Unmodified-Since`, per RFC 7232. Malformed or empty validators are
+ignored rather than rejected.
+
+Two documented deviations: weak validators (`W/"..."`) compare as strong,
+and a `DELETE` or `GET`/`HEAD` against a missing bucket is `204`/`NoSuchKey`
+where real S3 returns `NoSuchBucket`.
+
 ### Streaming uploads (aws-chunked)
 
 A default SDK `PutObject` signs its payload with
@@ -276,6 +292,7 @@ All errors use S3-shaped XML:
 | `InvalidPartOrder` | 400 | CompleteMultipartUpload part list is not in ascending order |
 | `MalformedXML` | 400 | CompleteMultipartUpload body is not valid `CompleteMultipartUpload` XML |
 | `IncompleteBody` | 400 | `aws-chunked` framing is malformed, truncated, or over the decoder limits |
+| `PreconditionFailed` | 412 | An `If-Match`/`If-None-Match`/`If-Unmodified-Since`/`If-Modified-Since` condition did not hold |
 | `MethodNotAllowed` | 405 | POST to an object without `?uploads`/`?uploadId` |
 | `NoSuchBucket` | 404 | Bucket doesn't exist |
 | `NoSuchKey` | 404 | Object key doesn't exist |
