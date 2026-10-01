@@ -15,6 +15,9 @@ All notable changes to **stunt** are documented here. The format is based on
   and re-upload any in-flight multipart upload, since
   `CompleteMultipartUpload` rejects mixed old and new part ETags with
   `400 InvalidPart`. MD5 is a compat checksum here, never auth or integrity.
+- **aws-s3-style: conditional requests.** `GET`/`HEAD` honor `If-Match`,
+  `If-None-Match`, `If-Modified-Since`, and `If-Unmodified-Since`, returning
+  `304` or `412`; `PUT`/`DELETE` honor the ETag conditions.
 
 ## [0.52.0] — 2026-08-24
 

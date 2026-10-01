@@ -9383,6 +9383,8 @@
         "ETags are MD5 hex (multipart MD5(binary-concat)-N)",
         "Multipart 5 MiB minimum part size not enforced (small parts allowed)",
         "DELETE of a missing bucket is an idempotent 204 (real S3: 404 NoSuchBucket)",
+        "DELETE object against a missing bucket is 204 (real S3: 404 NoSuchBucket)",
+        "GET/HEAD object against a missing bucket is 404 NoSuchKey (real S3: 404 NoSuchBucket)",
         "SigV4 canonical URI/query rebuilt from decoded values — duplicates indistinguishable",
         "No RFC 1123 Date fallback; canonical header whitespace collapsing not applied"
       ],
