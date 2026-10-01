@@ -739,8 +739,9 @@ def _find_object(bucket, key):
 # _upsert_object writes an object's content bytes (reusing the existing
 # blob id when overwriting, so the blob store has one file per object) and
 # refreshes its metadata doc. Returns nothing; the ETag is derived by the
-# caller (it differs for simple vs multipart uploads).
-def _upsert_object(bucket, key, raw, ct, etag):
+# caller (it differs for simple vs multipart uploads). meta is the
+# user-metadata map (x-amz-meta-*); {} when none.
+def _upsert_object(bucket, key, raw, ct, etag, meta):
     oc = store_collection("objects")
     bid = ""
     obj_id = ""
@@ -758,6 +759,7 @@ def _upsert_object(bucket, key, raw, ct, etag):
         "bid": bid,
         "contentType": ct,
         "etag": etag,
+        "metadata": meta,
         "lastModified": _unix_to_iso8601(now_unix),
         "lastModifiedUnix": now_unix,
         "size": len(raw),
@@ -787,10 +789,10 @@ def _upsert_object(bucket, key, raw, ct, etag):
 #     a non-ascending part list → 400 InvalidPartOrder.
 #   - Completion assembles the parts, in ascending part-number order,
 #     into the object; abort discards every part and creates nothing.
-#   - Documented deviations: part ETags are SHA-256 digests (the crypto
-#     module has no MD5), the multipart object ETag is
-#     sha256(concat part etags)-N, and the 5 MiB minimum part size is
-#     NOT enforced so small chunks can be exercised in tests.
+#   - Documented deviations: part ETags are MD5 digests (like real S3),
+#     the multipart object ETag is md5(concat part-md5 binaries)-N, and
+#     the 5 MiB minimum part size is NOT enforced so small chunks can be
+#     exercised in tests.
 
 # Real S3 allows part numbers 1..10k (assembled to keep digit runs short).
 _MPU_MAX_PART_NUMBER = 10 * 1000
@@ -871,7 +873,7 @@ def _mpu_create(req, bucket, key):
 
 # _mpu_upload_part handles PUT /{bucket}/{key}?partNumber=N&uploadId=... —
 # stores the part bytes (out-of-order and re-uploads both fine) and returns
-# the part ETag (SHA-256 of the verbatim part bytes).
+# the part ETag (MD5 of the verbatim part bytes, like real S3).
 def _mpu_upload_part(req, bucket, key):
     part_raw = _query_val(req, "partNumber")
     upload_id = _query_val(req, "uploadId")
@@ -896,7 +898,7 @@ def _mpu_upload_part(req, bucket, key):
     raw = req.get("raw_body", "")
     if raw == None:
         raw = ""
-    etag = crypto.sha256(raw)
+    etag = crypto.md5(raw)
 
     # One blob per (upload, part number); re-uploading a part overwrites it.
     bid = upload_id + "_p" + str(n)
@@ -973,6 +975,16 @@ def _strip_quotes(s):
             out = out + s[i]
     return out
 
+# _strip_weak normalizes a Complete ETag for comparison: strips one W/
+# prefix, removes quotes, lowercases (uppercase hex accepted, like real
+# S3; Complete is strict otherwise — no whitespace trim).
+def _strip_weak(s):
+    if s == None:
+        return ""
+    if _has_prefix(s, "W/"):
+        s = s[2:]
+    return _strip_quotes(s).lower()
+
 # _mpu_parse_complete parses the CompleteMultipartUpload XML body into an
 # ordered [(part_number, etag), ...] list, or None when malformed.
 def _mpu_parse_complete(raw):
@@ -1037,32 +1049,45 @@ def _mpu_complete(req, bucket, key):
         prev = n
 
     # Every listed part must exist with a matching ETag (real S3: InvalidPart).
+    # Both sides are normalized (W/ prefix, quotes, case) before comparing;
+    # an empty request ETag never matches (always checked, no bypass).
     for entry in listed:
         n = entry[0]
         etag_req = entry[1]
         row = stored.get(n, None)
         if row == None:
             return _xml_error("InvalidPart", "One or more of the specified parts could not be found. The part may not have been uploaded, or the specified entity tag may not match the part's entity tag.", "/" + bucket + "/" + key, 400)
-        if etag_req != "" and etag_req != row.get("etag", ""):
+        if _strip_weak(etag_req) != _strip_weak(row.get("etag", "")):
             return _xml_error("InvalidPart", "One or more of the specified parts could not be found. The part may not have been uploaded, or the specified entity tag may not match the part's entity tag.", "/" + bucket + "/" + key, 400)
 
     # Assemble: concatenate the part blobs in ascending part-number order.
     b = store_blob("s3-objects")
     full = ""
-    concat_etags = ""
+    hexes = []
     for entry in listed:
         row = stored[entry[0]]
         content = b.get(row.get("bid", ""))
         if content == None:
             content = ""
         full = full + content
-        concat_etags = concat_etags + row.get("etag", "")
-    etag = crypto.sha256(concat_etags) + "-" + str(len(listed))
+        hexes.append(_strip_weak(row.get("etag", "")))
+    # Guarded pre-check (type first — never bare len() on a non-string,
+    # which would 500): any shape mismatch → 400 InvalidPart without
+    # calling the builtin. The builtin is total too (None on mismatch).
+    if len(hexes) == 0 or len(hexes) > 10000:
+        return _xml_error("InvalidPart", "One or more of the specified parts could not be found. The part may not have been uploaded, or the specified entity tag may not match the part's entity tag.", "/" + bucket + "/" + key, 400)
+    for h in hexes:
+        if type(h) != "string" or len(h) != 32 or not _is_hex(h):
+            return _xml_error("InvalidPart", "One or more of the specified parts could not be found. The part may not have been uploaded, or the specified entity tag may not match the part's entity tag.", "/" + bucket + "/" + key, 400)
+    digest = crypto.md5_hex_concat(hexes)
+    if digest == None:
+        return _xml_error("InvalidPart", "One or more of the specified parts could not be found. The part may not have been uploaded, or the specified entity tag may not match the part's entity tag.", "/" + bucket + "/" + key, 400)
+    etag = digest + "-" + str(len(hexes))
 
     ct = upload.get("contentType", "application/octet-stream")
     if ct == None or ct == "":
         ct = "application/octet-stream"
-    _upsert_object(bucket, key, full, ct, etag)
+    _upsert_object(bucket, key, full, ct, etag, {})
 
     _mpu_discard(upload_id)
     store_collection("mpu_uploads").delete(upload_id)

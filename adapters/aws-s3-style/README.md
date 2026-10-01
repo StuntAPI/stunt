@@ -60,7 +60,7 @@ The real S3 multipart upload protocol, stateful on the object store:
 | Method | Route | Description |
 |--------|-------|-------------|
 | POST | `/{bucket}/{key}?uploads` | CreateMultipartUpload → XML `<UploadId>` |
-| PUT | `/{bucket}/{key}?partNumber=N&uploadId=...` | UploadPart → `ETag` header (quoted SHA-256 of the part bytes) |
+| PUT | `/{bucket}/{key}?partNumber=N&uploadId=...` | UploadPart → `ETag` header (quoted MD5 hex of the part bytes) |
 | GET | `/{bucket}/{key}?uploadId=...` | ListParts XML (`max-parts` / `part-number-marker` paging) |
 | POST | `/{bucket}/{key}?uploadId=...` | CompleteMultipartUpload (XML body listing the parts) |
 | DELETE | `/{bucket}/{key}?uploadId=...` | AbortMultipartUpload → 204 |
@@ -83,10 +83,8 @@ Semantics enforced like the real service:
   real paging (`max-parts`, default 1000; `part-number-marker` →
   `<NextPartNumberMarker>`/`<IsTruncated>`).
 
-Documented deviations: part ETags and the assembled object's ETag are
-SHA-256 based (`sha256(concat part etags)-N` for the multipart object, like
-real S3's `md5(md5s)-N` shape), and the 5 MiB minimum part size is **not**
-enforced so small chunks can be exercised in local tests.
+Documented deviations: the 5 MiB minimum part size is **not** enforced so
+small chunks can be exercised in local tests.
 
 ListObjectsV2 also honors the real S3 list params:
 
@@ -208,10 +206,9 @@ unknown access key yields `InvalidAccessKeyId`; a stale `x-amz-date` yields
 
 ### Clock-derived response data
 
-- **ETag** is content-derived: the quoted SHA-256 hex digest of the object's
-  verbatim bytes (real S3 uses the MD5 digest for non-multipart uploads; the
-  engine's crypto module has no MD5, so the stronger digest is used — a
-  documented deviation).
+- **ETag** is content-derived: the quoted MD5 hex digest of the object's
+  verbatim bytes, as in real S3. Multipart objects use
+  `md5(concat part-md5 binaries)-N`.
 - **Last-Modified** (GET/HEAD headers, RFC 1123) and `<LastModified>` (XML,
   ISO 8601 with milliseconds) derive from the engine clock at upload time.
 - Bucket `<CreationDate>` derives from the clock as well.
@@ -241,7 +238,7 @@ curl "http://localhost:PORT/mybucket?list-type=2"
 # Paginated listing
 curl "http://localhost:PORT/mybucket?list-type=2&max-keys=10&continuation-token=<NextContinuationToken>"
 
-# Binary round-trip (bytes stored verbatim, ETag = quoted sha256 of the bytes)
+# Binary round-trip (bytes stored verbatim, ETag = quoted MD5 of the bytes)
 curl -X PUT "http://localhost:PORT/mybucket/photo.jpg" \
   -H "Authorization: AWS4-HMAC-SHA256 ..." \
   -H "Content-Type: image/jpeg" \
@@ -253,11 +250,11 @@ curl -X POST "http://localhost:PORT/mybucket/big.bin?uploads" -H "Authorization:
   -H "x-amz-date: 20260120T000000Z"
 # → <InitiateMultipartUploadResult>...<UploadId>mpu_1</UploadId></InitiateMultipartUploadResult>
 curl -X PUT "http://localhost:PORT/mybucket/big.bin?partNumber=1&uploadId=mpu_1" \
-  -H "Authorization: ..." --data-binary @part1.bin        # → ETag: "sha256-of-part1"
+  -H "Authorization: ..." --data-binary @part1.bin        # → ETag: "md5-of-part1"
 curl -X POST "http://localhost:PORT/mybucket/big.bin?uploadId=mpu_1" \
   -H "Authorization: ..." \
   -d '<CompleteMultipartUpload><Part><PartNumber>1</PartNumber><ETag>"..."</ETag></Part></CompleteMultipartUpload>'
-# → <CompleteMultipartUploadResult>...<ETag>"sha256-of-etags-1"</ETag>...</CompleteMultipartUploadResult>
+# → <CompleteMultipartUploadResult>...<ETag>"md5-of-part-md5s-1"</ETag>...</CompleteMultipartUploadResult>
 ```
 
 ## Error responses

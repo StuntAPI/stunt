@@ -2,9 +2,12 @@ package starlark
 
 import (
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/sha1"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
+	"strings"
 	"testing"
 
 	sk "go.starlark.net/starlark"
@@ -105,4 +108,147 @@ func bytesToHex(b []byte) string {
 		out[2*i+1] = hexc[v&0x0f]
 	}
 	return string(out)
+}
+
+func callMD5HexConcatRaw(t *testing.T, args []sk.Value, kwargs []sk.Tuple) (sk.Value, error) {
+	t.Helper()
+	fn, ok := cryptoModule.Members["md5_hex_concat"]
+	if !ok {
+		t.Fatalf("crypto.md5_hex_concat not found")
+	}
+	return sk.Call(new(sk.Thread), fn, sk.Tuple(args), kwargs)
+}
+
+func md5HexConcatWant(hexes []string) string {
+	raw := make([]byte, 0, len(hexes)*16)
+	for _, h := range hexes {
+		b, err := hex.DecodeString(strings.ToLower(h))
+		if err != nil {
+			panic(err)
+		}
+		raw = append(raw, b...)
+	}
+	sum := md5.Sum(raw)
+	return hex.EncodeToString(sum[:])
+}
+
+func TestMD5HexConcat(t *testing.T) {
+	// Single valid 32-hex → hex out (md5("hello") digest as input element).
+	single := "5d41402abc4b2a76b9719d911017c592"
+	got, err := callMD5HexConcatRaw(t,
+		[]sk.Value{sk.NewList([]sk.Value{sk.String(single)})}, nil)
+	if err != nil {
+		t.Fatalf("md5_hex_concat single: unexpected error: %v", err)
+	}
+	if got == sk.None {
+		t.Fatal("md5_hex_concat single: want hex, got None")
+	}
+	if want := md5HexConcatWant([]string{single}); string(got.(sk.String)) != want {
+		t.Errorf("md5_hex_concat single = %q, want %q", got, want)
+	}
+
+	// Uppercase accepted, normalized to same lowercase result.
+	upper := "5D41402ABC4B2A76B9719D911017C592"
+	gotUpper, err := callMD5HexConcatRaw(t,
+		[]sk.Value{sk.NewList([]sk.Value{sk.String(upper)})}, nil)
+	if err != nil {
+		t.Fatalf("md5_hex_concat upper: unexpected error: %v", err)
+	}
+	if gotUpper == sk.None {
+		t.Fatal("md5_hex_concat upper: want hex, got None")
+	}
+	if string(gotUpper.(sk.String)) != string(got.(sk.String)) {
+		t.Errorf("md5_hex_concat upper = %q, want %q (lowercased)", gotUpper, got)
+	}
+
+	// Multi-element vector: concat binary then md5.
+	multi := []string{single, "d41d8cd98f00b204e9800998ecf8427e"}
+	gotMulti, err := callMD5HexConcatRaw(t,
+		[]sk.Value{sk.NewList([]sk.Value{sk.String(multi[0]), sk.String(multi[1])})}, nil)
+	if err != nil {
+		t.Fatalf("md5_hex_concat multi: unexpected error: %v", err)
+	}
+	if want := md5HexConcatWant(multi); string(gotMulti.(sk.String)) != want {
+		t.Errorf("md5_hex_concat multi = %q, want %q", gotMulti, want)
+	}
+
+	// Every shape mismatch must be total (None, never Error).
+	noneCases := map[string]sk.Value{
+		"empty list":    sk.NewList(nil),
+		"None top":      sk.None,
+		"string top":    sk.String(single),
+		"int top":       sk.MakeInt(1),
+		"dict top":      sk.NewDict(0),
+		"tuple top":     sk.Tuple{sk.String(single)},
+		"non-string":    sk.NewList([]sk.Value{sk.MakeInt(1)}),
+		"none elem":     sk.NewList([]sk.Value{sk.None}),
+		"empty string":  sk.NewList([]sk.Value{sk.String("")}),
+		"short non-32":  sk.NewList([]sk.Value{sk.String("abc")}),
+		"long 33":       sk.NewList([]sk.Value{sk.String(single + "0")}),
+		"64-hex":        sk.NewList([]sk.Value{sk.String(strings.Repeat("0", 64))}),
+		"non-hex":       sk.NewList([]sk.Value{sk.String(strings.Repeat("z", 32))}),
+		"ws-padded":     sk.NewList([]sk.Value{sk.String(" " + single + " ")}),
+		"ws-tab-padded": sk.NewList([]sk.Value{sk.String("\t" + single)}),
+		"one bad elem": sk.NewList([]sk.Value{
+			sk.String(single), sk.String(strings.Repeat("z", 32)),
+		}),
+	}
+	for name, arg := range noneCases {
+		v, err := callMD5HexConcatRaw(t, []sk.Value{arg}, nil)
+		if err != nil {
+			t.Errorf("md5_hex_concat %s: want None with nil error, got error %v", name, err)
+			continue
+		}
+		if v != sk.None {
+			t.Errorf("md5_hex_concat %s = %v, want None", name, v)
+		}
+	}
+
+	// >10000 elements → None.
+	big := make([]sk.Value, 10001)
+	for i := range big {
+		big[i] = sk.String(single)
+	}
+	v, err := callMD5HexConcatRaw(t, []sk.Value{sk.NewList(big)}, nil)
+	if err != nil {
+		t.Fatalf("md5_hex_concat >10000: unexpected error: %v", err)
+	}
+	if v != sk.None {
+		t.Errorf("md5_hex_concat >10000 = %v, want None", v)
+	}
+	// Exactly 10000 valid elements must still hash (boundary).
+	boundary := make([]sk.Value, 10000)
+	for i := range boundary {
+		boundary[i] = sk.String(single)
+	}
+	v, err = callMD5HexConcatRaw(t, []sk.Value{sk.NewList(boundary)}, nil)
+	if err != nil {
+		t.Fatalf("md5_hex_concat 10000: unexpected error: %v", err)
+	}
+	if v == sk.None {
+		t.Error("md5_hex_concat 10000 valid: want hex, got None")
+	}
+
+	// Extra kwargs → None (total, not an UnpackArgs error).
+	v, err = callMD5HexConcatRaw(t,
+		[]sk.Value{sk.NewList([]sk.Value{sk.String(single)})},
+		[]sk.Tuple{{sk.String("extra"), sk.String("1")}})
+	if err != nil {
+		t.Errorf("md5_hex_concat extra kwarg: want None with nil error, got error %v", err)
+	} else if v != sk.None {
+		t.Errorf("md5_hex_concat extra kwarg = %v, want None", v)
+	}
+
+	// Wrong positional arity → None (total, not an error).
+	for _, args := range [][]sk.Value{
+		nil,
+		{sk.NewList([]sk.Value{sk.String(single)}), sk.NewList(nil)},
+	} {
+		v, err := callMD5HexConcatRaw(t, args, nil)
+		if err != nil {
+			t.Errorf("md5_hex_concat arity %d: want None with nil error, got error %v", len(args), err)
+		} else if v != sk.None {
+			t.Errorf("md5_hex_concat arity %d = %v, want None", len(args), v)
+		}
+	}
 }
