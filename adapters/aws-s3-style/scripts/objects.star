@@ -70,6 +70,11 @@ def on_put_object(req):
     if bucket_doc == None:
         return _no_such_bucket_error(bucket)
 
+    obj = _find_object(bucket, key)
+    cond = _check_preconditions(req, obj, bucket, key, "put")
+    if cond != None:
+        return cond
+
     # Content goes in the byte-exact blob store (filesystem-backed), keyed by
     # bucket/key; the collection holds metadata only. raw_body is the verbatim
     # request bytes, so binary uploads round-trip exactly — a parsed body map
@@ -112,6 +117,10 @@ def on_get_object(req):
     if obj == None:
         return _no_such_key(bucket, key)
 
+    cond = _check_preconditions(req, obj, bucket, key, "get")
+    if cond != None:
+        return cond
+
     content = store_blob("s3-objects").get(obj.get("bid", ""))
     if content == None:
         content = ""
@@ -142,6 +151,10 @@ def on_head_object(req):
     obj = _find_object(bucket, key)
     if obj == None:
         return _no_such_key(bucket, key)
+
+    cond = _check_preconditions(req, obj, bucket, key, "head")
+    if cond != None:
+        return cond
 
     ct = obj.get("contentType", "application/octet-stream")
     if ct == None:
@@ -174,6 +187,11 @@ def on_delete_object(req):
     # AbortMultipartUpload (?uploadId=...).
     if _query_present(req, "uploadId"):
         return _mpu_abort(req, bucket, key)
+
+    obj = _find_object(bucket, key)
+    cond = _check_preconditions(req, obj, bucket, key, "delete")
+    if cond != None:
+        return cond
 
     oc = store_collection("objects")
     obj_id = None
