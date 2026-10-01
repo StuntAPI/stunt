@@ -739,8 +739,10 @@ def _find_object(bucket, key):
 # _upsert_object writes an object's content bytes (reusing the existing
 # blob id when overwriting, so the blob store has one file per object) and
 # refreshes its metadata doc. Returns nothing; the ETag is derived by the
-# caller (it differs for simple vs multipart uploads).
-def _upsert_object(bucket, key, raw, ct, etag):
+# caller (it differs for simple vs multipart uploads). meta is the object's
+# x-amz-meta-* map; {} when the request carried none, which clears any
+# previously stored value.
+def _upsert_object(bucket, key, raw, ct, etag, meta):
     oc = store_collection("objects")
     bid = ""
     obj_id = ""
@@ -761,11 +763,93 @@ def _upsert_object(bucket, key, raw, ct, etag):
         "lastModified": _unix_to_iso8601(now_unix),
         "lastModifiedUnix": now_unix,
         "size": len(raw),
+        "metadata": meta,
     }
     if obj_id != None and obj_id != "":
         oc.update(obj_id, doc)
     else:
         oc.insert(doc)
+
+# ====================================================================
+# User metadata (x-amz-meta-*)
+# ====================================================================
+# S3 user metadata: request headers with the x-amz-meta- prefix are stored
+# with the object and echoed back on GET/HEAD 200 only (never on 304/412,
+# List, or error responses). The first occurrence wins: the engine already
+# collapses duplicate wire headers to v[0] (headerMap), and the collect
+# loop below keeps the first suffix on post-lower collision as
+# defense-in-depth. Suffixes are lowercased ASCII-only (hand-rolled, not
+# str.lower(), so non-ASCII bytes pass through unfolded and are preserved
+# for size/echo). The byte sum len(suffix)+len(value) over all collected
+# entries must fit in 2048 (the AWS 2KB user-metadata total; the prefix is
+# excluded, measured post-dedup with byte len, so 2048 passes / 2049 fails).
+
+# _ascii_lower lowercases ASCII A-Z only, preserving every other byte
+# (unlike str.lower(), which would fold non-ASCII too).
+def _ascii_lower(s):
+    out = ""
+    for i in range(len(s)):
+        ch = s[i]
+        if ch >= "A" and ch <= "Z":
+            out = out + chr(ord(ch) + 32)
+        else:
+            out = out + ch
+    return out
+
+# _meta_bad_value returns True when s holds a byte real S3 rejects in user
+# metadata: CR, LF, NUL, any other C0 control except TAB, or DEL. (CR/LF
+# cannot arrive over HTTP — Go rejects them at the transport — so this is
+# defense-in-depth covered by inspection, not e2e.)
+def _meta_bad_value(s):
+    for i in range(len(s)):
+        o = ord(s[i])
+        if o == 9:
+            continue
+        if o < 32 or o == 127:
+            return True
+    return False
+
+# _collect_metadata gathers x-amz-meta-* request headers (iteration keys are
+# already the lowercase canonical form). Empty suffix or rejected bytes ->
+# 400 InvalidArgument; post-dedup byte total over 2048 -> 400
+# MetadataTooLarge. Empty values are allowed; spaces are preserved verbatim.
+# Returns (meta, None) on success or (None, error_response).
+def _collect_metadata(req):
+    headers = req.get("headers")
+    if headers == None:
+        return {}, None
+    meta = {}
+    total = 0
+    for k in headers.keys():
+        if not _has_prefix(k, "x-amz-meta-"):
+            continue
+        suffix = _ascii_lower(k[len("x-amz-meta-"):])
+        v = headers.get(k, "")
+        if v == None:
+            v = ""
+        v = str(v)
+        if suffix == "":
+            return None, _invalid_argument(k, v, "Metadata name must not be empty.")
+        if _meta_bad_value(suffix) or _meta_bad_value(v):
+            return None, _invalid_argument(k, v, "Metadata contains invalid characters.")
+        if suffix in meta:
+            continue
+        meta[suffix] = v
+        total = total + len(suffix) + len(v)
+    if total > 2048:
+        return None, _xml_error("MetadataTooLarge", "Your metadata headers exceed the maximum allowed metadata size.", "", 400)
+    return meta, None
+
+# _meta_response_headers merges stored user metadata into a GET/HEAD 200
+# response-header dict (suffixes were lowercased at collect time). Legacy
+# docs stored without a metadata field fall back to {}.
+def _meta_response_headers(obj, base):
+    meta = obj.get("metadata", {})
+    if meta == None:
+        meta = {}
+    for k in meta.keys():
+        base["x-amz-meta-" + k] = meta[k]
+    return base
 
 # ====================================================================
 # Multipart upload core
@@ -853,11 +937,15 @@ def _mpu_create(req, bucket, key):
         ct = "application/octet-stream"
 
     upload_id = "mpu_" + str(store_kv_incr("s3", "mpu_seq"))
+    meta, merr = _collect_metadata(req)
+    if merr != None:
+        return merr
     store_collection("mpu_uploads").insert({
         "id": upload_id,
         "bucket": bucket,
         "key": key,
         "contentType": ct,
+        "metadata": meta,
         "initiatedUnix": clock.now_unix(),
     })
 
@@ -1062,7 +1150,13 @@ def _mpu_complete(req, bucket, key):
     ct = upload.get("contentType", "application/octet-stream")
     if ct == None or ct == "":
         ct = "application/octet-stream"
-    _upsert_object(bucket, key, full, ct, etag)
+    # The object's user metadata is the Create request's (stored on the
+    # upload row); Complete-request and UploadPart meta are ignored. Legacy
+    # uploads stored without a metadata field fall back to {}.
+    meta = upload.get("metadata", {})
+    if meta == None:
+        meta = {}
+    _upsert_object(bucket, key, full, ct, etag, meta)
 
     _mpu_discard(upload_id)
     store_collection("mpu_uploads").delete(upload_id)
