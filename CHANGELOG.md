@@ -4,6 +4,18 @@ All notable changes to **stunt** are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Adapters
+
+- **BREAKING (test double): aws-s3-style ETags are now real MD5.**
+  Single-object and part ETags are the MD5 hex of the verbatim bytes and
+  multipart objects use `md5(concat part-md5 binaries)-N`, like real S3.
+  Fixtures pinning the old 64-hex SHA-256 ETags must be regenerated; abort
+  and re-upload any in-flight multipart upload, since
+  `CompleteMultipartUpload` rejects mixed old and new part ETags with
+  `400 InvalidPart`. MD5 is a compat checksum here, never auth or integrity.
+
 ## [0.52.0] — 2026-08-24
 
 The conformance campaign: every real API adapter now carries a real test
