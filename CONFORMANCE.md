@@ -2861,7 +2861,7 @@ behavior notes live in each adapter's README.
 
 **Deviations** (3)
 
-- Content-MD5 carries base64 SHA-256 (engine has no MD5) — documented deviation
+- Content-MD5 is returned unconditionally; real Azure returns it only when the request carried a Content-MD5 header
 - SAS checked structurally (sv/sig/se present) and any non-empty bearer accepted
 - PUT on an existing container updates it in place 201 (real Azure: 409 conflict)
 

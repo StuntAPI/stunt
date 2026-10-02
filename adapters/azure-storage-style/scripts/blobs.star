@@ -412,9 +412,11 @@ def _get_blob_properties(req, container, blob):
 # List enumerates committed vs uncommitted blocks. Committed content is
 # byte-exact: GET /{container}/{blob} returns the assembled bytes.
 #
-# Documented deviation: the crypto module has no MD5, so Content-MD5
-# response headers carry the base64 SHA-256 of the bytes instead (the S3
-# adapter makes the same trade for its ETags).
+# Content-MD5 is the base64 MD5 of the bytes Azure says it covers: the staged
+# block for Put Block, and the request body for Put Block List. Azure returns
+# the header only when the request carried Content-MD5; this adapter returns it
+# unconditionally at service version 2024-08-04, which is recorded as a
+# deviation in conformance/matrix.yaml.
 
 # _put_block: PUT /{container}/{blob}?comp=block&blockid=<base64>
 # Stages the request body as an uncommitted block. Blocks may be staged in
@@ -434,7 +436,7 @@ def _put_block(req, container, blob):
     raw = req.get("raw_body", "")
     if raw == None:
         raw = ""
-    digest = crypto.sha256(raw, "base64")
+    digest = crypto.md5(raw, "base64")
 
     bstore = store_blob("az-blocks")
     bc = store_collection("blocks")
@@ -454,7 +456,7 @@ def _put_block(req, container, blob):
         "blockId": block_id,
         "bid": bid,
         "size": len(raw),
-        "sha256b64": digest,
+        "md5b64": digest,
         "lastModifiedUnix": clock.now_unix(),
     }
     if existing == None:
@@ -578,7 +580,7 @@ def _put_block_list(req, container, blob):
     return respond(201, "", {
         "ETag": '"' + doc["etag"] + '"',
         "Last-Modified": doc["lastModified"],
-        "Content-MD5": crypto.sha256(full, "base64"),
+        "Content-MD5": crypto.md5(raw, "base64"),
         "x-ms-request-id": _req_id(),
         "x-ms-version": "2024-08-04",
     })

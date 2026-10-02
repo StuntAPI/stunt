@@ -8,6 +8,14 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **fix(adapter): azure-storage-style: `Content-MD5` carried base64 SHA-256, and
+  Put Block List hashed the wrong bytes.** It is now the base64 MD5 that Azure
+  specifies, over the block for Put Block and over the request body for Put
+  Block List, which real Azure documents explicitly as "the list of blocks and
+  not the content of the blob itself". The previous code hashed the assembled
+  blob. The stated reason for the old behavior — that the crypto module has no
+  MD5 — was never true.
+
 - **BREAKING (test double): aws-s3-style ETags are now real MD5.**
   Single-object and part ETags are the MD5 hex of the verbatim bytes and
   multipart objects use `md5(concat part-md5 binaries)-N`, like real S3.
