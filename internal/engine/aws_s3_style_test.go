@@ -739,9 +739,22 @@ func TestAwsS3StyleMultipartUpload(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("complete -> %d; body %s", status, body)
 	}
+	// The composite ETag is MD5 over the concatenated BINARY part digests,
+	// suffixed with the part count. Asserted exactly: a suffix-only check lets
+	// any 32-hex-plus-"-3" pass, so a digest composed from the wrong bytes — the
+	// part bodies instead of the part digests, say — would sail through.
 	etag := strings.ReplaceAll(s3XMLTag(t, body, "ETag"), "&quot;", "")
-	if !strings.HasSuffix(etag, "-3") {
-		t.Fatalf("complete ETag = %q, want multipart form ending in -3", etag)
+	h := md5.New()
+	for _, n := range []int{1, 2, 3} {
+		raw, err := hex.DecodeString(etags[n])
+		if err != nil {
+			t.Fatalf("part %d etag %q is not hex: %v", n, etags[n], err)
+		}
+		h.Write(raw)
+	}
+	wantETag := hex.EncodeToString(h.Sum(nil)) + "-3"
+	if etag != wantETag {
+		t.Fatalf("complete ETag = %q, want %q (md5 of the concatenated part digests)", etag, wantETag)
 	}
 
 	got, status := s3Get(t, base+"/mpubucket/multi.bin", now)
