@@ -39,6 +39,20 @@ All notable changes to **stunt** are documented here. The format is based on
   are floors, not exact counts, so a re-fetch that adds routes — the normal result
   of a spec refresh — needs no edit; only a shrink does, which is the point.
 
+- **build: SDK dependency bumps now arrive as green pull requests.** Added
+  dependabot for the nested `conformance` Go module and the Node suite, a
+  workflow that regenerates `CONFORMANCE.md` / `conformance/matrix.json` after a
+  bump, and auto-merge gated on the required `just ci` check.
+
+  Regeneration is the load-bearing part: genmatrix reads SDK versions out of
+  those manifests and publishes them as the version each adapter was verified
+  against, so every bump invalidated a generated file and the freshness gate
+  failed the PR on arrival.
+
+  Repository settings to match: auto-merge and branch deletion enabled, and
+  merge-commit and rebase disabled so squash is the only merge path — a control
+  whose durability depends on which button the author pressed is not a control.
+
 - **fix(adapter): aws-s3-style: a bucket name holding a control byte created the
   bucket but broke the connection.** `Location` echoed the name raw, and a header
   value containing a raw C0 byte or DEL is not parseable — Go's HTTP client
