@@ -60,8 +60,14 @@ def on_create_bucket(req):
         "region": region,
     })
 
+    # Location is a URI-reference, so the bucket name is percent-encoded into
+    # one. Raw, a bucket name holding a control byte produced a header value no
+    # HTTP client can parse — Go aborts the connection with "malformed MIME
+    # header line" before the caller ever sees a status. Real S3 rejects such
+    # names outright; this simulator accepts them, so it has to emit a header
+    # that is at least well-formed.
     return respond(200, "", {
-        "Location": "/" + bucket,
+        "Location": _sig_uri_encode("/" + bucket, True),
         "x-amz-request-id": _req_id(),
     })
 

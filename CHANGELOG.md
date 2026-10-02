@@ -8,6 +8,13 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **fix(adapter): aws-s3-style: a bucket name holding a control byte created the
+  bucket but broke the connection.** `Location` echoed the name raw, and a header
+  value containing a raw C0 byte or DEL is not parseable — Go's HTTP client
+  aborts with `malformed MIME header line` before the caller sees a status. The
+  name is now percent-encoded into the `Location` URI-reference, which also makes
+  non-ASCII and space-containing names correct rather than merely tolerated.
+
 - **fix(adapter): azure-storage-style: Put Blob answered `Content-MD5: ""`.** An
   empty value is neither the digest nor an absent header, so an SDK reading it
   either fails to parse it or compares against nothing. It is now the base64 MD5

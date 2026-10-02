@@ -2932,3 +2932,79 @@ func TestAWSS3NonASCIIKeysRoundTrip(t *testing.T) {
 		t.Fatalf("delete non-ascii key -> status %d, want 204", resp.StatusCode)
 	}
 }
+
+// TestAWSS3CreateBucketLocationIsPercentEncoded pins that the Location header on
+// PutBucket is a usable URI-reference. A bucket name holding a control byte used
+// to be echoed raw, producing a header value no HTTP client can parse — Go
+// aborts the connection with "malformed MIME header line" before the caller sees
+// a status at all, so the bucket was created but the client could not tell.
+//
+// Real S3 rejects such bucket names outright. This simulator accepts them, so it
+// has to at least emit a well-formed header.
+func TestAWSS3CreateBucketLocationIsPercentEncoded(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	for _, tc := range []struct {
+		name    string
+		bucket  string
+		wantLoc string
+	}{
+		{"plain", "plainbucket", "/plainbucket"},
+		{"non-ascii", "caf%C3%A9", "/caf%C3%A9"},
+		{"space", "a%20b", "/a%20b"},
+		{"quote", "a%22b", "/a%22b"},
+		{"del", "del%7Fb", "/del%7Fb"},
+		{"c0 control", "ctl%01b", "/ctl%01b"},
+		{"backspace", "bs%08b", "/bs%08b"},
+		{"nul", "nul%00b", "/nul%00b"},
+		{"line feed", "lf%0Ab", "/lf%0Ab"},
+	} {
+		resp, derr := http.DefaultClient.Do(s3SignedReq(t, "PUT", base+"/"+tc.bucket, nil, now, awsStyleAccessKey, awsStyleSecretKey))
+		if derr != nil {
+			t.Fatalf("create bucket %s: %v", tc.name, derr)
+		}
+		status := resp.StatusCode
+		loc := resp.Header.Get("Location")
+		resp.Body.Close()
+		if status != 200 {
+			t.Fatalf("create bucket %s -> status %d, want 200", tc.name, status)
+		}
+		if loc != tc.wantLoc {
+			t.Fatalf("create bucket %s Location = %q, want %q", tc.name, loc, tc.wantLoc)
+		}
+		// A header value must not carry a raw control byte; Go would already
+		// have failed the request above, but assert it so the reason is obvious.
+		for i := 0; i < len(loc); i++ {
+			if o := loc[i]; o < 32 || o == 127 {
+				t.Fatalf("create bucket %s Location = %q contains a raw control byte at %d", tc.name, loc, i)
+			}
+		}
+	}
+}
