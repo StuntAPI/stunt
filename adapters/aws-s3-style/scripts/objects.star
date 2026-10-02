@@ -305,11 +305,15 @@ def _find_from(s, start, needle):
 # _hex2 returns v (0-255) as two uppercase hex digits.
 def _hex2(v):
     digits = "0123456789ABCDEF"
-    return digits[v // 16] + digits[v % 16]
+    return digits[(v // 16) % 16] + digits[v % 16]
 
 # _url_encode percent-encodes s per RFC 3986 (unreserved chars stay literal,
 # everything else becomes %XX of its UTF-8 bytes). Used for the S3
 # encoding-type=url response encoding.
+#
+# The byte value comes from _SIG_BYTE_HEX, not ord(): a lone byte >= 0x80 is
+# not valid UTF-8, so ord() returns U+FFFD and every non-ASCII key came back as
+# the three bytes of the replacement character instead of its own.
 def _url_encode(s):
     unreserved = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.~"
     out = ""
@@ -318,13 +322,7 @@ def _url_encode(s):
         if _find_substr(unreserved, ch) >= 0:
             out = out + ch
         else:
-            v = ord(ch)
-            if v < 0x80:
-                out = out + "%" + _hex2(v)
-            elif v < 0x800:
-                out = out + "%" + _hex2(0xC0 | (v >> 6)) + "%" + _hex2(0x80 | (v & 0x3F))
-            else:
-                out = out + "%" + _hex2(0xE0 | (v >> 12)) + "%" + _hex2(0x80 | ((v >> 6) & 0x3F)) + "%" + _hex2(0x80 | (v & 0x3F))
+            out = out + "%" + _SIG_BYTE_HEX[ch]
     return out
 
 # _list_objects_v2 returns a ListObjectsV2 XML response. All list params are
