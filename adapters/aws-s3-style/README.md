@@ -16,19 +16,48 @@ integration testing without a real AWS account:
 
 - **Create bucket:** `PUT /{bucket}` → `200` (409 `BucketAlreadyOwnedByYou` if it exists).
 - **Delete bucket:** `DELETE /{bucket}` → `204`. Per S3 semantics the bucket
-  must be empty (otherwise 409 `BucketNotEmpty`); deleting a non-existent
-  bucket is an idempotent no-op `204` to keep teardown/cleanup flows robust.
+  must be empty (otherwise 409 `BucketNotEmpty`); an in-progress multipart
+  upload also blocks the delete, so abort or complete it first. Deleting a
+  non-existent bucket is an idempotent no-op `204` to keep teardown/cleanup
+  flows robust. This is **stricter than AWS documents for general-purpose
+  buckets**: AWS states the rule for directory buckets, where it is enforced,
+  while for general-purpose buckets it says only that all objects must be
+  deleted and recommends clearing incomplete uploads to reclaim storage. It
+  does not document `DeleteBucket` with an upload in progress, so refusing the
+  delete is an inference there. Because
+  `ListMultipartUploads` is not implemented, a client that has lost an upload
+  id cannot discover which upload is blocking the delete — `stunt reset
+  aws-s3-style` clears the service state.
 - **Upload object:** `PUT /{bucket}/{key}` (body = object content) → `200` with `ETag`.
 - **Download object:** `GET /{bucket}/{key}` → `200` with raw body.
 - **Object metadata:** `HEAD /{bucket}/{key}` → `200` with `Content-Length`, `ETag`, `Last-Modified`.
 - **Delete object:** `DELETE /{bucket}/{key}` → `204` (idempotent).
+- **List objects:** `GET /{bucket}?list-type=2&max-keys=N&prefix=...` → **XML**
+  `<ListBucketResult>`.
 - **Multipart upload:** `POST /{bucket}/{key}?uploads` → `UploadId`; parts
   via `PUT ...?partNumber=N&uploadId=...` (out-of-order accepted, per-part
   `ETag`); `POST ?uploadId=...` completes (assembles the parts into the
   object), `DELETE ?uploadId=...` aborts, `GET ?uploadId=...` lists parts —
   see [Multipart upload](#multipart-upload).
-- **ListObjectsV2:** `GET /{bucket}?list-type=2&max-keys=N&prefix=...` → **XML** `<ListBucketResult>`.
+- **Unimplemented subresources** — a `?subresource` the simulator does not
+  implement returns `501 NotImplemented` rather than falling through to the
+  object operation on the same route. On the bucket that means `?versioning`,
+  `?tagging`, `?policy`, `?cors`, `?acl`, `?versions`, `?uploads`, and the
+  rest; on an object `?acl`, `?tagging`, `?retention`, `?legal-hold`,
+  `?torrent`, and the rest. The guards are asymmetric on purpose: the mutating
+  routes — bucket `PUT`/`DELETE` and object `PUT`/`POST`/`DELETE` —
+  **allowlist** the parameters a real client may send and reject everything
+  else, because a denylist there would let one token added to S3 later silently
+  re-open overwriting or destroying state. `x-id` is allowlisted by value too,
+  since every AWS SDK sends `x-id=<OperationName>` on every call. The read
+  routes use a denylist, since
+  falling through on a read is harmless. Presigned-auth parameters
+  (`X-Amz-Algorithm`, `X-Amz-Signature`, …) are exempt from the mutating
+  guards, since they authenticate the request rather than select a
+  subresource. All subresource matching is case-insensitive, so `?Versioning`
+  is caught too.
 - **Bucket location:** `GET /{bucket}?location` → **XML** `<LocationConstraint>`.
+- **ListMultipartUploads:** `GET /{bucket}?uploads` → `501 NotImplemented`.
 
 Objects are **stateful**: an object uploaded via PUT appears in ListObjectsV2 for
 the same bucket, enabling round-trip testing locally.
@@ -316,7 +345,9 @@ All errors use S3-shaped XML:
 | `NoSuchKey` | 404 | Object key doesn't exist |
 | `NoSuchUpload` | 404 | Unknown/completed/aborted `uploadId` |
 | `BucketAlreadyOwnedByYou` | 409 | Bucket already exists on PUT |
-| `BucketNotEmpty` | 409 | `DELETE /{bucket}` on a bucket that still contains objects |
+| `BucketNotEmpty` | 409 | `DELETE /{bucket}` on a bucket that still contains objects or an in-progress multipart upload |
+| `NotImplemented` | 501 | any `?subresource` this simulator does not implement, and any `x-id` naming an operation it does not route |
+| `InvalidRequest` | 400 | `?partNumber` without an `uploadId`, or `x-id=UploadPart` / `x-id=AbortMultipartUpload` without the `uploadId` it needs |
 
 ## API version
 

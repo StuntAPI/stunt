@@ -6,7 +6,7 @@
 # synthetic. See DISCLAIMER.
 id: aws-s3-style
 name: "Amazon S3-style API simulator (unofficial)"
-version: "0.1.0"
+version: "0.2.0"
 
 api:
   name: "Amazon S3 API"
@@ -24,12 +24,23 @@ endpoints:
   - route: /{bucket}
     method: GET
     handler: scripts/objects.star#on_list_or_location
+  # Every bucket-level POST in S3 is unimplemented here — DeleteObjects
+  # (?delete), CreateBucketMetadataConfiguration (?metadataConfiguration),
+  # CreateBucketMetadataTableConfiguration (?metadataTable), and the browser
+  # form POST Object. Routed so the answer is S3-shaped 501 XML rather than the
+  # JSON catch-all 404 below.
+  - route: /{bucket}
+    method: POST
+    handler: scripts/buckets.star#on_post_bucket
+    concurrency_key: bucket
   # Create bucket: PUT /{bucket}
   - route: /{bucket}
     method: PUT
     handler: scripts/buckets.star#on_create_bucket
     concurrency_key: bucket
-  # Delete bucket: DELETE /{bucket} (must be empty, per S3 semantics)
+  # Delete bucket: DELETE /{bucket}. Must be empty; an in-flight multipart
+  # upload also blocks it. AWS documents that rule for directory buckets; for
+  # general-purpose buckets it is an inference — see conformance/matrix.yaml.
   - route: /{bucket}
     method: DELETE
     handler: scripts/buckets.star#on_delete_bucket
@@ -83,7 +94,8 @@ resources:
 identity:
   token_scheme: custom
 
-# Catch-all: any unmatched route returns a 404 in S3-shaped XML.
+# Catch-all: any unmatched route returns a JSON 404, not S3-shaped XML. The
+# adapter-level handlers above cover the S3 surface; this is the fallback.
 rules:
   - name: catchall-404
     match: { path: "/**" }

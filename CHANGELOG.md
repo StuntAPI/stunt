@@ -24,6 +24,49 @@ All notable changes to **stunt** are documented here. The format is based on
   because the crypto module had no MD5, which was never true.
   Run `stunt clean` (or `stunt reset <service>`, using the service name from
   your manifest) after upgrading if any test or fixture pins a contact id.
+- **fix(adapter): aws-s3-style: deleting a bucket with an in-progress multipart
+  upload returned 204.** The upload row and its part blobs survived, leaving an
+  upload that `ListParts` could still list but that `AbortMultipartUpload`,
+  `CompleteMultipartUpload`, and `UploadPart` all rejected with
+  `404 NoSuchBucket`. It now returns `409 BucketNotEmpty`. This is
+  **stricter than AWS documents for general-purpose buckets.** AWS documents
+  the MPU-blocks-delete rule only for directory buckets, where it is enforced;
+  for general-purpose buckets it states only that all objects must be deleted,
+  and the "Emptying a general purpose bucket" guide recommends clearing
+  incomplete uploads as a storage-cost measure rather than as a deletion
+  precondition. It does not document what DeleteBucket does with an upload in
+  progress, so refusing the delete is an inference there — but it is the safe
+  one, because the alternative leaves an upload that can be listed but never
+  resolved. A teardown helper that deletes a bucket after an abandoned upload
+  will now get a 409.
+- **fix(adapter): aws-s3-style: unimplemented subresources return
+  `501 NotImplemented`** instead of falling through to the object operation on
+  the same route. On the bucket, a fall-through answered `200` with a
+  `ListBucketResult`; worse, `PUT /{bucket}?versioning` **created a bucket**
+  and `DELETE /{bucket}?tagging` **deleted one**, while real S3 applies those
+  subresources to the bucket's configuration and leaves it in place. On an
+  object, `PUT /{bucket}/{key}?tagging` **overwrote the content** and
+  `DELETE /{bucket}/{key}?tagging` **deleted the object**, while real
+  `PutObjectTagging` and `DeleteObjectTagging` only change tags. Bucket `PUT`
+  and `DELETE` now reject any query parameter outright, since real S3 takes
+  none on those routes; the read route uses a denylist. Both comparisons are
+  case-insensitive apart from the SigV4 presigned-auth parameters, which are
+  exempt because they authenticate the request rather than select a subresource.
+  The value of `x-id` must name an operation the adapter
+  actually routes: `PUT /{bucket}/{key}?x-id=CopyObject` and
+  `?x-id=RestoreObject` previously reached PutObject and mutated the object
+  behind an operation this adapter does not implement.
+- **fix(adapter): aws-s3-style: `PUT /{bucket}/{key}?partNumber=N` without an
+  `uploadId` overwrote the object.** Real S3 answers `400 InvalidRequest`;
+  `partNumber` only selects `UploadPart` alongside `uploadId`.
+
+**Upgrade note:** state written before the delete guard may contain multipart
+uploads belonging to buckets that were already deleted. Such a bucket name is
+blocked on `DELETE` after recreation, and the upload is only reachable with its
+`uploadId`. `stunt reset aws-s3-style` clears the service state if a bucket
+deletion is unexpectedly refused. The same applies to new state:
+`ListMultipartUploads` is not implemented, so a client that loses an
+`uploadId` has no route to find the upload blocking a delete.
 
 - **BREAKING (test double): aws-s3-style ETags are now real MD5.**
   Single-object and part ETags are the MD5 hex of the verbatim bytes and
@@ -43,9 +86,6 @@ All notable changes to **stunt** are documented here. The format is based on
 
 - **Response headers keep the adapter's casing.** `x-amz-meta-*` is emitted
   lowercase, as real S3 does, instead of Go's canonical form.
-
-### Engine
-
 - **aws-chunked request bodies are decoded before dispatch.** SigV4 streaming
   uploads from AWS SDKs store the object bytes instead of the chunk framing.
 

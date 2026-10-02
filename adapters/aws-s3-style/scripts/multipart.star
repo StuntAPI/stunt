@@ -26,9 +26,17 @@ def on_post_multipart(req):
     bucket = req["params"]["bucket"]
     key = req["params"]["key"]
 
-    if _query_present(req, "uploads"):
+    # Allowlist before the multipart dispatch, for the same reason as the PUT and
+    # DELETE object routes: POST /{bucket}/{key} also carries the object POSTs
+    # this adapter does not implement (SelectObjectContent, RestoreObject), and
+    # with the guard after the dispatch they completed an upload.
+    unsupported = _reject_object_write_query(req, bucket, key, _OBJECT_POST_PARAMS, _OBJECT_POST_OPS)
+    if unsupported != None:
+        return unsupported
+
+    if _query_present_ci(req, "uploads"):
         return _mpu_create(req, bucket, key)
-    if _query_present(req, "uploadId"):
+    if _query_present_ci(req, "uploadId"):
         return _mpu_complete(req, bucket, key)
 
     # Real S3 has no plain POST-to-object operation.
