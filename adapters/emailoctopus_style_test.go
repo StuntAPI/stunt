@@ -152,8 +152,24 @@ func TestEmailOctopusListsAndContacts(t *testing.T) {
 	}
 
 	// ===== get by contact id round-trips the email =====
-	// Get by contact id round-trips the email.
-	cid, _ := d1[0].(map[string]any)["id"].(string)
+	// Get by contact id round-trips the email. The id is read off the contact
+	// itself rather than taken from a page position: the listing is ordered by
+	// contact id (which the starting_after cursor depends on), so which
+	// address lands on page one follows from the digest, not from creation
+	// order.
+	all := f.call(f.vmCont, "on_list_contacts", "GET", "/lists/"+listID+"/contacts",
+		map[string]string{"list_id": listID}, nil, nil, eoAuth)
+	rows, _ := all.Body["data"].([]any)
+	cid := ""
+	for _, r := range rows {
+		row, _ := r.(map[string]any)
+		if row["email_address"] == "one@example.test" {
+			cid, _ = row["id"].(string)
+		}
+	}
+	if cid == "" {
+		t.Fatalf("one@example.test missing from the listing: %v", all.Body)
+	}
 	one := f.call(f.vmCont, "on_get_contact", "GET", "/lists/"+listID+"/contacts/"+cid,
 		map[string]string{"list_id": listID, "contact_id": cid}, nil, nil, eoAuth)
 	if one.Status != 200 || one.Body["email_address"] != "one@example.test" {

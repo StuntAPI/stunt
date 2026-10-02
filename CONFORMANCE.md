@@ -3904,8 +3904,8 @@ behavior notes live in each adapter's README.
 
 **Deviations** (3)
 
+- contact ids are the MD5 of the lowercased email, which is the alias the API documents for contact_id; the docs do not state the shape of the id returned on create
 - any non-empty bearer token is accepted; real keys are dashboard-issued API keys
-- contact ids use truncated SHA-256 of the email; the real API uses MD5
 - v2 has no webhooks; adapter emits unsigned lifecycle events as a local extension
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>

@@ -15,6 +15,15 @@ All notable changes to **stunt** are documented here. The format is based on
   not the content of the blob itself". The previous code hashed the assembled
   blob. The stated reason for the old behavior — that the crypto module has no
   MD5 — was never true.
+- **BREAKING (test double): emailoctopus-style contact ids are now the MD5 of
+  the lowercased email address**, not a truncated SHA-256. EmailOctopus documents
+  `contact_id` as "the ID of the contact, or an MD5 hash of the lowercase version
+  of the contact's email address", so a caller holding only an address computes
+  that hash and sends it. With the old derivation that documented request form
+  matched no contact and returned 404. The adapter previously claimed to deviate
+  because the crypto module had no MD5, which was never true.
+  Run `stunt clean` (or `stunt reset <service>`, using the service name from
+  your manifest) after upgrading if any test or fixture pins a contact id.
 
 - **BREAKING (test double): aws-s3-style ETags are now real MD5.**
   Single-object and part ETags are the MD5 hex of the verbatim bytes and
