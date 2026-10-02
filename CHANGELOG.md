@@ -8,6 +8,20 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **fix(adapter): a non-ASCII byte in a bucket name, key, or query value
+  returned HTTP 500 in every SigV4 adapter** (`aws-s3-style`, `aws-iam-sts-style`,
+  `dynamodb-style`, `sqs-style`). Building the SigV4 canonical URI read each
+  path byte with `ord()`, which returns U+FFFD for a lone byte >= 0x80 because a
+  single byte is not valid UTF-8, so the real byte value was lost and the hex
+  table was indexed at 4095. This included keys that are perfectly valid UTF-8 —
+  `café.txt` was enough to trigger it. The encoder now looks the byte up in a
+  table built at load from a base64 blob, which is how a Starlark handler can
+  read a raw byte at all.
+- **fix(adapter): aws-s3-style: `encoding-type=url` encoded non-ASCII keys as
+  the replacement character.** The same `ord()` misread made every non-ASCII key
+  come back as the three bytes of U+FFFD instead of its own, silently rather
+  than loudly.
+
 - **fix(adapter): azure-storage-style: `Content-MD5` carried base64 SHA-256, and
   Put Block List hashed the wrong bytes.** It is now the base64 MD5 that Azure
   specifies, over the block for Put Block and over the request body for Put

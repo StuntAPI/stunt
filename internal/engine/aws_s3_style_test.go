@@ -2810,3 +2810,112 @@ func TestAWSS3CompleteRejectsDoubleEscapedETags(t *testing.T) {
 		}
 	}
 }
+
+// TestAWSS3NonASCIIKeysRoundTrip pins that a bucket or key holding any
+// non-ASCII byte works. The SigV4 canonical URI percent-encodes the decoded
+// path, and it used to read each byte with ord() — which returns U+FFFD for a
+// lone byte >= 0x80, because a single byte is not valid UTF-8. That indexed a
+// 16-character hex table at 4095 and every such request died with
+// `string index 4095 out of range`, including keys that are perfectly valid
+// UTF-8.
+func TestAWSS3NonASCIIKeysRoundTrip(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "aws-s3-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"s3": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+
+	base := addrs["s3"]
+	now := time.Now()
+
+	// The bucket itself carries a non-ASCII byte.
+	const bucket = "caf%C3%A9-bucket"
+	if _, status := s3Put(t, base+"/"+bucket, nil, now); status != 200 {
+		t.Fatalf("create non-ascii bucket -> status %d, want 200", status)
+	}
+
+	keys := []struct{ name, esc, want string }{
+		{"latin-1 supplement", "caf%C3%A9.txt", "café.txt"},
+		{"latin extended", "na%C3%AFve.txt", "naïve.txt"},
+		{"cjk", "%E6%97%A5%E6%9C%AC.txt", "日本.txt"},
+		{"emoji outside the BMP", "box%F0%9F%93%A6.txt", "box📦.txt"},
+		{"two-byte and space", "a%20%C3%A9b.txt", "a éb.txt"},
+		{"ascii control", "tab%09here.txt", "tab\there.txt"},
+	}
+	for _, k := range keys {
+		if _, status := s3Put(t, base+"/"+bucket+"/"+k.esc, []byte("payload-"+k.name), now); status != 200 {
+			t.Fatalf("put %s -> status %d, want 200", k.name, status)
+		}
+		body, status := s3Get(t, base+"/"+bucket+"/"+k.esc, now)
+		if status != 200 {
+			t.Fatalf("get %s -> status %d, want 200; body %s", k.name, status, body)
+		}
+		if body != "payload-"+k.name {
+			t.Fatalf("get %s -> %q, want %q", k.name, body, "payload-"+k.name)
+		}
+		// HEAD must agree, so the stored key is byte-exact.
+		resp := s3Head(t, base+"/"+bucket+"/"+k.esc, now)
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			t.Fatalf("head %s -> status %d, want 200", k.name, resp.StatusCode)
+		}
+	}
+
+	// A listing must round-trip the key name, not a replacement character.
+	body, status := s3Get(t, base+"/"+bucket+"?list-type=2", now)
+	if status != 200 {
+		t.Fatalf("list -> status %d, want 200; body %s", status, body)
+	}
+	for _, k := range keys {
+		if !strings.Contains(body, "<Key>"+k.want+"</Key>") {
+			t.Fatalf("listing lost %s: %s", k.name, body)
+		}
+		if strings.Contains(body, "�") {
+			t.Fatalf("listing contains a replacement character: %s", body)
+		}
+	}
+
+	// encoding-type=url percent-encodes keys in the response; it must encode
+	// the real bytes, not the UTF-8 of U+FFFD.
+	body, status = s3Get(t, base+"/"+bucket+"?list-type=2&encoding-type=url", now)
+	if status != 200 {
+		t.Fatalf("list with encoding-type=url -> status %d; body %s", status, body)
+	}
+	if !strings.Contains(body, "caf%C3%A9.txt") {
+		t.Fatalf("encoding-type=url did not encode the real bytes: %s", body)
+	}
+	if strings.Contains(body, "%EF%BF%BD") {
+		t.Fatalf("encoding-type=url emitted a replacement character: %s", body)
+	}
+
+	// And the non-ASCII bucket can be deleted, which also signs its path.
+	resp := s3Delete(t, base+"/"+bucket, now)
+	if resp.StatusCode != 409 {
+		t.Fatalf("delete non-empty non-ascii bucket -> status %d, want 409", resp.StatusCode)
+	}
+	resp = s3Delete(t, base+"/"+bucket+"/caf%C3%A9.txt", now)
+	resp.Body.Close()
+	if resp.StatusCode != 204 {
+		t.Fatalf("delete non-ascii key -> status %d, want 204", resp.StatusCode)
+	}
+}

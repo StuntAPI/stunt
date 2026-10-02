@@ -288,8 +288,24 @@ _HEX_UPPER = "0123" + "4567" + "89AB" + "CDEF"
 # _sig_hex2 renders v (0-255) as two uppercase hex digits (percent-encoding
 # uses uppercase %XX).
 def _sig_hex2(v):
-    return _HEX_UPPER[v // 16] + _HEX_UPPER[v % 16]
+    return _HEX_UPPER[(v // 16) % 16] + _HEX_UPPER[v % 16]
 
+
+# _SIG_BYTE_HEX maps a single-byte string to the uppercase hex of its byte
+# value. ord() cannot be used for this: a lone byte >= 0x80 is not a valid
+# UTF-8 sequence, so Starlark decodes it to U+FFFD and the real byte value is
+# lost — percent-encoding 0xFD instead of, say, 0xC3. The table is built by
+# decoding a 256-byte blob, because Starlark source cannot carry a raw high
+# byte. Built once at load; lookups are dict gets.
+_SIG_ALL_BYTES_B64 = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/w=="
+def _sig_build_byte_hex():
+    table = {}
+    raw = crypto.base64_decode(_SIG_ALL_BYTES_B64)
+    for i in range(len(raw)):
+        table[raw[i]] = _sig_hex2(i)
+    return table
+
+_SIG_BYTE_HEX = _sig_build_byte_hex()
 # _sig_uri_encode percent-encodes s per RFC 3986. keep_slash=True keeps "/"
 # literal (canonical URI); False encodes it (canonical query).
 _SIG_UNRESERVED = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" + "0123" + "4567" + "89-_.~"
@@ -303,7 +319,7 @@ def _sig_uri_encode(s, keep_slash):
         elif ch == "/" and keep_slash:
             out = out + "/"
         else:
-            out = out + "%" + _sig_hex2(ord(ch))
+            out = out + "%" + _SIG_BYTE_HEX[ch]
     return out
 
 # _sig_sort_strings returns the items sorted ascending (insertion sort —
