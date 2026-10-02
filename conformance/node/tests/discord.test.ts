@@ -48,9 +48,17 @@ describe("@discordjs/rest against discord-style", () => {
 
         // ===== add-reaction is the real PUT and returns 204 =====
         // (the adapter models the endpoint as a documented no-op)
-        await rest.put(
+        //
+        // The SDK throws on any non-2xx, so resolving proves the status was 2xx;
+        // the parsed result is a zero-length ArrayBuffer, which narrows that to
+        // 204 among the no-content 2xx responses. Previously the result was
+        // discarded and nothing was asserted, while CONFORMANCE.md published
+        // "returns 204" as an SDK-verified behavior — a claim nothing checked.
+        const reacted = await rest.put(
           Routes.channelMessageOwnReaction(channelId, posted.id, encodeURIComponent("👍")),
         );
+        expect(reacted).toBeInstanceOf(ArrayBuffer);
+        expect((reacted as ArrayBuffer).byteLength).toBe(0);
       } finally {
         await h.stop();
       }

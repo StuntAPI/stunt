@@ -21,6 +21,13 @@ All notable changes to **stunt** are documented here. The format is based on
   drop reflects an authoring gap, not missing tests. `vm_only 60 -> 59`,
   `boot 3 -> 4`.
 
+- **fix(conformance): the `add-reaction` Discord behavior was published as
+  verified while asserting nothing.** `discord.test.ts` discarded the result of
+  the reaction PUT and had no `expect` on it, so CONFORMANCE.md carried
+  "add-reaction is the real PUT and returns 204" as an SDK-verified behavior that
+  no assertion checked. It now asserts the SDK returned a zero-length body,
+  which combined with the SDK throwing on non-2xx pins the status to 204.
+
 - **fix(adapter): aws-s3-style: a bucket name holding a control byte created the
   bucket but broke the connection.** `Location` echoed the name raw, and a header
   value containing a raw C0 byte or DEL is not parseable — Go's HTTP client
