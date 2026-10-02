@@ -297,12 +297,14 @@ def _uuid():
     h = h[:12] + "4" + h[13:16] + "b" + h[17:32]
     return h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:32]
 
-# _contact_id derives the contact id from the email address. The real API uses
-# the MD5 of the LOWERCASED email (32 lowercase hex chars); stunt's crypto
-# module has no MD5, so a truncated SHA-256 of the lowercased email is used —
-# same shape, same determinism-per-email property.
+# _contact_id derives the contact id from the email address: the MD5 of the
+# LOWERCASED email, 32 lowercase hex chars. EmailOctopus documents contact_id as
+# "the ID of the contact, or an MD5 hash of the lowercase version of the
+# contact's email address", so a caller holding only an address is expected to
+# compute this hash and send it. Deriving the id any other way makes that
+# documented request form resolve to nothing.
 def _contact_id(email):
-    return crypto.sha256(email.lower())[:32]
+    return crypto.md5(email.lower())
 
 # _row_id is the contacts collection's storage key: list-scoped composite.
 # The real API keys contacts by email hash PER LIST (the same address is

@@ -164,11 +164,14 @@ same way); a malformed cursor answers `400`.
 | `campaigns` | Campaign records + report aggregates (derived on first read) |
 | `automation_queue` | Automation queue entries (automation, contact, queued_at) |
 
-Contact ids are the hash of the **lowercased email address** rendered as 32
-lowercase hex characters. The real API uses the MD5 of that string; stunt's
-crypto module has no MD5, so a truncated SHA-256 is used — same shape, same
-determinism-per-email property. List/campaign/automation ids are UUID-shaped
-synthetic values.
+Contact ids are the MD5 of the **lowercased email address**, 32 lowercase hex
+characters. EmailOctopus documents `contact_id` as "the ID of the contact, or an
+MD5 hash of the lowercase version of the contact's email address", so a caller
+holding only an address can compute that hash and use it directly; deriving ids
+this way is what makes the documented form resolve. The docs do not state the
+shape of the id returned on create, so this is a deliberate choice rather than a
+claimed parity — recorded as a deviation in `conformance/matrix.yaml`.
+List/campaign/automation ids are UUID-shaped synthetic values.
 
 ## Clock
 

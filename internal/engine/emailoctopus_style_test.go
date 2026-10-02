@@ -3,10 +3,13 @@ package engine
 import (
 	"bytes"
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -722,5 +725,107 @@ func emailoctopusAssertRecentISO(t *testing.T, v any, what string) {
 	}
 	if d := time.Since(ts); d < -time.Minute || d > 15*time.Minute {
 		t.Fatalf("%s = %v, want within 15min of now (age %s)", what, s, d)
+	}
+}
+
+// TestEmailOctopusContactIDIsMD5OfLowercasedEmail pins that a caller holding
+// only an address can identify a contact the way EmailOctopus documents it:
+// "The ID of the contact, or an MD5 hash of the lowercase version of the
+// contact's email address." Contact ids were a truncated SHA-256, so that
+// documented request form matched nothing and 404'd.
+func TestEmailOctopusContactIDIsMD5OfLowercasedEmail(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "emailoctopus-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"emailoctopus": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["emailoctopus"]
+	const token = "eo_local_dev_key"
+
+	const automationID = "12345678-1234-4234-8234-123456789012"
+	const email = "Grace.Hopper@Example.COM"
+
+	body, status := postJSONAuth(t, base+"/lists", token, map[string]any{"name": "MD5 list"})
+	if status != 201 {
+		t.Fatalf("create list -> status %d, want 201; body %s", status, body)
+	}
+	listID, _ := emailoctopusDecode(t, body)["id"].(string)
+	if listID == "" {
+		t.Fatalf("no list id in %s", body)
+	}
+
+	body, status = emailoctopusPostRaw(t, base+"/lists/"+listID+"/contacts", token,
+		[]byte(`{"email_address":"`+email+`"}`))
+	if status != 201 {
+		t.Fatalf("create contact -> status %d, want 201; body %s", status, body)
+	}
+	created := map[string]any{}
+	if err := json.Unmarshal([]byte(body), &created); err != nil {
+		t.Fatalf("contact response is not JSON: %v; body %s", err, body)
+	}
+	contactID, _ := created["id"].(string)
+	if contactID == "" {
+		t.Fatalf("no contact id in %s", body)
+	}
+
+	// The returned id is the MD5 of the lowercased address.
+	sum := md5.Sum([]byte(strings.ToLower(email)))
+	want := hex.EncodeToString(sum[:])
+	if contactID != want {
+		t.Fatalf("contact id = %q, want the md5 of %q = %q", contactID, strings.ToLower(email), want)
+	}
+
+	// The documented alias resolves: a caller holding only the address computes
+	// that hash itself and sends it as contact_id. Lowercase hex is the
+	// convention; the docs lowercase the input address, not the digest.
+	if body, status := emailoctopusPostRaw(t, base+"/automations/"+automationID+"/queue", token,
+		[]byte(`{"contact_id":"`+want+`"}`)); status != 204 {
+		t.Fatalf("queue by md5 alias %q -> status %d, want 204; body %s", want, status, body)
+	}
+	if body, status := getAuth(t, base+"/lists/"+listID+"/contacts/"+want, token); status != 200 {
+		t.Fatalf("get contact by md5 alias %q -> status %d, want 200; body %s", want, status, body)
+	}
+	// PUT, DELETE and batch all resolve the same alias. The v2 spec dropped the
+	// alias clause from the batch form's `id`, but it resolves anyway because
+	// the id itself is derived this way.
+	if body, status := emailoctopusPutJSON(t, base+"/lists/"+listID+"/contacts/"+want, token,
+		map[string]any{"fields": map[string]any{"Hometown": "Lisbon"}}); status != 200 {
+		t.Fatalf("update contact by md5 alias -> status %d, want 200; body %s", status, body)
+	}
+	if body, status := emailoctopusPutJSON(t, base+"/lists/"+listID+"/contacts/batch", token,
+		map[string]any{"contacts": []map[string]any{{"id": want, "status": "subscribed"}}}); status != 200 {
+		t.Fatalf("batch update by md5 alias -> status %d, want 200; body %s", status, body)
+	}
+	if body, status := deleteAuth(t, base+"/lists/"+listID+"/contacts/"+want, token); status != 204 {
+		t.Fatalf("delete contact by md5 alias -> status %d, want 204; body %s", status, body)
+	}
+	if body, status := getAuth(t, base+"/lists/"+listID+"/contacts/"+want, token); status != 404 {
+		t.Fatalf("deleted contact still resolves -> status %d, want 404; body %s", status, body)
+	}
+
+	// A hash of a different address must not resolve to this contact.
+	other := md5.Sum([]byte("someone.else@example.com"))
+	if body, status := getAuth(t, base+"/lists/"+listID+"/contacts/"+hex.EncodeToString(other[:]), token); status != 404 {
+		t.Fatalf("get contact by unrelated md5 -> status %d, want 404; body %s", status, body)
 	}
 }
