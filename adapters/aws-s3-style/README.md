@@ -15,6 +15,9 @@ A faithful behavioral mock of Amazon S3's path-style API, designed for local
 integration testing without a real AWS account:
 
 - **Create bucket:** `PUT /{bucket}` → `200` (409 `BucketAlreadyOwnedByYou` if it exists).
+  `Location` is percent-encoded, so a name holding non-ASCII or control bytes
+  still yields a parseable header. Real S3 rejects such names; this simulator
+  accepts them.
 - **Delete bucket:** `DELETE /{bucket}` → `204`. Per S3 semantics the bucket
   must be empty (otherwise 409 `BucketNotEmpty`); an in-progress multipart
   upload also blocks the delete, so abort or complete it first. Deleting a
