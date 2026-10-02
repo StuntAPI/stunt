@@ -21,7 +21,7 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
-**99 adapters** — 2 SDK+VM, 34 SDK-only, 60 VM-only, 3 boot-tier.
+**99 adapters** — 2 SDK+VM, 34 SDK-only, 59 VM-only, 4 boot-tier.
 
 **45 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.
 
@@ -71,7 +71,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [github-style](adapters/github-style/) | GitHub REST + GraphQL API `2022-11-28` | 26 +GQL | SDK | go-github/v89 @ v89.0.0<br>octokit @ 5.0.5 (floor) | 6 | [7](#github-style) | [4](#github-style) |
 | [gmail-style](adapters/gmail-style/) | Gmail API `v1` | 16 | SDK | google-api-go-client @ v0.293.0 | 9 | [6](#gmail-style) | [3](#gmail-style) |
 | [google-admin-style](adapters/google-admin-style/) | Google Admin SDK Directory API `directory_v1` | 13 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#google-admin-style) | [4](#google-admin-style) |
-| [google-cloudtasks-style](adapters/google-cloudtasks-style/) | Google Cloud Tasks API `v2` | 16 | VM | — | — | [7](#google-cloudtasks-style) | [7](#google-cloudtasks-style) |
+| [google-cloudtasks-style](adapters/google-cloudtasks-style/) | Google Cloud Tasks API `v2` | 16 | boot | — | — | [7](#google-cloudtasks-style) | [7](#google-cloudtasks-style) |
 | [google-iam-style](adapters/google-iam-style/) | Google Cloud IAM API + Service Accounts `v1` | 10 | SDK | google-api-go-client @ v0.293.0 | 7 | [4](#google-iam-style) | [2](#google-iam-style) |
 | [google-style](adapters/google-style/) | Google OAuth2 API `v2` | 4 | SDK | x/oauth2 @ v0.36.0<br>google-api-go-client/idtoken @ v0.293.0 | 7 | [2](#google-style) | [2](#google-style) |
 | [gsearchconsole-style](adapters/gsearchconsole-style/) | Google Search Console API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 7 | [2](#gsearchconsole-style) | [4](#gsearchconsole-style) |

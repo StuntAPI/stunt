@@ -319,3 +319,28 @@ func TestRenderSurfaceDetailBlock(t *testing.T) {
 		t.Error("unexpected cell content")
 	}
 }
+
+func TestVMTiersDerivedFromPublishedNames(t *testing.T) {
+	ads := []*adapter.Adapter{
+		{ID: "marked-style"},
+		{ID: "markerless-style"},
+		{ID: "unsuited-style"},
+	}
+	vmBehav := map[string][]string{
+		"marked-style": {"create round-trips", "delete removes it"},
+	}
+	got := vmTiers(ads, vmBehav)
+
+	if !got["marked-style"] {
+		t.Errorf("marked-style: want VM tier, got %v", got["marked-style"])
+	}
+	// A suite file exists but carries no // ===== marker, so it publishes no
+	// behavior names and cannot claim VM verification. This is the case that
+	// used to pass on os.Stat alone.
+	if got["markerless-style"] {
+		t.Errorf("markerless-style: suite exists but publishes no names, want no VM tier")
+	}
+	if got["unsuited-style"] {
+		t.Errorf("unsuited-style: no suite at all, want no VM tier")
+	}
+}
