@@ -662,3 +662,77 @@ func azMD5(b []byte) []byte {
 	sum := md5.Sum(b)
 	return sum[:]
 }
+
+// TestAzurePutBlobContentMD5 pins that a single-shot Put Blob reports the
+// base64 MD5 of the blob it stored. It used to answer `Content-MD5: ""`, which
+// is neither the digest nor an absent header: an SDK that reads the header
+// either fails to parse it or compares against nothing.
+func TestAzurePutBlobContentMD5(t *testing.T) {
+	base, err := func() (string, error) {
+		d, e := filepath.Abs(filepath.Join("..", "..", "adapters", "azure-storage-style"))
+		return d, e
+	}()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"azure": {Adapter: base},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	svc := addrs["azure"]
+
+	const sharedKey = "SharedKey stuntstorage:dHVudA=="
+	if _, status := azPut(t, svc+"/md5blob", sharedKey, nil); status != 201 {
+		t.Fatalf("create container -> status %d, want 201", status)
+	}
+
+	for _, payload := range []struct {
+		name string
+		data []byte
+	}{
+		{"ascii", []byte("hello world")},
+		{"empty", []byte{}},
+		{"binary", []byte{0x00, 0xFF, 0x10, 0x80, 0x7F, 0x0A}},
+		{"multi-kb", azTestBytes(9*1024, 7)},
+	} {
+		hdr, status := azPutHeaders(t, svc+"/md5blob/"+payload.name+".bin", sharedKey, payload.data)
+		if status != 201 {
+			t.Fatalf("put blob %s -> status %d, want 201", payload.name, status)
+		}
+		want := base64.StdEncoding.EncodeToString(azMD5(payload.data))
+		if got := hdr.Get("Content-MD5"); got != want {
+			t.Fatalf("put blob %s Content-MD5 = %q, want %q (base64 md5 of the blob)", payload.name, got, want)
+		}
+		// The header must match the bytes a later GET returns.
+		body, gstatus := azGet(t, svc+"/md5blob/"+payload.name+".bin", sharedKey)
+		if gstatus != 200 || body != string(payload.data) {
+			t.Fatalf("get blob %s -> %d, %d bytes", payload.name, gstatus, len(payload.data))
+		}
+		// Overwriting recomputes it.
+		replaced := append([]byte("replaced:"), payload.data...)
+		hdr, status = azPutHeaders(t, svc+"/md5blob/"+payload.name+".bin", sharedKey, replaced)
+		if status != 201 {
+			t.Fatalf("overwrite blob %s -> status %d, want 201", payload.name, status)
+		}
+		if got, want := hdr.Get("Content-MD5"), base64.StdEncoding.EncodeToString(azMD5(replaced)); got != want {
+			t.Fatalf("overwrite blob %s Content-MD5 = %q, want %q", payload.name, got, want)
+		}
+	}
+}

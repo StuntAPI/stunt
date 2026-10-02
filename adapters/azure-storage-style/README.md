@@ -97,7 +97,7 @@ Path-style URLs: `/{container}/{blob}`.
 | GET | `/{container}?restype=container&comp=list` | ListBlobs (XML). **Stateful.** |
 | HEAD | `/{container}` | Container metadata. |
 | DELETE | `/{container}` | Delete container. |
-| PUT | `/{container}/{blob}` | Upload BlockBlob (`x-ms-blob-type`). |
+| PUT | `/{container}/{blob}` | Upload BlockBlob (`x-ms-blob-type`). Returns `Content-MD5`: base64 MD5 of the stored blob. |
 | GET | `/{container}/{blob}` | Download blob. |
 | HEAD | `/{container}/{blob}` | Blob metadata (`x-ms-blob-type`, `Content-Length`, `ETag`). |
 | DELETE | `/{container}/{blob}` | Delete blob. |
