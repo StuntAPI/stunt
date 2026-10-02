@@ -948,14 +948,15 @@ func TestAWSS3Conditionals(t *testing.T) {
 		t.Fatalf("create bucket -> %d", status)
 	}
 
-	// The ETag algorithm is covered by its own test; here the returned value
-	// is just the validator these preconditions are compared against.
+	// The ETag is the validator these preconditions are compared against, and
+	// the conditionals below only mean something if it is the real content
+	// digest, so assert it exactly rather than checking its shape.
 	etag, status := s3PutETag(t, base+"/condbucket/file.txt", []byte("hello"), now)
 	if status != 200 {
 		t.Fatalf("put file -> %d", status)
 	}
-	if !strings.HasPrefix(etag, `"`) || !strings.HasSuffix(etag, `"`) {
-		t.Fatalf("put file ETag = %q, want a quoted validator", etag)
+	if want := `"` + awsMD5Hex([]byte("hello")) + `"`; etag != want {
+		t.Fatalf("put file ETag = %q, want %q", etag, want)
 	}
 	wrongETag := `"00000000000000000000000000000000"`
 

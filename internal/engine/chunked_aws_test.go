@@ -97,11 +97,12 @@ func TestAWSChunkedDecode(t *testing.T) {
 	if resp.StatusCode != 200 {
 		t.Fatalf("chunked put -> status %d, want 200; body %s", resp.StatusCode, putBody)
 	}
-	// The ETag digest algorithm is covered separately; here what matters is
-	// that it is derived from the decoded bytes, not the framing. A quoted
-	// 32/64-char hex digest is the shape every real S3 ETag has.
-	if etag := resp.Header.Get("ETag"); len(etag) < 34 || etag[0] != '"' || etag[len(etag)-1] != '"' {
-		t.Fatalf("chunked put ETag = %q, want a quoted content digest", etag)
+	// The ETag must be the MD5 of the decoded bytes, not of the chunk framing
+	// and not of the signed payload. Asserted exactly: a shape check would pass
+	// on a digest computed from the wrong input.
+	wantETag := `"` + awsMD5Hex([]byte("hello")) + `"`
+	if etag := resp.Header.Get("ETag"); etag != wantETag {
+		t.Fatalf("chunked put ETag = %q, want %q (md5 of the decoded body)", etag, wantETag)
 	}
 
 	body, status := s3Get(t, base+"/chunkbucket/hello.txt", now)
@@ -119,6 +120,13 @@ func TestAWSChunkedDecode(t *testing.T) {
 	}
 	if cl := hresp.Header.Get("Content-Length"); cl != "5" {
 		t.Fatalf("rawHttpBodyLength %s, want 5", cl)
+	}
+	// HEAD must report the same validator the PUT returned. Without this, a
+	// digest computed correctly for the response but stored wrongly on the
+	// object would pass this test, and a client that caches the HEAD validator
+	// would then send an If-Match that never matches.
+	if etag := hresp.Header.Get("ETag"); etag != wantETag {
+		t.Fatalf("HEAD ETag = %q, want %q (same digest the PUT returned)", etag, wantETag)
 	}
 
 	// Declared decoded length mismatch -> 400 IncompleteBody.
