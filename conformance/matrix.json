@@ -1,7 +1,7 @@
 {
   "summary": {
     "adapters": 99,
-    "checks": 238,
+    "checks": 241,
     "tiers": {
       "sdk_and_vm": 2,
       "sdk_only": 34,
@@ -9377,7 +9377,10 @@
         "DeleteBucket refused while a multipart upload is in progress",
         "AbortMultipartUpload releases the blocked bucket delete",
         "CompleteMultipartUpload with the SDK's XML-escaped ETag",
-        "Object tagging subresources refused without touching the object"
+        "Object tagging subresources refused without touching the object",
+        "Presigned GET URL (real presigner, signed headers sent)",
+        "Presigned DELETE (real presigner)",
+        "Presigned GET rejects a tampered signature"
       ],
       "missing": [
         "No bucket policy, tagging, ACL, CORS, lifecycle, or website subresources",
