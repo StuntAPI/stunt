@@ -94,4 +94,4 @@ rules:
 #            etag, lastModified, metadata, committedBlocks}
 # - blocks: staged (uncommitted) Put Block payloads
 #   {id: sha256(container,blob,blockId), container, blob, blockId, bid,
-#    size, sha256b64, lastModifiedUnix}
+#    size, md5b64, lastModifiedUnix}

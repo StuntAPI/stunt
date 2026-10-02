@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/sha256"
 	"encoding/base64"
 	"io"
@@ -291,7 +292,7 @@ func TestAzureStorageStyleBlockBlobLifecycle(t *testing.T) {
 		if status != 201 {
 			t.Fatalf("put block %s -> %d", tc.id, status)
 		}
-		wantMD5 := base64.StdEncoding.EncodeToString(azSHA256(tc.data))
+		wantMD5 := base64.StdEncoding.EncodeToString(azMD5(tc.data))
 		if got := hdr.Get("Content-MD5"); got != wantMD5 {
 			t.Fatalf("put block %s Content-MD5 = %q, want %q", tc.id, got, wantMD5)
 		}
@@ -398,14 +399,8 @@ func azTestBytes(n int, seed int) []byte {
 	return out
 }
 
-// azSHA256 returns the raw SHA-256 digest of b.
-func azSHA256(b []byte) []byte {
-	sum := sha256.Sum256(b)
-	return sum[:]
-}
-
-// azBlockListBody builds a Put Block List XML body listing the block ids
-// (as <Latest> entries, the common Azure SDK form).
+// azBlockListBody builds a Put Block List XML body listing the block ids (as
+// `<Latest>` entries, the common Azure SDK form).
 func azBlockListBody(ids []string) string {
 	var b strings.Builder
 	b.WriteString(`<?xml version="1.0" encoding="utf-8"?><BlockList>`)
@@ -577,4 +572,93 @@ func azDelete(t *testing.T, rawurl, auth string) *http.Response {
 		t.Fatal(err)
 	}
 	return resp
+}
+
+// TestAzureContentMD5IsRealMD5 pins that the Content-MD5 response header is the
+// base64 MD5 of the bytes Azure says it covers, at both sites that emit it.
+// Put Block covers the staged block. Put Block List covers the request body —
+// the XML block list — not the blob the commit assembles, which is what real
+// Azure returns and what an SDK verifies when it sent a Content-MD5.
+func TestAzureContentMD5IsRealMD5(t *testing.T) {
+	adapterDir, err := filepath.Abs(filepath.Join("..", "..", "adapters", "azure-storage-style"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stateDir := t.TempDir()
+	m := &manifest.Manifest{
+		Path:    filepath.Join(stateDir, "stunt.yaml"),
+		Version: 1,
+		Network: manifest.Network{Mode: "port", BasePort: 0},
+		Services: map[string]manifest.Service{
+			"azure": {Adapter: adapterDir},
+		},
+	}
+
+	e, err := New(m)
+	if err != nil {
+		t.Fatalf("engine.New: %v", err)
+	}
+	defer e.Close()
+	addrs, cancel, err := e.ServeForTest(context.Background())
+	if err != nil {
+		t.Fatalf("ServeForTest: %v", err)
+	}
+	defer cancel()
+	time.Sleep(50 * time.Millisecond)
+	base := addrs["azure"]
+
+	const sharedKey = "SharedKey stuntstorage:dHVudA=="
+	if _, status := azPut(t, base+"/md5cont", sharedKey, nil); status != 201 {
+		t.Fatalf("create container -> %d, want 201", status)
+	}
+
+	blobURL := base + "/md5cont/md5.bin"
+	partA := []byte("first block")
+	partB := []byte("second block")
+	idA := base64.StdEncoding.EncodeToString([]byte("md5-A"))
+	idB := base64.StdEncoding.EncodeToString([]byte("md5-B"))
+
+	for _, p := range []struct {
+		id   string
+		data []byte
+	}{{idA, partA}, {idB, partB}} {
+		hdr, status := azPutHeaders(t, blobURL+"?comp=block&blockid="+url.QueryEscape(p.id), sharedKey, p.data)
+		if status != 201 {
+			t.Fatalf("put block %s -> %d, want 201", p.id, status)
+		}
+		// Put Block's Content-MD5 covers the staged block.
+		want := base64.StdEncoding.EncodeToString(azMD5(p.data))
+		if got := hdr.Get("Content-MD5"); got != want {
+			t.Fatalf("put block %s Content-MD5 = %q, want %q (base64 md5 of the block)", p.id, got, want)
+		}
+	}
+
+	// Put Block List's Content-MD5 covers the request body, which is the XML
+	// block list, not the assembled blob.
+	commit := azBlockListBody([]string{idA, idB})
+	hdr, status := azPutHeaders(t, blobURL+"?comp=blocklist", sharedKey, []byte(commit))
+	if status != 201 {
+		t.Fatalf("put blocklist -> %d, want 201", status)
+	}
+	wantCommit := base64.StdEncoding.EncodeToString(azMD5([]byte(commit)))
+	if got := hdr.Get("Content-MD5"); got != wantCommit {
+		t.Fatalf("put blocklist Content-MD5 = %q, want %q (base64 md5 of the request body)", got, wantCommit)
+	}
+
+	// And the assembled blob really is A+B, so the commit digest above is
+	// demonstrably not a digest of the blob.
+	assembled := append(append([]byte{}, partA...), partB...)
+	if base64.StdEncoding.EncodeToString(azMD5(assembled)) == wantCommit {
+		t.Fatal("assembled bytes and commit body hash the same; the test cannot distinguish them")
+	}
+	body, status := azGet(t, blobURL, sharedKey)
+	if status != 200 || body != string(assembled) {
+		t.Fatalf("assembled blob -> %d %q, want %d bytes A+B", status, body, len(assembled))
+	}
+}
+
+// azMD5 is the base64-encoded MD5 Azure returns in Content-MD5.
+func azMD5(b []byte) []byte {
+	sum := md5.Sum(b)
+	return sum[:]
 }

@@ -116,9 +116,7 @@ The real Azure block-blob assembly model, stateful and byte-exact:
 1. **Put Block** (`PUT /{container}/{blob}?comp=block&blockid=<base64>`,
    body = block bytes) stages the block as *uncommitted*. Blocks may be
    staged **in any order**, and re-staging an id replaces its bytes. Each
-   `201` carries a `Content-MD5` header (base64 SHA-256 of the block — the
-   crypto module has no MD5, a documented deviation, the same trade the S3
-   adapter makes for its ETags).
+   `201` carries a `Content-MD5` header: the base64 MD5 of the block.
 2. **Get Block List** (`GET ...?comp=blocklist&blocklisttype=...`) returns
    the `<CommittedBlocks>` (commit order) and `<UncommittedBlocks>`
    (staged, sorted by block id). `blocklisttype` is required — missing is
@@ -204,7 +202,7 @@ Block assembly example (ids are base64; order comes from the LIST):
 ```
 PUT /mycontainer/report.bin?comp=block&blockid=YmxvY2stQQ==
 Authorization: SharedKey stuntstorage:...
-<body>                          → 201, Content-MD5: <base64 sha256 of block>
+<body>                          → 201, Content-MD5: <base64 md5 of block>
 
 PUT /mycontainer/report.bin?comp=block&blockid=YmxvY2stQg==
 Authorization: SharedKey stuntstorage:...
@@ -221,7 +219,7 @@ PUT /mycontainer/report.bin?comp=blocklist
 Authorization: SharedKey stuntstorage:...
 <?xml version="1.0" encoding="utf-8"?><BlockList>
   <Latest>YmxvY2stQQ==</Latest><Latest>YmxvY2stQg==</Latest>
-</BlockList>                    → 201, ETag + Content-MD5 of the assembled bytes
+</BlockList>                    → 201, ETag + Content-MD5: <base64 md5 of the XML request body>
 
 GET /mycontainer/report.bin     → 200, block A bytes followed by block B bytes
 ```
