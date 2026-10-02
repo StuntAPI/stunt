@@ -216,7 +216,12 @@ def _upload_blob(req, container, blob):
         "Last-Modified": _rfc1123(),
         "x-ms-request-id": _req_id(),
         "x-ms-version": "2024-08-04",
-        "Content-MD5": "",
+        # The MD5 of the blob just stored. Real Azure returns Content-MD5 only
+        # when the request carried one; this adapter returns it unconditionally
+        # at version 2024-08-04, which conformance/matrix.yaml records as a
+        # deviation. Given that, an empty value is the one option that is
+        # neither the digest nor an absent header.
+        "Content-MD5": crypto.md5(raw, "base64"),
     })
 
 # on_get_blob returns the blob content or metadata.

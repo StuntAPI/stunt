@@ -8,6 +8,11 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **fix(adapter): azure-storage-style: Put Blob answered `Content-MD5: ""`.** An
+  empty value is neither the digest nor an absent header, so an SDK reading it
+  either fails to parse it or compares against nothing. It is now the base64 MD5
+  of the blob just stored, matching the two block-staging operations.
+
 - **fix(adapter): a non-ASCII byte in a bucket name, key, or query value
   returned HTTP 500 in every SigV4 adapter** (`aws-s3-style`, `aws-iam-sts-style`,
   `dynamodb-style`, `sqs-style`). Building the SigV4 canonical URI read each
