@@ -14,3 +14,7 @@ docs/dogfood/
 *-findings.md
 GOAL.md
 .DS_Store
+
+# Dependency trees — never committed. A symlinked node_modules becomes a
+# dangling link on CI and fails `bun install` with ENOENT.
+node_modules/
