@@ -200262,7 +200262,7 @@
         },
         {
           "label": "stripe-node",
-          "version": "22.5.0 (floor)"
+          "version": "22.6.2 (floor)"
         }
       ],
       "behaviors": [
@@ -200927,8 +200927,8 @@
         }
       ],
       "surface": {
-        "source": "sdk stripe-node @ 22.5.0 (floor)",
-        "provider_routes": 568,
+        "source": "sdk stripe-node @ 22.6.2 (floor)",
+        "provider_routes": 573,
         "covered_routes": 138,
         "coverage_pct": 24,
         "missing_routes": [
@@ -201083,6 +201083,26 @@
           {
             "method": "POST",
             "route": "/v1/billing/credit_grants/{id}/void"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/billing/feedback_options"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/billing/feedback_options"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/billing/feedback_options/{id}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/billing/feedback_options/{id}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/billing/feedback_options/{id}/deactivate"
           },
           {
             "method": "POST",
