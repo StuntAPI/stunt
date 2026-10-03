@@ -30,10 +30,20 @@ jobs:
     if: github.actor == 'dependabot[bot]' && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     steps:
+      # `gh pr merge --auto` resolves the PR's head ref to enable auto-merge and
+      # needs a repository. Without this the command fails on git before it does
+      # anything, and a wrapped failure goes unnoticed.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          gh pr merge "$PR" --auto --squash --delete-branch \
-            || echo "could not enable auto-merge (it may already be on)"
+          # No --delete-branch here: the repository already sets
+          # delete_branch_on_merge, and asking for it here makes gh shell out to
+          # git. Deliberately unguarded — a failure here means auto-merge is
+          # silently not on, which is exactly what this workflow exists to set up.
+          gh pr merge "$PR" --auto --squash
