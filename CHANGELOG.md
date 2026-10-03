@@ -8,6 +8,13 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **fix(conformance): the Node harness no longer falls back to `stunt` on PATH.**
+  `bootAdapter` defaulted `STUNT_BIN` to `stunt`, so running `bun test` directly
+  tested whatever binary happened to be installed. A stale Homebrew build answered
+  `500` on a route this commit serves, and it read as a live adapter bug. The
+  binary the suites run is part of what the matrix publishes, so it is now
+  required rather than defaulted, and the error names `just conformance-node`.
+
 - **docs: record the conformance matrix's limits and the deferred work.**
   CONTRIBUTING.md now states what the generated matrix does and does not claim —
   that it is derived from source text rather than test results, that a skipped

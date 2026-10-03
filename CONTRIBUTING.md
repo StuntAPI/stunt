@@ -187,6 +187,11 @@ regenerates and fails on drift.
 `bun install --frozen-lockfile` in `conformance/node` first. `just ci-full` does
 both in order.
 
+Run the Node suites through `just conformance-node`. It builds a fresh binary and
+sets `STUNT_BIN`; the harness **refuses** to fall back to `stunt` on `PATH`, because
+a stale install would silently become what the matrix attests to. If you see
+`STUNT_BIN is not set`, you are running `bun test` directly — use the recipe.
+
 What the matrix claims, and what it does not:
 
 - A behavior is listed only if a section marker (`// ===== name =====`) or a
