@@ -116528,7 +116528,7 @@
       "sdks": [
         {
           "label": "openai-node",
-          "version": "7.5.0 (floor)"
+          "version": "7.25.0 (floor)"
         }
       ],
       "behaviors": [
@@ -116561,11 +116561,111 @@
         }
       ],
       "surface": {
-        "source": "sdk openai-node @ 7.5.0 (floor)",
-        "provider_routes": 246,
+        "source": "sdk openai-node @ 7.25.0 (floor)",
+        "provider_routes": 302,
         "covered_routes": 2,
         "coverage_pct": 0,
         "missing_routes": [
+          {
+            "method": "GET",
+            "route": "/v1/agents"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/agents"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/agents/environments/templates"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/agents/environments/templates"
+          },
+          {
+            "method": "DELETE",
+            "route": "/v1/agents/environments/templates/{environmentTemplateID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/agents/environments/templates/{environmentTemplateID}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/agents/environments/templates/{environmentTemplateID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/agents/environments/{environmentID}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/agents/environments/{environmentID}/files"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/agents/sessions"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/agents/sessions"
+          },
+          {
+            "method": "DELETE",
+            "route": "/v1/agents/sessions/{sessionID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/agents/sessions/{sessionID}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/agents/sessions/{sessionID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/agents/sessions/{sessionID}/events"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/agents/sessions/{sessionID}/events"
+          },
+          {
+            "method": "DELETE",
+            "route": "/v1/agents/sessions/{session_id}/artifacts/{artifactID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/agents/sessions/{session_id}/artifacts/{artifactID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/agents/sessions/{session_id}/artifacts/{artifactID}/content"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/agents/sessions/{session_id}/subagents/{subagentID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/agents/sessions/{session_id}/subagents/{subagent_id}/turns/{turnID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/agents/sessions/{session_id}/turns/{turnID}"
+          },
+          {
+            "method": "DELETE",
+            "route": "/v1/agents/{agentID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/agents/{agentID}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/agents/{agentID}"
+          },
           {
             "method": "GET",
             "route": "/v1/assistants"
@@ -116719,10 +116819,6 @@
             "route": "/v1/conversations/{conversation_id}/items/{itemID}"
           },
           {
-            "method": "POST",
-            "route": "/v1/embeddings"
-          },
-          {
             "method": "GET",
             "route": "/v1/evals"
           },
@@ -116835,6 +116931,34 @@
             "route": "/v1/images/variations"
           },
           {
+            "method": "POST",
+            "route": "/v1/live/sessions"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/live/sessions/{sessionID}/accept"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/live/sessions/{sessionID}/content"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/live/sessions/{sessionID}/fork"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/live/sessions/{sessionID}/hangup"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/live/sessions/{sessionID}/refer"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/live/sessions/{sessionID}/reject"
+          },
+          {
             "method": "DELETE",
             "route": "/v1/models/{model}"
           },
@@ -116905,6 +117029,26 @@
           {
             "method": "POST",
             "route": "/v1/organization/data_retention"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/organization/external_storage"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/organization/external_storage"
+          },
+          {
+            "method": "DELETE",
+            "route": "/v1/organization/external_storage/{externalStorageID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/organization/external_storage/{externalStorageID}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/organization/external_storage/{externalStorageID}/validate"
           },
           {
             "method": "GET",
@@ -117264,6 +117408,10 @@
           },
           {
             "method": "POST",
+            "route": "/v1/realtime/calls"
+          },
+          {
+            "method": "POST",
             "route": "/v1/realtime/calls/{callID}/accept"
           },
           {
@@ -117292,6 +117440,10 @@
           },
           {
             "method": "POST",
+            "route": "/v1/realtime/translations/client_secrets"
+          },
+          {
+            "method": "POST",
             "route": "/v1/responses"
           },
           {
@@ -117313,6 +117465,14 @@
           {
             "method": "POST",
             "route": "/v1/responses/{responseID}/cancel"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/safety/alerts/{id}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/safety/cases/{id}"
           },
           {
             "method": "GET",
@@ -117432,6 +117592,38 @@
           },
           {
             "method": "GET",
+            "route": "/v1/vaults"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/vaults"
+          },
+          {
+            "method": "DELETE",
+            "route": "/v1/vaults/{vaultID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/vaults/{vaultID}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/vaults/{vaultID}/credentials"
+          },
+          {
+            "method": "DELETE",
+            "route": "/v1/vaults/{vault_id}/credentials/{credentialID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/vaults/{vault_id}/credentials/{credentialID}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/vaults/{vault_id}/credentials/{credentialID}"
+          },
+          {
+            "method": "GET",
             "route": "/v1/vector_stores"
           },
           {
@@ -117517,6 +117709,38 @@
           {
             "method": "POST",
             "route": "/v1/videos/{videoID}/remix"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/webhook_endpoints"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/webhook_endpoints"
+          },
+          {
+            "method": "DELETE",
+            "route": "/v1/webhook_endpoints/{webhookEndpointID}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/webhook_endpoints/{webhookEndpointID}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/webhook_endpoints/{webhookEndpointID}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/webhook_endpoints/{webhookEndpointID}/rotate_secret"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/webhook_endpoints/{webhookEndpointID}/test"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/webhook_event_types"
           }
         ],
         "derived": true
