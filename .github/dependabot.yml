@@ -31,7 +31,11 @@ updates:
     commit-message:
       prefix: "chore(deps)"
 
-  - package-ecosystem: npm
+  # The Node suite is installed with bun and locked by bun.lock, not a
+  # package-lock.json. Dependabot's `npm` ecosystem refuses such a project with
+  # "misconfigured_tooling" — it cannot update a bun.lock — so this must be the
+  # `bun` ecosystem.
+  - package-ecosystem: bun
     directory: /conformance/node
     schedule:
       interval: weekly
