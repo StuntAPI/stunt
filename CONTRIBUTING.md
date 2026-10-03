@@ -177,6 +177,60 @@ are **host-safe** by convention: they use temp dirs, free high ports,
   — mirror the existing `*_test.go` in `internal/engine/`.
 - Add a test for every new behavior; fix bugs with a failing test first (TDD).
 
+### The conformance matrix
+
+`CONFORMANCE.md` and `conformance/matrix.json` are **generated**. Never edit
+them by hand — run `just conformance-matrix` and commit the result. CI
+regenerates and fails on drift.
+
+`just conformance-matrix` needs `conformance/node/node_modules` to exist, so run
+`bun install --frozen-lockfile` in `conformance/node` first. `just ci-full` does
+both in order.
+
+Run the Node suites through `just conformance-node`. It builds a fresh binary and
+sets `STUNT_BIN`; the harness **refuses** to fall back to `stunt` on `PATH`, because
+a stale install would silently become what the matrix attests to. If you see
+`STUNT_BIN is not set`, you are running `bun test` directly — use the recipe.
+
+What the matrix claims, and what it does not:
+
+- A behavior is listed only if a section marker (`// ===== name =====`) or a
+  `Record(...)` call exists. **The matrix is derived from source text, not from
+  test results.** A skipped or assertion-free test still publishes its name. That
+  gap is known, not closed.
+- `verification: VM` means the adapter has **published** engine-level behavior
+  names. It is not derived from a suite file merely existing.
+- `missing:` and `deviations:` bullets in `conformance/matrix.yaml` need no
+  justification. They are a coverage record, not a verification claim, and the
+  ratchet below never guarded them.
+
+### Dependency bumps
+
+SDK versions are load-bearing — they are published as the version each adapter
+was verified against. Dependabot opens a weekly PR per ecosystem; a second
+workflow regenerates the artifacts the bump invalidates; auto-merge lands it once
+`just ci (ubuntu-latest)` is green. `main` is protected, so a bump cannot skip
+the gate.
+
+If you bump one by hand, regenerate in the same commit or the freshness gate
+will fail.
+
+### Not built yet
+
+Recorded so the absence is legible rather than looking like an oversight:
+
+- **No .NET SDK conformance tier.** Planned, designed, and abandoned after three
+  review rounds found the same flaw in each: a gate implemented in Go inside the
+  repository it guards is always inside the trust boundary, because a pull
+  request can edit it. The replacement would be a `jq` comparison in a workflow
+  pinned to the base ref. Unstarted.
+- **No GCS or Azure Cosmos adapters.** Vyral's `Google.Cloud.Storage.V1` and
+  `Azure.Cosmos` dependencies have no simulator here. Straightforward work, not
+  blocked.
+- **No coverage ratchet.** The three matrix-integrity bugs it was meant to catch
+  are fixed directly (VM tier derivation, the Discord assertion, the route-count
+  floors), so a gate is not currently load-bearing.
+
 ---
 
 ## Submitting a PR

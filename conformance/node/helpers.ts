@@ -17,7 +17,22 @@ export type Harness = {
   stop: () => Promise<void>;
 };
 
-const STUNT_BIN = process.env.STUNT_BIN ?? "stunt";
+// STUNT_BIN is required, never defaulted. Falling back to `stunt` on PATH meant
+// the suite could test whatever binary happened to be installed — during one
+// session a Homebrew build answered 500 on a route this commit serves, and it
+// read as a live adapter bug rather than a stale binary. The matrix publishes
+// whichever build ran, so the binary is part of the claim, not an
+// implementation detail.
+//
+// `just conformance-node` builds a fresh one and sets this.
+const STUNT_BIN = process.env.STUNT_BIN;
+if (!STUNT_BIN) {
+  throw new Error(
+    "STUNT_BIN is not set. Run `just conformance-node`, which builds a fresh " +
+      "binary and points this at it. Refusing to fall back to `stunt` on PATH: " +
+      "a stale install would silently become what CONFORMANCE.md attests to.",
+  );
+}
 const repoRoot = resolve(import.meta.dir, "..", "..");
 
 export async function bootAdapter(adapter: string): Promise<Harness> {

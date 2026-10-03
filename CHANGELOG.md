@@ -8,6 +8,25 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **fix(conformance): the Node harness no longer falls back to `stunt` on PATH.**
+  `bootAdapter` defaulted `STUNT_BIN` to `stunt`, so running `bun test` directly
+  tested whatever binary happened to be installed. A stale Homebrew build answered
+  `500` on a route this commit serves, and it read as a live adapter bug. The
+  binary the suites run is part of what the matrix publishes, so it is now
+  required rather than defaulted, and the error names `just conformance-node`.
+
+- **docs: record the conformance matrix's limits and the deferred work.**
+  CONTRIBUTING.md now states what the generated matrix does and does not claim —
+  that it is derived from source text rather than test results, that a skipped
+  test still publishes its name — and that `missing:` / `deviations:` bullets are
+  a coverage record rather than a verification claim. It also records the three
+  deliberately-unbuilt pieces (.NET tier, GCS and Cosmos adapters, coverage
+  ratchet) so their absence is legible rather than looking like an oversight.
+
+  The .NET entry also records why it was abandoned: three review rounds each found
+  that a gate implemented in Go inside the repository it guards sits inside the
+  trust boundary, because a pull request can edit it.
+
 - **fix(conformance): the VM tier was derived from a file existing, not from
   published evidence.** `genmatrix` set an adapter's VM tier from
   `os.Stat(adapters/<id>_style_test.go)`, so a suite file carrying a single
