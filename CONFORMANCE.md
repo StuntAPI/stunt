@@ -105,7 +105,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [reddit-style](adapters/reddit-style/) | Reddit API `1.0` | 2 | VM | — | — | [5](#reddit-style) | [3](#reddit-style) |
 | [resend-style](adapters/resend-style/) | Resend API `1.0.0` | 6 | SDK | resend-node @ 6.22.0 (floor) | 4 | [6](#resend-style) | [3](#resend-style) |
 | [revenuecat-style](adapters/revenuecat-style/) | RevenueCat API `v1` | 7 | VM | — | — | [5](#revenuecat-style) | [5](#revenuecat-style) |
-| [salesforce-style](adapters/salesforce-style/) | Salesforce REST API `v60.0` | 29 | SDK | jsforce @ 3.10.22 (floor) | 6 | [7](#salesforce-style) | [4](#salesforce-style) |
+| [salesforce-style](adapters/salesforce-style/) | Salesforce REST API `v60.0` | 29 | SDK | jsforce @ 3.10.27 (floor) | 6 | [7](#salesforce-style) | [4](#salesforce-style) |
 | [sendgrid-style](adapters/sendgrid-style/) | Twilio SendGrid v3 API `v3` | 5 | VM | — | — | [7](#sendgrid-style) | [6](#sendgrid-style) |
 | [servicenow-style](adapters/servicenow-style/) | ServiceNow Table API `2` | 44 | VM | — | — | [5](#servicenow-style) | [1](#servicenow-style) |
 | [shopify-style](adapters/shopify-style/) | Shopify Admin REST + GraphQL API `2024-10` | 21 +GQL | SDK | go-shopify/v4 @ v4.7.0 | 5 | [7](#shopify-style) | [4](#shopify-style) |
@@ -114,7 +114,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [smartbill-style](adapters/smartbill-style/) | SmartBill Cloud API `1.0` | 18 | VM | — | — | [3](#smartbill-style) | [4](#smartbill-style) |
 | [sqs-style](adapters/sqs-style/) | Amazon SQS API `2012-11-05` | 2 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 6 | [4](#sqs-style) | [5](#sqs-style) |
 | [square-style](adapters/square-style/) | Square API `2024-08-21` | 18 | SDK | square-node @ 45.1.0 (floor) | 4 | [7](#square-style) | [2](#square-style) |
-| [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.3.0<br>stripe-node @ 22.6.2 (floor) | 9 | [7](#stripe-style) | [5](#stripe-style) |
+| [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.3.0<br>stripe-node @ 22.5.0 (floor) | 9 | [7](#stripe-style) | [5](#stripe-style) |
 | [tenderly-style](adapters/tenderly-style/) | Tenderly Simulation API `v1` | 5 | VM | — | — | [3](#tenderly-style) | [4](#tenderly-style) |
 | [thegraph-style](adapters/thegraph-style/) | The Graph (GraphQL over subgraphs) `1.0` | 1 +GQL | VM | — | — | [3](#thegraph-style) | [2](#thegraph-style) |
 | [threads-style](adapters/threads-style/) | Threads API (Meta) `v1.0` | 8 | VM | — | — | [3](#threads-style) | [6](#threads-style) |
@@ -403,7 +403,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - transition moves the status
 - delete removes it
 
-### jsforce @ 3.10.22 (floor)
+### jsforce @ 3.10.27 (floor)
 
 **salesforce-style**
 
@@ -511,7 +511,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - SDK iterator walks has_more pages (4+ over limit=2)
 - webhook.ConstructEvent verifies HMAC + parses data.object
 
-### stripe-node @ 22.6.2 (floor)
+### stripe-node @ 22.5.0 (floor)
 
 **stripe-style**
 
@@ -8529,9 +8529,9 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk stripe-node @ 22.6.2 (floor): 573 real routes · 138 covered · 24% · 435 not implemented
+**Provider surface** — derived from sdk stripe-node @ 22.5.0 (floor): 568 real routes · 138 covered · 24% · 430 not implemented
 
-<details><summary>not implemented (435)</summary>
+<details><summary>not implemented (430)</summary>
 
 - `POST` `/oauth/deauthorize`
 - `POST` `/oauth/token`
@@ -8571,11 +8571,6 @@ behavior notes live in each adapter's README.
 - `POST` `/v1/billing/credit_grants/{id}`
 - `POST` `/v1/billing/credit_grants/{id}/expire`
 - `POST` `/v1/billing/credit_grants/{id}/void`
-- `GET` `/v1/billing/feedback_options`
-- `POST` `/v1/billing/feedback_options`
-- `GET` `/v1/billing/feedback_options/{id}`
-- `POST` `/v1/billing/feedback_options/{id}`
-- `POST` `/v1/billing/feedback_options/{id}/deactivate`
 - `POST` `/v1/billing/meter_event_adjustments`
 - `POST` `/v1/billing/meter_events`
 - `GET` `/v1/billing/meters`
@@ -8583,7 +8578,12 @@ behavior notes live in each adapter's README.
 - `GET` `/v1/billing/meters/{id}`
 - `POST` `/v1/billing/meters/{id}`
 - `POST` `/v1/billing/meters/{id}/deactivate`
-… and 385 more
+- `GET` `/v1/billing/meters/{id}/event_summaries`
+- `POST` `/v1/billing/meters/{id}/reactivate`
+- `GET` `/v1/billing_portal/configurations`
+- `POST` `/v1/billing_portal/configurations`
+- `GET` `/v1/billing_portal/configurations/{id}`
+… and 380 more
 
 
 </details>
