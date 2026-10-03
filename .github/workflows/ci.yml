@@ -8,6 +8,11 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  # Dispatched by conformance-artifacts.yml after it commits regenerated
+  # artifacts. GitHub does not trigger workflows from a GITHUB_TOKEN push, so a
+  # bump's regeneration would otherwise never be re-gated and the PR would sit
+  # red on its pre-regeneration commit forever.
+  workflow_dispatch:
 
 permissions:
   contents: read

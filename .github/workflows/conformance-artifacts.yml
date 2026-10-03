@@ -24,6 +24,8 @@ on:
 
 permissions:
   contents: write
+  # To dispatch ci.yml after committing — see the note on the push step below.
+  actions: write
 
 # One regeneration per branch; a superseded run should not race this one.
 concurrency:
@@ -62,6 +64,9 @@ jobs:
           just readme-counts
 
       - name: Commit if the artifacts moved
+        env:
+          # `gh` does not pick up the workflow token on its own.
+          GH_TOKEN: ${{ github.token }}
         run: |
           if git diff --quiet -- CONFORMANCE.md conformance/matrix.json README.md; then
             echo "artifacts already current — nothing to commit"
@@ -72,3 +77,13 @@ jobs:
           git add CONFORMANCE.md conformance/matrix.json README.md
           git commit -m "chore(conformance): regenerate artifacts for the SDK bump"
           git push origin "HEAD:${{ github.ref_name }}"
+
+          # That push deliberately triggers nothing: GitHub does not start
+          # workflows from a GITHUB_TOKEN push, so the regenerated commit never
+          # gets gated and the bump sits red on its pre-regeneration commit
+          # forever. Dispatch the gate ourselves. The run reports on this
+          # branch's head SHA, which is the commit branch protection reads, so it
+          # satisfies the required check — verified on #129, which was otherwise
+          # stuck exactly this way.
+          gh workflow run ci.yml --ref "${{ github.ref_name }}"
+          echo "dispatched ci.yml on ${{ github.ref_name }}"
