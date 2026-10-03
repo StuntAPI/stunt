@@ -95,7 +95,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [persona-style](adapters/persona-style/) | Persona Inquiry API `2023-01-05` | 5 | VM | — | — | [5](#persona-style) | [6](#persona-style) |
 | [photos-style](adapters/photos-style/) | Google Photos Library API `v1` | 12 | VM | — | — | [5](#photos-style) | [5](#photos-style) |
 | [pinata-style](adapters/pinata-style/) | Pinata API `1.0` | 6 | VM | — | — | [4](#pinata-style) | [3](#pinata-style) |
-| [plaid-style](adapters/plaid-style/) | Plaid API `2020-09-14` | 13 | SDK | plaid-node @ 32.0.0 (floor) | 4 | [5](#plaid-style) | [3](#plaid-style) |
+| [plaid-style](adapters/plaid-style/) | Plaid API `2020-09-14` | 13 | SDK | plaid-node @ 47.0.0 (floor) | 4 | [5](#plaid-style) | [3](#plaid-style) |
 | [powerplatform-style](adapters/powerplatform-style/) | Microsoft Power Platform API `2` | 9 | VM | — | — | [4](#powerplatform-style) | [6](#powerplatform-style) |
 | [printful-style](adapters/printful-style/) | Printful API `v2` | 13 | VM | — | — | [5](#printful-style) | [3](#printful-style) |
 | [printify-style](adapters/printify-style/) | Printify API `v1` | 16 | VM | — | — | [5](#printify-style) | [4](#printify-style) |
@@ -464,7 +464,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - models.list returns the catalog
 - chat.completions.create returns a typed echo response
 
-### plaid-node @ 32.0.0 (floor)
+### plaid-node @ 47.0.0 (floor)
 
 **plaid-style**
 
@@ -6981,13 +6981,14 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk plaid-node @ 32.0.0 (floor): 294 real routes · 13 covered · 4% · 281 not implemented
+**Provider surface** — derived from sdk plaid-node @ 47.0.0 (floor): 351 real routes · 13 covered · 3% · 338 not implemented
 
-<details><summary>not implemented (281)</summary>
+<details><summary>not implemented (338)</summary>
 
 - `POST` `/application/get`
 - `POST` `/asset_report/audit_copy/create`
 - `POST` `/asset_report/audit_copy/get`
+- `POST` `/asset_report/audit_copy/pdf/get`
 - `POST` `/asset_report/audit_copy/remove`
 - `POST` `/asset_report/create`
 - `POST` `/asset_report/filter`
@@ -6996,6 +6997,7 @@ behavior notes live in each adapter's README.
 - `POST` `/asset_report/refresh`
 - `POST` `/asset_report/remove`
 - `POST` `/auth/get`
+- `POST` `/auth/verify`
 - `POST` `/bank_transfer/balance/get`
 - `POST` `/bank_transfer/cancel`
 - `POST` `/bank_transfer/create`
@@ -7020,22 +7022,20 @@ behavior notes live in each adapter's README.
 - `POST` `/beacon/user/review`
 - `POST` `/beacon/user/update`
 - `POST` `/beta/credit/v1/bank_employment/get`
+- `POST` `/beta/ewa_report/v1/get`
+- `POST` `/beta/issues/v1/get`
+- `POST` `/beta/issues/v1/list`
+- `POST` `/beta/issues/v1/match`
+- `POST` `/beta/issues/v1/subscribe`
+- `POST` `/beta/issues/v1/unsubscribe`
+- `POST` `/beta/partner/customer/v1/create`
+- `POST` `/beta/partner/customer/v1/enable`
+- `POST` `/beta/partner/customer/v1/get`
+- `POST` `/beta/partner/customer/v1/update`
 - `POST` `/beta/transactions/rules/v1/create`
 - `POST` `/beta/transactions/rules/v1/list`
 - `POST` `/beta/transactions/rules/v1/remove`
-- `POST` `/beta/transactions/user_insights/v1/get`
-- `POST` `/beta/transactions/v1/enhance`
-- `POST` `/cashflow_report/get`
-- `POST` `/cashflow_report/refresh`
-- `POST` `/categories/get`
-- `POST` `/consent/events/get`
-- `POST` `/consumer_report/pdf/get`
-- `POST` `/cra/check_report/base_report/get`
-- `POST` `/cra/check_report/cashflow_insights/get`
-- `POST` `/cra/check_report/create`
-- `POST` `/cra/check_report/income_insights/get`
-- `POST` `/cra/check_report/network_insights/get`
-… and 231 more
+… and 288 more
 
 
 </details>

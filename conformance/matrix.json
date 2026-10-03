@@ -191879,7 +191879,7 @@
       "sdks": [
         {
           "label": "plaid-node",
-          "version": "32.0.0 (floor)"
+          "version": "47.0.0 (floor)"
         }
       ],
       "behaviors": [
@@ -191955,10 +191955,10 @@
         }
       ],
       "surface": {
-        "source": "sdk plaid-node @ 32.0.0 (floor)",
-        "provider_routes": 294,
+        "source": "sdk plaid-node @ 47.0.0 (floor)",
+        "provider_routes": 351,
         "covered_routes": 13,
-        "coverage_pct": 4,
+        "coverage_pct": 3,
         "missing_routes": [
           {
             "method": "POST",
@@ -191971,6 +191971,10 @@
           {
             "method": "POST",
             "route": "/asset_report/audit_copy/get"
+          },
+          {
+            "method": "POST",
+            "route": "/asset_report/audit_copy/pdf/get"
           },
           {
             "method": "POST",
@@ -192003,6 +192007,10 @@
           {
             "method": "POST",
             "route": "/auth/get"
+          },
+          {
+            "method": "POST",
+            "route": "/auth/verify"
           },
           {
             "method": "POST",
@@ -192102,6 +192110,46 @@
           },
           {
             "method": "POST",
+            "route": "/beta/ewa_report/v1/get"
+          },
+          {
+            "method": "POST",
+            "route": "/beta/issues/v1/get"
+          },
+          {
+            "method": "POST",
+            "route": "/beta/issues/v1/list"
+          },
+          {
+            "method": "POST",
+            "route": "/beta/issues/v1/match"
+          },
+          {
+            "method": "POST",
+            "route": "/beta/issues/v1/subscribe"
+          },
+          {
+            "method": "POST",
+            "route": "/beta/issues/v1/unsubscribe"
+          },
+          {
+            "method": "POST",
+            "route": "/beta/partner/customer/v1/create"
+          },
+          {
+            "method": "POST",
+            "route": "/beta/partner/customer/v1/enable"
+          },
+          {
+            "method": "POST",
+            "route": "/beta/partner/customer/v1/get"
+          },
+          {
+            "method": "POST",
+            "route": "/beta/partner/customer/v1/update"
+          },
+          {
+            "method": "POST",
             "route": "/beta/transactions/rules/v1/create"
           },
           {
@@ -192122,11 +192170,31 @@
           },
           {
             "method": "POST",
+            "route": "/beta/webhook_events/list"
+          },
+          {
+            "method": "POST",
+            "route": "/business_verification/create"
+          },
+          {
+            "method": "POST",
+            "route": "/business_verification/get"
+          },
+          {
+            "method": "POST",
             "route": "/cashflow_report/get"
           },
           {
             "method": "POST",
+            "route": "/cashflow_report/insights/get"
+          },
+          {
+            "method": "POST",
             "route": "/cashflow_report/refresh"
+          },
+          {
+            "method": "POST",
+            "route": "/cashflow_report/transactions/get"
           },
           {
             "method": "POST",
@@ -192158,6 +192226,10 @@
           },
           {
             "method": "POST",
+            "route": "/cra/check_report/lend_score/get"
+          },
+          {
+            "method": "POST",
             "route": "/cra/check_report/network_insights/get"
           },
           {
@@ -192171,6 +192243,14 @@
           {
             "method": "POST",
             "route": "/cra/check_report/verification/get"
+          },
+          {
+            "method": "POST",
+            "route": "/cra/check_report/verification/pdf/get"
+          },
+          {
+            "method": "POST",
+            "route": "/cra/credit_profile/report/get"
           },
           {
             "method": "POST",
@@ -192203,6 +192283,30 @@
           {
             "method": "POST",
             "route": "/cra/partner_insights/get"
+          },
+          {
+            "method": "POST",
+            "route": "/cra/report/get"
+          },
+          {
+            "method": "POST",
+            "route": "/cra/servicing/subscription/create"
+          },
+          {
+            "method": "POST",
+            "route": "/cra/servicing/subscription/delete"
+          },
+          {
+            "method": "POST",
+            "route": "/cra/servicing/subscription/get"
+          },
+          {
+            "method": "POST",
+            "route": "/cra/servicing/subscription/list"
+          },
+          {
+            "method": "POST",
+            "route": "/cra/servicing/subscription/update"
           },
           {
             "method": "POST",
@@ -192309,6 +192413,22 @@
             "route": "/employment/verification/get"
           },
           {
+            "method": "GET",
+            "route": "/fdx/consents"
+          },
+          {
+            "method": "GET",
+            "route": "/fdx/consents/{consentId}"
+          },
+          {
+            "method": "GET",
+            "route": "/fdx/consents/{consentId}/revocation"
+          },
+          {
+            "method": "PUT",
+            "route": "/fdx/consents/{consentId}/revocation"
+          },
+          {
             "method": "POST",
             "route": "/fdx/notifications"
           },
@@ -192327,6 +192447,10 @@
           {
             "method": "POST",
             "route": "/identity/match"
+          },
+          {
+            "method": "POST",
+            "route": "/identity/match/list"
           },
           {
             "method": "POST",
@@ -192430,6 +192554,10 @@
           },
           {
             "method": "POST",
+            "route": "/item/products/terminate"
+          },
+          {
+            "method": "POST",
             "route": "/item/public_token/create"
           },
           {
@@ -192462,7 +192590,15 @@
           },
           {
             "method": "POST",
-            "route": "/network_insights/report/get"
+            "route": "/oauth/introspect"
+          },
+          {
+            "method": "POST",
+            "route": "/oauth/revoke"
+          },
+          {
+            "method": "POST",
+            "route": "/oauth/token"
           },
           {
             "method": "POST",
@@ -192574,6 +192710,10 @@
           },
           {
             "method": "POST",
+            "route": "/processor/investments/auth/get"
+          },
+          {
+            "method": "POST",
             "route": "/processor/investments/holdings/get"
           },
           {
@@ -192642,6 +192782,34 @@
           },
           {
             "method": "POST",
+            "route": "/protect/cash_advance/decision/create"
+          },
+          {
+            "method": "POST",
+            "route": "/protect/cash_advance/repayment/create"
+          },
+          {
+            "method": "POST",
+            "route": "/protect/compute"
+          },
+          {
+            "method": "POST",
+            "route": "/protect/event/get"
+          },
+          {
+            "method": "POST",
+            "route": "/protect/event/send"
+          },
+          {
+            "method": "POST",
+            "route": "/protect/report/create"
+          },
+          {
+            "method": "POST",
+            "route": "/protect/user/insights/get"
+          },
+          {
+            "method": "POST",
             "route": "/sandbox/bank_income/fire_webhook"
           },
           {
@@ -192658,7 +192826,19 @@
           },
           {
             "method": "POST",
+            "route": "/sandbox/cra/servicing/simulate"
+          },
+          {
+            "method": "POST",
+            "route": "/sandbox/fdx/consent/seed"
+          },
+          {
+            "method": "POST",
             "route": "/sandbox/income/fire_webhook"
+          },
+          {
+            "method": "POST",
+            "route": "/sandbox/item/application/seed"
           },
           {
             "method": "POST",
@@ -192679,6 +192859,10 @@
           {
             "method": "POST",
             "route": "/sandbox/processor_token/create"
+          },
+          {
+            "method": "POST",
+            "route": "/sandbox/transactions/create"
           },
           {
             "method": "POST",
@@ -192727,6 +192911,10 @@
           {
             "method": "POST",
             "route": "/sandbox/transfer/test_clock/list"
+          },
+          {
+            "method": "POST",
+            "route": "/sandbox/user/fire_webhook"
           },
           {
             "method": "POST",
@@ -192850,6 +193038,10 @@
           },
           {
             "method": "POST",
+            "route": "/transfer/ledger/event/list"
+          },
+          {
+            "method": "POST",
             "route": "/transfer/ledger/get"
           },
           {
@@ -192942,6 +193134,10 @@
           },
           {
             "method": "POST",
+            "route": "/transfer/return/recover"
+          },
+          {
+            "method": "POST",
             "route": "/transfer/sweep/get"
           },
           {
@@ -192954,7 +193150,31 @@
           },
           {
             "method": "POST",
+            "route": "/user/financial_data/refresh"
+          },
+          {
+            "method": "POST",
+            "route": "/user/get"
+          },
+          {
+            "method": "POST",
+            "route": "/user/identity/remove"
+          },
+          {
+            "method": "POST",
+            "route": "/user/items/associate"
+          },
+          {
+            "method": "POST",
             "route": "/user/items/get"
+          },
+          {
+            "method": "POST",
+            "route": "/user/items/remove"
+          },
+          {
+            "method": "POST",
+            "route": "/user/products/terminate"
           },
           {
             "method": "POST",
@@ -192970,7 +193190,15 @@
           },
           {
             "method": "POST",
+            "route": "/user/transactions/refresh"
+          },
+          {
+            "method": "POST",
             "route": "/user/update"
+          },
+          {
+            "method": "POST",
+            "route": "/user_account/session/event/send"
           },
           {
             "method": "POST",
