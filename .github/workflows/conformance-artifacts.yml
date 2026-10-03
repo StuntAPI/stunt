@@ -1,0 +1,74 @@
+# Regenerate the conformance artifacts after a dependency bump.
+#
+# The SDK versions in conformance/go.mod and conformance/node/package.json are
+# load-bearing: genmatrix reads them and publishes them in CONFORMANCE.md as the
+# version each adapter was verified against. So a version bump changes a
+# generated file, and the freshness gate in ci.yml fails the bump PR until
+# CONFORMANCE.md, conformance/matrix.json and README.md are regenerated and
+# committed. Without this, every dependabot PR is red on arrival.
+#
+# Regeneration is the only thing this does. It cannot make a failing suite pass:
+# the gate still runs, and the bump still has to go green on its own merits
+# before auto-merge considers it.
+name: conformance-artifacts
+
+on:
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - "conformance/go.mod"
+      - "conformance/go.sum"
+      - "conformance/node/package.json"
+      - "conformance/node/bun.lock"
+
+permissions:
+  contents: write
+
+# One regeneration per branch; a superseded run should not race this one.
+concurrency:
+  group: conformance-artifacts-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    name: regenerate generated artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          # Required: the regeneration step commits back to this branch, and the
+          # default leaves no credentials in .git/config once the step ends.
+          persist-credentials: true
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.3"
+          cache: true
+
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install just --version 1.39.0 --locked
+
+      # genmatrix resolves the node surface sources through
+      # conformance/node/node_modules, so they must exist before it runs.
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+        working-directory: conformance/node
+
+      - name: Regenerate
+        run: |
+          just conformance-matrix
+          just readme-counts
+
+      - name: Commit if the artifacts moved
+        run: |
+          if git diff --quiet -- CONFORMANCE.md conformance/matrix.json README.md; then
+            echo "artifacts already current — nothing to commit"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CONFORMANCE.md conformance/matrix.json README.md
+          git commit -m "chore(conformance): regenerate artifacts for the SDK bump"
+          git push origin "HEAD:${{ github.ref_name }}"

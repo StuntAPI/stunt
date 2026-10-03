@@ -1,0 +1,41 @@
+# Dependency updates for the SDK conformance suites.
+#
+# The SDK versions are load-bearing: genmatrix reads them out of these manifests
+# and publishes them in CONFORMANCE.md as the version each adapter was verified
+# against. A bump therefore invalidates the generated artifacts, so the
+# freshness gate in ci.yml fails the bump PR until they are regenerated.
+# .github/workflows/conformance-artifacts.yml does that on any push that
+# touches either manifest.
+#
+# The root module is deliberately absent: it carries the CLI's own dependencies
+# and is already covered by `just mod-tidy`, and bundling it here would mix
+# product bumps with verification bumps in one PR.
+version: 2
+updates:
+  # The Go SDK suite lives in a nested module so those dependencies never touch
+  # the stunt binary's graph. Dependabot needs a directory entry per module.
+  - package-ecosystem: gomod
+    directory: /conformance
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      aws-sdk:
+        patterns:
+          - "github.com/aws/aws-sdk-go-v2*"
+      google-api:
+        patterns:
+          - "google.golang.org/*"
+          - "golang.org/x/oauth2"
+    commit-message:
+      prefix: "chore(deps)"
+
+  - package-ecosystem: npm
+    directory: /conformance/node
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"

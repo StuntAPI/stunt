@@ -1,0 +1,39 @@
+# Auto-merge dependency bumps once they are green.
+#
+# Deliberately narrow. It enables GitHub's native auto-merge, which holds the PR
+# until every required status check reports success — and `main` now has a ruleset
+# (see the repository rules) requiring `just ci (ubuntu-latest)`, so "green"
+# means the whole gate ran: build, test -race, vet, gofmt, mod-tidy, cross-build,
+# adapter lint, the Go SDK conformance suites, and the Node SDK conformance
+# suites.
+#
+# What this does NOT do is make a red suite pass. A bump that breaks a suite is
+# never auto-merged; the PR sits there red and needs a human, which is the
+# entire point of gating on the check rather than on a timer.
+name: conformance-automerge
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  automerge:
+    # dependabot's own token cannot approve or merge, so only this path can.
+    # `pull_request_target` runs with the base branch's context and secrets,
+    # which is what makes the `gh` call authorised; it is scoped to dependabot
+    # actors and to pull_request events, so no untrusted code is executed.
+    if: github.actor == 'dependabot[bot]' && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr merge "$PR" --auto --squash --delete-branch \
+            || echo "could not enable auto-merge (it may already be on)"
