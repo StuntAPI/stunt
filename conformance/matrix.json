@@ -13256,7 +13256,7 @@
       "sdks": [
         {
           "label": "cloudflare-go",
-          "version": "v0.117.0"
+          "version": "v0.119.0"
         }
       ],
       "behaviors": [
@@ -204880,7 +204880,7 @@
       "sdks": [
         {
           "label": "twilio-go",
-          "version": "v1.30.9"
+          "version": "v1.31.2"
         },
         {
           "label": "twilio-node",

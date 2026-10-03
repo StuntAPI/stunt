@@ -15,11 +15,11 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.45.7
 	github.com/aws/smithy-go v1.28.2
 	github.com/bold-commerce/go-shopify/v4 v4.7.0
-	github.com/cloudflare/cloudflare-go v0.117.0
+	github.com/cloudflare/cloudflare-go v0.119.0
 	github.com/ethereum/go-ethereum v1.17.5
 	github.com/google/go-github/v89 v89.0.0
 	github.com/stripe/stripe-go/v86 v86.3.0
-	github.com/twilio/twilio-go v1.30.9
+	github.com/twilio/twilio-go v1.31.2
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/api v0.293.0
 	gopkg.in/yaml.v3 v3.0.1

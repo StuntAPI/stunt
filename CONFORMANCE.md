@@ -49,7 +49,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [braintree-style](adapters/braintree-style/) | Braintree GraphQL + REST API `2024-09-01` | 15 +GQL | VM | — | — | [8](#braintree-style) | [7](#braintree-style) |
 | [braze-style](adapters/braze-style/) | Braze REST API `2.0` | 12 | VM | — | — | [8](#braze-style) | [6](#braze-style) |
 | [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | VM | — | — | [6](#chainlink-style) | [7](#chainlink-style) |
-| [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | SDK | cloudflare-go @ v0.117.0 | 7 | [8](#cloudflare-style) | [6](#cloudflare-style) |
+| [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | SDK | cloudflare-go @ v0.119.0 | 7 | [8](#cloudflare-style) | [6](#cloudflare-style) |
 | [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | VM | — | — | [6](#cloudkit-style) | [2](#cloudkit-style) |
 | [discord-style](adapters/discord-style/) | Discord API `v10` | 26 (+1 ws) | SDK | discord-node @ 2.6.3 (floor) | 5 | [8](#discord-style) | [5](#discord-style) |
 | [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | SDK | google-api-go-client @ v0.293.0 | 8 | [7](#drive-style) | [5](#drive-style) |
@@ -118,7 +118,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [tenderly-style](adapters/tenderly-style/) | Tenderly Simulation API `v1` | 5 | VM | — | — | [3](#tenderly-style) | [4](#tenderly-style) |
 | [thegraph-style](adapters/thegraph-style/) | The Graph (GraphQL over subgraphs) `1.0` | 1 +GQL | VM | — | — | [3](#thegraph-style) | [2](#thegraph-style) |
 | [threads-style](adapters/threads-style/) | Threads API (Meta) `v1.0` | 8 | VM | — | — | [3](#threads-style) | [6](#threads-style) |
-| [twilio-style](adapters/twilio-style/) | Twilio API `2010-04-01` | 6 | SDK | twilio-go @ v1.30.9<br>twilio-node @ 6.1.0 (floor) | 8 | [6](#twilio-style) | [4](#twilio-style) |
+| [twilio-style](adapters/twilio-style/) | Twilio API `2010-04-01` | 6 | SDK | twilio-go @ v1.31.2<br>twilio-node @ 6.1.0 (floor) | 8 | [6](#twilio-style) | [4](#twilio-style) |
 | [twitter-style](adapters/twitter-style/) | Twitter/X API `v2` | 9 | VM | — | — | [6](#twitter-style) | [5](#twitter-style) |
 | [walletconnect-style](adapters/walletconnect-style/) | WalletConnect (Relay Protocol v2) `2.0` | 7 | VM | — | — | [3](#walletconnect-style) | [5](#walletconnect-style) |
 | [whatsapp-style](adapters/whatsapp-style/) | WhatsApp Business Cloud API (Meta) `v21.0` | 8 | VM | — | — | [5](#whatsapp-style) | [7](#whatsapp-style) |
@@ -194,7 +194,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - SendMessageBatch correlated results
 - missing-queue typed error surface
 
-### cloudflare-go @ v0.117.0
+### cloudflare-go @ v0.119.0
 
 **cloudflare-style**
 
@@ -519,7 +519,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - autoPagingEach walks has_more pages
 - Webhook registration, delivery verified by the SDK's own constructEvent
 
-### twilio-go @ v1.30.9
+### twilio-go @ v1.31.2
 
 **twilio-style**
 
