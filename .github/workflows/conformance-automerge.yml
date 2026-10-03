@@ -42,6 +42,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
         run: |
+          # `main` requires branches to be up to date before merging
+          # (strict_required_status_checks_policy). Dependabot rebases only on its
+          # own schedule, so a bump that falls behind main sits at BEHIND until
+          # the next weekly run — auto-merge on, never merging. Update the branch
+          # here so the required check is evaluated against the current base.
+          # Tolerated: an up-to-date branch has nothing to update.
+          gh pr update-branch "$PR" --rebase || true
+
           # No --delete-branch here: the repository already sets
           # delete_branch_on_merge, and asking for it here makes gh shell out to
           # git. Deliberately unguarded — a failure here means auto-merge is
