@@ -64,12 +64,18 @@ jobs:
           just readme-counts
 
       - name: Commit if the artifacts moved
+        id: commit
         env:
           # `gh` does not pick up the workflow token on its own.
           GH_TOKEN: ${{ github.token }}
         run: |
           if git diff --quiet -- CONFORMANCE.md conformance/matrix.json README.md; then
             echo "artifacts already current — nothing to commit"
+            # No push means no GITHUB_TOKEN commit, so the pull_request run on
+            # the existing head executes normally and needs no approval. The
+            # approve step must not run: there is nothing gated to release, and
+            # looking for a gated run that will never exist fails the job.
+            echo "committed=false" >>"$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name  "github-actions[bot]"
@@ -77,6 +83,7 @@ jobs:
           git add CONFORMANCE.md conformance/matrix.json README.md
           git commit -m "chore(conformance): regenerate artifacts for the SDK bump"
           git push origin "HEAD:${{ github.ref_name }}"
+          echo "committed=true" >>"$GITHUB_OUTPUT"
 
       # That push starts no workflow, by design: GitHub suppresses runs triggered
       # by a GITHUB_TOKEN push, to stop bots looping. The regenerated commit is
@@ -98,26 +105,37 @@ jobs:
       # stays BLOCKED with a passing gate. Approving is the only thing that
       # clears the collision.
       - name: Release the gate on the regenerated commit
+        if: steps.commit.outputs.committed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Ask the remote for the branch head, NOT $GITHUB_SHA. This step runs
+          # after the regeneration commit was pushed, so the head is the new
+          # commit and $GITHUB_SHA is the stale pre-push one. The gated run is
+          # created against the new head, so filtering on $GITHUB_SHA finds
+          # nothing and every bump deadlocks — which is exactly what happened
+          # here before this line was fixed.
+          HEAD_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$GITHUB_REF_NAME" \
+                      --jq '.object.sha')
+          echo "regenerated head is $HEAD_SHA (workflow ran on $GITHUB_SHA)"
+
           # The run is created asynchronously after the push, so poll briefly
           # rather than assuming it is there on the first look.
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
             IDS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs" \
                     --paginate \
                     --jq ".workflow_runs[]
-                        | select(.head_sha == \"$GITHUB_SHA\"
+                        | select(.head_sha == \"$HEAD_SHA\"
                                  and .event == \"pull_request\"
                                  and .conclusion == \"action_required\")
                         | .id")
             [ -n "$IDS" ] && break
-            echo "attempt $attempt: no gated run on $GITHUB_SHA yet — waiting"
+            echo "attempt $attempt: no gated run on $HEAD_SHA yet — waiting"
             sleep 10
           done
 
           if [ -z "$IDS" ]; then
-            echo "::error::Found no action_required pull_request run on $GITHUB_SHA to approve."
+            echo "::error::Found no action_required pull_request run on $HEAD_SHA to approve."
             echo "::error::The regenerated commit will never be gated and this bump will not merge."
             exit 1
           fi

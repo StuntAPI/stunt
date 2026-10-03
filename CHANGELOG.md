@@ -21,6 +21,17 @@ All notable changes to **stunt** are documented here. The format is based on
   cancelled run outranks a green dispatch and the PR stays blocked while its gate
   reports success. `workflow_dispatch` has been removed from `ci.yml` again.
 
+  Two details the approval depends on, both found by running it against real bumps
+  rather than reasoning about it:
+
+  - It must filter on the **post-push** head, read back from the remote. `$GITHUB_SHA`
+    is the pre-push commit, and no gated run ever exists on it, so every bump
+    deadlocks.
+  - It must run **only when a regeneration commit was actually pushed**. A bump
+    that changes no published artifact makes no commit, and the ordinary
+    `pull_request` run then needs no approval — looking for a gated run there
+    fails the job on a PR whose gate is already green.
+
 - **chore(conformance): restore cloudflare-go to v0.117.0.** A v0.119.0 bump was
   introduced into #129 as scaffolding while diagnosing the regeneration gate and
   rode along in its squash. Reverted here, with `CONFORMANCE.md` and
