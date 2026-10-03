@@ -8,6 +8,24 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **fix(conformance): approve the gated run so a dependency bump can merge.**
+  The regeneration workflow commits with `GITHUB_TOKEN`, and GitHub starts no
+  workflow from such a push — so the regenerated commit is never gated and a bump
+  sits red forever. The workflow now approves the `pull_request` run that the push
+  parks in `action_required`, which is the only run reporting the required check
+  on that commit. Verified on #129: `BLOCKED` -> `CLEAN` -> merged.
+
+  This replaces the `workflow_dispatch` approach from #139, which does not work
+  and fails quietly. A dispatched run reports the same check name, and branch
+  protection matches required checks by name and takes the latest — so the stale
+  cancelled run outranks a green dispatch and the PR stays blocked while its gate
+  reports success. `workflow_dispatch` has been removed from `ci.yml` again.
+
+- **chore(conformance): restore cloudflare-go to v0.117.0.** A v0.119.0 bump was
+  introduced into #129 as scaffolding while diagnosing the regeneration gate and
+  rode along in its squash. Reverted here, with `CONFORMANCE.md` and
+  `conformance/matrix.json` regenerated to match.
+
 - **fix(conformance): the Node harness no longer falls back to `stunt` on PATH.**
   `bootAdapter` defaulted `STUNT_BIN` to `stunt`, so running `bun test` directly
   tested whatever binary happened to be installed. A stale Homebrew build answered

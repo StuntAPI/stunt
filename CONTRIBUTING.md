@@ -215,6 +215,14 @@ the gate.
 If you bump one by hand, regenerate in the same commit or the freshness gate
 will fail.
 
+The regeneration workflow commits with `GITHUB_TOKEN`, and GitHub deliberately
+starts no workflow from such a push — so it also approves the `pull_request` run
+that the regenerated commit parks. Without that approval a bump regenerates its
+artifacts and then sits red forever. Do not replace it with
+`gh workflow run ci.yml`: a dispatched run reports the *same* check name, and
+branch protection matches by name and takes the latest, so a green dispatch loses
+to the stale `cancelled` one and the PR stays blocked with a passing gate.
+
 ### Not built yet
 
 Recorded so the absence is legible rather than looking like an oversight:

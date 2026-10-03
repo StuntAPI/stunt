@@ -13256,7 +13256,7 @@
       "sdks": [
         {
           "label": "cloudflare-go",
-          "version": "v0.119.0"
+          "version": "v0.117.0"
         }
       ],
       "behaviors": [
