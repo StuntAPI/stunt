@@ -35,7 +35,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [apple-appstoreconnect-style](adapters/apple-appstoreconnect-style/) | App Store Connect API `v3` | 15 | VM | — | — | [7](#apple-appstoreconnect-style) | [7](#apple-appstoreconnect-style) |
 | [apple-music-style](adapters/apple-music-style/) | Apple Music API `1.0` | 18 | VM | — | — | [5](#apple-music-style) | [5](#apple-music-style) |
 | [apple-searchads-style](adapters/apple-searchads-style/) | Apple Search Ads API `v4` | 12 | VM | — | — | [4](#apple-searchads-style) | [5](#apple-searchads-style) |
-| [apps-script-style](adapters/apps-script-style/) | Google Apps Script API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 6 | [2](#apps-script-style) | [3](#apps-script-style) |
+| [apps-script-style](adapters/apps-script-style/) | Google Apps Script API `v1` | 11 | SDK | google-api-go-client @ v0.299.0 | 6 | [2](#apps-script-style) | [3](#apps-script-style) |
 | [auth0-style](adapters/auth0-style/) | Auth0 Authentication & Management API `v2` | 17 | VM | — | — | [3](#auth0-style) | [4](#auth0-style) |
 | [avalara-style](adapters/avalara-style/) | Avalara AvaTax REST API `2` | 8 | VM | — | — | [5](#avalara-style) | [3](#avalara-style) |
 | [aws-cognito-style](adapters/aws-cognito-style/) | Amazon Cognito Identity Provider API `2016-04-18` | 7 | VM | — | — | [6](#aws-cognito-style) | [3](#aws-cognito-style) |
@@ -52,7 +52,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | SDK | cloudflare-go @ v0.119.0 | 7 | [8](#cloudflare-style) | [6](#cloudflare-style) |
 | [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | VM | — | — | [6](#cloudkit-style) | [2](#cloudkit-style) |
 | [discord-style](adapters/discord-style/) | Discord API `v10` | 26 (+1 ws) | SDK | discord-node @ 2.6.3 (floor) | 5 | [8](#discord-style) | [5](#discord-style) |
-| [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | SDK | google-api-go-client @ v0.293.0 | 8 | [7](#drive-style) | [5](#drive-style) |
+| [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | SDK | google-api-go-client @ v0.299.0 | 8 | [7](#drive-style) | [5](#drive-style) |
 | [dropbox-style](adapters/dropbox-style/) | Dropbox API `2` | 8 | VM | — | — | [8](#dropbox-style) | [4](#dropbox-style) |
 | [dune-style](adapters/dune-style/) | Dune Analytics API `v1` | 6 | VM | — | — | [5](#dune-style) | [4](#dune-style) |
 | [dynamodb-style](adapters/dynamodb-style/) | Amazon DynamoDB API `2012-08-10` | 1 | SDK + VM | aws-sdk-go-v2 @ v1.47.1 | 8 | [8](#dynamodb-style) | [5](#dynamodb-style) |
@@ -65,18 +65,18 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [etherscan-style](adapters/etherscan-style/) | Etherscan API `1.0` | 1 | VM | — | — | [3](#etherscan-style) | [2](#etherscan-style) |
 | [fattureincloud-style](adapters/fattureincloud-style/) | Fatture in Cloud API v2 `2.0.29` | 42 | VM | — | — | [3](#fattureincloud-style) | [6](#fattureincloud-style) |
 | [firebase-style](adapters/firebase-style/) | Firebase Auth + Firestore + Cloud Messaging API `v1` | 22 | VM | — | — | [4](#firebase-style) | [8](#firebase-style) |
-| [ga4-style](adapters/ga4-style/) | Google Analytics Data API + Admin API `v1beta` | 7 | SDK | google-api-go-client @ v0.293.0 | 7 | [4](#ga4-style) | [3](#ga4-style) |
-| [gcalendar-style](adapters/gcalendar-style/) | Google Calendar API `v3` | 10 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#gcalendar-style) | [2](#gcalendar-style) |
-| [gdocs-style](adapters/gdocs-style/) | Google Docs API `v1` | 5 | SDK | google-api-go-client @ v0.293.0 | 5 | [3](#gdocs-style) | [5](#gdocs-style) |
+| [ga4-style](adapters/ga4-style/) | Google Analytics Data API + Admin API `v1beta` | 7 | SDK | google-api-go-client @ v0.299.0 | 7 | [4](#ga4-style) | [3](#ga4-style) |
+| [gcalendar-style](adapters/gcalendar-style/) | Google Calendar API `v3` | 10 | SDK | google-api-go-client @ v0.299.0 | 8 | [4](#gcalendar-style) | [2](#gcalendar-style) |
+| [gdocs-style](adapters/gdocs-style/) | Google Docs API `v1` | 5 | SDK | google-api-go-client @ v0.299.0 | 5 | [3](#gdocs-style) | [5](#gdocs-style) |
 | [github-style](adapters/github-style/) | GitHub REST + GraphQL API `2022-11-28` | 26 +GQL | SDK | go-github/v89 @ v89.0.0<br>octokit @ 5.0.5 (floor) | 6 | [7](#github-style) | [4](#github-style) |
-| [gmail-style](adapters/gmail-style/) | Gmail API `v1` | 16 | SDK | google-api-go-client @ v0.293.0 | 9 | [6](#gmail-style) | [3](#gmail-style) |
-| [google-admin-style](adapters/google-admin-style/) | Google Admin SDK Directory API `directory_v1` | 13 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#google-admin-style) | [4](#google-admin-style) |
+| [gmail-style](adapters/gmail-style/) | Gmail API `v1` | 16 | SDK | google-api-go-client @ v0.299.0 | 9 | [6](#gmail-style) | [3](#gmail-style) |
+| [google-admin-style](adapters/google-admin-style/) | Google Admin SDK Directory API `directory_v1` | 13 | SDK | google-api-go-client @ v0.299.0 | 8 | [4](#google-admin-style) | [4](#google-admin-style) |
 | [google-cloudtasks-style](adapters/google-cloudtasks-style/) | Google Cloud Tasks API `v2` | 16 | boot | — | — | [7](#google-cloudtasks-style) | [7](#google-cloudtasks-style) |
-| [google-iam-style](adapters/google-iam-style/) | Google Cloud IAM API + Service Accounts `v1` | 10 | SDK | google-api-go-client @ v0.293.0 | 7 | [4](#google-iam-style) | [2](#google-iam-style) |
-| [google-style](adapters/google-style/) | Google OAuth2 API `v2` | 4 | SDK | x/oauth2 @ v0.36.0<br>google-api-go-client/idtoken @ v0.293.0 | 7 | [2](#google-style) | [2](#google-style) |
-| [gsearchconsole-style](adapters/gsearchconsole-style/) | Google Search Console API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 7 | [2](#gsearchconsole-style) | [4](#gsearchconsole-style) |
-| [gsheets-style](adapters/gsheets-style/) | Google Sheets API `v4` | 10 | SDK | google-api-go-client @ v0.293.0 | 8 | [4](#gsheets-style) | [3](#gsheets-style) |
-| [gtasks-style](adapters/gtasks-style/) | Google Tasks API `v1` | 11 | SDK | google-api-go-client @ v0.293.0 | 8 | [3](#gtasks-style) | [2](#gtasks-style) |
+| [google-iam-style](adapters/google-iam-style/) | Google Cloud IAM API + Service Accounts `v1` | 10 | SDK | google-api-go-client @ v0.299.0 | 7 | [4](#google-iam-style) | [2](#google-iam-style) |
+| [google-style](adapters/google-style/) | Google OAuth2 API `v2` | 4 | SDK | x/oauth2 @ v0.37.0<br>google-api-go-client/idtoken @ v0.299.0 | 7 | [2](#google-style) | [2](#google-style) |
+| [gsearchconsole-style](adapters/gsearchconsole-style/) | Google Search Console API `v1` | 11 | SDK | google-api-go-client @ v0.299.0 | 7 | [2](#gsearchconsole-style) | [4](#gsearchconsole-style) |
+| [gsheets-style](adapters/gsheets-style/) | Google Sheets API `v4` | 10 | SDK | google-api-go-client @ v0.299.0 | 8 | [4](#gsheets-style) | [3](#gsheets-style) |
+| [gtasks-style](adapters/gtasks-style/) | Google Tasks API `v1` | 11 | SDK | google-api-go-client @ v0.299.0 | 8 | [3](#gtasks-style) | [2](#gtasks-style) |
 | [helius-style](adapters/helius-style/) | Helius Solana RPC + Enhanced API `v0` | 11 | VM | — | — | [3](#helius-style) | [6](#helius-style) |
 | [hn-style](adapters/hn-style/) | Hacker News Firebase API `v0` | 11 | VM | — | — | [3](#hn-style) | [4](#hn-style) |
 | [hubspot-style](adapters/hubspot-style/) | HubSpot CRM API `v3` | 33 | SDK | hubspot-node @ 14.0.1 (floor) | 5 | [4](#hubspot-style) | — |
@@ -118,14 +118,14 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [tenderly-style](adapters/tenderly-style/) | Tenderly Simulation API `v1` | 5 | VM | — | — | [3](#tenderly-style) | [4](#tenderly-style) |
 | [thegraph-style](adapters/thegraph-style/) | The Graph (GraphQL over subgraphs) `1.0` | 1 +GQL | VM | — | — | [3](#thegraph-style) | [2](#thegraph-style) |
 | [threads-style](adapters/threads-style/) | Threads API (Meta) `v1.0` | 8 | VM | — | — | [3](#threads-style) | [6](#threads-style) |
-| [twilio-style](adapters/twilio-style/) | Twilio API `2010-04-01` | 6 | SDK | twilio-go @ v1.30.9<br>twilio-node @ 6.1.0 (floor) | 8 | [6](#twilio-style) | [4](#twilio-style) |
+| [twilio-style](adapters/twilio-style/) | Twilio API `2010-04-01` | 6 | SDK | twilio-go @ v1.31.2<br>twilio-node @ 6.1.0 (floor) | 8 | [6](#twilio-style) | [4](#twilio-style) |
 | [twitter-style](adapters/twitter-style/) | Twitter/X API `v2` | 9 | VM | — | — | [6](#twitter-style) | [5](#twitter-style) |
 | [walletconnect-style](adapters/walletconnect-style/) | WalletConnect (Relay Protocol v2) `2.0` | 7 | VM | — | — | [3](#walletconnect-style) | [5](#walletconnect-style) |
 | [whatsapp-style](adapters/whatsapp-style/) | WhatsApp Business Cloud API (Meta) `v21.0` | 8 | VM | — | — | [5](#whatsapp-style) | [7](#whatsapp-style) |
 | [workday-style](adapters/workday-style/) | Workday REST API `v40.0` | 8 | VM | — | — | [4](#workday-style) | [3](#workday-style) |
 | [x-articles-style](adapters/x-articles-style/) | X (Twitter) Articles API `v2` | 8 | VM | — | — | [4](#x-articles-style) | [4](#x-articles-style) |
 | [xero-style](adapters/xero-style/) | Xero Accounting API `2.0` | 15 | VM | — | — | [6](#xero-style) | [5](#xero-style) |
-| [youtube-style](adapters/youtube-style/) | YouTube Data API `v3` | 14 | SDK | google-api-go-client @ v0.293.0 | 8 | [7](#youtube-style) | [2](#youtube-style) |
+| [youtube-style](adapters/youtube-style/) | YouTube Data API `v3` | 14 | SDK | google-api-go-client @ v0.299.0 | 8 | [7](#youtube-style) | [2](#youtube-style) |
 | [zendesk-style](adapters/zendesk-style/) | Zendesk REST API `2` | 37 | SDK | node-zendesk @ 6.0.1 (floor) | 6 | [8](#zendesk-style) | [5](#zendesk-style) |
 | [zuora-style](adapters/zuora-style/) | Zuora REST API `v1` | 20 | VM | — | — | [8](#zuora-style) | [5](#zuora-style) |
 
@@ -246,7 +246,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - Order.ListWithPagination walks page_info cursors
 - webhooks verify through the SDK's VerifyWebhookRequest HMAC validator
 
-### google-api-go-client @ v0.293.0
+### google-api-go-client @ v0.299.0
 
 **apps-script-style**
 
@@ -373,7 +373,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - PlaylistItems.Insert adds the video, Delete removes it
 - Videos.Delete -> 204; re-delete surfaces a googleapi 404
 
-### google-api-go-client/idtoken @ v0.293.0
+### google-api-go-client/idtoken @ v0.299.0
 
 **google-style**
 
@@ -519,7 +519,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - autoPagingEach walks has_more pages
 - Webhook registration, delivery verified by the SDK's own constructEvent
 
-### twilio-go @ v1.30.9
+### twilio-go @ v1.31.2
 
 **twilio-style**
 
@@ -537,7 +537,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - Callbacks verified by twilio-node's own validateRequest
 - The magic invalid number -> failed
 
-### x/oauth2 @ v0.36.0
+### x/oauth2 @ v0.37.0
 
 **google-style**
 
@@ -2293,7 +2293,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 16 real routes · 7 covered · 43% · 9 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.299.0: 16 real routes · 7 covered · 43% · 9 not implemented
 
 <details><summary>not implemented (9)</summary>
 
@@ -3591,7 +3591,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 64 real routes · 8 covered · 12% · 56 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.299.0: 64 real routes · 8 covered · 12% · 56 not implemented
 
 <details><summary>not implemented (56)</summary>
 
@@ -4482,7 +4482,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 66 real routes · 11 covered · 16% · 55 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.299.0: 66 real routes · 11 covered · 16% · 55 not implemented
 
 <details><summary>not implemented (55)</summary>
 
@@ -4587,7 +4587,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 38 real routes · 9 covered · 23% · 29 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.299.0: 38 real routes · 9 covered · 23% · 29 not implemented
 
 <details><summary>not implemented (29)</summary>
 
@@ -4666,7 +4666,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 3 real routes · 3 covered · 100% · 0 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.299.0: 3 real routes · 3 covered · 100% · 0 not implemented
 
 **Missing** (3)
 
@@ -4863,7 +4863,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 79 real routes · 16 covered · 20% · 63 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.299.0: 79 real routes · 16 covered · 20% · 63 not implemented
 
 <details><summary>not implemented (63)</summary>
 
@@ -4982,7 +4982,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 128 real routes · 13 covered · 10% · 115 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.299.0: 128 real routes · 13 covered · 10% · 115 not implemented
 
 <details><summary>not implemented (115)</summary>
 
@@ -5162,9 +5162,9 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 133 real routes · 14 covered · 10% · 119 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.299.0: 136 real routes · 14 covered · 10% · 122 not implemented
 
-<details><summary>not implemented (119)</summary>
+<details><summary>not implemented (122)</summary>
 
 - `POST` `/v1/iamPolicies:lintPolicy`
 - `POST` `/v1/iamPolicies:queryAuditableServices`
@@ -5196,6 +5196,9 @@ behavior notes live in each adapter's README.
 - `DELETE` `/v1/locations/{locationsId}/workforcePools/{workforcePoolsId}/providers/{providersId}/scimTenants/{scimTenantsId}/tokens/{tokensId}`
 - `GET` `/v1/locations/{locationsId}/workforcePools/{workforcePoolsId}/providers/{providersId}/scimTenants/{scimTenantsId}/tokens/{tokensId}`
 - `PATCH` `/v1/locations/{locationsId}/workforcePools/{workforcePoolsId}/providers/{providersId}/scimTenants/{scimTenantsId}/tokens/{tokensId}`
+- `POST` `/v1/locations/{locationsId}/workforcePools/{workforcePoolsId}/providers/{providersId}/scimTenants/{scimTenantsId}:getIamPolicy`
+- `POST` `/v1/locations/{locationsId}/workforcePools/{workforcePoolsId}/providers/{providersId}/scimTenants/{scimTenantsId}:setIamPolicy`
+- `POST` `/v1/locations/{locationsId}/workforcePools/{workforcePoolsId}/providers/{providersId}/scimTenants/{scimTenantsId}:testIamPermissions`
 - `POST` `/v1/locations/{locationsId}/workforcePools/{workforcePoolsId}/providers/{providersId}/scimTenants/{scimTenantsId}:undelete`
 - `POST` `/v1/locations/{locationsId}/workforcePools/{workforcePoolsId}/providers/{providersId}:undelete`
 - `DELETE` `/v1/locations/{locationsId}/workforcePools/{workforcePoolsId}/subjects/{subjectsId}`
@@ -5213,10 +5216,7 @@ behavior notes live in each adapter's README.
 - `POST` `/v1/organizations/{organizationsId}/roles/{rolesId}:undelete`
 - `POST` `/v1/permissions:queryTestablePermissions`
 - `GET` `/v1/projects/{projectsId}/locations/{locationsId}/oauthClients`
-- `POST` `/v1/projects/{projectsId}/locations/{locationsId}/oauthClients`
-- `DELETE` `/v1/projects/{projectsId}/locations/{locationsId}/oauthClients/{oauthClientsId}`
-- `GET` `/v1/projects/{projectsId}/locations/{locationsId}/oauthClients/{oauthClientsId}`
-… and 69 more
+… and 72 more
 
 
 </details>
@@ -5304,7 +5304,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 11 real routes · 10 covered · 90% · 1 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.299.0: 11 real routes · 10 covered · 90% · 1 not implemented
 
 <details><summary>not implemented (1)</summary>
 
@@ -5361,7 +5361,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 17 real routes · 10 covered · 58% · 7 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.299.0: 17 real routes · 10 covered · 58% · 7 not implemented
 
 <details><summary>not implemented (7)</summary>
 
@@ -5425,7 +5425,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 14 real routes · 9 covered · 64% · 5 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.299.0: 14 real routes · 9 covered · 64% · 5 not implemented
 
 <details><summary>not implemented (5)</summary>
 
@@ -9488,7 +9488,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk google-api-go-client @ v0.293.0: 83 real routes · 9 covered · 10% · 74 not implemented
+**Provider surface** — derived from sdk google-api-go-client @ v0.299.0: 83 real routes · 9 covered · 10% · 74 not implemented
 
 <details><summary>not implemented (74)</summary>
 
