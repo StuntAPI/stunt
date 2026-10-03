@@ -39,8 +39,8 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [auth0-style](adapters/auth0-style/) | Auth0 Authentication & Management API `v2` | 17 | VM | — | — | [3](#auth0-style) | [4](#auth0-style) |
 | [avalara-style](adapters/avalara-style/) | Avalara AvaTax REST API `2` | 8 | VM | — | — | [5](#avalara-style) | [3](#avalara-style) |
 | [aws-cognito-style](adapters/aws-cognito-style/) | Amazon Cognito Identity Provider API `2016-04-18` | 7 | VM | — | — | [6](#aws-cognito-style) | [3](#aws-cognito-style) |
-| [aws-iam-sts-style](adapters/aws-iam-sts-style/) | AWS STS + IAM API `2011-06-15` | 2 | SDK | aws-sdk-go-v2 @ v1.43.7 | 2 | [3](#aws-iam-sts-style) | [3](#aws-iam-sts-style) |
-| [aws-s3-style](adapters/aws-s3-style/) | Amazon S3 API `2006-03-01` | 9 | SDK | aws-sdk-go-v2 @ v1.43.7 | 16 | [9](#aws-s3-style) | [16](#aws-s3-style) |
+| [aws-iam-sts-style](adapters/aws-iam-sts-style/) | AWS STS + IAM API `2011-06-15` | 2 | SDK | aws-sdk-go-v2 @ v1.47.1 | 2 | [3](#aws-iam-sts-style) | [3](#aws-iam-sts-style) |
+| [aws-s3-style](adapters/aws-s3-style/) | Amazon S3 API `2006-03-01` | 9 | SDK | aws-sdk-go-v2 @ v1.47.1 | 16 | [9](#aws-s3-style) | [16](#aws-s3-style) |
 | [azure-devops-style](adapters/azure-devops-style/) | Azure DevOps REST API `7.1` | 17 | VM | — | — | [8](#azure-devops-style) | [6](#azure-devops-style) |
 | [azure-servicebus-style](adapters/azure-servicebus-style/) | Azure Service Bus + Storage `2024-01-01` | 18 | VM | — | — | [6](#azure-servicebus-style) | [3](#azure-servicebus-style) |
 | [azure-storage-style](adapters/azure-storage-style/) | Azure Storage Blob REST API `2024-08-04` | 9 | VM | — | — | [6](#azure-storage-style) | [3](#azure-storage-style) |
@@ -55,7 +55,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | SDK | google-api-go-client @ v0.293.0 | 8 | [7](#drive-style) | [5](#drive-style) |
 | [dropbox-style](adapters/dropbox-style/) | Dropbox API `2` | 8 | VM | — | — | [8](#dropbox-style) | [4](#dropbox-style) |
 | [dune-style](adapters/dune-style/) | Dune Analytics API `v1` | 6 | VM | — | — | [5](#dune-style) | [4](#dune-style) |
-| [dynamodb-style](adapters/dynamodb-style/) | Amazon DynamoDB API `2012-08-10` | 1 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 8 | [8](#dynamodb-style) | [5](#dynamodb-style) |
+| [dynamodb-style](adapters/dynamodb-style/) | Amazon DynamoDB API `2012-08-10` | 1 | SDK + VM | aws-sdk-go-v2 @ v1.47.1 | 8 | [8](#dynamodb-style) | [5](#dynamodb-style) |
 | [echo-style](adapters/echo-style/) | gRPC echo demo `1.0` | 0 (+1 ws) | boot | — | — | — | — |
 | [emailoctopus-style](adapters/emailoctopus-style/) | EmailOctopus API `2.0.0` | 21 | VM | — | — | [2](#emailoctopus-style) | [3](#emailoctopus-style) |
 | [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 8 | [8](#entra-id-style) | [3](#entra-id-style) |
@@ -112,7 +112,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [signin-with-apple-style](adapters/signin-with-apple-style/) | Sign in with Apple `v2` | 3 | VM | — | — | [3](#signin-with-apple-style) | [2](#signin-with-apple-style) |
 | [slack-style](adapters/slack-style/) | Slack Web API `1.0` | 7 | SDK | slack-node @ 7.19.0 (floor) | 4 | [6](#slack-style) | [2](#slack-style) |
 | [smartbill-style](adapters/smartbill-style/) | SmartBill Cloud API `1.0` | 18 | VM | — | — | [3](#smartbill-style) | [4](#smartbill-style) |
-| [sqs-style](adapters/sqs-style/) | Amazon SQS API `2012-11-05` | 2 | SDK + VM | aws-sdk-go-v2 @ v1.43.7 | 6 | [4](#sqs-style) | [5](#sqs-style) |
+| [sqs-style](adapters/sqs-style/) | Amazon SQS API `2012-11-05` | 2 | SDK + VM | aws-sdk-go-v2 @ v1.47.1 | 6 | [4](#sqs-style) | [5](#sqs-style) |
 | [square-style](adapters/square-style/) | Square API `2024-08-21` | 18 | SDK | square-node @ 45.1.0 (floor) | 4 | [7](#square-style) | [2](#square-style) |
 | [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.3.0<br>stripe-node @ 22.5.0 (floor) | 9 | [7](#stripe-style) | [5](#stripe-style) |
 | [tenderly-style](adapters/tenderly-style/) | Tenderly Simulation API `v1` | 5 | VM | — | — | [3](#tenderly-style) | [4](#tenderly-style) |
@@ -148,7 +148,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - deletePost removes the record from search
 - refreshSession rotates the token pair via the SDK
 
-### aws-sdk-go-v2 @ v1.43.7
+### aws-sdk-go-v2 @ v1.47.1
 
 **aws-iam-sts-style**
 
