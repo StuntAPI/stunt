@@ -58,6 +58,18 @@ jobs:
       - run: bun install --frozen-lockfile
         working-directory: conformance/node
 
+      # It also reads the Go SDKs' own route tables out of the module cache.
+      # `go list -m -f {{.Dir}}` returns an EMPTY STRING — not an error — for a
+      # module that is required but not yet downloaded, and genmatrix reports that
+      # as "not downloaded — run `just conformance` first". Running the suite
+      # first does not help: those tests skip when the module is absent, so they
+      # never trigger the download. Only `go mod download` does, which is why
+      # this must be explicit. Without it, any bump touching a Google SDK fails
+      # here — verified on #125, which bumped google.golang.org/api.
+      - name: Download the Go SDK modules genmatrix reads
+        run: go mod download all
+        working-directory: conformance
+
       - name: Regenerate
         run: |
           just conformance-matrix

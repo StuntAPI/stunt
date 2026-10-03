@@ -32,6 +32,17 @@ All notable changes to **stunt** are documented here. The format is based on
     `pull_request` run then needs no approval — looking for a gated run there
     fails the job on a PR whose gate is already green.
 
+- **fix(conformance): download the Go SDK modules before regenerating.** The
+  regeneration workflow jumped straight to `conformance-matrix`, which reads the
+  Go SDKs' route tables out of the module cache. `go list -m` returns an empty
+  string — not an error — for a required-but-undownloaded module, so `genmatrix`
+  failed with "not downloaded — run `just conformance` first". Running the suite
+  first does not help: those tests skip when the module is missing, so they never
+  trigger the download. Only `go mod download` does. Any bump touching a Google
+  SDK hit this — verified on #125 (`google.golang.org/api`). CI was unaffected
+  only because it runs `just conformance` before the freshness gate; the
+  regeneration workflow has no such step.
+
 - **chore(conformance): restore cloudflare-go to v0.117.0.** A v0.119.0 bump was
   introduced into #129 as scaffolding while diagnosing the regeneration gate and
   rode along in its squash. Reverted here, with `CONFORMANCE.md` and
