@@ -15,7 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.45.7
 	github.com/aws/smithy-go v1.28.2
 	github.com/bold-commerce/go-shopify/v4 v4.7.0
-	github.com/cloudflare/cloudflare-go v0.119.0
+	github.com/cloudflare/cloudflare-go v0.117.0
 	github.com/ethereum/go-ethereum v1.17.5
 	github.com/google/go-github/v89 v89.0.0
 	github.com/stripe/stripe-go/v86 v86.3.0

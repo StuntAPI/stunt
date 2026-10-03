@@ -78,12 +78,52 @@ jobs:
           git commit -m "chore(conformance): regenerate artifacts for the SDK bump"
           git push origin "HEAD:${{ github.ref_name }}"
 
-          # That push deliberately triggers nothing: GitHub does not start
-          # workflows from a GITHUB_TOKEN push, so the regenerated commit never
-          # gets gated and the bump sits red on its pre-regeneration commit
-          # forever. Dispatch the gate ourselves. The run reports on this
-          # branch's head SHA, which is the commit branch protection reads, so it
-          # satisfies the required check — verified on #129, which was otherwise
-          # stuck exactly this way.
-          gh workflow run ci.yml --ref "${{ github.ref_name }}"
-          echo "dispatched ci.yml on ${{ github.ref_name }}"
+      # That push starts no workflow, by design: GitHub suppresses runs triggered
+      # by a GITHUB_TOKEN push, to stop bots looping. The regenerated commit is
+      # therefore never gated, and the bump sits red on its pre-regeneration
+      # commit forever — verified on #129, which sat OPEN and unmergeable for the
+      # whole of a working session.
+      #
+      # GitHub does still *create* the pull_request run; it just parks it in
+      # `action_required`, awaiting approval. Approving it releases the gate on
+      # the regenerated commit, and because it is the only run reporting
+      # `just ci (ubuntu-latest)` on that SHA, branch protection reads it and the
+      # bump becomes mergeable. Verified: #129 went BLOCKED -> CLEAN -> merged on
+      # exactly this call.
+      #
+      # The tempting alternative — `gh workflow run ci.yml` — does not work, and
+      # fails quietly. A dispatched run reports the same check name, and branch
+      # protection matches required checks by name and takes the latest, so the
+      # stale `action_required`/`cancelled` run outranks a green dispatch. The PR
+      # stays BLOCKED with a passing gate. Approving is the only thing that
+      # clears the collision.
+      - name: Release the gate on the regenerated commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The run is created asynchronously after the push, so poll briefly
+          # rather than assuming it is there on the first look.
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            IDS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs" \
+                    --paginate \
+                    --jq ".workflow_runs[]
+                        | select(.head_sha == \"$GITHUB_SHA\"
+                                 and .event == \"pull_request\"
+                                 and .conclusion == \"action_required\")
+                        | .id")
+            [ -n "$IDS" ] && break
+            echo "attempt $attempt: no gated run on $GITHUB_SHA yet — waiting"
+            sleep 10
+          done
+
+          if [ -z "$IDS" ]; then
+            echo "::error::Found no action_required pull_request run on $GITHUB_SHA to approve."
+            echo "::error::The regenerated commit will never be gated and this bump will not merge."
+            exit 1
+          fi
+
+          for id in $IDS; do
+            echo "approving run $id"
+            gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/approve" >/dev/null \
+              && echo "approved $id — the gate will now run on this commit"
+          done

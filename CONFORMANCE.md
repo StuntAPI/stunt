@@ -49,7 +49,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [braintree-style](adapters/braintree-style/) | Braintree GraphQL + REST API `2024-09-01` | 15 +GQL | VM | — | — | [8](#braintree-style) | [7](#braintree-style) |
 | [braze-style](adapters/braze-style/) | Braze REST API `2.0` | 12 | VM | — | — | [8](#braze-style) | [6](#braze-style) |
 | [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | VM | — | — | [6](#chainlink-style) | [7](#chainlink-style) |
-| [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | SDK | cloudflare-go @ v0.119.0 | 7 | [8](#cloudflare-style) | [6](#cloudflare-style) |
+| [cloudflare-style](adapters/cloudflare-style/) | Cloudflare API `4` | 35 | SDK | cloudflare-go @ v0.117.0 | 7 | [8](#cloudflare-style) | [6](#cloudflare-style) |
 | [cloudkit-style](adapters/cloudkit-style/) | CloudKit Web Services API `1` | 5 | VM | — | — | [6](#cloudkit-style) | [2](#cloudkit-style) |
 | [discord-style](adapters/discord-style/) | Discord API `v10` | 26 (+1 ws) | SDK | discord-node @ 2.6.3 (floor) | 5 | [8](#discord-style) | [5](#discord-style) |
 | [drive-style](adapters/drive-style/) | Google Drive API `v3` | 13 | SDK | google-api-go-client @ v0.293.0 | 8 | [7](#drive-style) | [5](#drive-style) |
@@ -194,7 +194,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - SendMessageBatch correlated results
 - missing-queue typed error surface
 
-### cloudflare-go @ v0.119.0
+### cloudflare-go @ v0.117.0
 
 **cloudflare-style**
 
