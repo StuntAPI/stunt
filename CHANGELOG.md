@@ -28,6 +28,17 @@ All notable changes to **stunt** are documented here. The format is based on
   no assertion checked. It now asserts the SDK returned a zero-length body,
   which combined with the SDK throwing on non-2xx pins the status to 204.
 
+- **test(conformance): guard the vendored provider route tables against shrinking.**
+  `conformance/surfaces/*.json` carried no size check, so trimming
+  `adyen-style.json` from 39 routes to 2 left it loadable and republished
+  coverage as 23% → 50%, while 30 real routes silently reclassified from
+  "documented not-implemented" to "not part of the API". The denominator behind
+  every coverage percentage was the easiest quantity in the repo to move.
+
+  `TestCommittedSurfacesDoNotShrink` pins a floor per artifact plus a total. They
+  are floors, not exact counts, so a re-fetch that adds routes — the normal result
+  of a spec refresh — needs no edit; only a shrink does, which is the point.
+
 - **fix(adapter): aws-s3-style: a bucket name holding a control byte created the
   bucket but broke the connection.** `Location` echoed the name raw, and a header
   value containing a raw C0 byte or DEL is not parseable — Go's HTTP client
