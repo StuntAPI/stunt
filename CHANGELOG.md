@@ -8,6 +8,19 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **fix(conformance): the VM tier was derived from a file existing, not from
+  published evidence.** `genmatrix` set an adapter's VM tier from
+  `os.Stat(adapters/<id>_style_test.go)`, so a suite file carrying a single
+  `// =====` marker, or none at all, published `verification: VM` with nothing
+  behind it and pushed the tier counters up. The tier is now derived from the
+  published behavior names.
+
+  This corrects one live claim: `google-cloudtasks-style` published VM
+  verification with **zero** behaviors. It does have 20 engine-level tests with
+  real assertions, but no `// =====` markers, so it published nothing — the tier
+  drop reflects an authoring gap, not missing tests. `vm_only 60 -> 59`,
+  `boot 3 -> 4`.
+
 - **fix(adapter): aws-s3-style: a bucket name holding a control byte created the
   bucket but broke the connection.** `Location` echoed the name raw, and a header
   value containing a raw C0 byte or DEL is not parseable — Go's HTTP client

@@ -5,8 +5,8 @@
     "tiers": {
       "sdk_and_vm": 2,
       "sdk_only": 34,
-      "vm_only": 60,
-      "boot": 3
+      "vm_only": 59,
+      "boot": 4
     }
   },
   "adapters": [
@@ -108344,7 +108344,7 @@
       "api_name": "Google Cloud Tasks API",
       "api_version": "v2",
       "routes": 16,
-      "verification": "VM",
+      "verification": "boot",
       "sdks": [],
       "behaviors": [],
       "missing": [
