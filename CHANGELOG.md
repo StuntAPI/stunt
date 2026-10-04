@@ -8,6 +8,19 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **build: Go 1.23.3 → 1.27.1 everywhere.** New `.mise.toml` pins the repo-local
+  toolchain, all three workflows move to `go-version: "1.27.1"`, and both `go.mod`
+  files move to `go 1.27.1`.
+
+  `conformance/go.mod` had to move with the root: it carries
+  `replace stuntapi.com/stunt => ../`, so raising the root's floor makes the
+  conformance module refuse to build until its own floor matches.
+
+  This also retires the `GOTOOLCHAIN` auto-upgrade that `conformance` needed —
+  `golang.org/x/oauth2` v0.37.0 requires go >= 1.26.0, so the module's floor was
+  1.26.0 while CI installed 1.23.3 and upgraded transparently at test time. Local
+  and CI now resolve the same toolchain.
+
 - **fix(conformance): approve the gated run so a dependency bump can merge.**
   The regeneration workflow commits with `GITHUB_TOKEN`, and GitHub starts no
   workflow from such a push — so the regenerated commit is never gated and a bump

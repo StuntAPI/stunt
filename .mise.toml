@@ -1,0 +1,7 @@
+# Repo-local toolchain pin. CI pins the same version in .github/workflows/*.yml —
+# keep the two in step, or `just ci` stops being the gate that ships.
+#
+# conformance/ is a separate module and needs >= 1.26.0 (golang.org/x/oauth2
+# v0.37.0). Pinning 1.27.1 satisfies both without GOTOOLCHAIN having to upgrade.
+[tools]
+go = "1.27.1"

@@ -3,7 +3,7 @@ module stuntapi.com/stunt/conformance
 // aws-sdk-go-v2/config v1.32.38 requires go >= 1.24. CI's setup-go pins
 // 1.23.3 and GOTOOLCHAIN=auto upgrades transparently; a GOTOOLCHAIN=local
 // environment needs a 1.24+ toolchain for `just conformance` only.
-go 1.26.0
+go 1.27.1
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.47.1
