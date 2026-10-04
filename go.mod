@@ -1,6 +1,6 @@
 module stuntapi.com/stunt
 
-go 1.23.3
+go 1.27.1
 
 require (
 	github.com/brianvoe/gofakeit/v6 v6.28.0

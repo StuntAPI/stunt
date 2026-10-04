@@ -63,7 +63,9 @@ docs/             # specs + plans
 
 ## Dev environment
 
-You need **Go 1.23+**.
+You need **Go 1.27.1+**. The repo pins it in `.mise.toml`, and CI pins the
+same version in `.github/workflows/*.yml` — keep the two in step, or `just ci`
+stops being the gate that ships.
 
 ```bash
 git clone https://github.com/StuntAPI/stunt
