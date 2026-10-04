@@ -8,6 +8,22 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **docs: correct the recorded .NET tier status.** The "Not built yet" entry in
+  CONTRIBUTING.md described the .NET conformance tier as abandoned because a gate
+  written in Go sits inside the trust boundary of the repository it guards. That
+  reasoning belongs to the separate coverage-ratchet artifact — it appears in none
+  of the .NET charter, design, or ledger. The .NET work was neither accepted nor
+  abandoned: it is **deferred**, closed at 5/6/4/6 after two rounds by four seats
+  tripped a stop rule on a flat high-severity count and recurring failure classes.
+
+  The real blockers are recorded now: evidence derived from source text rather
+  than attested at runtime, .NET SDKs auto-discovering ambient credentials and
+  signing to real endpoints silently, and no dependency lockfile. The entry also
+  carries forward the unverified premise that roughly 40–46 of the 99 adapters
+  have a first-party .NET client — a count that was never produced — and the
+  prerequisite the review named: attesting the existing Go and Node rows, which
+  needs no .NET suite.
+
 - **test(blob): stop the append cost test from reporting on the machine.**
   `TestAppendIsLinearPerChunk` compared the wall-clock cost of the first half of
   200 appends against the second half and failed above a 2x ratio. Under
