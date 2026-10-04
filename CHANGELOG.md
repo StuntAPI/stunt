@@ -8,6 +8,38 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **test(blob): stop the append cost test from reporting on the machine.**
+  `TestAppendIsLinearPerChunk` compared the wall-clock cost of the first half of
+  200 appends against the second half and failed above a 2x ratio. Under
+  `go test ./...` the runner executes packages in parallel, so the load lands
+  unevenly across the two windows and the ratio measured CPU scheduling rather
+  than append cost: it failed about 1 run in 4 on both go1.23.3 and go1.27.1, and
+  passed whenever the package ran alone.
+
+  It now asserts the contract deterministically — each append grows the blob by
+  exactly one chunk and reports the authoritative total, over 200 appends. No
+  timing, so it cannot depend on machine speed or load.
+
+  The O(1)-per-chunk *cost* claim is no longer asserted here, and that is a real
+  loss of coverage rather than a fix. Three repairs were measured before giving
+  up on it (first-quarter normalisation, max/min across quarters, least-squares
+  fitted trend); the best separated the cases cleanly when unloaded but still
+  failed under parallel execution, because a correct implementation then shows
+  monotonic-looking growth of its own:
+
+  ```
+  -p 1 (serial)     0 failures over 6 full-suite runs
+  -p 8 (parallel)  12 failure lines over 6 full-suite runs
+                     correct impl            growth 3.95
+                     read-modify-write mutant growth 4.20 .. 5.15
+  ```
+
+  Those overlap, so no wall-clock threshold separates a quadratic regression from
+  CPU starvation. Closing the gap properly needs a non-timing signal — an
+  injectable open seam on `Store` to count content bytes read — which is a
+  production change and deliberately not smuggled into a test fix. The rationale
+  is recorded on the test.
+
 - **build: Go 1.23.3 → 1.27.1 everywhere.** New `.mise.toml` pins the repo-local
   toolchain, all three workflows move to `go-version: "1.27.1"`, and both `go.mod`
   files move to `go 1.27.1`.
