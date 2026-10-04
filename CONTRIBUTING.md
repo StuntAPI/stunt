@@ -229,11 +229,40 @@ to the stale `cancelled` one and the PR stays blocked with a passing gate.
 
 Recorded so the absence is legible rather than looking like an oversight:
 
-- **No .NET SDK conformance tier.** Planned, designed, and abandoned after three
-  review rounds found the same flaw in each: a gate implemented in Go inside the
-  repository it guards is always inside the trust boundary, because a pull
-  request can edit it. The replacement would be a `jq` comparison in a workflow
-  pinned to the base ref. Unstarted.
+- **No .NET SDK conformance tier.** *Deferred, not abandoned.* Designed and
+  reviewed over two rounds by four seats (harness, conformance-integrity,
+  security, adversarial), then closed at **5/6/4/6** — below the bar — after a
+  stop rule fired on two counts: the open in-scope HIGH count did not fall between
+  rounds (18 → ~17), and the same failure classes recurred in both.
+
+  The dominant finding, reached independently by three seats: **the design derived
+  its evidence from source text instead of attesting it at runtime.** Most other
+  clusters followed from that — tier conflation, junk behaviour names, and a
+  harness that could boot the wrong adapter and still report green. Two blockers
+  were independent of it: .NET SDKs auto-discover ambient credentials *by
+  default*, so a harness would sign and send to real cloud endpoints silently,
+  with no log line; and CPM pins versions rather than hashes with no lockfile, on
+  a repo whose verified SDK surface is Go and Node. The review also conceded five
+  errors of its own, among them a cited commit that does not exist and a causal
+  inversion in its own motivating example.
+
+  **The gap is real, not cosmetic.** A read-validation defect surfaced through a
+  .NET client while the Go SDK suite was green; a monolingual matrix cannot see
+  that class. Today 36 of 99 adapters carry SDK-tier evidence, and the sources
+  behind those rows are Go modules, Node packages, and vendored official API
+  specs — 25 distinct client entries plus 19 vendored specs. Every one is Go,
+  Node, or a published schema. There is no .NET project in the tree and no .NET
+  client anywhere in the matrix; the only "Microsoft" in it is
+  `graph.microsoft.com` inside a deviation note.
+
+  **Two things must be settled before resuming.** The first is a prerequisite the
+  review named, needing no .NET suite at all: a provenance/attestation gate for
+  the *existing* Go and Node rows, so the matrix's evidence is attested rather
+  than derived. The second is an unverified premise — that roughly 40–46 of the
+  99 adapters have a first-party .NET client. That count was never produced. An
+  earlier draft's "roughly 60" conflated "has no SDK row today" (63) with "no
+  .NET client exists". If the real number is small, the sweep's premise does not
+  hold and the question changes shape.
 - **No GCS or Azure Cosmos adapters.** Vyral's `Google.Cloud.Storage.V1` and
   `Azure.Cosmos` dependencies have no simulator here. Straightforward work, not
   blocked.
