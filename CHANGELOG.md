@@ -8,6 +8,23 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **docs: bring AGENTS.md up to date with the CLI.** The file claimed to be a
+  "complete, accurate reference" mirroring `stunt llm`. It covered 18 of the 24 real
+  commands and the claim was backwards — `stunt llm` prints a subset, so this file is
+  the more complete of the two. Added `ui`, `ps`, `stop`, `reset`, `completion`, and the
+  `adapter remove|update|import` subcommands, plus a new section for the
+  `requests` / `replay` / `state` / `snapshot` inspection loop, which was entirely
+  undocumented. That loop is the scripted path to reproducing a bug against a live
+  server, so its absence was the costly part of the gap.
+
+  The header now says plainly that neither file is generated or checked, and that
+  `--help` wins where they disagree — nothing in the justfile or CI references
+  AGENTS.md, so this drift accumulated unnoticed.
+
+  Every added command and flag was checked against the built binary. One claim was
+  wrong on the first pass and is corrected in the table: `stunt replay` prints the
+  fresh status and body, it does not diff against the captured response.
+
 - **docs: correct the recorded .NET tier status.** The "Not built yet" entry in
   CONTRIBUTING.md described the .NET conformance tier as abandoned because a gate
   written in Go sits inside the trust boundary of the repository it guards. That

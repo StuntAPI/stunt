@@ -1,7 +1,9 @@
 # AGENTS.md — Operating stunt (for LLMs and agents)
 
-> This file is a **complete, accurate reference** for LLMs, coding agents, and AI-assisted tools
-> that need to operate `stunt` successfully. It mirrors the in-binary reference (`stunt llm`).
+> This file is a **reference** for LLMs, coding agents, and AI-assisted tools that need to
+> operate `stunt` successfully. It is the more complete of the two: `stunt llm` prints an
+> in-binary subset, so treat that as a summary and this file as the authority. Neither is
+> generated or checked — if a command here does not behave as described, trust `--help`.
 > If you are an agent asked to *use* or *build for* stunt, read this first.
 
 ## What stunt is
@@ -56,7 +58,28 @@ adapters written in a **sandboxed Starlark** scripting layer.
 | `stunt profile show <name>` | Describe one profile and where it is active. |
 | `stunt profile activate <name>` | Activate a global preset, or a name one service defines (`--service` disambiguates). |
 | `stunt profile deactivate` | Deactivate (`--service` for one; default all). Runtime-only — resets on restart; `stunt up --profile <name>` sets a boot default. |
-| `stunt llm` | Print the in-binary reference (this doc, compact). |
+| `stunt llm` | Print the in-binary reference (a compact subset of this file). |
+| `stunt ui` | Open the running server's dashboard in a browser (resolves URL + token from the runtime file `stunt up` writes). |
+| `stunt ps` | List every running stunt server across all manifests (`~/.stunt/instances.json`); prunes dead entries. `--json`. |
+| `stunt stop [<pid>]` | Stop a server via the global registry (no pid → this manifest's instance). |
+| `stunt reset <service>` \| `--all` | Wipe simulator state on a **running** server, without restarting it. |
+| `stunt adapter remove\|update\|import` | Remove / update / import an adapter in the manifest. |
+| `stunt completion <shell>` | Emit a shell completion script. |
+
+### Inspecting a running server
+
+The dashboard (`stunt ui`) is the fast path. These four are the scripted equivalent, and
+together they are the loop for reproducing a bug against a live server:
+
+| Command | What it does |
+|---|---|
+| `stunt requests` | List recently captured requests. `--follow` streams them live over WebSocket. |
+| `stunt replay <id>` | Re-issue a captured request against the running server; prints the fresh status and body. It does **not** compare against the captured response — read both. |
+| `stunt state collections\|collection\|kv\|blobs` | Browse simulator state directly. |
+| `stunt snapshot save\|load` | Download a state archive, or restore one. |
+
+`requests` → `replay` is the pair worth remembering: capture whatever the client actually
+sent, re-issue it, and see whether the simulator's answer is stable.
 
 **Global flag:** `--manifest <path>` (default `stunt.yaml`). Adapter cache: `--cache-dir` /
 `$STUNT_ADAPTER_CACHE` (default `~/.stunt/adapters`). Catalog: `--catalog-url` / `$STUNT_CATALOG_URL`.
