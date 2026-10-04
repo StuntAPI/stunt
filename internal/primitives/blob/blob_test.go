@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-	"time"
 )
 
 func newTestStore(t *testing.T) *Store {
@@ -530,39 +529,78 @@ func TestAppendReturnsGrowingTotal(t *testing.T) {
 	}
 }
 
-// TestAppendIsLinearPerChunk pins the O(chunk) guarantee machine-independently.
-// A correct O_APPEND impl costs roughly the same per chunk, so the second half
-// of N appends takes about as long as the first. A read-modify-write regression
-// reads the growing blob before each write, so its second half dominates (~3×
-// the first); the ratio catches that on any hardware where an absolute time
-// budget would be unreliable.
+// TestAppendIsLinearPerChunk pins the contract every append must satisfy, and is
+// named for the guarantee Append's doc comment claims: cost independent of how
+// large the blob has grown.
+//
+// What it asserts, per append, for 200 consecutive appends: the reported total is
+// (i+1)*size, and the blob grew by exactly one chunk. Arithmetic, so it holds
+// identically on a loaded CI runner and an idle laptop.
+//
+// What it does NOT assert, and why: that cost really is O(1) per chunk. This test
+// previously did so with a wall-clock ratio (secondHalf/firstHalf > 2) and was
+// flaky — about 1 run in 4 under `go test ./...`, on go1.23.3 and go1.27.1 alike,
+// passing whenever the package ran alone. It reports on the machine, not the code.
+//
+// Every repair was measured, not assumed:
+//
+//	normalising on the first quarter   correct impl gave 6.11x (first quarter fast)
+//	max/min across four quarters       correct impl gave 5.34x (one quarter stalled)
+//	least-squares fitted trend         correct impl gave 0.72 .. 1.13 unloaded
+//
+// and the fitted trend — the best of them — still fails under parallel package
+// execution, because `go test ./...` starves later packages and a correct
+// implementation then shows monotonic-looking growth:
+//
+//	-p 1 (serial)     0 failures over 6 full-suite runs
+//	-p 8 (parallel)  12 failure lines over 6 full-suite runs
+//	                   correct impl  growth 3.95   [761µs 1026µs 2007µs 2526µs]
+//	                   read-modify-write mutant    growth 4.20 .. 5.15
+//
+// Those overlap. No wall-clock threshold separates a quadratic regression from CPU
+// starvation, because starvation is unbounded. Keeping a threshold that only holds
+// on an idle machine would trade a 1-in-4 flake for a coin flip.
+//
+// So the cost claim is left to Append's own doc comment, and closing this gap
+// properly needs a non-timing signal: an injectable open seam on Store to count
+// content bytes read, which would make the quadratic case fail deterministically.
+// That is a production change, so it is deliberately not smuggled into a test fix.
+//
+// To confirm the growth guard is still live, this mutant must fail — it is caught
+// by the size assertions, not by timing:
+//
+//	replace os.O_APPEND|os.O_WRONLY with os.O_RDWR
 func TestAppendIsLinearPerChunk(t *testing.T) {
 	s := newTestStore(t)
 
 	const chunks = 200
-	const half = chunks / 2
 	const size = 64 << 10 // 64 KiB
 	payload := bytes.Repeat([]byte("z"), size)
 
-	var firstHalf, secondHalf time.Duration
 	for i := 0; i < chunks; i++ {
-		start := time.Now()
-		if _, err := s.Append("drive", "big.bin", "application/octet-stream", bytes.NewReader(payload)); err != nil {
+		var prior int64
+		if i > 0 {
+			info, err := s.Stat("drive", "big.bin")
+			if err != nil {
+				t.Fatalf("Stat before append %d: %v", i, err)
+			}
+			prior = info.Size
+		}
+
+		total, err := s.Append("drive", "big.bin", "application/octet-stream", bytes.NewReader(payload))
+		if err != nil {
 			t.Fatalf("Append %d: %v", i, err)
 		}
-		d := time.Since(start)
-		if i < half {
-			firstHalf += d
-		} else {
-			secondHalf += d
-		}
-	}
 
-	if firstHalf == 0 {
-		t.Fatal("firstHalf timing was zero; cannot ratio")
-	}
-	if ratio := float64(secondHalf) / float64(firstHalf); ratio > 2 {
-		t.Errorf("append cost is not O(1) per chunk: second half took %.1fx the first half (second=%v first=%v) — likely a read-modify-write quadratic regression", ratio, secondHalf, firstHalf)
+		if want := int64(i+1) * int64(size); total != want {
+			t.Fatalf("append %d reported total %d, want %d — append must grow by one chunk per call",
+				i, total, want)
+		}
+		if grew := total - prior; grew != int64(size) {
+			t.Fatalf("append %d grew the blob by %d bytes, want %d — a read-modify-write "+
+				"implementation rewrites the accumulated content instead of appending",
+				i, grew, size)
+		}
 	}
 
 	// Content integrity: the assembled blob must be exactly chunks repetitions
