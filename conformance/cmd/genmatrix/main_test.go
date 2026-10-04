@@ -235,11 +235,32 @@ func TestResolveVersions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got["go-github/v89"] != "v89.0.0" || got["stripe-go/v86"] != "v86.3.0" {
-		t.Fatalf("go versions: %+v", got)
+	// The constraint travels beside the version, never inside it: a consumer
+	// must be able to compare "22.5.0" without stripping a suffix first.
+	for _, want := range []struct {
+		label      string
+		version    string
+		constraint string
+	}{
+		{"go-github/v89", "v89.0.0", constraintPinned},
+		{"stripe-go/v86", "v86.3.0", constraintPinned},
+		{"stripe-node", "22.5.0", constraintFloor},
+	} {
+		g := got[want.label]
+		if g.Version != want.version || g.Constraint != want.constraint {
+			t.Fatalf("%s = %+v, want version %q constraint %q", want.label, g, want.version, want.constraint)
+		}
 	}
-	if got["stripe-node"] != "22.5.0 (floor)" {
-		t.Fatalf("node version: %+v", got)
+	// Display is the annotated form used in CONFORMANCE.md.
+	if got["stripe-node"].Display() != "22.5.0 (floor)" {
+		t.Fatalf("stripe-node Display() = %q", got["stripe-node"].Display())
+	}
+	if got["stripe-go/v86"].Display() != "v86.3.0" {
+		t.Fatalf("stripe-go/v86 Display() = %q", got["stripe-go/v86"].Display())
+	}
+	// Language is derived from which manifest the label resolves through.
+	if language("stripe-node") != "node" || language("stripe-go/v86") != "go" {
+		t.Fatalf("language derivation wrong: %q %q", language("stripe-node"), language("stripe-go/v86"))
 	}
 
 	if _, err := resolveVersions([]check{{SDK: "mystery-sdk"}}, versions); err == nil ||
@@ -296,7 +317,7 @@ func TestRenderSurfaceDetailBlock(t *testing.T) {
 		},
 	}
 	gaps := map[string]gapEntry{"demo-style": {Deviations: []string{"covered but different"}, Missing: []string{"no DELETE /v9/things"}}}
-	doc, err := render(adapters, nil, map[string]string{}, gaps, map[string]*surfaceOut{}, map[string][]astscan.EndpointTags{}, ".")
+	doc, err := render(adapters, nil, map[string]sdkVersion{}, gaps, map[string]*surfaceOut{}, map[string][]astscan.EndpointTags{}, ".")
 	if err != nil {
 		t.Fatal(err)
 	}

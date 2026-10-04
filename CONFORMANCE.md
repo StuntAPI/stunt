@@ -21,6 +21,14 @@ Verification tiers:
   the all-adapters-boot guard on every CI run; no SDK suite drives it yet.
 - Every adapter additionally documents its behavior in depth in its README.
 
+**SDK coverage is go and node only.** Every client in the Official SDK(s)
+column is one of those languages. No client written in any other language is driven
+against any adapter today, so this matrix says nothing about how such an SDK would
+behave. A `—` in that column means *no client is driven* — which is not the
+same as *no client existing*.
+
+**Version annotations.** A version with no annotation is an exact `go.mod` entry, so a run reproduces from it. *(floor)* marks a declared *minimum* — the npm caret range in `package.json` — so the version actually exercised may be higher than the one printed. Prefer a pinned version when you need to reproduce a run exactly.
+
 **99 adapters** — 2 SDK+VM, 34 SDK-only, 59 VM-only, 4 boot-tier.
 
 **45 adapters carry derived provider-surface coverage**: their real-API route totals come from the route tables embedded in the pinned official SDKs (Google Discovery docs inside `google-api-go-client`; generated tables inside the Node clients) or from official specs vendored under `conformance/surfaces/` (refreshed by `just surfaces-fetch`) — mechanical and network-free at generation time. For those rows the derived not-implemented list supplements the curated Missing column; adapters without one have no trustworthy machine-readable surface and stay fully curated.

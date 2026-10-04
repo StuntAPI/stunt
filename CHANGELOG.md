@@ -8,6 +8,40 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **feat(conformance): state which SDK languages are covered, and what a published
+  version number means.** Two gaps in what the matrix told a reader.
+
+  *Language coverage was never stated.* All 25 driven clients are a Go module or an
+  npm package, but that was only inferable from a parenthetical inside the `SDK`
+  tier bullet, and there was no `.net` / `csharp` / `dotnet` anywhere in the file. So
+  for the 63 adapters with an empty `sdks` array, a reader could not tell "this
+  provider ships no first-party client" from "a client exists and we never ran it" —
+  the same ambiguity for `CONFORMANCE.md`, with fewer hints, since JSON gives an empty
+  array and nothing else. `summary.sdk_languages` is now published and the preamble
+  states the boundary explicitly. Both are derived from the SDK labels, never declared
+  by hand.
+
+  *`(floor)` was baked into the version string.* `sdks[].version` was
+  `"22.6.2 (floor)"`, so every consumer had to know the convention and strip it before
+  comparing or sorting — and silently misbehaved if it did not. Version and meaning are
+  now separate fields:
+
+  ```json
+  {"label": "stripe-node",  "version": "22.6.2", "constraint": "floor"}
+  {"label": "stripe-go/v86", "version": "v86.3.0", "constraint": "pinned"}
+  ```
+
+  The asymmetry was real and load-bearing: 10 labels are pinned `go.mod` entries and 15
+  are declared npm minimums that may resolve higher at install. Nothing said so.
+
+  **Breaking:** the `version` field no longer carries the suffix. Nothing in this repo
+  consumes it outside `genmatrix`, so the blast radius is external consumers.
+
+  `CONFORMANCE.md` keeps rendering `(floor)` — from `Display()`, which reads the
+  constraint rather than parsing it back out of a string — so the table and the 10
+  surface-provenance strings that include it are byte-identical to before. The
+  regeneration is deterministic: two consecutive runs produce identical bytes.
+
 - **docs: bring AGENTS.md up to date with the CLI.** The file claimed to be a
   "complete, accurate reference" mirroring `stunt llm`. It covered 18 of the 24 real
   commands and the claim was backwards — `stunt llm` prints a subset, so this file is
