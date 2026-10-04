@@ -421,11 +421,48 @@ var nodePackages = map[string]string{
 	"twilio-node":            "twilio",
 }
 
+// Version constraints. A "pinned" version is an exact go.mod entry, so a run is
+// reproducible from it. A "floor" is a declared minimum taken from an npm caret
+// range in package.json, so the version actually exercised may be higher than the
+// one printed.
+const (
+	constraintPinned = "pinned"
+	constraintFloor  = "floor"
+)
+
+// sdkVersion keeps a resolved version and what that number means as separate
+// fields. They used to be one string with " (floor)" appended, which meant every
+// JSON consumer had to know the convention and strip it before comparing or
+// sorting versions — and silently misbehaved if it did not.
+type sdkVersion struct {
+	Version    string
+	Constraint string
+}
+
+// Display is the human-readable form used in CONFORMANCE.md and in surface
+// provenance strings.
+func (s sdkVersion) Display() string {
+	if s.Constraint == constraintFloor {
+		return s.Version + " (" + constraintFloor + ")"
+	}
+	return s.Version
+}
+
+// language is derived from which manifest the label resolves through, never
+// declared by hand: a label in nodePackages came from package.json, everything
+// else from go.mod.
+func language(label string) string {
+	if _, ok := nodePackages[label]; ok {
+		return "node"
+	}
+	return "go"
+}
+
 // resolveVersions resolves the display version for every SDK label in the
 // checks, failing loud on an unmapped label so a new suite cannot silently
 // drop out of the matrix.
-func resolveVersions(checks []check, versions map[string]string) (map[string]string, error) {
-	out := map[string]string{}
+func resolveVersions(checks []check, versions map[string]string) (map[string]sdkVersion, error) {
+	out := map[string]sdkVersion{}
 	for _, c := range checks {
 		if _, done := out[c.SDK]; done {
 			continue
@@ -436,7 +473,7 @@ func resolveVersions(checks []check, versions map[string]string) (map[string]str
 			if !ok {
 				return nil, fmt.Errorf("package.json has no %q dependency for sdk %q", pkg, label)
 			}
-			out[label] = v + " (floor)"
+			out[label] = sdkVersion{Version: v, Constraint: constraintFloor}
 			continue
 		}
 		base, suffix := label, ""
@@ -451,7 +488,7 @@ func resolveVersions(checks []check, versions map[string]string) (map[string]str
 		if !ok {
 			return nil, fmt.Errorf("go.mod has no %q require for sdk %q", repo+suffix, label)
 		}
-		out[label] = v
+		out[label] = sdkVersion{Version: v, Constraint: constraintPinned}
 	}
 	return out, nil
 }
@@ -547,7 +584,7 @@ type surfaceOut struct {
 // the adapter's manifest routes. Any failure is fatal: a missing module
 // cache or an extractor that lost the source layout must never render as
 // an empty (100%-covered) table.
-func deriveSurfaces(adapters []*adapter.Adapter, sdkVer map[string]string, confDir string) (map[string]*surfaceOut, error) {
+func deriveSurfaces(adapters []*adapter.Adapter, sdkVer map[string]sdkVersion, confDir string) (map[string]*surfaceOut, error) {
 	out := map[string]*surfaceOut{}
 	tables := map[string][]sdkmap.Route{}
 	for _, a := range adapters {
@@ -570,7 +607,7 @@ func deriveSurfaces(adapters []*adapter.Adapter, sdkVer map[string]string, confD
 			if !ok {
 				return nil, fmt.Errorf("surface source for %s: sdk label %q has no resolved version — is its suite installed?", a.ID, spec.Label)
 			}
-			source = "sdk " + spec.Label + " @ " + ver
+			source = "sdk " + spec.Label + " @ " + ver.Display()
 			cacheKey := spec.Kind + " " + spec.Ref + " " + spec.Also
 			cached, done := tables[cacheKey]
 			if !done {
@@ -654,7 +691,7 @@ type sdkGroup struct {
 	byAdapter map[string][]string
 }
 
-func render(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, surfaces map[string]*surfaceOut, derived map[string][]astscan.EndpointTags, root string) (string, error) {
+func render(adapters []*adapter.Adapter, checks []check, sdkVer map[string]sdkVersion, gaps map[string]gapEntry, surfaces map[string]*surfaceOut, derived map[string][]astscan.EndpointTags, root string) (string, error) {
 	byAdapterChecks := map[string][]check{}
 	vmBehav, err := loadVMBehaviors(root, adapters)
 	if err != nil {
@@ -712,6 +749,20 @@ Verification tiers:
 - Every adapter additionally documents its behavior in depth in its README.
 
 `)
+	fmt.Fprintf(&b, `**SDK coverage is %s only.** Every client in the Official SDK(s)
+column is one of those languages. No client written in any other language is driven
+against any adapter today, so this matrix says nothing about how such an SDK would
+behave. A `+"`—`"+` in that column means *no client is driven* — which is not the
+same as *no client existing*.
+
+`, languageList(sdkLanguages(sdkVer)))
+	// Insert B: version legend, stating the same semantics as
+	// summary.sdk_version_semantics so the two cannot disagree.
+	fmt.Fprintf(&b, "**Version annotations.** A version with no annotation is an exact "+
+		"`go.mod` entry, so a run reproduces from it. *(floor)* marks a declared "+
+		"*minimum* — the npm caret range in `package.json` — so the version actually "+
+		"exercised may be higher than the one printed. Prefer a pinned version when "+
+		"you need to reproduce a run exactly.\n\n")
 	tierOf := func(id string) string {
 		_, isSDK := byAdapterChecks[id]
 		switch {
@@ -764,7 +815,7 @@ Verification tiers:
 			for _, c := range cs {
 				if !seen[c.SDK] {
 					seen[c.SDK] = true
-					parts = append(parts, fmt.Sprintf("%s @ %s", c.SDK, sdkVer[c.SDK]))
+					parts = append(parts, fmt.Sprintf("%s @ %s", c.SDK, sdkVer[c.SDK].Display()))
 				}
 			}
 			sdkCell = strings.Join(parts, "<br>")
@@ -795,7 +846,7 @@ sections in ` + "`conformance/node/tests/*.test.ts`" + `).
 `)
 	for _, label := range groupOrder {
 		g := groups[label]
-		fmt.Fprintf(&b, "### %s @ %s\n\n", label, sdkVer[label])
+		fmt.Fprintf(&b, "### %s @ %s\n\n", label, sdkVer[label].Display())
 		for _, adapterID := range g.order {
 			fmt.Fprintf(&b, "**%s**\n\n", adapterID)
 			for _, n := range g.byAdapter[adapterID] {
@@ -935,6 +986,41 @@ func collapse(s string) string {
 // matrixJSON is the JSON shape stuntapi.com renders (src/data/
 // conformance.json). It mirrors the markdown matrix one-to-one; versions
 // are resolved from the same sources so they cannot drift.
+// sdkLanguages returns the sorted, de-duplicated set of languages every driven
+// client is written in.
+func sdkLanguages(sdkVer map[string]sdkVersion) []string {
+	seen := map[string]bool{}
+	for label := range sdkVer {
+		seen[language(label)] = true
+	}
+	out := make([]string, 0, len(seen))
+	for l := range seen {
+		out = append(out, l)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// languageList renders a language set as prose: "go", "go and node", "a, b and c".
+func languageList(ls []string) string {
+	switch len(ls) {
+	case 0:
+		return "no"
+	case 1:
+		return ls[0]
+	case 2:
+		return ls[0] + " and " + ls[1]
+	default:
+		return strings.Join(ls[:len(ls)-1], ", ") + " and " + ls[len(ls)-1]
+	}
+}
+
+// sdkVersionSemantics is the legend rendered in the markdown preamble and
+// published alongside the data, so the two cannot disagree.
+const sdkVersionSemantics = "sdks[].constraint is \"pinned\" (an exact go.mod entry, " +
+	"reproducible from it) or \"floor\" (a declared minimum from an npm caret range, " +
+	"which may resolve higher at install time). The value is never annotated in place."
+
 type matrixJSON struct {
 	Generated struct {
 		Adapters int `json:"adapters"`
@@ -945,6 +1031,14 @@ type matrixJSON struct {
 			VMOnly   int `json:"vm_only"`
 			Boot     int `json:"boot"`
 		} `json:"tiers"`
+		// SDKLanguages is every language a driven client is written in, derived
+		// from the labels rather than declared. An empty sdks array therefore has
+		// a stated reading: no client in a listed language is driven, which is not
+		// the same as no client existing for that provider.
+		SDKLanguages []string `json:"sdk_languages"`
+		// SDKVersionSemantics explains sdks[].constraint, so a JSON consumer gets
+		// the same legend the markdown preamble renders.
+		SDKVersionSemantics string `json:"sdk_version_semantics"`
 	} `json:"summary"`
 	Adapters []adapterJSON `json:"adapters"`
 }
@@ -1007,9 +1101,13 @@ type routeJSON struct {
 type sdkJSON struct {
 	Label   string `json:"label"`
 	Version string `json:"version"`
+	// Constraint is "pinned" (an exact go.mod entry, reproducible) or "floor" (a
+	// declared npm minimum, possibly resolved higher at install). Kept out of
+	// Version so a consumer can compare or sort without parsing a suffix.
+	Constraint string `json:"constraint"`
 }
 
-func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]string, gaps map[string]gapEntry, surfaces map[string]*surfaceOut, derived map[string][]astscan.EndpointTags, root string) ([]byte, error) {
+func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]sdkVersion, gaps map[string]gapEntry, surfaces map[string]*surfaceOut, derived map[string][]astscan.EndpointTags, root string) ([]byte, error) {
 	byAdapterChecks := map[string][]check{}
 	for _, c := range checks {
 		byAdapterChecks[c.Adapter] = append(byAdapterChecks[c.Adapter], c)
@@ -1026,6 +1124,8 @@ func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]s
 	var m matrixJSON
 	m.Generated.Adapters = len(adapters)
 	m.Generated.Checks = len(checks)
+	m.Generated.SDKLanguages = sdkLanguages(sdkVer)
+	m.Generated.SDKVersionSemantics = sdkVersionSemantics
 	for _, a := range adapters {
 		tier := "boot"
 		isSDK := len(byAdapterChecks[a.ID]) > 0
@@ -1112,7 +1212,7 @@ func renderJSON(adapters []*adapter.Adapter, checks []check, sdkVer map[string]s
 			row.Behaviors = append(row.Behaviors, c.Name)
 			if !seen[c.SDK] {
 				seen[c.SDK] = true
-				row.SDKs = append(row.SDKs, sdkJSON{Label: c.SDK, Version: sdkVer[c.SDK]})
+				row.SDKs = append(row.SDKs, sdkJSON{Label: c.SDK, Version: sdkVer[c.SDK].Version, Constraint: sdkVer[c.SDK].Constraint})
 			}
 		}
 		if row.SDKs == nil {

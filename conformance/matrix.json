@@ -7,7 +7,12 @@
       "sdk_only": 34,
       "vm_only": 59,
       "boot": 4
-    }
+    },
+    "sdk_languages": [
+      "go",
+      "node"
+    ],
+    "sdk_version_semantics": "sdks[].constraint is \"pinned\" (an exact go.mod entry, reproducible from it) or \"floor\" (a declared minimum from an npm caret range, which may resolve higher at install time). The value is never annotated in place."
   },
   "adapters": [
     {
@@ -6656,7 +6661,8 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -9291,7 +9297,8 @@
       "sdks": [
         {
           "label": "aws-sdk-go-v2",
-          "version": "v1.47.1"
+          "version": "v1.47.1",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -9361,7 +9368,8 @@
       "sdks": [
         {
           "label": "aws-sdk-go-v2",
-          "version": "v1.47.1"
+          "version": "v1.47.1",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -11493,7 +11501,8 @@
       "sdks": [
         {
           "label": "atproto",
-          "version": "0.20.41 (floor)"
+          "version": "0.20.41",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -13256,7 +13265,8 @@
       "sdks": [
         {
           "label": "cloudflare-go",
-          "version": "v0.119.0"
+          "version": "v0.119.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -27121,7 +27131,8 @@
       "sdks": [
         {
           "label": "discord-node",
-          "version": "2.6.3 (floor)"
+          "version": "2.6.3",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -28458,7 +28469,8 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -29480,7 +29492,8 @@
       "sdks": [
         {
           "label": "aws-sdk-go-v2",
-          "version": "v1.47.1"
+          "version": "v1.47.1",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -29930,7 +29943,8 @@
       "sdks": [
         {
           "label": "microsoft-graph-client",
-          "version": "3.0.7 (floor)"
+          "version": "3.0.7",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -100462,7 +100476,8 @@
       "sdks": [
         {
           "label": "go-ethereum",
-          "version": "v1.17.5"
+          "version": "v1.17.5",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -101939,7 +101954,8 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -102323,7 +102339,8 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -102638,7 +102655,8 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -102758,11 +102776,13 @@
       "sdks": [
         {
           "label": "go-github/v89",
-          "version": "v89.0.0"
+          "version": "v89.0.0",
+          "constraint": "pinned"
         },
         {
           "label": "octokit",
-          "version": "5.0.5 (floor)"
+          "version": "5.0.5",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -107114,7 +107134,8 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -107631,7 +107652,8 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -108595,7 +108617,8 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -109280,11 +109303,13 @@
       "sdks": [
         {
           "label": "x/oauth2",
-          "version": "v0.37.0"
+          "version": "v0.37.0",
+          "constraint": "pinned"
         },
         {
           "label": "google-api-go-client/idtoken",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -109370,7 +109395,8 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -109582,7 +109608,8 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -109801,7 +109828,8 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -110398,7 +110426,8 @@
       "sdks": [
         {
           "label": "hubspot-node",
-          "version": "14.0.1 (floor)"
+          "version": "14.0.1",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -113260,7 +113289,8 @@
       "sdks": [
         {
           "label": "jira-js",
-          "version": "6.1.0 (floor)"
+          "version": "6.1.0",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -116540,7 +116570,8 @@
       "sdks": [
         {
           "label": "openai-node",
-          "version": "7.5.0 (floor)"
+          "version": "7.5.0",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -117945,7 +117976,8 @@
       "sdks": [
         {
           "label": "microsoft-graph-client",
-          "version": "3.0.7 (floor)"
+          "version": "3.0.7",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -191891,7 +191923,8 @@
       "sdks": [
         {
           "label": "plaid-node",
-          "version": "32.0.0 (floor)"
+          "version": "32.0.0",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -194922,7 +194955,8 @@
       "sdks": [
         {
           "label": "resend-node",
-          "version": "6.22.0 (floor)"
+          "version": "6.22.0",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -195330,7 +195364,8 @@
       "sdks": [
         {
           "label": "jsforce",
-          "version": "3.10.27 (floor)"
+          "version": "3.10.27",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -196678,7 +196713,8 @@
       "sdks": [
         {
           "label": "go-shopify/v4",
-          "version": "v4.7.0"
+          "version": "v4.7.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -197113,7 +197149,8 @@
       "sdks": [
         {
           "label": "slack-node",
-          "version": "7.19.0 (floor)"
+          "version": "7.19.0",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -198608,7 +198645,8 @@
       "sdks": [
         {
           "label": "aws-sdk-go-v2",
-          "version": "v1.47.1"
+          "version": "v1.47.1",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -198700,7 +198738,8 @@
       "sdks": [
         {
           "label": "square-node",
-          "version": "45.1.0 (floor)"
+          "version": "45.1.0",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -200258,11 +200297,13 @@
       "sdks": [
         {
           "label": "stripe-go/v86",
-          "version": "v86.3.0"
+          "version": "v86.3.0",
+          "constraint": "pinned"
         },
         {
           "label": "stripe-node",
-          "version": "22.6.2 (floor)"
+          "version": "22.6.2",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -204912,11 +204953,13 @@
       "sdks": [
         {
           "label": "twilio-go",
-          "version": "v1.31.2"
+          "version": "v1.31.2",
+          "constraint": "pinned"
         },
         {
           "label": "twilio-node",
-          "version": "6.1.0 (floor)"
+          "version": "6.1.0",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
@@ -209139,7 +209182,8 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0"
+          "version": "v0.299.0",
+          "constraint": "pinned"
         }
       ],
       "behaviors": [
@@ -209693,7 +209737,8 @@
       "sdks": [
         {
           "label": "node-zendesk",
-          "version": "6.0.1 (floor)"
+          "version": "6.0.1",
+          "constraint": "floor"
         }
       ],
       "behaviors": [
