@@ -100476,7 +100476,7 @@
       "sdks": [
         {
           "label": "go-ethereum",
-          "version": "v1.17.5",
+          "version": "v1.17.7",
           "constraint": "pinned"
         }
       ],
