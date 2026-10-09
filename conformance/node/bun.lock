@@ -18,7 +18,7 @@
         "openai": "^7.5.0",
         "plaid": "^32.0.0",
         "resend": "^6.22.0",
-        "square": "^45.1.0",
+        "square": "^46.0.0",
         "stripe": "^22.6.2",
         "twilio": "^6.1.0",
       },
@@ -435,7 +435,7 @@
 
     "signal-exit": ["signal-exit@3.0.7", "", {}, "sha512-wnD2ZE+l+SPC/uoS0vXeE9L1+0wuaMqKlfz9AMUo38JsyLSBWSFcHR1Rri62LZc12vLr1gb3jl7iwQhgwpAbGQ=="],
 
-    "square": ["square@45.1.0", "", { "dependencies": { "form-data": "^4.0.6", "form-data-encoder": "^4.1.0", "formdata-node": "^6.0.3", "node-fetch": "^2.7.0", "readable-stream": "^4.7.0", "square-legacy": "npm:square@^39.1.1" } }, "sha512-A7nCXOU6RgKo40ZpxAHv+VwlUh8mEiBV7aEz4TDnVSnE3BRcT0sHKhAI6oKc45VSXYwcUSGI3AbWh9d7dID0OQ=="],
+    "square": ["square@46.0.0", "", { "dependencies": { "form-data": "^4.0.6", "form-data-encoder": "^4.1.0", "formdata-node": "^6.0.3", "node-fetch": "^2.7.0", "readable-stream": "^4.7.0", "square-legacy": "npm:square@^39.1.1" } }, "sha512-kxjA2w1ttzVPPojuwRnco0zIPBEfXOz7zaNsIy0YD1hmtryz92v1jGtw5VNoWb4H/hw9O0crsWnLFjZlJUUQYA=="],
 
     "square-legacy": ["square@39.1.1", "", { "dependencies": { "@apimatic/authentication-adapters": "^0.5.4", "@apimatic/axios-client-adapter": "^0.3.7", "@apimatic/core": "^0.10.16", "@apimatic/json-bigint": "^1.2.0", "@apimatic/schema": "^0.7.14", "@types/node": "^14.14.30" } }, "sha512-75b/UWbXl6xk1cG0jEWeWTRHAbDseF78kdPa3N4Cm57KMkDwOS2qGSLfooyqMDmFEKhQAfTA0WSiMkw40hQ/2A=="],
 

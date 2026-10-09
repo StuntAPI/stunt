@@ -198770,7 +198770,7 @@
       "sdks": [
         {
           "label": "square-node",
-          "version": "45.1.0",
+          "version": "46.0.0",
           "constraint": "floor"
         }
       ],
@@ -198868,8 +198868,8 @@
         }
       ],
       "surface": {
-        "source": "sdk square-node @ 45.1.0 (floor)",
-        "provider_routes": 329,
+        "source": "sdk square-node @ 46.0.0 (floor)",
+        "provider_routes": 326,
         "covered_routes": 13,
         "coverage_pct": 3,
         "missing_routes": [
@@ -199395,10 +199395,6 @@
           },
           {
             "method": "GET",
-            "route": "/v2/inventory/transfers/{transfer_id}"
-          },
-          {
-            "method": "GET",
             "route": "/v2/inventory/{catalog_object_id}"
           },
           {
@@ -199620,14 +199616,6 @@
           {
             "method": "GET",
             "route": "/v2/locations/{location_id}/transactions/{transaction_id}"
-          },
-          {
-            "method": "POST",
-            "route": "/v2/locations/{location_id}/transactions/{transaction_id}/capture"
-          },
-          {
-            "method": "POST",
-            "route": "/v2/locations/{location_id}/transactions/{transaction_id}/void"
           },
           {
             "method": "POST",

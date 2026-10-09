@@ -121,7 +121,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [slack-style](adapters/slack-style/) | Slack Web API `1.0` | 7 | SDK | slack-node @ 8.2.0 (floor) | 4 | [6](#slack-style) | [2](#slack-style) |
 | [smartbill-style](adapters/smartbill-style/) | SmartBill Cloud API `1.0` | 18 | VM | — | — | [3](#smartbill-style) | [4](#smartbill-style) |
 | [sqs-style](adapters/sqs-style/) | Amazon SQS API `2012-11-05` | 2 | SDK + VM | aws-sdk-go-v2 @ v1.47.1 | 6 | [4](#sqs-style) | [5](#sqs-style) |
-| [square-style](adapters/square-style/) | Square API `2024-08-21` | 18 | SDK | square-node @ 45.1.0 (floor) | 4 | [7](#square-style) | [2](#square-style) |
+| [square-style](adapters/square-style/) | Square API `2024-08-21` | 18 | SDK | square-node @ 46.0.0 (floor) | 4 | [7](#square-style) | [2](#square-style) |
 | [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.3.0<br>stripe-node @ 22.6.2 (floor) | 9 | [7](#stripe-style) | [5](#stripe-style) |
 | [tenderly-style](adapters/tenderly-style/) | Tenderly Simulation API `v1` | 5 | VM | — | — | [3](#tenderly-style) | [4](#tenderly-style) |
 | [thegraph-style](adapters/thegraph-style/) | The Graph (GraphQL over subgraphs) `1.0` | 1 +GQL | VM | — | — | [3](#thegraph-style) | [2](#thegraph-style) |
@@ -499,7 +499,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - chat.postMessage lands in conversations.history
 - reactions.add on the posted message
 
-### square-node @ 45.1.0 (floor)
+### square-node @ 46.0.0 (floor)
 
 **square-style**
 
@@ -8271,9 +8271,9 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk square-node @ 45.1.0 (floor): 329 real routes · 13 covered · 3% · 316 not implemented
+**Provider surface** — derived from sdk square-node @ 46.0.0 (floor): 326 real routes · 13 covered · 3% · 313 not implemented
 
-<details><summary>not implemented (316)</summary>
+<details><summary>not implemented (313)</summary>
 
 - `POST` `/v2/apple-pay/domains`
 - `GET` `/v2/bank-accounts`
@@ -8325,7 +8325,7 @@ behavior notes live in each adapter's README.
 - `POST` `/v2/catalog/search-catalog-items`
 - `POST` `/v2/catalog/update-item-modifier-lists`
 - `POST` `/v2/catalog/update-item-taxes`
-… and 266 more
+… and 263 more
 
 
 </details>
