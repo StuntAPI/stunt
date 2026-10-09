@@ -200334,7 +200334,7 @@
         },
         {
           "label": "stripe-node",
-          "version": "22.6.2",
+          "version": "23.0.0",
           "constraint": "floor"
         }
       ],
@@ -201000,10 +201000,10 @@
         }
       ],
       "surface": {
-        "source": "sdk stripe-node @ 22.6.2 (floor)",
-        "provider_routes": 573,
+        "source": "sdk stripe-node @ 23.0.0 (floor)",
+        "provider_routes": 591,
         "covered_routes": 138,
-        "coverage_pct": 24,
+        "coverage_pct": 23,
         "missing_routes": [
           {
             "method": "POST",
@@ -201072,6 +201072,26 @@
           {
             "method": "POST",
             "route": "/v1/application_fees/{feeId}/refunds/{id}"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/apps/installs"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/apps/installs"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/apps/installs/{id}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/apps/installs/{id}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/apps/installs/{id}/uninstall"
           },
           {
             "method": "GET",
@@ -201883,6 +201903,22 @@
           },
           {
             "method": "GET",
+            "route": "/v1/product_catalog/trial_offers"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/product_catalog/trial_offers"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/product_catalog/trial_offers/{id}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/product_catalog/trial_offers/{id}"
+          },
+          {
+            "method": "GET",
             "route": "/v1/products/search"
           },
           {
@@ -202123,6 +202159,10 @@
           },
           {
             "method": "POST",
+            "route": "/v1/subscriptions/{id}/pause"
+          },
+          {
+            "method": "POST",
             "route": "/v1/subscriptions/{id}/resume"
           },
           {
@@ -202140,6 +202180,18 @@
           {
             "method": "GET",
             "route": "/v1/tax/calculations/{id}/line_items"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/tax/locations"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/tax/locations"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/tax/locations/{id}"
           },
           {
             "method": "GET",
@@ -202452,6 +202504,26 @@
           {
             "method": "POST",
             "route": "/v1/test_helpers/treasury/received_debits"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/three_d_secure/authentications"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/three_d_secure/authentications"
+          },
+          {
+            "method": "GET",
+            "route": "/v1/three_d_secure/authentications/{id}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/three_d_secure/authentications/{id}/cancel"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/three_d_secure/authentications/{id}/submit"
           },
           {
             "method": "GET",
