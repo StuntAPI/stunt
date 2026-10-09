@@ -11,7 +11,6 @@ package conformance
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -89,28 +88,6 @@ func Record(t *testing.T, sdk, adapter, name string) {
 	t.Helper()
 	t.Logf("✓ %s/%s: %s", sdk, adapter, name)
 	registered[sdk] = append(registered[sdk], Check{SDK: sdk, Adapter: adapter, Name: name})
-}
-
-// ScoreboardPath, when set (RUN_CONFORMANCE_SCOREBOARD), receives the
-// result dump after the whole run (TSV: sdk, adapter, check).
-const ScoreboardPath = "RUN_CONFORMANCE_SCOREBOARD"
-
-// TestMain dumps the scoreboard after a green run when the env var names
-// a file — consumed by the case-study generator.
-func TestMain(m *testing.M) {
-	code := m.Run()
-	if path := os.Getenv(ScoreboardPath); path != "" && code == 0 {
-		f, err := os.Create(path)
-		if err == nil {
-			defer f.Close()
-			for sdk, checks := range registered {
-				for _, c := range checks {
-					fmt.Fprintf(f, "%s\t%s\t%s\n", sdk, c.Adapter, c.Name)
-				}
-			}
-		}
-	}
-	os.Exit(code)
 }
 
 // parseURL is net/url.Parse with the error swallowed for the test
