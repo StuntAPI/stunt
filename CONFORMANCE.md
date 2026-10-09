@@ -122,7 +122,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [smartbill-style](adapters/smartbill-style/) | SmartBill Cloud API `1.0` | 18 | VM | — | — | [3](#smartbill-style) | [4](#smartbill-style) |
 | [sqs-style](adapters/sqs-style/) | Amazon SQS API `2012-11-05` | 2 | SDK + VM | aws-sdk-go-v2 @ v1.47.1 | 6 | [4](#sqs-style) | [5](#sqs-style) |
 | [square-style](adapters/square-style/) | Square API `2024-08-21` | 18 | SDK | square-node @ 45.1.0 (floor) | 4 | [7](#square-style) | [2](#square-style) |
-| [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.3.0<br>stripe-node @ 22.6.2 (floor) | 9 | [7](#stripe-style) | [5](#stripe-style) |
+| [stripe-style](adapters/stripe-style/) | Stripe API `2025-01-27.acacia` | 158 | SDK | stripe-go/v86 @ v86.4.2<br>stripe-node @ 22.6.2 (floor) | 9 | [7](#stripe-style) | [5](#stripe-style) |
 | [tenderly-style](adapters/tenderly-style/) | Tenderly Simulation API `v1` | 5 | VM | — | — | [3](#tenderly-style) | [4](#tenderly-style) |
 | [thegraph-style](adapters/thegraph-style/) | The Graph (GraphQL over subgraphs) `1.0` | 1 +GQL | VM | — | — | [3](#thegraph-style) | [2](#thegraph-style) |
 | [threads-style](adapters/threads-style/) | Threads API (Meta) `v1.0` | 8 | VM | — | — | [3](#threads-style) | [6](#threads-style) |
@@ -508,7 +508,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - orders.create prices line items and mints an order id
 - orders.get round-trips the priced order
 
-### stripe-go/v86 @ v86.3.0
+### stripe-go/v86 @ v86.4.2
 
 **stripe-style**
 
@@ -8057,9 +8057,9 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk slack-node @ 8.2.0 (floor): 280 real routes · 6 covered · 2% · 274 not implemented
+**Provider surface** — derived from sdk slack-node @ 8.2.0 (floor): 272 real routes · 6 covered · 2% · 266 not implemented
 
-<details><summary>not implemented (274)</summary>
+<details><summary>not implemented (266)</summary>
 
 - `POST` `/api/admin.analytics.getFile`
 - `POST` `/api/admin.apps.activities.list`
@@ -8111,7 +8111,7 @@ behavior notes live in each adapter's README.
 - `POST` `/api/admin.emoji.remove`
 - `POST` `/api/admin.emoji.rename`
 - `POST` `/api/admin.functions.list`
-… and 224 more
+… and 216 more
 
 
 </details>

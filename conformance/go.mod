@@ -18,7 +18,7 @@ require (
 	github.com/cloudflare/cloudflare-go v0.119.0
 	github.com/ethereum/go-ethereum v1.17.7
 	github.com/google/go-github/v89 v89.0.0
-	github.com/stripe/stripe-go/v86 v86.3.0
+	github.com/stripe/stripe-go/v86 v86.4.2
 	github.com/twilio/twilio-go v1.31.2
 	golang.org/x/oauth2 v0.37.0
 	google.golang.org/api v0.299.0
