@@ -11,7 +11,7 @@
         "@microsoft/microsoft-graph-client": "^3.0.7",
         "@slack/web-api": "^8.2.0",
         "discord-api-types": "^0.38.0",
-        "jira.js": "^6.1.0",
+        "jira.js": "^6.2.0",
         "jsforce": "^3.10.27",
         "node-zendesk": "^6.0.1",
         "octokit": "^5.0.5",
@@ -313,7 +313,7 @@
 
     "iso-datestring-validator": ["iso-datestring-validator@2.2.2", "", {}, "sha512-yLEMkBbLZTlVQqOnQ4FiMujR6T4DEcCb1xizmvXS+OxuhwcbtynoosRzdMA69zZCShCNAbi+gJ71FxZBBXx1SA=="],
 
-    "jira.js": ["jira.js@6.1.0", "", { "dependencies": { "zod": "^4.4.3" } }, "sha512-AHG75xR/4U5vHVB8dssndHgQ0O4P1oi2WFt/Q/oNzncgKeeiVXq6UDzJBDmWyrNDaYsJfIOWYp+dmdjcCmO7PA=="],
+    "jira.js": ["jira.js@6.2.0", "", { "dependencies": { "zod": "^4.4.3" } }, "sha512-tF6FUfByN0ezxR1SoA5iZ49FI0U/GdHLR+r3FDq4aqHO2MlVKE2VitAsnsa1ThFhdT82hTSCYXw8jT9zbeOIRw=="],
 
     "jsforce": ["jsforce@3.10.27", "", { "dependencies": { "@babel/runtime": "^7.27.0", "@babel/runtime-corejs3": "^7.28.3", "@sindresorhus/is": "^4", "base64url": "^3.0.1", "commander": "^4.0.1", "core-js": "^3.50.0", "csv-parse": "^7.0.2", "csv-stringify": "^6.8.3", "faye": "^1.4.2", "form-data": "^4.0.6", "inquirer": "^8.2.7", "multistream": "^3.1.0", "open": "^7.0.0", "undici": "^8.11.0", "xml2js": "^0.6.2" }, "bin": { "jsforce": "bin/jsforce", "jsforce-gen-schema": "bin/jsforce-gen-schema" } }, "sha512-UFeTk45/DxShnkUypWUevtfI2TzKWnEdvS28Y45/xNXfeSUqdZVWR7Roq7AxfRVTpFrtkbc48rxkwSugTH1cYg=="],
 
