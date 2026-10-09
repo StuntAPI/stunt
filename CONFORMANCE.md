@@ -89,7 +89,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [hn-style](adapters/hn-style/) | Hacker News Firebase API `v0` | 11 | VM | — | — | [3](#hn-style) | [4](#hn-style) |
 | [hubspot-style](adapters/hubspot-style/) | HubSpot CRM API `v3` | 33 | SDK | hubspot-node @ 14.0.1 (floor) | 5 | [4](#hubspot-style) | — |
 | [instagram-style](adapters/instagram-style/) | Instagram Graph API `v21.0` | 10 | VM | — | — | [4](#instagram-style) | [5](#instagram-style) |
-| [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 32 | SDK | jira-js @ 6.1.0 (floor) | 7 | [5](#jira-style) | [6](#jira-style) |
+| [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 32 | SDK | jira-js @ 6.2.0 (floor) | 7 | [5](#jira-style) | [6](#jira-style) |
 | [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | VM | — | — | [3](#jumio-style) | [6](#jumio-style) |
 | [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | VM | — | — | [4](#linkedin-style) | [3](#linkedin-style) |
 | [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | SDK | openai-node @ 7.5.0 (floor) | 2 | [4](#llm-style) | [3](#llm-style) |
@@ -399,7 +399,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - searchApi.doSearch finds the record by name
 - archive hides the record from reads
 
-### jira-js @ 6.1.0 (floor)
+### jira-js @ 6.2.0 (floor)
 
 **jira-style**
 
@@ -5818,7 +5818,7 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk jira-js @ 6.1.0 (floor): 634 real routes · 22 covered · 3% · 611 not implemented
+**Provider surface** — derived from sdk jira-js @ 6.2.0 (floor): 634 real routes · 22 covered · 3% · 611 not implemented
 
 <details><summary>not implemented (611)</summary>
 

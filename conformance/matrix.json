@@ -113293,7 +113293,7 @@
       "sdks": [
         {
           "label": "jira-js",
-          "version": "6.1.0",
+          "version": "6.2.0",
           "constraint": "floor"
         }
       ],
@@ -113452,7 +113452,7 @@
         }
       ],
       "surface": {
-        "source": "sdk jira-js @ 6.1.0 (floor)",
+        "source": "sdk jira-js @ 6.2.0 (floor)",
         "provider_routes": 634,
         "covered_routes": 22,
         "coverage_pct": 3,
