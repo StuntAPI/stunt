@@ -6661,7 +6661,7 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -6729,7 +6729,7 @@
         }
       ],
       "surface": {
-        "source": "sdk google-api-go-client @ v0.299.0",
+        "source": "sdk google-api-go-client @ v0.300.0",
         "provider_routes": 16,
         "covered_routes": 7,
         "coverage_pct": 43,
@@ -28469,7 +28469,7 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -28554,7 +28554,7 @@
         }
       ],
       "surface": {
-        "source": "sdk google-api-go-client @ v0.299.0",
+        "source": "sdk google-api-go-client @ v0.300.0",
         "provider_routes": 64,
         "covered_routes": 8,
         "coverage_pct": 12,
@@ -101954,7 +101954,7 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -102009,7 +102009,7 @@
         }
       ],
       "surface": {
-        "source": "sdk google-api-go-client @ v0.299.0",
+        "source": "sdk google-api-go-client @ v0.300.0",
         "provider_routes": 66,
         "covered_routes": 11,
         "coverage_pct": 16,
@@ -102339,7 +102339,7 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -102406,7 +102406,7 @@
         }
       ],
       "surface": {
-        "source": "sdk google-api-go-client @ v0.299.0",
+        "source": "sdk google-api-go-client @ v0.300.0",
         "provider_routes": 38,
         "covered_routes": 9,
         "coverage_pct": 23,
@@ -102655,7 +102655,7 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -102701,7 +102701,7 @@
         }
       ],
       "surface": {
-        "source": "sdk google-api-go-client @ v0.299.0",
+        "source": "sdk google-api-go-client @ v0.300.0",
         "provider_routes": 3,
         "covered_routes": 3,
         "coverage_pct": 100,
@@ -107134,7 +107134,7 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -107229,7 +107229,7 @@
         }
       ],
       "surface": {
-        "source": "sdk google-api-go-client @ v0.299.0",
+        "source": "sdk google-api-go-client @ v0.300.0",
         "provider_routes": 79,
         "covered_routes": 16,
         "coverage_pct": 20,
@@ -107652,7 +107652,7 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -107733,7 +107733,7 @@
         }
       ],
       "surface": {
-        "source": "sdk google-api-go-client @ v0.299.0",
+        "source": "sdk google-api-go-client @ v0.300.0",
         "provider_routes": 128,
         "covered_routes": 13,
         "coverage_pct": 10,
@@ -108617,7 +108617,7 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -108683,8 +108683,8 @@
         }
       ],
       "surface": {
-        "source": "sdk google-api-go-client @ v0.299.0",
-        "provider_routes": 136,
+        "source": "sdk google-api-go-client @ v0.300.0",
+        "provider_routes": 137,
         "covered_routes": 14,
         "coverage_pct": 10,
         "missing_routes": [
@@ -108835,6 +108835,10 @@
           {
             "method": "GET",
             "route": "/v1/locations/{locationsId}/workforcePools/{workforcePoolsId}/subjects/{subjectsId}/operations/{operationsId}"
+          },
+          {
+            "method": "POST",
+            "route": "/v1/locations/{locationsId}/workforcePools/{workforcePoolsId}/subjects/{subjectsId}:revokeSessions"
           },
           {
             "method": "POST",
@@ -109308,7 +109312,7 @@
         },
         {
           "label": "google-api-go-client/idtoken",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -109395,7 +109399,7 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -109465,7 +109469,7 @@
         }
       ],
       "surface": {
-        "source": "sdk google-api-go-client @ v0.299.0",
+        "source": "sdk google-api-go-client @ v0.300.0",
         "provider_routes": 11,
         "covered_routes": 10,
         "coverage_pct": 90,
@@ -109608,7 +109612,7 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -109676,7 +109680,7 @@
         }
       ],
       "surface": {
-        "source": "sdk google-api-go-client @ v0.299.0",
+        "source": "sdk google-api-go-client @ v0.300.0",
         "provider_routes": 17,
         "covered_routes": 10,
         "coverage_pct": 58,
@@ -109828,7 +109832,7 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -109898,7 +109902,7 @@
         }
       ],
       "surface": {
-        "source": "sdk google-api-go-client @ v0.299.0",
+        "source": "sdk google-api-go-client @ v0.300.0",
         "provider_routes": 14,
         "covered_routes": 9,
         "coverage_pct": 64,
@@ -197203,7 +197207,7 @@
       ],
       "surface": {
         "source": "sdk slack-node @ 8.2.0 (floor)",
-        "provider_routes": 280,
+        "provider_routes": 272,
         "covered_routes": 6,
         "coverage_pct": 2,
         "missing_routes": [
@@ -197509,10 +197513,6 @@
           },
           {
             "method": "POST",
-            "route": "/api/admin.users.getExpiration"
-          },
-          {
-            "method": "POST",
             "route": "/api/admin.users.invite"
           },
           {
@@ -197593,50 +197593,6 @@
           },
           {
             "method": "POST",
-            "route": "/api/agents.conversations.archive"
-          },
-          {
-            "method": "POST",
-            "route": "/api/agents.conversations.create"
-          },
-          {
-            "method": "POST",
-            "route": "/api/agents.conversations.getCanvas"
-          },
-          {
-            "method": "POST",
-            "route": "/api/agents.conversations.listViews"
-          },
-          {
-            "method": "POST",
-            "route": "/api/agents.conversations.removeView"
-          },
-          {
-            "method": "POST",
-            "route": "/api/agents.conversations.setCanvasContent"
-          },
-          {
-            "method": "POST",
-            "route": "/api/agents.conversations.setCommands"
-          },
-          {
-            "method": "POST",
-            "route": "/api/agents.conversations.setProperties"
-          },
-          {
-            "method": "POST",
-            "route": "/api/agents.conversations.setView"
-          },
-          {
-            "method": "POST",
-            "route": "/api/agents.sessions.rename"
-          },
-          {
-            "method": "POST",
-            "route": "/api/agents.sessions.setStatus"
-          },
-          {
-            "method": "POST",
             "route": "/api/api.test"
           },
           {
@@ -197694,10 +197650,6 @@
           {
             "method": "POST",
             "route": "/api/auth.teams.list"
-          },
-          {
-            "method": "POST",
-            "route": "/api/blocks.validate"
           },
           {
             "method": "POST",
@@ -198005,6 +197957,10 @@
           },
           {
             "method": "POST",
+            "route": "/api/files.upload"
+          },
+          {
+            "method": "POST",
             "route": "/api/functions.completeError"
           },
           {
@@ -198082,6 +198038,10 @@
           {
             "method": "POST",
             "route": "/api/rtm.connect"
+          },
+          {
+            "method": "POST",
+            "route": "/api/rtm.start"
           },
           {
             "method": "POST",
@@ -198302,6 +198262,18 @@
           {
             "method": "POST",
             "route": "/api/workflows.featured.set"
+          },
+          {
+            "method": "POST",
+            "route": "/api/workflows.stepCompleted"
+          },
+          {
+            "method": "POST",
+            "route": "/api/workflows.stepFailed"
+          },
+          {
+            "method": "POST",
+            "route": "/api/workflows.updateStep"
           }
         ],
         "derived": true
@@ -209214,7 +209186,7 @@
       "sdks": [
         {
           "label": "google-api-go-client",
-          "version": "v0.299.0",
+          "version": "v0.300.0",
           "constraint": "pinned"
         }
       ],
@@ -209300,7 +209272,7 @@
         }
       ],
       "surface": {
-        "source": "sdk google-api-go-client @ v0.299.0",
+        "source": "sdk google-api-go-client @ v0.300.0",
         "provider_routes": 83,
         "covered_routes": 9,
         "coverage_pct": 10,
