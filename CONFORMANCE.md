@@ -92,7 +92,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 32 | SDK | jira-js @ 6.2.0 (floor) | 7 | [5](#jira-style) | [6](#jira-style) |
 | [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | VM | — | — | [3](#jumio-style) | [6](#jumio-style) |
 | [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | VM | — | — | [4](#linkedin-style) | [3](#linkedin-style) |
-| [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | SDK | openai-node @ 7.5.0 (floor) | 2 | [4](#llm-style) | [3](#llm-style) |
+| [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | SDK | openai-node @ 7.27.0 (floor) | 2 | [4](#llm-style) | [3](#llm-style) |
 | [marketo-style](adapters/marketo-style/) | Marketo Engage REST API `1.0` | 21 | VM | — | — | [5](#marketo-style) | [3](#marketo-style) |
 | [microsoft-graph-style](adapters/microsoft-graph-style/) | Microsoft Graph API `v1.0` | 55 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 10 | [8](#microsoft-graph-style) | [6](#microsoft-graph-style) |
 | [netsuite-style](adapters/netsuite-style/) | NetSuite SuiteTalk REST API `1.0` | 9 | VM | — | — | [4](#netsuite-style) | [3](#netsuite-style) |
@@ -465,7 +465,7 @@ sections in `conformance/node/tests/*.test.ts`).
 
 - issue CRUD + paginate over Link headers
 
-### openai-node @ 7.5.0 (floor)
+### openai-node @ 7.27.0 (floor)
 
 **llm-style**
 
@@ -6031,10 +6031,34 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk openai-node @ 7.5.0 (floor): 246 real routes · 2 covered · 0% · 238 not implemented
+**Provider surface** — derived from sdk openai-node @ 7.27.0 (floor): 301 real routes · 2 covered · 0% · 293 not implemented
 
-<details><summary>not implemented (238)</summary>
+<details><summary>not implemented (293)</summary>
 
+- `GET` `/v1/agents`
+- `POST` `/v1/agents`
+- `GET` `/v1/agents/environments/templates`
+- `POST` `/v1/agents/environments/templates`
+- `DELETE` `/v1/agents/environments/templates/{environmentTemplateID}`
+- `GET` `/v1/agents/environments/templates/{environmentTemplateID}`
+- `POST` `/v1/agents/environments/templates/{environmentTemplateID}`
+- `GET` `/v1/agents/environments/{environmentID}`
+- `POST` `/v1/agents/environments/{environmentID}/files`
+- `GET` `/v1/agents/sessions`
+- `DELETE` `/v1/agents/sessions/{sessionID}`
+- `GET` `/v1/agents/sessions/{sessionID}`
+- `POST` `/v1/agents/sessions/{sessionID}`
+- `GET` `/v1/agents/sessions/{sessionID}/events`
+- `POST` `/v1/agents/sessions/{sessionID}/events`
+- `DELETE` `/v1/agents/sessions/{session_id}/artifacts/{artifactID}`
+- `GET` `/v1/agents/sessions/{session_id}/artifacts/{artifactID}`
+- `GET` `/v1/agents/sessions/{session_id}/artifacts/{artifactID}/content`
+- `GET` `/v1/agents/sessions/{session_id}/subagents/{subagentID}`
+- `GET` `/v1/agents/sessions/{session_id}/subagents/{subagent_id}/turns/{turnID}`
+- `GET` `/v1/agents/sessions/{session_id}/turns/{turnID}`
+- `DELETE` `/v1/agents/{agentID}`
+- `GET` `/v1/agents/{agentID}`
+- `POST` `/v1/agents/{agentID}`
 - `GET` `/v1/assistants`
 - `POST` `/v1/assistants`
 - `DELETE` `/v1/assistants/{assistantID}`
@@ -6061,31 +6085,7 @@ behavior notes live in each adapter's README.
 - `POST` `/v1/containers`
 - `DELETE` `/v1/containers/{containerID}`
 - `GET` `/v1/containers/{containerID}`
-- `POST` `/v1/containers/{containerID}/files`
-- `DELETE` `/v1/containers/{container_id}/files/{fileID}`
-- `GET` `/v1/containers/{container_id}/files/{fileID}`
-- `GET` `/v1/containers/{container_id}/files/{fileID}/content`
-- `POST` `/v1/content_provenance_checks`
-- `POST` `/v1/conversations`
-- `DELETE` `/v1/conversations/{conversationID}`
-- `GET` `/v1/conversations/{conversationID}`
-- `POST` `/v1/conversations/{conversationID}`
-- `POST` `/v1/conversations/{conversationID}/items`
-- `DELETE` `/v1/conversations/{conversation_id}/items/{itemID}`
-- `GET` `/v1/conversations/{conversation_id}/items/{itemID}`
-- `POST` `/v1/embeddings`
-- `GET` `/v1/evals`
-- `POST` `/v1/evals`
-- `DELETE` `/v1/evals/{evalID}`
-- `GET` `/v1/evals/{evalID}`
-- `POST` `/v1/evals/{evalID}`
-- `POST` `/v1/evals/{evalID}/runs`
-- `DELETE` `/v1/evals/{eval_id}/runs/{runID}`
-- `GET` `/v1/evals/{eval_id}/runs/{runID}`
-- `POST` `/v1/evals/{eval_id}/runs/{runID}`
-- `GET` `/v1/evals/{eval_id}/runs/{run_id}/output_items/{outputItemID}`
-- `GET` `/v1/files`
-… and 188 more
+… and 243 more
 
 
 </details>
