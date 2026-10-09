@@ -200329,7 +200329,7 @@
       "sdks": [
         {
           "label": "stripe-go/v86",
-          "version": "v86.3.0",
+          "version": "v86.4.2",
           "constraint": "pinned"
         },
         {
