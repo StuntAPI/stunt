@@ -8,6 +8,31 @@ All notable changes to **stunt** are documented here. The format is based on
 
 ### Adapters
 
+- **fix(conformance): the scoreboard was dead code. `RUN_CONFORMANCE_SCOREBOARD`
+  has never once written a file.** `TestMain` sat in `harness.go`, a regular
+  `.go` file. `go test` only recognises `TestMain` in a `*_test.go` file: from a
+  non-test file the function still compiles and the symbols exist, but the
+  generated test main never references it and the linker dead-code-eliminates it.
+  The suite reports `ok` either way, so nothing ever complained.
+
+  Found by grepping the linked binary rather than trusting the run: the compiled
+  package archive contained the probe 3 times, the linked test binary 0 times.
+
+  Moved into `scoreboard_test.go`, where it is honoured. First working run
+  produces **161** rows of runtime attestation.
+
+- **feat(conformance): 80 of 241 published behaviours have no runtime
+  attestation.** With the scoreboard alive, the gap is measurable. All 80 are
+  Node-driven adapters: `bluesky`, `discord`, `github` (octokit), `slack`,
+  `openai` and the rest. Every Go-driven adapter is fully attested —
+  161 of 161. The Node suites run as a separate `bun test` process with no
+  equivalent dump, so their published behaviour names are still derived from
+  `// ===== name =====` section markers in source text, exactly as before.
+
+  A skipped, renamed-without-running, or vacuous Node test therefore still
+  publishes its behaviour name, which is the defect class this seam exists to
+  catch. The Node equivalent is the remaining work and needs no Go changes.
+
 - **feat(conformance): state which SDK languages are covered, and what a published
   version number means.** Two gaps in what the matrix told a reader.
 
