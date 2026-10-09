@@ -69,7 +69,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 8 | [8](#entra-id-style) | [3](#entra-id-style) |
 | [erc4337-style](adapters/erc4337-style/) | ERC-4337 Bundler RPC `0.7` | 2 | VM | — | — | [5](#erc4337-style) | [6](#erc4337-style) |
 | [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | VM | — | — | [3](#escrow-style) | [4](#escrow-style) |
-| [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | SDK | go-ethereum @ v1.17.5 | 5 | [5](#eth-jsonrpc-style) | [4](#eth-jsonrpc-style) |
+| [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | SDK | go-ethereum @ v1.17.7 | 5 | [5](#eth-jsonrpc-style) | [4](#eth-jsonrpc-style) |
 | [etherscan-style](adapters/etherscan-style/) | Etherscan API `1.0` | 1 | VM | — | — | [3](#etherscan-style) | [2](#etherscan-style) |
 | [fattureincloud-style](adapters/fattureincloud-style/) | Fatture in Cloud API v2 `2.0.29` | 42 | VM | — | — | [3](#fattureincloud-style) | [6](#fattureincloud-style) |
 | [firebase-style](adapters/firebase-style/) | Firebase Auth + Firestore + Cloud Messaging API `v1` | 22 | VM | — | — | [4](#firebase-style) | [8](#firebase-style) |
@@ -224,7 +224,7 @@ sections in `conformance/node/tests/*.test.ts`).
 - single-message fetch round-trips
 - add-reaction is the real PUT and returns 204
 
-### go-ethereum @ v1.17.5
+### go-ethereum @ v1.17.7
 
 **eth-jsonrpc-style**
 
