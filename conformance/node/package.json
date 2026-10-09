@@ -12,7 +12,7 @@
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@slack/web-api": "^8.2.0",
     "discord-api-types": "^0.38.0",
-    "jira.js": "^6.1.0",
+    "jira.js": "^6.2.0",
     "jsforce": "^3.10.27",
     "node-zendesk": "^6.0.1",
     "octokit": "^5.0.5",
