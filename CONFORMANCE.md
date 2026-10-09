@@ -8057,9 +8057,9 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk slack-node @ 8.2.0 (floor): 272 real routes · 6 covered · 2% · 266 not implemented
+**Provider surface** — derived from sdk slack-node @ 8.2.0 (floor): 280 real routes · 6 covered · 2% · 274 not implemented
 
-<details><summary>not implemented (266)</summary>
+<details><summary>not implemented (274)</summary>
 
 - `POST` `/api/admin.analytics.getFile`
 - `POST` `/api/admin.apps.activities.list`
@@ -8111,7 +8111,7 @@ behavior notes live in each adapter's README.
 - `POST` `/api/admin.emoji.remove`
 - `POST` `/api/admin.emoji.rename`
 - `POST` `/api/admin.functions.list`
-… and 216 more
+… and 224 more
 
 
 </details>
