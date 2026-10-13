@@ -9297,7 +9297,7 @@
       "sdks": [
         {
           "label": "aws-sdk-go-v2",
-          "version": "v1.47.1",
+          "version": "v1.47.3",
           "constraint": "pinned"
         }
       ],
@@ -9368,7 +9368,7 @@
       "sdks": [
         {
           "label": "aws-sdk-go-v2",
-          "version": "v1.47.1",
+          "version": "v1.47.3",
           "constraint": "pinned"
         }
       ],
@@ -29492,7 +29492,7 @@
       "sdks": [
         {
           "label": "aws-sdk-go-v2",
-          "version": "v1.47.1",
+          "version": "v1.47.3",
           "constraint": "pinned"
         }
       ],
@@ -198677,7 +198677,7 @@
       "sdks": [
         {
           "label": "aws-sdk-go-v2",
-          "version": "v1.47.1",
+          "version": "v1.47.3",
           "constraint": "pinned"
         }
       ],
