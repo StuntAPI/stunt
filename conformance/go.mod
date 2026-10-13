@@ -16,7 +16,7 @@ require (
 	github.com/aws/smithy-go v1.28.1
 	github.com/bold-commerce/go-shopify/v4 v4.7.0
 	github.com/cloudflare/cloudflare-go v0.119.0
-	github.com/ethereum/go-ethereum v1.17.7
+	github.com/ethereum/go-ethereum v1.17.8
 	github.com/google/go-github/v89 v89.0.0
 	github.com/stripe/stripe-go/v86 v86.3.0
 	github.com/twilio/twilio-go v1.31.2
