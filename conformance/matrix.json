@@ -11501,7 +11501,7 @@
       "sdks": [
         {
           "label": "atproto",
-          "version": "0.20.41",
+          "version": "0.24.3",
           "constraint": "floor"
         }
       ],

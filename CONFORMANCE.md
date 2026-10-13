@@ -53,7 +53,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [azure-servicebus-style](adapters/azure-servicebus-style/) | Azure Service Bus + Storage `2024-01-01` | 18 | VM | — | — | [6](#azure-servicebus-style) | [3](#azure-servicebus-style) |
 | [azure-storage-style](adapters/azure-storage-style/) | Azure Storage Blob REST API `2024-08-04` | 9 | VM | — | — | [6](#azure-storage-style) | [3](#azure-storage-style) |
 | [blog-style](adapters/blog-style/) | GraphQL demo `1.0` | 0 +GQL | boot | — | — | — | — |
-| [bluesky-style](adapters/bluesky-style/) | Bluesky AT Protocol `com.atproto (2024-Q4)` | 7 | SDK | atproto @ 0.20.41 (floor) | 8 | [7](#bluesky-style) | [4](#bluesky-style) |
+| [bluesky-style](adapters/bluesky-style/) | Bluesky AT Protocol `com.atproto (2024-Q4)` | 7 | SDK | atproto @ 0.24.3 (floor) | 8 | [7](#bluesky-style) | [4](#bluesky-style) |
 | [braintree-style](adapters/braintree-style/) | Braintree GraphQL + REST API `2024-09-01` | 15 +GQL | VM | — | — | [8](#braintree-style) | [7](#braintree-style) |
 | [braze-style](adapters/braze-style/) | Braze REST API `2.0` | 12 | VM | — | — | [8](#braze-style) | [6](#braze-style) |
 | [chainlink-style](adapters/chainlink-style/) | Chainlink Data Feeds + Functions + Automation `1.0` | 21 | VM | — | — | [6](#chainlink-style) | [7](#chainlink-style) |
@@ -143,7 +143,7 @@ What each suite actually asserts, as written in the test sources
 (`Record(...)` literals in `conformance/*_test.go`; `// =====`
 sections in `conformance/node/tests/*.test.ts`).
 
-### atproto @ 0.20.41 (floor)
+### atproto @ 0.24.3 (floor)
 
 **bluesky-style**
 
