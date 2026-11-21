@@ -16,6 +16,13 @@ api:
 # NOTE: literal routes must come BEFORE parameterized routes so they are
 # matched first (the dispatch engine checks in declaration order).
 endpoints:
+  - route: /emails/batch
+    method: POST
+    handler: scripts/emails.star#on_send_batch
+  - route: /domains
+    method: GET
+    handler: scripts/domains.star#on_list_domains
+
   # --- Send email ---
   - route: /emails
     method: POST

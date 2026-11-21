@@ -70,6 +70,11 @@ def on_chat_completions(req):
 # last object returned). The response carries the OpenAI-canonical has_more
 # flag; the client passes the last id back as `after` to fetch the next page.
 def on_list_models(req):
+    if req.headers.get("x-api-key", "") != "":
+        err = _require_api_key(req)
+        if err != None:
+            return err
+        return respond(200, {"data": [{"id": "claude-sonnet-4-20250514", "type": "model", "display_name": "Synthetic Claude", "created_at": "2025-05-14T00:00:00Z"}], "has_more": False, "first_id": "claude-sonnet-4-20250514", "last_id": "claude-sonnet-4-20250514"})
     err = _require_bearer(req)
     if err != None:
         return err

@@ -37,8 +37,9 @@ This guarantees test stability — no randomness, no model, no network. Tests as
 `choices[0].message.content` (OpenAI) or `content[0].text` (Anthropic) will always pass
 with the same input.
 
-If the request sets `stream: true` (OpenAI only), the response is a single SSE data
-chunk followed by `data: [DONE]`.
+If the request sets `stream: true`, OpenAI returns one SSE data chunk followed by `data: [DONE]`; Anthropic returns its message-start, content-block, message-delta, and message-stop SSE events.
+
+`GET /v1/models` also accepts Anthropic `x-api-key` authentication and returns the Anthropic model-list envelope for those requests.
 
 ## Endpoints
 

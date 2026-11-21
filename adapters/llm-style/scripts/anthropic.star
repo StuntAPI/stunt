@@ -31,6 +31,20 @@ def on_messages(req):
     n = store_kv_incr("llm", "message_seq")
     message_id = "msg_stunt_" + str(n)
 
+    if body.get("stream", False):
+        events = [
+            {"type": "message_start", "message": {"id": message_id, "type": "message", "role": "assistant", "model": model, "content": [], "stop_reason": None, "stop_sequence": None, "usage": {"input_tokens": _est_tokens(user_msg), "output_tokens": 0}}},
+            {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}},
+            {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": reply}},
+            {"type": "content_block_stop", "index": 0},
+            {"type": "message_delta", "delta": {"stop_reason": "end_turn", "stop_sequence": None}, "usage": {"output_tokens": _est_tokens(reply)}},
+            {"type": "message_stop"},
+        ]
+        raw = ""
+        for event in events:
+            raw += "event: " + event["type"] + "\ndata: " + json.encode(event) + "\n\n"
+        return respond(200, raw, {"Content-Type": "text/event-stream", "Cache-Control": "no-cache"})
+
     return respond(200, {
         "id": message_id,
         "type": "message",
