@@ -71,8 +71,7 @@ def on_create_bucket(req):
         "x-amz-request-id": _req_id(),
     })
 
-# on_post_bucket handles POST /{bucket}. Every bucket-level POST in real S3 is
-# unimplemented here, so the route answers 501 for all of them:
+# on_post_bucket implements DeleteObjects; other bucket POST operations return 501:
 #   ?delete                    DeleteObjects (multi-object delete)
 #   ?metadataConfiguration     CreateBucketMetadataConfiguration
 #   ?metadataTable             CreateBucketMetadataTableConfiguration
@@ -88,8 +87,8 @@ def on_post_bucket(req):
 
     bucket = _xml_escape(req["params"]["bucket"])
     if _query_present_ci(req, "delete"):
-        return _xml_error("NotImplemented", "DeleteObjects (POST /{bucket}?delete) is not implemented by this simulator.", bucket, 501)
-    return _xml_error("NotImplemented", "No bucket-level POST is implemented by this simulator: DeleteObjects (?delete), CreateBucketMetadataConfiguration (?metadataConfiguration), CreateBucketMetadataTableConfiguration (?metadataTable) and browser form POST Object uploads are all unsupported.", bucket, 501)
+        return _delete_objects(req)
+    return _xml_error("NotImplemented", "Unsupported bucket-level POST: CreateBucketMetadataConfiguration (?metadataConfiguration), CreateBucketMetadataTableConfiguration (?metadataTable) and browser form POST Object uploads are all unsupported.", bucket, 501)
 
 # _bucket_not_empty returns the real S3 409 BucketNotEmpty XML error. Built
 # at the point of return rather than hoisted above the emptiness checks,
@@ -159,3 +158,15 @@ def on_delete_bucket(req):
     return respond(204, "", {
         "x-amz-request-id": _req_id(),
     })
+
+
+# HeadBucket is an authenticated existence check used by connection probes.
+def on_head_bucket(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+    bucket = req["params"]["bucket"]
+    for b in store_collection("buckets").list():
+        if b.get("name", "") == bucket:
+            return respond(200, "", {"x-amz-bucket-region": b.get("region", "us-east-1")})
+    return _no_such_bucket_error(bucket)

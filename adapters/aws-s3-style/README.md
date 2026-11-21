@@ -31,6 +31,9 @@ integration testing without a real AWS account:
   `ListMultipartUploads` is not implemented, a client that has lost an upload
   id cannot discover which upload is blocking the delete — `stunt reset
   aws-s3-style` clears the service state.
+- **Head bucket:** `HEAD /{bucket}` verifies SigV4 and bucket existence.
+- **Copy object:** `PUT /{bucket}/{key}` with `x-amz-copy-source` copies bytes, content type and user metadata; `x-amz-metadata-directive: REPLACE` replaces metadata.
+- **Batch delete:** `POST /{bucket}?delete` deletes up to 1000 keys from the SDK XML envelope; missing keys succeed and `Quiet` suppresses successful entries.
 - **Upload object:** `PUT /{bucket}/{key}` (body = object content) → `200` with `ETag`.
 - **Download object:** `GET /{bucket}/{key}` → `200` with raw body.
 - **Object metadata:** `HEAD /{bucket}/{key}` → `200` with `Content-Length`, `ETag`, `Last-Modified`.
@@ -359,3 +362,5 @@ api:
   name: "Amazon S3 API"
   version: "2006-03-01"
 ```
+
+CopyObject does not implement source conditions, version selection, tagging, ACL or encryption options. DeleteObjects supports the SDK Object/Key XML envelope; namespace-prefixed elements and numeric character references beyond the five XML entities are unsupported. Presigned PUT CRC32 checksum query parameters are accepted for SDK compatibility; checksum values are not verified.
