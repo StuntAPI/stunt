@@ -260,3 +260,10 @@ def _seed_service_principals():
     ]
     for sp in sps:
         spc.insert(sp)
+
+# Missing photos are an ordinary Graph response, after bearer validation.
+def on_photo(req):
+    user, err = _require_bearer(req)
+    if err != None:
+        return err
+    return respond(404, {"error": {"code": "ImageNotFound", "message": "No photo is stored for this user."}})

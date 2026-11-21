@@ -65,6 +65,9 @@ def on_put_object(req):
     if unsupported != None:
         return unsupported
 
+    if _query_present_ci(req, "uploadId") and (_ascii_lower(_query_val_ci(req, "x-id")) == "copyobject" or req.get("headers", {}).get("x-amz-copy-source", "")):
+        return _xml_error("NotImplemented", "UploadPartCopy is not implemented", _xml_escape("/" + bucket + "/" + key), 501)
+
     # Multipart upload part (?partNumber=N&uploadId=...).
     if _query_present_ci(req, "uploadId"):
         return _mpu_upload_part(req, bucket, key)
@@ -78,6 +81,11 @@ def on_put_object(req):
             break
     if bucket_doc == None:
         return _no_such_bucket_error(bucket)
+
+    if req.get("headers", {}).get("x-amz-copy-source", ""):
+        return _copy_object(req, bucket, key)
+    if _ascii_lower(_query_val_ci(req, "x-id")) == "copyobject":
+        return _invalid_argument("x-amz-copy-source", "", "CopyObject requires a copy source")
 
     obj = _find_object(bucket, key)
     cond = _check_preconditions(req, obj, bucket, key, "put")
@@ -222,18 +230,7 @@ def on_delete_object(req):
     if cond != None:
         return cond
 
-    oc = store_collection("objects")
-    obj_id = None
-    bid = None
-    for o in oc.list():
-        if o.get("bucket", "") == bucket and o.get("key", "") == key:
-            obj_id = o.get("id", "")
-            bid = o.get("bid", "")
-            break
-    if obj_id != None and obj_id != "":
-        oc.delete(obj_id)
-    if bid != None and bid != "":
-        store_blob("s3-objects").delete(bid)
+    _delete_stored_object(bucket, key)
 
     return respond(204, "", {
         "x-amz-request-id": _req_id(),
@@ -499,3 +496,34 @@ def _no_such_key(bucket, key):
     xml = xml + "<Key>" + _xml_escape(key) + "</Key>"
     xml = xml + "<RequestId>" + _req_id() + "</RequestId></Error>"
     return respond(404, xml, {"Content-Type": "application/xml"})
+
+# CopyObject returns XML even though both ordinary PUT and copy use PUT.
+def _copy_object(req, bucket, key):
+    headers = req.get("headers", {})
+    source = _copy_source_decode(headers.get("x-amz-copy-source", ""))
+    if source == None:
+        return _invalid_argument("x-amz-copy-source", "", "Invalid copy source")
+    if source.startswith("/"):
+        source = source[1:]
+    split = source.find("/")
+    if split < 1:
+        return _invalid_argument("x-amz-copy-source", source, "Invalid copy source")
+    source_bucket, source_key = source[:split], source[split+1:]
+    obj = _find_object(source_bucket, source_key)
+    if obj == None:
+        return _no_such_key(source_bucket, source_key)
+    raw = store_blob("s3-objects").get(obj.get("bid", "")) or ""
+    directive = headers.get("x-amz-metadata-directive", "COPY")
+    if directive not in ["COPY", "REPLACE"]:
+        return _invalid_argument("x-amz-metadata-directive", directive, "Invalid metadata directive")
+    metadata = obj.get("metadata", {})
+    ct = obj.get("contentType", "application/octet-stream")
+    if directive == "REPLACE":
+        metadata, err = _collect_metadata(req)
+        if err != None:
+            return err
+        ct = headers.get("Content-Type", "application/octet-stream")
+    etag = _etag(raw)
+    _upsert_object(bucket, key, raw, ct, etag, metadata)
+    xml = '<CopyObjectResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><LastModified>' + _unix_to_iso8601(clock.now_unix()) + '</LastModified><ETag>"' + etag + '"</ETag></CopyObjectResult>'
+    return respond(200, xml, {"Content-Type": "application/xml", "x-amz-request-id": _req_id()})

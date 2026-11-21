@@ -15,6 +15,12 @@ api:
 # Endpoints — each maps a route + method to a Starlark handler.
 endpoints:
   # --- OAuth2 ---
+  - route: /o/oauth2/v2/auth
+    method: GET
+    handler: scripts/oauth.star#on_authorize
+  - route: /token
+    method: POST
+    handler: scripts/oauth.star#on_token
   - route: /o/oauth2/auth
     method: GET
     handler: scripts/oauth.star#on_authorize

@@ -1,7 +1,7 @@
 {
   "summary": {
     "adapters": 99,
-    "checks": 241,
+    "checks": 244,
     "tiers": {
       "sdk_and_vm": 2,
       "sdk_only": 34,
@@ -9363,7 +9363,7 @@
       "real_hosts": [],
       "api_name": "Amazon S3 API",
       "api_version": "2006-03-01",
-      "routes": 9,
+      "routes": 10,
       "verification": "SDK",
       "sdks": [
         {
@@ -9373,6 +9373,9 @@
         }
       ],
       "behaviors": [
+        "HeadBucket existence probe",
+        "CopyObject preserves binary bytes and user metadata; missing source refused",
+        "DeleteObjects existing and missing keys, XML escaping and quiet mode",
         "CreateBucket",
         "PutObject (binary body)",
         "GetObject byte-exact round-trip (incl. non-UTF-8)",
@@ -9393,11 +9396,10 @@
       "missing": [
         "No bucket policy, tagging, ACL, CORS, lifecycle, or website subresources",
         "No object versioning (?versions listing, versionId delete) or object lock",
-        "No CopyObject (x-amz-copy-source) or UploadPartCopy",
+        "No UploadPartCopy; CopyObject supports COPY/REPLACE user metadata but not source conditional headers, version selection, tagging, ACL or encryption options",
         "No browser form POST uploads (POST policy) — POST /{bucket} returns 501 NotImplemented when SigV4-signed, but a real browser form upload (which authenticates with form fields, so carries no Authorization header) is refused earlier with 403 MissingSecurityHeader",
         "No object-lock configuration subresource (?object-lock) on the bucket",
         "No ListMultipartUploads (GET /{bucket}?uploads returns 501 NotImplemented)",
-        "No multi-object DeleteObjects (POST /{bucket}?delete returns 501 NotImplemented)",
         "No object-level subresources: ?acl, ?tagging, ?retention, ?legal-hold, ?torrent, ?attributes, ?annotation, ?encryption — 501 NotImplemented rather than falling through to the object operation",
         "No SelectObjectContent (?select) or RestoreObject (?restore) — POST verbs, answered 501 NotImplemented (a bare POST /{bucket}/{key} with no query is 405)"
       ],
@@ -9409,19 +9411,24 @@
         "Unimplemented subresources return 501 NotImplemented rather than falling through to the object operation on the same route. The mutating routes use an allowlist and reject every query parameter except the SigV4 presigned-auth ones and the route's own; the read routes use a denylist. The guard runs before the multipart dispatch",
         "Starlark handlers are step-bounded: a single ListObjectsV2 or DeleteBucket over a large enough bucket exhausts the budget and returns a JSON 500 rather than S3 XML. The reachable threshold for ListObjectsV2 is a few hundred objects in one un-paginated page; DeleteBucket did not reproduce it in a few hundred rows",
         "x-amz-meta-* suffixes are lowercased and the first occurrence wins",
-        "On mutating routes (bucket PUT/DELETE, object PUT/POST/DELETE) x-id must name an operation this adapter routes; the SDK's x-id=CopyObject, x-id=RestoreObject, x-id=SelectObjectContent, x-id=PutObjectLegalHold and x-id=UploadPartCopy all return 501 rather than falling through. AbortMultipartUpload is routed and must not be refused",
-        "CopyObject selected by the x-amz-copy-source header alone, with no x-id query parameter, still writes a zero-byte object; the query allowlist cannot see a header-selected subresource",
+        "On mutating routes (bucket PUT/DELETE, object PUT/POST/DELETE) x-id must name an operation this adapter routes; the SDK's x-id=RestoreObject, x-id=SelectObjectContent, x-id=PutObjectLegalHold and x-id=UploadPartCopy all return 501 rather than falling through. AbortMultipartUpload is routed and must not be refused",
         "PUT /{bucket}/{key}?partNumber=N without uploadId returns 400 InvalidRequest rather than falling through to PutObject",
         "Per-chunk STREAMING signatures not verified (header SigV4 only)",
         "Streaming checksum trailers discarded (unsupported-checksum)",
         "DELETE object against a missing bucket is 204 (real S3: 404 NoSuchBucket)",
         "GET/HEAD object against a missing bucket is 404 NoSuchKey (real S3: 404 NoSuchBucket)",
         "SigV4 canonical URI/query rebuilt from decoded values — duplicates indistinguishable",
+        "Presigned PUT accepts JS SDK CRC32 checksum query parameters but does not validate checksum values",
+        "DeleteObjects XML parsing supports the SDK Object/Key envelope and named XML entities; numeric character references beyond the five XML entities and namespace-prefixed elements are unsupported",
         "No RFC 1123 Date fallback; canonical header whitespace collapsing not applied"
       ],
       "covered": [
         {
           "method": "GET",
+          "route": "/{bucket}"
+        },
+        {
+          "method": "HEAD",
           "route": "/{bucket}"
         },
         {
@@ -9472,12 +9479,24 @@
           ]
         },
         {
+          "method": "HEAD",
+          "route": "/{bucket}",
+          "tags": [
+            "query",
+            "params",
+            "stateful",
+            "errors",
+            "clock"
+          ]
+        },
+        {
           "method": "POST",
           "route": "/{bucket}",
           "tags": [
             "query",
             "params",
             "stateful",
+            "errors",
             "clock"
           ]
         },
@@ -29938,7 +29957,7 @@
       "real_hosts": [],
       "api_name": "Microsoft Graph / Entra ID",
       "api_version": "v1.0",
-      "routes": 9,
+      "routes": 10,
       "verification": "SDK",
       "sdks": [
         {
@@ -29987,6 +30006,10 @@
         },
         {
           "method": "GET",
+          "route": "/v1.0/me/photos/{size}/$value"
+        },
+        {
+          "method": "GET",
           "route": "/v1.0/me"
         },
         {
@@ -30013,7 +30036,7 @@
       "surface": {
         "source": "spec msgraph-metadata v1.0 @ v1.0",
         "provider_routes": 17531,
-        "covered_routes": 6,
+        "covered_routes": 7,
         "coverage_pct": 0,
         "missing_routes": [
           {
@@ -74621,10 +74644,6 @@
             "route": "/v1.0/me/photos/{profilePhoto-id}/$value"
           },
           {
-            "method": "GET",
-            "route": "/v1.0/me/photos/{profilePhoto-id}/$value"
-          },
-          {
             "method": "PUT",
             "route": "/v1.0/me/photos/{profilePhoto-id}/$value"
           },
@@ -100146,6 +100165,16 @@
         },
         {
           "method": "GET",
+          "route": "/v1.0/me/photos/{size}/$value",
+          "tags": [
+            "auth",
+            "stateful",
+            "errors",
+            "clock"
+          ]
+        },
+        {
+          "method": "GET",
           "route": "/v1.0/me",
           "tags": [
             "auth",
@@ -102770,7 +102799,7 @@
       "real_hosts": [],
       "api_name": "GitHub REST + GraphQL API",
       "api_version": "2022-11-28",
-      "routes": 26,
+      "routes": 30,
       "graphql": true,
       "verification": "SDK",
       "sdks": [
@@ -102795,7 +102824,7 @@
       ],
       "missing": [
         "No X-Hub-Signature (SHA-1) or X-GitHub-Delivery UUID webhook headers",
-        "No users, orgs, teams, or search endpoints",
+        "No users beyond OAuth self-profile/email, orgs, teams, or search endpoints",
         "No git data, contents, branches, or releases endpoints",
         "No PR review comments, files, or requested_reviewers endpoints",
         "No actions workflows, jobs, artifacts, or logs endpoints",
@@ -102803,12 +102832,29 @@
         "No GraphQL nodes or mutations beyond viewer, repository, issues, pulls"
       ],
       "deviations": [
+        "OAuth app sign-in auto-approves synthetic users and accepts any non-empty client secret; registration and scope enforcement not modeled",
         "POST /graphql served without the REST Bearer/PAT check (transport lacks auth hook)",
         "App JWT RS256 signature not verified; the credential store is the check",
         "Webhook body is a stunt {type, payload} envelope, not GitHub's bare event body",
         "Runs advance on fixed clock (queued+1s, in_progress+3s); dispatch takes simulate_fail"
       ],
       "covered": [
+        {
+          "method": "GET",
+          "route": "/login/oauth/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/login/oauth/access_token"
+        },
+        {
+          "method": "GET",
+          "route": "/user"
+        },
+        {
+          "method": "GET",
+          "route": "/user/emails"
+        },
         {
           "method": "GET",
           "route": "/app"
@@ -102917,7 +102963,7 @@
       "surface": {
         "source": "sdk octokit @ 5.0.5 (floor)",
         "provider_routes": 998,
-        "covered_routes": 23,
+        "covered_routes": 25,
         "coverage_pct": 2,
         "missing_routes": [
           {
@@ -106229,10 +106275,6 @@
             "route": "/search/users"
           },
           {
-            "method": "GET",
-            "route": "/user"
-          },
-          {
             "method": "PATCH",
             "route": "/user"
           },
@@ -106342,10 +106384,6 @@
           },
           {
             "method": "DELETE",
-            "route": "/user/emails"
-          },
-          {
-            "method": "GET",
             "route": "/user/emails"
           },
           {
@@ -106808,6 +106846,42 @@
         "derived": true
       },
       "derived_behaviors": [
+        {
+          "method": "GET",
+          "route": "/login/oauth/authorize",
+          "tags": [
+            "query",
+            "stateful",
+            "errors",
+            "clock"
+          ]
+        },
+        {
+          "method": "POST",
+          "route": "/login/oauth/access_token",
+          "tags": [
+            "body",
+            "stateful",
+            "errors",
+            "clock"
+          ]
+        },
+        {
+          "method": "GET",
+          "route": "/user",
+          "tags": [
+            "auth",
+            "stateful"
+          ]
+        },
+        {
+          "method": "GET",
+          "route": "/user/emails",
+          "tags": [
+            "auth",
+            "stateful"
+          ]
+        },
         {
           "method": "GET",
           "route": "/app",
@@ -109298,7 +109372,7 @@
       "real_hosts": [],
       "api_name": "Google OAuth2 API",
       "api_version": "v2",
-      "routes": 4,
+      "routes": 6,
       "verification": "SDK",
       "sdks": [
         {
@@ -109332,6 +109406,14 @@
       "covered": [
         {
           "method": "GET",
+          "route": "/o/oauth2/v2/auth"
+        },
+        {
+          "method": "POST",
+          "route": "/token"
+        },
+        {
+          "method": "GET",
           "route": "/o/oauth2/auth"
         },
         {
@@ -109348,6 +109430,25 @@
         }
       ],
       "derived_behaviors": [
+        {
+          "method": "GET",
+          "route": "/o/oauth2/v2/auth",
+          "tags": [
+            "query",
+            "stateful",
+            "errors"
+          ]
+        },
+        {
+          "method": "POST",
+          "route": "/token",
+          "tags": [
+            "body",
+            "stateful",
+            "errors",
+            "clock"
+          ]
+        },
         {
           "method": "GET",
           "route": "/o/oauth2/auth",
@@ -116580,14 +116681,13 @@
       ],
       "missing": [
         "No embeddings (POST /v1/embeddings) or legacy completions endpoints",
-        "No Anthropic SSE streaming (stream:true only handled for OpenAI)",
         "No tool use, function calling, or JSON mode",
         "No image or multimodal content blocks"
       ],
       "deviations": [
         "Responses deterministic: echo of the last user message; no model or randomness",
         "Reply derived solely from the last user message; earlier history ignored",
-        "stream:true (OpenAI) returns one SSE chunk plus [DONE], not token-by-token"
+        "stream:true returns the complete reply in one text delta, not token-by-token"
       ],
       "covered": [
         {
@@ -194950,7 +195050,7 @@
       "real_hosts": [],
       "api_name": "Resend API",
       "api_version": "1.0.0",
-      "routes": 6,
+      "routes": 8,
       "verification": "SDK",
       "sdks": [
         {
@@ -194966,9 +195066,8 @@
         "delivery state derives on read (sent -\u003e delivered)"
       ],
       "missing": [
-        "No domains surface (create, list, verify, delete)",
+        "Domain list is an authenticated empty result; no domain create, verify, or delete",
         "No API keys management (/api-keys)",
-        "No batch send (POST /emails/batch)",
         "No scheduled sends (schedule, cancel schedule)",
         "No audiences or contacts",
         "No broadcasts or tags"
@@ -194979,6 +195078,14 @@
         "Webhook events fire exactly once on the first deriving read, not on real delivery"
       ],
       "covered": [
+        {
+          "method": "POST",
+          "route": "/emails/batch"
+        },
+        {
+          "method": "GET",
+          "route": "/domains"
+        },
         {
           "method": "POST",
           "route": "/emails"
@@ -195007,8 +195114,8 @@
       "surface": {
         "source": "sdk resend-node @ 6.22.0 (floor)",
         "provider_routes": 20,
-        "covered_routes": 2,
-        "coverage_pct": 10,
+        "covered_routes": 3,
+        "coverage_pct": 15,
         "missing_routes": [
           {
             "method": "POST",
@@ -195041,10 +195148,6 @@
           {
             "method": "POST",
             "route": "/domains/claim"
-          },
-          {
-            "method": "POST",
-            "route": "/emails/batch"
           },
           {
             "method": "POST",
@@ -195086,6 +195189,24 @@
         "derived": true
       },
       "derived_behaviors": [
+        {
+          "method": "POST",
+          "route": "/emails/batch",
+          "tags": [
+            "body",
+            "auth",
+            "stateful",
+            "errors",
+            "clock"
+          ]
+        },
+        {
+          "method": "GET",
+          "route": "/domains",
+          "tags": [
+            "auth"
+          ]
+        },
         {
           "method": "POST",
           "route": "/emails",
@@ -197117,7 +197238,8 @@
           "tags": [
             "query",
             "stateful",
-            "errors"
+            "errors",
+            "clock"
           ]
         },
         {

@@ -1885,10 +1885,10 @@ func TestAWSS3SubresourcesDoNotTouchTheBucket(t *testing.T) {
 		}
 	}
 
-	// POST ?delete is S3's multi-object delete, unimplemented here.
+	// POST ?delete validates its XML before deleting anything.
 	body, status := s3Post(t, base+"/guard?delete", []byte("<Delete/>"), now)
-	if status != 501 || !strings.Contains(body, "NotImplemented") {
-		t.Fatalf("POST ?delete -> status %d, want 501 NotImplemented; body %s", status, body)
+	if status != 400 || !strings.Contains(body, "MalformedXML") {
+		t.Fatalf("POST ?delete -> status %d, want 400 MalformedXML; body %s", status, body)
 	}
 
 	// A real create/delete still works.
@@ -2313,7 +2313,7 @@ func TestAWSS3XIdMustNameAnImplementedOperation(t *testing.T) {
 
 	// Operations the adapter does not implement, on both mutating verbs.
 	for _, op := range []string{
-		"CopyObject", "RestoreObject", "SelectObjectContent", "PutObjectLegalHold",
+		"RestoreObject", "SelectObjectContent", "PutObjectLegalHold",
 		"GetObjectAttributes", "PutObjectTagging", "UploadPartCopy", "ObjectLockToken",
 	} {
 		if body, status := s3Put(t, base+"/xid/keep.txt?x-id="+op, []byte("OVERWRITTEN"), now); status != 501 {

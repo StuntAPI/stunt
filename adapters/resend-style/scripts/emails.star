@@ -166,3 +166,20 @@ def _event_payload(event_type, email_id, doc):
             "created_at": doc["created_at"],
         },
     }
+
+# Batch uses the same send path and persistence as individual sends.
+def on_send_batch(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+    emails = (req.body or {}).get("_batch", [])
+    if type(emails) != "list" or len(emails) == 0 or len(emails) > 100:
+        return respond(422, {"name": "validation_error", "message": "Batch must contain between 1 and 100 emails.", "statusCode": 422})
+    for email in emails:
+        if type(email) != "dict":
+            return respond(422, {"name": "validation_error", "message": "Each batch entry must be an email object.", "statusCode": 422})
+    data = []
+    for email in emails:
+        result = on_send_email({"headers": req.headers, "body": email})
+        data.append(result["body"])
+    return respond(200, {"data": data})

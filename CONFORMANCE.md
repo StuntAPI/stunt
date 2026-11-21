@@ -48,7 +48,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [avalara-style](adapters/avalara-style/) | Avalara AvaTax REST API `2` | 8 | VM | — | — | [5](#avalara-style) | [3](#avalara-style) |
 | [aws-cognito-style](adapters/aws-cognito-style/) | Amazon Cognito Identity Provider API `2016-04-18` | 7 | VM | — | — | [6](#aws-cognito-style) | [3](#aws-cognito-style) |
 | [aws-iam-sts-style](adapters/aws-iam-sts-style/) | AWS STS + IAM API `2011-06-15` | 2 | SDK | aws-sdk-go-v2 @ v1.47.1 | 2 | [3](#aws-iam-sts-style) | [3](#aws-iam-sts-style) |
-| [aws-s3-style](adapters/aws-s3-style/) | Amazon S3 API `2006-03-01` | 9 | SDK | aws-sdk-go-v2 @ v1.47.1 | 16 | [9](#aws-s3-style) | [16](#aws-s3-style) |
+| [aws-s3-style](adapters/aws-s3-style/) | Amazon S3 API `2006-03-01` | 10 | SDK | aws-sdk-go-v2 @ v1.47.1 | 19 | [8](#aws-s3-style) | [17](#aws-s3-style) |
 | [azure-devops-style](adapters/azure-devops-style/) | Azure DevOps REST API `7.1` | 17 | VM | — | — | [8](#azure-devops-style) | [6](#azure-devops-style) |
 | [azure-servicebus-style](adapters/azure-servicebus-style/) | Azure Service Bus + Storage `2024-01-01` | 18 | VM | — | — | [6](#azure-servicebus-style) | [3](#azure-servicebus-style) |
 | [azure-storage-style](adapters/azure-storage-style/) | Azure Storage Blob REST API `2024-08-04` | 9 | VM | — | — | [6](#azure-storage-style) | [3](#azure-storage-style) |
@@ -66,7 +66,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [dynamodb-style](adapters/dynamodb-style/) | Amazon DynamoDB API `2012-08-10` | 1 | SDK + VM | aws-sdk-go-v2 @ v1.47.1 | 8 | [8](#dynamodb-style) | [5](#dynamodb-style) |
 | [echo-style](adapters/echo-style/) | gRPC echo demo `1.0` | 0 (+1 ws) | boot | — | — | — | — |
 | [emailoctopus-style](adapters/emailoctopus-style/) | EmailOctopus API `2.0.0` | 21 | VM | — | — | [2](#emailoctopus-style) | [3](#emailoctopus-style) |
-| [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 8 | [8](#entra-id-style) | [3](#entra-id-style) |
+| [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 10 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 8 | [8](#entra-id-style) | [3](#entra-id-style) |
 | [erc4337-style](adapters/erc4337-style/) | ERC-4337 Bundler RPC `0.7` | 2 | VM | — | — | [5](#erc4337-style) | [6](#erc4337-style) |
 | [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | VM | — | — | [3](#escrow-style) | [4](#escrow-style) |
 | [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | SDK | go-ethereum @ v1.17.7 | 5 | [5](#eth-jsonrpc-style) | [4](#eth-jsonrpc-style) |
@@ -76,12 +76,12 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [ga4-style](adapters/ga4-style/) | Google Analytics Data API + Admin API `v1beta` | 7 | SDK | google-api-go-client @ v0.299.0 | 7 | [4](#ga4-style) | [3](#ga4-style) |
 | [gcalendar-style](adapters/gcalendar-style/) | Google Calendar API `v3` | 10 | SDK | google-api-go-client @ v0.299.0 | 8 | [4](#gcalendar-style) | [2](#gcalendar-style) |
 | [gdocs-style](adapters/gdocs-style/) | Google Docs API `v1` | 5 | SDK | google-api-go-client @ v0.299.0 | 5 | [3](#gdocs-style) | [5](#gdocs-style) |
-| [github-style](adapters/github-style/) | GitHub REST + GraphQL API `2022-11-28` | 26 +GQL | SDK | go-github/v89 @ v89.0.0<br>octokit @ 5.0.5 (floor) | 6 | [7](#github-style) | [4](#github-style) |
+| [github-style](adapters/github-style/) | GitHub REST + GraphQL API `2022-11-28` | 30 +GQL | SDK | go-github/v89 @ v89.0.0<br>octokit @ 5.0.5 (floor) | 6 | [7](#github-style) | [5](#github-style) |
 | [gmail-style](adapters/gmail-style/) | Gmail API `v1` | 16 | SDK | google-api-go-client @ v0.299.0 | 9 | [6](#gmail-style) | [3](#gmail-style) |
 | [google-admin-style](adapters/google-admin-style/) | Google Admin SDK Directory API `directory_v1` | 13 | SDK | google-api-go-client @ v0.299.0 | 8 | [4](#google-admin-style) | [4](#google-admin-style) |
 | [google-cloudtasks-style](adapters/google-cloudtasks-style/) | Google Cloud Tasks API `v2` | 16 | boot | — | — | [7](#google-cloudtasks-style) | [7](#google-cloudtasks-style) |
 | [google-iam-style](adapters/google-iam-style/) | Google Cloud IAM API + Service Accounts `v1` | 10 | SDK | google-api-go-client @ v0.299.0 | 7 | [4](#google-iam-style) | [2](#google-iam-style) |
-| [google-style](adapters/google-style/) | Google OAuth2 API `v2` | 4 | SDK | x/oauth2 @ v0.37.0<br>google-api-go-client/idtoken @ v0.299.0 | 7 | [2](#google-style) | [2](#google-style) |
+| [google-style](adapters/google-style/) | Google OAuth2 API `v2` | 6 | SDK | x/oauth2 @ v0.37.0<br>google-api-go-client/idtoken @ v0.299.0 | 7 | [2](#google-style) | [2](#google-style) |
 | [gsearchconsole-style](adapters/gsearchconsole-style/) | Google Search Console API `v1` | 11 | SDK | google-api-go-client @ v0.299.0 | 7 | [2](#gsearchconsole-style) | [4](#gsearchconsole-style) |
 | [gsheets-style](adapters/gsheets-style/) | Google Sheets API `v4` | 10 | SDK | google-api-go-client @ v0.299.0 | 8 | [4](#gsheets-style) | [3](#gsheets-style) |
 | [gtasks-style](adapters/gtasks-style/) | Google Tasks API `v1` | 11 | SDK | google-api-go-client @ v0.299.0 | 8 | [3](#gtasks-style) | [2](#gtasks-style) |
@@ -92,7 +92,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [jira-style](adapters/jira-style/) | Jira Cloud REST API `3` | 32 | SDK | jira-js @ 6.2.0 (floor) | 7 | [5](#jira-style) | [6](#jira-style) |
 | [jumio-style](adapters/jumio-style/) | Jumio API `v1` | 5 | VM | — | — | [3](#jumio-style) | [6](#jumio-style) |
 | [linkedin-style](adapters/linkedin-style/) | LinkedIn API `v2` | 8 | VM | — | — | [4](#linkedin-style) | [3](#linkedin-style) |
-| [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | SDK | openai-node @ 7.5.0 (floor) | 2 | [4](#llm-style) | [3](#llm-style) |
+| [llm-style](adapters/llm-style/) | OpenAI API + Anthropic API `OpenAI v1 / Anthropic v1` | 3 | SDK | openai-node @ 7.5.0 (floor) | 2 | [3](#llm-style) | [3](#llm-style) |
 | [marketo-style](adapters/marketo-style/) | Marketo Engage REST API `1.0` | 21 | VM | — | — | [5](#marketo-style) | [3](#marketo-style) |
 | [microsoft-graph-style](adapters/microsoft-graph-style/) | Microsoft Graph API `v1.0` | 55 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 10 | [8](#microsoft-graph-style) | [6](#microsoft-graph-style) |
 | [netsuite-style](adapters/netsuite-style/) | NetSuite SuiteTalk REST API `1.0` | 9 | VM | — | — | [4](#netsuite-style) | [3](#netsuite-style) |
@@ -111,7 +111,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [psd2-style](adapters/psd2-style/) | Open Banking / PSD2 (Berlin Group NextGenPSD2) `1.3.6` | 19 | VM | — | — | [6](#psd2-style) | [7](#psd2-style) |
 | [qbo-style](adapters/qbo-style/) | QuickBooks Online API `v3` | 11 | VM | — | — | [6](#qbo-style) | [4](#qbo-style) |
 | [reddit-style](adapters/reddit-style/) | Reddit API `1.0` | 2 | VM | — | — | [5](#reddit-style) | [3](#reddit-style) |
-| [resend-style](adapters/resend-style/) | Resend API `1.0.0` | 6 | SDK | resend-node @ 6.22.0 (floor) | 4 | [6](#resend-style) | [3](#resend-style) |
+| [resend-style](adapters/resend-style/) | Resend API `1.0.0` | 8 | SDK | resend-node @ 6.22.0 (floor) | 4 | [5](#resend-style) | [3](#resend-style) |
 | [revenuecat-style](adapters/revenuecat-style/) | RevenueCat API `v1` | 7 | VM | — | — | [5](#revenuecat-style) | [5](#revenuecat-style) |
 | [salesforce-style](adapters/salesforce-style/) | Salesforce REST API `v60.0` | 29 | SDK | jsforce @ 3.10.27 (floor) | 6 | [7](#salesforce-style) | [4](#salesforce-style) |
 | [sendgrid-style](adapters/sendgrid-style/) | Twilio SendGrid v3 API `v3` | 5 | VM | — | — | [7](#sendgrid-style) | [6](#sendgrid-style) |
@@ -158,13 +158,11 @@ sections in `conformance/node/tests/*.test.ts`).
 
 ### aws-sdk-go-v2 @ v1.47.1
 
-**aws-iam-sts-style**
-
-- GetCallerIdentity with real SigV4 signature
-- AssumeRole -> credentials
-
 **aws-s3-style**
 
+- HeadBucket existence probe
+- CopyObject preserves binary bytes and user metadata; missing source refused
+- DeleteObjects existing and missing keys, XML escaping and quiet mode
 - CreateBucket
 - PutObject (binary body)
 - GetObject byte-exact round-trip (incl. non-UTF-8)
@@ -181,6 +179,11 @@ sections in `conformance/node/tests/*.test.ts`).
 - Presigned GET URL (real presigner, signed headers sent)
 - Presigned DELETE (real presigner)
 - Presigned GET rejects a tampered signature
+
+**aws-iam-sts-style**
+
+- GetCallerIdentity with real SigV4 signature
+- AssumeRole -> credentials
 
 **dynamodb-style**
 
@@ -2591,13 +2594,14 @@ behavior notes live in each adapter's README.
 
 ### aws-s3-style
 
-**Covered** — 9 routes
+**Covered** — 10 routes
 
 <details><summary>Routes</summary>
 
 | Method | Route |
 |---|---|
 | GET | `/{bucket}` |
+| HEAD | `/{bucket}` |
 | POST | `/{bucket}` |
 | PUT | `/{bucket}` |
 | DELETE | `/{bucket}` |
@@ -2609,19 +2613,18 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Missing** (9)
+**Missing** (8)
 
 - No bucket policy, tagging, ACL, CORS, lifecycle, or website subresources
 - No object versioning (?versions listing, versionId delete) or object lock
-- No CopyObject (x-amz-copy-source) or UploadPartCopy
+- No UploadPartCopy; CopyObject supports COPY/REPLACE user metadata but not source conditional headers, version selection, tagging, ACL or encryption options
 - No browser form POST uploads (POST policy) — POST /{bucket} returns 501 NotImplemented when SigV4-signed, but a real browser form upload (which authenticates with form fields, so carries no Authorization header) is refused earlier with 403 MissingSecurityHeader
 - No object-lock configuration subresource (?object-lock) on the bucket
 - No ListMultipartUploads (GET /{bucket}?uploads returns 501 NotImplemented)
-- No multi-object DeleteObjects (POST /{bucket}?delete returns 501 NotImplemented)
 - No object-level subresources: ?acl, ?tagging, ?retention, ?legal-hold, ?torrent, ?attributes, ?annotation, ?encryption — 501 NotImplemented rather than falling through to the object operation
 - No SelectObjectContent (?select) or RestoreObject (?restore) — POST verbs, answered 501 NotImplemented (a bare POST /{bucket}/{key} with no query is 405)
 
-**Deviations** (16)
+**Deviations** (17)
 
 - ETags are MD5 hex (multipart MD5(binary-concat)-N)
 - Multipart 5 MiB minimum part size not enforced (small parts allowed)
@@ -2630,20 +2633,22 @@ behavior notes live in each adapter's README.
 - Unimplemented subresources return 501 NotImplemented rather than falling through to the object operation on the same route. The mutating routes use an allowlist and reject every query parameter except the SigV4 presigned-auth ones and the route's own; the read routes use a denylist. The guard runs before the multipart dispatch
 - Starlark handlers are step-bounded: a single ListObjectsV2 or DeleteBucket over a large enough bucket exhausts the budget and returns a JSON 500 rather than S3 XML. The reachable threshold for ListObjectsV2 is a few hundred objects in one un-paginated page; DeleteBucket did not reproduce it in a few hundred rows
 - x-amz-meta-* suffixes are lowercased and the first occurrence wins
-- On mutating routes (bucket PUT/DELETE, object PUT/POST/DELETE) x-id must name an operation this adapter routes; the SDK's x-id=CopyObject, x-id=RestoreObject, x-id=SelectObjectContent, x-id=PutObjectLegalHold and x-id=UploadPartCopy all return 501 rather than falling through. AbortMultipartUpload is routed and must not be refused
-- CopyObject selected by the x-amz-copy-source header alone, with no x-id query parameter, still writes a zero-byte object; the query allowlist cannot see a header-selected subresource
+- On mutating routes (bucket PUT/DELETE, object PUT/POST/DELETE) x-id must name an operation this adapter routes; the SDK's x-id=RestoreObject, x-id=SelectObjectContent, x-id=PutObjectLegalHold and x-id=UploadPartCopy all return 501 rather than falling through. AbortMultipartUpload is routed and must not be refused
 - PUT /{bucket}/{key}?partNumber=N without uploadId returns 400 InvalidRequest rather than falling through to PutObject
 - Per-chunk STREAMING signatures not verified (header SigV4 only)
 - Streaming checksum trailers discarded (unsupported-checksum)
 - DELETE object against a missing bucket is 204 (real S3: 404 NoSuchBucket)
 - GET/HEAD object against a missing bucket is 404 NoSuchKey (real S3: 404 NoSuchBucket)
 - SigV4 canonical URI/query rebuilt from decoded values — duplicates indistinguishable
+- Presigned PUT accepts JS SDK CRC32 checksum query parameters but does not validate checksum values
+- DeleteObjects XML parsing supports the SDK Object/Key envelope and named XML entities; numeric character references beyond the five XML entities and namespace-prefixed elements are unsupported
 - No RFC 1123 Date fallback; canonical header whitespace collapsing not applied
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
 - `GET` `/{bucket}` — query, params, stateful, paginate, filter, errors, clock
-- `POST` `/{bucket}` — query, params, stateful, clock
+- `HEAD` `/{bucket}` — query, params, stateful, errors, clock
+- `POST` `/{bucket}` — query, params, stateful, errors, clock
 - `PUT` `/{bucket}` — body, query, params, stateful, errors, clock
 - `DELETE` `/{bucket}` — query, params, stateful, errors, clock
 - `PUT` `/{bucket}/{key+}` — query, params, stateful, errors, clock
@@ -3966,7 +3971,7 @@ behavior notes live in each adapter's README.
 
 ### entra-id-style
 
-**Covered** — 9 routes
+**Covered** — 10 routes
 
 <details><summary>Routes</summary>
 
@@ -3975,6 +3980,7 @@ behavior notes live in each adapter's README.
 | GET | `/common/oauth2/v2.0/authorize` |
 | POST | `/common/oauth2/v2.0/token` |
 | GET | `/common/discovery/v2.0/keys` |
+| GET | `/v1.0/me/photos/{size}/$value` |
 | GET | `/v1.0/me` |
 | GET | `/v1.0/users` |
 | POST | `/v1.0/users` |
@@ -3984,9 +3990,9 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from spec msgraph-metadata v1.0 @ v1.0: 17531 real routes · 6 covered · 0% · 17525 not implemented
+**Provider surface** — derived from spec msgraph-metadata v1.0 @ v1.0: 17531 real routes · 7 covered · 0% · 17524 not implemented
 
-<details><summary>not implemented (17525)</summary>
+<details><summary>not implemented (17524)</summary>
 
 - `GET` `/v1.0/admin`
 - `PATCH` `/v1.0/admin`
@@ -4038,7 +4044,7 @@ behavior notes live in each adapter's README.
 - `DELETE` `/v1.0/admin/edge/internetExplorerMode/siteLists/{browserSiteList-id}`
 - `GET` `/v1.0/admin/edge/internetExplorerMode/siteLists/{browserSiteList-id}`
 - `PATCH` `/v1.0/admin/edge/internetExplorerMode/siteLists/{browserSiteList-id}`
-… and 17475 more
+… and 17474 more
 
 
 </details>
@@ -4065,6 +4071,7 @@ behavior notes live in each adapter's README.
 - `GET` `/common/oauth2/v2.0/authorize` — query, stateful, errors
 - `POST` `/common/oauth2/v2.0/token` — body, stateful, errors, clock
 - `GET` `/common/discovery/v2.0/keys` — —
+- `GET` `/v1.0/me/photos/{size}/$value` — auth, stateful, errors, clock
 - `GET` `/v1.0/me` — auth, stateful, clock
 - `GET` `/v1.0/users` — query, auth, stateful, paginate, errors, clock
 - `POST` `/v1.0/users` — body, auth, stateful, clock
@@ -4702,12 +4709,16 @@ behavior notes live in each adapter's README.
 
 ### github-style
 
-**Covered** — 26 routes · GraphQL schema
+**Covered** — 30 routes · GraphQL schema
 
 <details><summary>Routes</summary>
 
 | Method | Route |
 |---|---|
+| GET | `/login/oauth/authorize` |
+| POST | `/login/oauth/access_token` |
+| GET | `/user` |
+| GET | `/user/emails` |
 | GET | `/app` |
 | GET | `/app/installations` |
 | POST | `/app/installations/{installation_id}/access_tokens` |
@@ -4737,9 +4748,9 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk octokit @ 5.0.5 (floor): 998 real routes · 23 covered · 2% · 971 not implemented
+**Provider surface** — derived from sdk octokit @ 5.0.5 (floor): 998 real routes · 25 covered · 2% · 969 not implemented
 
-<details><summary>not implemented (971)</summary>
+<details><summary>not implemented (969)</summary>
 
 - `GET` `/advisories`
 - `GET` `/advisories/{ghsa_id}`
@@ -4791,7 +4802,7 @@ behavior notes live in each adapter's README.
 - `DELETE` `/enterprises/{enterprise}/teams/{team_slug}`
 - `GET` `/enterprises/{enterprise}/teams/{team_slug}`
 - `PATCH` `/enterprises/{enterprise}/teams/{team_slug}`
-… and 921 more
+… and 919 more
 
 
 </details>
@@ -4799,15 +4810,16 @@ behavior notes live in each adapter's README.
 **Missing** (7)
 
 - No X-Hub-Signature (SHA-1) or X-GitHub-Delivery UUID webhook headers
-- No users, orgs, teams, or search endpoints
+- No users beyond OAuth self-profile/email, orgs, teams, or search endpoints
 - No git data, contents, branches, or releases endpoints
 - No PR review comments, files, or requested_reviewers endpoints
 - No actions workflows, jobs, artifacts, or logs endpoints
 - No webhook list/patch/delete or deliveries endpoints
 - No GraphQL nodes or mutations beyond viewer, repository, issues, pulls
 
-**Deviations** (4)
+**Deviations** (5)
 
+- OAuth app sign-in auto-approves synthetic users and accepts any non-empty client secret; registration and scope enforcement not modeled
 - POST /graphql served without the REST Bearer/PAT check (transport lacks auth hook)
 - App JWT RS256 signature not verified; the credential store is the check
 - Webhook body is a stunt {type, payload} envelope, not GitHub's bare event body
@@ -4815,6 +4827,10 @@ behavior notes live in each adapter's README.
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
+- `GET` `/login/oauth/authorize` — query, stateful, errors, clock
+- `POST` `/login/oauth/access_token` — body, stateful, errors, clock
+- `GET` `/user` — auth, stateful
+- `GET` `/user/emails` — auth, stateful
 - `GET` `/app` — auth, stateful, clock
 - `GET` `/app/installations` — query, auth, stateful, paginate, clock
 - `POST` `/app/installations/{installation_id}/access_tokens` — params, auth, stateful, clock
@@ -5258,12 +5274,14 @@ behavior notes live in each adapter's README.
 
 ### google-style
 
-**Covered** — 4 routes
+**Covered** — 6 routes
 
 <details><summary>Routes</summary>
 
 | Method | Route |
 |---|---|
+| GET | `/o/oauth2/v2/auth` |
+| POST | `/token` |
 | GET | `/o/oauth2/auth` |
 | POST | `/o/oauth2/token` |
 | GET | `/oauth2/v3/certs` |
@@ -5283,6 +5301,8 @@ behavior notes live in each adapter's README.
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
+- `GET` `/o/oauth2/v2/auth` — query, stateful, errors
+- `POST` `/token` — body, stateful, errors, clock
 - `GET` `/o/oauth2/auth` — query, stateful, errors
 - `POST` `/o/oauth2/token` — body, stateful, errors, clock
 - `GET` `/oauth2/v3/certs` — —
@@ -6090,10 +6110,9 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Missing** (4)
+**Missing** (3)
 
 - No embeddings (POST /v1/embeddings) or legacy completions endpoints
-- No Anthropic SSE streaming (stream:true only handled for OpenAI)
 - No tool use, function calling, or JSON mode
 - No image or multimodal content blocks
 
@@ -6101,7 +6120,7 @@ behavior notes live in each adapter's README.
 
 - Responses deterministic: echo of the last user message; no model or randomness
 - Reply derived solely from the last user message; earlier history ignored
-- stream:true (OpenAI) returns one SSE chunk plus [DONE], not token-by-token
+- stream:true returns the complete reply in one text delta, not token-by-token
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
@@ -7520,12 +7539,14 @@ behavior notes live in each adapter's README.
 
 ### resend-style
 
-**Covered** — 6 routes
+**Covered** — 8 routes
 
 <details><summary>Routes</summary>
 
 | Method | Route |
 |---|---|
+| POST | `/emails/batch` |
+| GET | `/domains` |
 | POST | `/emails` |
 | GET | `/emails` |
 | GET | `/emails/{id}` |
@@ -7535,9 +7556,9 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk resend-node @ 6.22.0 (floor): 20 real routes · 2 covered · 10% · 18 not implemented
+**Provider surface** — derived from sdk resend-node @ 6.22.0 (floor): 20 real routes · 3 covered · 15% · 17 not implemented
 
-<details><summary>not implemented (18)</summary>
+<details><summary>not implemented (17)</summary>
 
 - `POST` `/api-keys`
 - `POST` `/automations`
@@ -7547,7 +7568,6 @@ behavior notes live in each adapter's README.
 - `POST` `/contacts/imports`
 - `POST` `/domains`
 - `POST` `/domains/claim`
-- `POST` `/emails/batch`
 - `POST` `/events`
 - `POST` `/events/send`
 - `POST` `/segments`
@@ -7560,11 +7580,10 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Missing** (6)
+**Missing** (5)
 
-- No domains surface (create, list, verify, delete)
+- Domain list is an authenticated empty result; no domain create, verify, or delete
 - No API keys management (/api-keys)
-- No batch send (POST /emails/batch)
 - No scheduled sends (schedule, cancel schedule)
 - No audiences or contacts
 - No broadcasts or tags
@@ -7577,6 +7596,8 @@ behavior notes live in each adapter's README.
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
+- `POST` `/emails/batch` — body, auth, stateful, errors, clock
+- `GET` `/domains` — auth
 - `POST` `/emails` — body, auth, stateful, clock
 - `GET` `/emails` — query, auth, stateful, paginate, webhooks, errors, clock
 - `GET` `/emails/{id}` — params, auth, stateful, webhooks, errors, clock
@@ -8033,7 +8054,7 @@ behavior notes live in each adapter's README.
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
-- `GET` `/auth/authorize` — query, stateful, errors
+- `GET` `/auth/authorize` — query, stateful, errors, clock
 - `POST` `/auth/token` — body, stateful, errors, clock
 - `GET` `/auth/keys` — —
 

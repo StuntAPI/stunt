@@ -15,6 +15,8 @@ develop and test email-sending client code locally — assert that an email was
 "sent", retrieve it, and list all sent emails — without creating a real Resend
 account or hitting the network.
 
+- **Batch:** `POST /emails/batch` accepts 1–100 email objects, stores each through the single-send path, and returns `{data: [{id}, ...]}`.
+- **Domains:** `GET /domains` returns an authenticated empty list for connection checks; domain management is not simulated.
 - **Send:** `POST /emails` with `{from, to, subject, html, text, ...}` → `{id}`.
 - **Retrieve:** `GET /emails/{id}` returns the stored email (useful for test
   assertions that an email was sent).

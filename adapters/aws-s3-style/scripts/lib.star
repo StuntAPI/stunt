@@ -885,7 +885,7 @@ def _reject_bucket_query(req, bucket):
 # DELETE on an object are the most destructive routes in the API, and a denylist
 # there would let one token added to S3 later silently re-open overwriting or
 # destroying an object. Mirrors _reject_bucket_query for the same reason.
-_OBJECT_WRITE_PARAMS = ["partnumber", "uploadid", "x-id"]
+_OBJECT_WRITE_PARAMS = ["partnumber", "uploadid", "x-id", "x-amz-checksum-crc32", "x-amz-sdk-checksum-algorithm"]
 # versionId is accepted on delete because the real SDK always sends it and,
 # on a bucket with no versioning, any id addresses the single object — which is
 # what real S3 does too. Without it, every versioned delete regressed from 204
@@ -901,7 +901,7 @@ _OBJECT_DELETE_PARAMS = ["uploadid", "x-id", "versionid"]
 # returned 501 and the only route to clearing an in-progress upload — the thing
 # that releases the 409 BucketNotEmpty on DeleteBucket — was closed off to
 # every SDK client.
-_OBJECT_WRITE_OPS = ["putobject", "uploadpart"]
+_OBJECT_WRITE_OPS = ["putobject", "uploadpart", "copyobject"]
 _OBJECT_DELETE_OPS = ["deleteobject", "abortmultipartupload"]
 
 # POST /{bucket}/{key} carries CreateMultipartUpload (?uploads) and
@@ -941,7 +941,7 @@ def _query_val_ci(req, key):
 # _reject_object_write_query allows only `allowed` on a mutating object route,
 # and requires `x-id` to name one of `ops`. Checking the x-id VALUE matters as
 # much as the key: an SDK sends `x-id=<Operation>` on every call, so allowing
-# the key would let `?x-id=CopyObject` or `?x-id=RestoreObject` reach PutObject
+# the key would let `?x-id=RestoreObject` reach PutObject
 # or DeleteObject and mutate the object behind a mis-selected operation. Call
 # it BEFORE the ?uploadId / ?partNumber multipart dispatch, so that the dispatch
 # cannot be reached with a subresource the allowlist should have refused —
@@ -1893,3 +1893,78 @@ def _check_preconditions(req, obj, bucket, key, op):
             if lm_unix <= ims_ts:
                 return _not_modified(cur_etag, lm_unix, lm_valid)
     return None
+
+# CopySource is a percent-encoded path, not a form/query value (+ stays +).
+def _copy_source_decode(text):
+    raw_bytes = crypto.base64_decode(_SIG_ALL_BYTES_B64)
+    out = ""
+    i = 0
+    while i < len(text):
+        if text[i] == "%":
+            if i + 2 >= len(text) or not _is_hex(text[i+1:i+3]):
+                return None
+            out += raw_bytes[int(text[i+1:i+3], 16)]
+            i += 3
+        else:
+            out += text[i]
+            i += 1
+    return out
+
+# Shared by single and batch deletion. Missing keys are successful no-ops.
+def _delete_stored_object(bucket, key):
+    obj = _find_object(bucket, key)
+    if obj != None:
+        store_collection("objects").delete(obj.get("id", ""))
+        bid = obj.get("bid", "")
+        if bid:
+            store_blob("s3-objects").delete(bid)
+
+# DeleteObjects accepts the same SDK XML envelope as multipart completion.
+# Validate the entire key list before mutating anything.
+def _delete_objects(req):
+    err = _require_auth(req)
+    if err != None:
+        return err
+    bucket = req["params"]["bucket"]
+    if not _query_present_ci(req, "delete"):
+        return _xml_error("NotImplemented", "The requested operation is not implemented", "/" + _xml_escape(bucket), 501)
+    for name in req.get("query", {}):
+        want = _ascii_lower(name)
+        if _is_presigned_param(name):
+            continue
+        if want not in ["delete", "x-id"] or (want == "x-id" and _ascii_lower(_query_val_ci(req, "x-id")) != "deleteobjects"):
+            return _xml_error("NotImplemented", "Unsupported DeleteObjects parameter", "/" + _xml_escape(bucket), 501)
+    found = False
+    for b in store_collection("buckets").list():
+        if b.get("name", "") == bucket:
+            found = True
+    if not found:
+        return _no_such_bucket_error(bucket)
+    raw = req.get("raw_body", "") or ""
+    keys = []
+    pos = 0
+    malformed = raw.find("<Delete") < 0 or raw.find("</Delete>") < 0
+    while True:
+        start = raw.find("<Object>", pos)
+        if start < 0:
+            break
+        end = raw.find("</Object>", start)
+        if end < 0:
+            malformed = True
+            break
+        text = _xml_tag_text(raw[start:end], "Key")
+        if not text:
+            malformed = True
+        keys.append(_xml_unescape(text))
+        pos = end + len("</Object>")
+    if raw.find("<VersionId>") >= 0:
+        return _xml_error("NotImplemented", "Versioned batch deletion is not implemented", "/" + _xml_escape(bucket), 501)
+    if malformed or len(keys) == 0 or len(keys) > 1000:
+        return _xml_error("MalformedXML", "The XML you provided was not well-formed or did not validate against our published schema", "/" + _xml_escape(bucket), 400)
+    quiet = _xml_tag_text(raw, "Quiet") == "true"
+    xml = '<DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
+    for key in keys:
+        _delete_stored_object(bucket, key)
+        if not quiet:
+            xml += '<Deleted><Key>' + _xml_escape(key) + '</Key></Deleted>'
+    return respond(200, xml + '</DeleteResult>', {"Content-Type": "application/xml", "x-amz-request-id": _req_id()})

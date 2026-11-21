@@ -16,6 +16,20 @@ api:
 # NOTE: literal routes must come BEFORE parameterized routes so they are
 # matched first (the dispatch engine checks in declaration order).
 endpoints:
+  # --- OAuth app social sign-in ---
+  - route: /login/oauth/authorize
+    method: GET
+    handler: scripts/oauth.star#on_authorize
+  - route: /login/oauth/access_token
+    method: POST
+    handler: scripts/oauth.star#on_token
+  - route: /user
+    method: GET
+    handler: scripts/oauth.star#on_user
+  - route: /user/emails
+    method: GET
+    handler: scripts/oauth.star#on_emails
+
   # --- App metadata + installation token exchange ---
   - route: /app
     method: GET
@@ -133,6 +147,10 @@ graphql:
 
 # Backing stores — collections for stateful data.
 resources:
+  - name: oauth_codes
+    kind: collection
+  - name: oauth_tokens
+    kind: collection
   - name: issues
     kind: collection
   - name: pulls

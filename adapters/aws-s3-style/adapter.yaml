@@ -24,8 +24,12 @@ endpoints:
   - route: /{bucket}
     method: GET
     handler: scripts/objects.star#on_list_or_location
-  # Every bucket-level POST in S3 is unimplemented here — DeleteObjects
-  # (?delete), CreateBucketMetadataConfiguration (?metadataConfiguration),
+  # HeadBucket authenticated connection probe.
+  - route: /{bucket}
+    method: HEAD
+    handler: scripts/buckets.star#on_head_bucket
+  # Bucket POST implements DeleteObjects (?delete); unsupported operations
+  # include CreateBucketMetadataConfiguration (?metadataConfiguration),
   # CreateBucketMetadataTableConfiguration (?metadataTable), and the browser
   # form POST Object. Routed so the answer is S3-shaped 501 XML rather than the
   # JSON catch-all 404 below.
