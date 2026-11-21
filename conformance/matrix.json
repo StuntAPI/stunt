@@ -116681,14 +116681,13 @@
       ],
       "missing": [
         "No embeddings (POST /v1/embeddings) or legacy completions endpoints",
-        "No Anthropic SSE streaming (stream:true only handled for OpenAI)",
         "No tool use, function calling, or JSON mode",
         "No image or multimodal content blocks"
       ],
       "deviations": [
         "Responses deterministic: echo of the last user message; no model or randomness",
         "Reply derived solely from the last user message; earlier history ignored",
-        "stream:true (OpenAI) returns one SSE chunk plus [DONE], not token-by-token"
+        "stream:true returns the complete reply in one text delta, not token-by-token"
       ],
       "covered": [
         {
@@ -195051,7 +195050,7 @@
       "real_hosts": [],
       "api_name": "Resend API",
       "api_version": "1.0.0",
-      "routes": 6,
+      "routes": 8,
       "verification": "SDK",
       "sdks": [
         {
@@ -195067,9 +195066,8 @@
         "delivery state derives on read (sent -\u003e delivered)"
       ],
       "missing": [
-        "No domains surface (create, list, verify, delete)",
+        "Domain list is an authenticated empty result; no domain create, verify, or delete",
         "No API keys management (/api-keys)",
-        "No batch send (POST /emails/batch)",
         "No scheduled sends (schedule, cancel schedule)",
         "No audiences or contacts",
         "No broadcasts or tags"
@@ -195080,6 +195078,14 @@
         "Webhook events fire exactly once on the first deriving read, not on real delivery"
       ],
       "covered": [
+        {
+          "method": "POST",
+          "route": "/emails/batch"
+        },
+        {
+          "method": "GET",
+          "route": "/domains"
+        },
         {
           "method": "POST",
           "route": "/emails"
@@ -195108,8 +195114,8 @@
       "surface": {
         "source": "sdk resend-node @ 6.22.0 (floor)",
         "provider_routes": 20,
-        "covered_routes": 2,
-        "coverage_pct": 10,
+        "covered_routes": 3,
+        "coverage_pct": 15,
         "missing_routes": [
           {
             "method": "POST",
@@ -195142,10 +195148,6 @@
           {
             "method": "POST",
             "route": "/domains/claim"
-          },
-          {
-            "method": "POST",
-            "route": "/emails/batch"
           },
           {
             "method": "POST",
@@ -195187,6 +195189,24 @@
         "derived": true
       },
       "derived_behaviors": [
+        {
+          "method": "POST",
+          "route": "/emails/batch",
+          "tags": [
+            "body",
+            "auth",
+            "stateful",
+            "errors",
+            "clock"
+          ]
+        },
+        {
+          "method": "GET",
+          "route": "/domains",
+          "tags": [
+            "auth"
+          ]
+        },
         {
           "method": "POST",
           "route": "/emails",
