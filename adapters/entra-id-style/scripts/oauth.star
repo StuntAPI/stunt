@@ -75,7 +75,7 @@ def _issue_tokens(user, scope, aud):
         rdoc["scope"] = scope
         rc.insert(rdoc)
 
-    return {
+    response = {
         "token_type": "Bearer",
         "scope": scope,
         "expires_in": 3599,
@@ -83,6 +83,10 @@ def _issue_tokens(user, scope, aud):
         "access_token": access,
         "refresh_token": refresh,
     }
+
+    if _contains(scope, "openid"):
+        response["id_token"] = _mint_id_token(user, aud)
+    return response
 
 # --- handlers ---
 
@@ -193,3 +197,12 @@ def on_jwks(req):
     key["alg"] = "RS256"
     key["use"] = "sig"
     return respond(200, {"keys": [key]})
+
+# OIDC identity tokens are distinct from delegated Graph access tokens.
+def _mint_id_token(user, aud):
+    now = clock.now_unix()
+    claims = {"sub": user["id"], "oid": user["id"], "tid": "mock-tenant", "name": user["displayName"], "email": user["mail"], "email_verified": True, "iss": _JWT_ISS, "aud": aud, "iat": now, "exp": now + 3599}
+    header = crypto.base64url_encode(json.encode({"alg": "RS256", "typ": "JWT", "kid": _JWT_KID}))
+    payload = crypto.base64url_encode(json.encode(claims))
+    signing_input = header + "." + payload
+    return signing_input + "." + crypto.rsa_sign(_JWT_PRIVATE_KEY, signing_input, encoding="base64url")

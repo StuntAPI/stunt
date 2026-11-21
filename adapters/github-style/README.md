@@ -287,3 +287,7 @@ real vocabulary) and the usual `workflow_run` `completed` delivery.
 
 Issues, PRs, and workflow runs are seeded for `octocat/hello-world`. New records
 created via POST persist for the server's lifetime.
+
+## OAuth app sign-in
+
+`GET /login/oauth/authorize` auto-approves a synthetic user and returns a single-use code, bound to client, redirect URI and optional PKCE verifier. `POST /login/oauth/access_token` exchanges it using form client credentials. `GET /user` and `GET /user/emails` accept that OAuth bearer token; the profile has a private email, so clients must consult the verified primary email list. OAuth clients accept any non-empty synthetic client secret; client registration, refresh/revocation and scope enforcement are not modeled. OAuth tokens are distinct from GitHub App installation tokens.

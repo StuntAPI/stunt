@@ -29957,7 +29957,7 @@
       "real_hosts": [],
       "api_name": "Microsoft Graph / Entra ID",
       "api_version": "v1.0",
-      "routes": 9,
+      "routes": 10,
       "verification": "SDK",
       "sdks": [
         {
@@ -30006,6 +30006,10 @@
         },
         {
           "method": "GET",
+          "route": "/v1.0/me/photos/{size}/$value"
+        },
+        {
+          "method": "GET",
           "route": "/v1.0/me"
         },
         {
@@ -30032,7 +30036,7 @@
       "surface": {
         "source": "spec msgraph-metadata v1.0 @ v1.0",
         "provider_routes": 17531,
-        "covered_routes": 6,
+        "covered_routes": 7,
         "coverage_pct": 0,
         "missing_routes": [
           {
@@ -74640,10 +74644,6 @@
             "route": "/v1.0/me/photos/{profilePhoto-id}/$value"
           },
           {
-            "method": "GET",
-            "route": "/v1.0/me/photos/{profilePhoto-id}/$value"
-          },
-          {
             "method": "PUT",
             "route": "/v1.0/me/photos/{profilePhoto-id}/$value"
           },
@@ -100165,6 +100165,16 @@
         },
         {
           "method": "GET",
+          "route": "/v1.0/me/photos/{size}/$value",
+          "tags": [
+            "auth",
+            "stateful",
+            "errors",
+            "clock"
+          ]
+        },
+        {
+          "method": "GET",
           "route": "/v1.0/me",
           "tags": [
             "auth",
@@ -102789,7 +102799,7 @@
       "real_hosts": [],
       "api_name": "GitHub REST + GraphQL API",
       "api_version": "2022-11-28",
-      "routes": 26,
+      "routes": 30,
       "graphql": true,
       "verification": "SDK",
       "sdks": [
@@ -102814,7 +102824,7 @@
       ],
       "missing": [
         "No X-Hub-Signature (SHA-1) or X-GitHub-Delivery UUID webhook headers",
-        "No users, orgs, teams, or search endpoints",
+        "No users beyond OAuth self-profile/email, orgs, teams, or search endpoints",
         "No git data, contents, branches, or releases endpoints",
         "No PR review comments, files, or requested_reviewers endpoints",
         "No actions workflows, jobs, artifacts, or logs endpoints",
@@ -102822,12 +102832,29 @@
         "No GraphQL nodes or mutations beyond viewer, repository, issues, pulls"
       ],
       "deviations": [
+        "OAuth app sign-in auto-approves synthetic users and accepts any non-empty client secret; registration and scope enforcement not modeled",
         "POST /graphql served without the REST Bearer/PAT check (transport lacks auth hook)",
         "App JWT RS256 signature not verified; the credential store is the check",
         "Webhook body is a stunt {type, payload} envelope, not GitHub's bare event body",
         "Runs advance on fixed clock (queued+1s, in_progress+3s); dispatch takes simulate_fail"
       ],
       "covered": [
+        {
+          "method": "GET",
+          "route": "/login/oauth/authorize"
+        },
+        {
+          "method": "POST",
+          "route": "/login/oauth/access_token"
+        },
+        {
+          "method": "GET",
+          "route": "/user"
+        },
+        {
+          "method": "GET",
+          "route": "/user/emails"
+        },
         {
           "method": "GET",
           "route": "/app"
@@ -102936,7 +102963,7 @@
       "surface": {
         "source": "sdk octokit @ 5.0.5 (floor)",
         "provider_routes": 998,
-        "covered_routes": 23,
+        "covered_routes": 25,
         "coverage_pct": 2,
         "missing_routes": [
           {
@@ -106248,10 +106275,6 @@
             "route": "/search/users"
           },
           {
-            "method": "GET",
-            "route": "/user"
-          },
-          {
             "method": "PATCH",
             "route": "/user"
           },
@@ -106361,10 +106384,6 @@
           },
           {
             "method": "DELETE",
-            "route": "/user/emails"
-          },
-          {
-            "method": "GET",
             "route": "/user/emails"
           },
           {
@@ -106827,6 +106846,42 @@
         "derived": true
       },
       "derived_behaviors": [
+        {
+          "method": "GET",
+          "route": "/login/oauth/authorize",
+          "tags": [
+            "query",
+            "stateful",
+            "errors",
+            "clock"
+          ]
+        },
+        {
+          "method": "POST",
+          "route": "/login/oauth/access_token",
+          "tags": [
+            "body",
+            "stateful",
+            "errors",
+            "clock"
+          ]
+        },
+        {
+          "method": "GET",
+          "route": "/user",
+          "tags": [
+            "auth",
+            "stateful"
+          ]
+        },
+        {
+          "method": "GET",
+          "route": "/user/emails",
+          "tags": [
+            "auth",
+            "stateful"
+          ]
+        },
         {
           "method": "GET",
           "route": "/app",
@@ -109317,7 +109372,7 @@
       "real_hosts": [],
       "api_name": "Google OAuth2 API",
       "api_version": "v2",
-      "routes": 4,
+      "routes": 6,
       "verification": "SDK",
       "sdks": [
         {
@@ -109351,6 +109406,14 @@
       "covered": [
         {
           "method": "GET",
+          "route": "/o/oauth2/v2/auth"
+        },
+        {
+          "method": "POST",
+          "route": "/token"
+        },
+        {
+          "method": "GET",
           "route": "/o/oauth2/auth"
         },
         {
@@ -109367,6 +109430,25 @@
         }
       ],
       "derived_behaviors": [
+        {
+          "method": "GET",
+          "route": "/o/oauth2/v2/auth",
+          "tags": [
+            "query",
+            "stateful",
+            "errors"
+          ]
+        },
+        {
+          "method": "POST",
+          "route": "/token",
+          "tags": [
+            "body",
+            "stateful",
+            "errors",
+            "clock"
+          ]
+        },
         {
           "method": "GET",
           "route": "/o/oauth2/auth",
@@ -197136,7 +197218,8 @@
           "tags": [
             "query",
             "stateful",
-            "errors"
+            "errors",
+            "clock"
           ]
         },
         {

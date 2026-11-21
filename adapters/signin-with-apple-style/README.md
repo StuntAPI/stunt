@@ -79,3 +79,5 @@ services:
 ```
 
 Then `stunt up` and run through the OAuth2 flow.
+
+`response_type=code id_token` with `response_mode=form_post` returns an auto-submitting HTML form with escaped `code`, `state` and `id_token` fields. The front-channel and exchanged ID tokens identify the same synthetic user. The original code-only redirect remains supported.

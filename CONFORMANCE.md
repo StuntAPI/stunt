@@ -66,7 +66,7 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [dynamodb-style](adapters/dynamodb-style/) | Amazon DynamoDB API `2012-08-10` | 1 | SDK + VM | aws-sdk-go-v2 @ v1.47.1 | 8 | [8](#dynamodb-style) | [5](#dynamodb-style) |
 | [echo-style](adapters/echo-style/) | gRPC echo demo `1.0` | 0 (+1 ws) | boot | — | — | — | — |
 | [emailoctopus-style](adapters/emailoctopus-style/) | EmailOctopus API `2.0.0` | 21 | VM | — | — | [2](#emailoctopus-style) | [3](#emailoctopus-style) |
-| [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 9 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 8 | [8](#entra-id-style) | [3](#entra-id-style) |
+| [entra-id-style](adapters/entra-id-style/) | Microsoft Graph / Entra ID `v1.0` | 10 | SDK | microsoft-graph-client @ 3.0.7 (floor) | 8 | [8](#entra-id-style) | [3](#entra-id-style) |
 | [erc4337-style](adapters/erc4337-style/) | ERC-4337 Bundler RPC `0.7` | 2 | VM | — | — | [5](#erc4337-style) | [6](#erc4337-style) |
 | [escrow-style](adapters/escrow-style/) | Escrow.com API `2017-09-01` | 9 | VM | — | — | [3](#escrow-style) | [4](#escrow-style) |
 | [eth-jsonrpc-style](adapters/eth-jsonrpc-style/) | Ethereum JSON-RPC `1.0` | 1 | SDK | go-ethereum @ v1.17.7 | 5 | [5](#eth-jsonrpc-style) | [4](#eth-jsonrpc-style) |
@@ -76,12 +76,12 @@ Behavior columns come in two kinds: **verified** (an official SDK was driven aga
 | [ga4-style](adapters/ga4-style/) | Google Analytics Data API + Admin API `v1beta` | 7 | SDK | google-api-go-client @ v0.299.0 | 7 | [4](#ga4-style) | [3](#ga4-style) |
 | [gcalendar-style](adapters/gcalendar-style/) | Google Calendar API `v3` | 10 | SDK | google-api-go-client @ v0.299.0 | 8 | [4](#gcalendar-style) | [2](#gcalendar-style) |
 | [gdocs-style](adapters/gdocs-style/) | Google Docs API `v1` | 5 | SDK | google-api-go-client @ v0.299.0 | 5 | [3](#gdocs-style) | [5](#gdocs-style) |
-| [github-style](adapters/github-style/) | GitHub REST + GraphQL API `2022-11-28` | 26 +GQL | SDK | go-github/v89 @ v89.0.0<br>octokit @ 5.0.5 (floor) | 6 | [7](#github-style) | [4](#github-style) |
+| [github-style](adapters/github-style/) | GitHub REST + GraphQL API `2022-11-28` | 30 +GQL | SDK | go-github/v89 @ v89.0.0<br>octokit @ 5.0.5 (floor) | 6 | [7](#github-style) | [5](#github-style) |
 | [gmail-style](adapters/gmail-style/) | Gmail API `v1` | 16 | SDK | google-api-go-client @ v0.299.0 | 9 | [6](#gmail-style) | [3](#gmail-style) |
 | [google-admin-style](adapters/google-admin-style/) | Google Admin SDK Directory API `directory_v1` | 13 | SDK | google-api-go-client @ v0.299.0 | 8 | [4](#google-admin-style) | [4](#google-admin-style) |
 | [google-cloudtasks-style](adapters/google-cloudtasks-style/) | Google Cloud Tasks API `v2` | 16 | boot | — | — | [7](#google-cloudtasks-style) | [7](#google-cloudtasks-style) |
 | [google-iam-style](adapters/google-iam-style/) | Google Cloud IAM API + Service Accounts `v1` | 10 | SDK | google-api-go-client @ v0.299.0 | 7 | [4](#google-iam-style) | [2](#google-iam-style) |
-| [google-style](adapters/google-style/) | Google OAuth2 API `v2` | 4 | SDK | x/oauth2 @ v0.37.0<br>google-api-go-client/idtoken @ v0.299.0 | 7 | [2](#google-style) | [2](#google-style) |
+| [google-style](adapters/google-style/) | Google OAuth2 API `v2` | 6 | SDK | x/oauth2 @ v0.37.0<br>google-api-go-client/idtoken @ v0.299.0 | 7 | [2](#google-style) | [2](#google-style) |
 | [gsearchconsole-style](adapters/gsearchconsole-style/) | Google Search Console API `v1` | 11 | SDK | google-api-go-client @ v0.299.0 | 7 | [2](#gsearchconsole-style) | [4](#gsearchconsole-style) |
 | [gsheets-style](adapters/gsheets-style/) | Google Sheets API `v4` | 10 | SDK | google-api-go-client @ v0.299.0 | 8 | [4](#gsheets-style) | [3](#gsheets-style) |
 | [gtasks-style](adapters/gtasks-style/) | Google Tasks API `v1` | 11 | SDK | google-api-go-client @ v0.299.0 | 8 | [3](#gtasks-style) | [2](#gtasks-style) |
@@ -3971,7 +3971,7 @@ behavior notes live in each adapter's README.
 
 ### entra-id-style
 
-**Covered** — 9 routes
+**Covered** — 10 routes
 
 <details><summary>Routes</summary>
 
@@ -3980,6 +3980,7 @@ behavior notes live in each adapter's README.
 | GET | `/common/oauth2/v2.0/authorize` |
 | POST | `/common/oauth2/v2.0/token` |
 | GET | `/common/discovery/v2.0/keys` |
+| GET | `/v1.0/me/photos/{size}/$value` |
 | GET | `/v1.0/me` |
 | GET | `/v1.0/users` |
 | POST | `/v1.0/users` |
@@ -3989,9 +3990,9 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from spec msgraph-metadata v1.0 @ v1.0: 17531 real routes · 6 covered · 0% · 17525 not implemented
+**Provider surface** — derived from spec msgraph-metadata v1.0 @ v1.0: 17531 real routes · 7 covered · 0% · 17524 not implemented
 
-<details><summary>not implemented (17525)</summary>
+<details><summary>not implemented (17524)</summary>
 
 - `GET` `/v1.0/admin`
 - `PATCH` `/v1.0/admin`
@@ -4043,7 +4044,7 @@ behavior notes live in each adapter's README.
 - `DELETE` `/v1.0/admin/edge/internetExplorerMode/siteLists/{browserSiteList-id}`
 - `GET` `/v1.0/admin/edge/internetExplorerMode/siteLists/{browserSiteList-id}`
 - `PATCH` `/v1.0/admin/edge/internetExplorerMode/siteLists/{browserSiteList-id}`
-… and 17475 more
+… and 17474 more
 
 
 </details>
@@ -4070,6 +4071,7 @@ behavior notes live in each adapter's README.
 - `GET` `/common/oauth2/v2.0/authorize` — query, stateful, errors
 - `POST` `/common/oauth2/v2.0/token` — body, stateful, errors, clock
 - `GET` `/common/discovery/v2.0/keys` — —
+- `GET` `/v1.0/me/photos/{size}/$value` — auth, stateful, errors, clock
 - `GET` `/v1.0/me` — auth, stateful, clock
 - `GET` `/v1.0/users` — query, auth, stateful, paginate, errors, clock
 - `POST` `/v1.0/users` — body, auth, stateful, clock
@@ -4707,12 +4709,16 @@ behavior notes live in each adapter's README.
 
 ### github-style
 
-**Covered** — 26 routes · GraphQL schema
+**Covered** — 30 routes · GraphQL schema
 
 <details><summary>Routes</summary>
 
 | Method | Route |
 |---|---|
+| GET | `/login/oauth/authorize` |
+| POST | `/login/oauth/access_token` |
+| GET | `/user` |
+| GET | `/user/emails` |
 | GET | `/app` |
 | GET | `/app/installations` |
 | POST | `/app/installations/{installation_id}/access_tokens` |
@@ -4742,9 +4748,9 @@ behavior notes live in each adapter's README.
 
 </details>
 
-**Provider surface** — derived from sdk octokit @ 5.0.5 (floor): 998 real routes · 23 covered · 2% · 971 not implemented
+**Provider surface** — derived from sdk octokit @ 5.0.5 (floor): 998 real routes · 25 covered · 2% · 969 not implemented
 
-<details><summary>not implemented (971)</summary>
+<details><summary>not implemented (969)</summary>
 
 - `GET` `/advisories`
 - `GET` `/advisories/{ghsa_id}`
@@ -4796,7 +4802,7 @@ behavior notes live in each adapter's README.
 - `DELETE` `/enterprises/{enterprise}/teams/{team_slug}`
 - `GET` `/enterprises/{enterprise}/teams/{team_slug}`
 - `PATCH` `/enterprises/{enterprise}/teams/{team_slug}`
-… and 921 more
+… and 919 more
 
 
 </details>
@@ -4804,15 +4810,16 @@ behavior notes live in each adapter's README.
 **Missing** (7)
 
 - No X-Hub-Signature (SHA-1) or X-GitHub-Delivery UUID webhook headers
-- No users, orgs, teams, or search endpoints
+- No users beyond OAuth self-profile/email, orgs, teams, or search endpoints
 - No git data, contents, branches, or releases endpoints
 - No PR review comments, files, or requested_reviewers endpoints
 - No actions workflows, jobs, artifacts, or logs endpoints
 - No webhook list/patch/delete or deliveries endpoints
 - No GraphQL nodes or mutations beyond viewer, repository, issues, pulls
 
-**Deviations** (4)
+**Deviations** (5)
 
+- OAuth app sign-in auto-approves synthetic users and accepts any non-empty client secret; registration and scope enforcement not modeled
 - POST /graphql served without the REST Bearer/PAT check (transport lacks auth hook)
 - App JWT RS256 signature not verified; the credential store is the check
 - Webhook body is a stunt {type, payload} envelope, not GitHub's bare event body
@@ -4820,6 +4827,10 @@ behavior notes live in each adapter's README.
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
+- `GET` `/login/oauth/authorize` — query, stateful, errors, clock
+- `POST` `/login/oauth/access_token` — body, stateful, errors, clock
+- `GET` `/user` — auth, stateful
+- `GET` `/user/emails` — auth, stateful
 - `GET` `/app` — auth, stateful, clock
 - `GET` `/app/installations` — query, auth, stateful, paginate, clock
 - `POST` `/app/installations/{installation_id}/access_tokens` — params, auth, stateful, clock
@@ -5263,12 +5274,14 @@ behavior notes live in each adapter's README.
 
 ### google-style
 
-**Covered** — 4 routes
+**Covered** — 6 routes
 
 <details><summary>Routes</summary>
 
 | Method | Route |
 |---|---|
+| GET | `/o/oauth2/v2/auth` |
+| POST | `/token` |
 | GET | `/o/oauth2/auth` |
 | POST | `/o/oauth2/token` |
 | GET | `/oauth2/v3/certs` |
@@ -5288,6 +5301,8 @@ behavior notes live in each adapter's README.
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
+- `GET` `/o/oauth2/v2/auth` — query, stateful, errors
+- `POST` `/token` — body, stateful, errors, clock
 - `GET` `/o/oauth2/auth` — query, stateful, errors
 - `POST` `/o/oauth2/token` — body, stateful, errors, clock
 - `GET` `/oauth2/v3/certs` — —
@@ -8039,7 +8054,7 @@ behavior notes live in each adapter's README.
 
 <details><summary>Derived behavior tags (static — from scripts/*.star, not SDK-verified)</summary>
 
-- `GET` `/auth/authorize` — query, stateful, errors
+- `GET` `/auth/authorize` — query, stateful, errors, clock
 - `POST` `/auth/token` — body, stateful, errors, clock
 - `GET` `/auth/keys` — —
 

@@ -86,3 +86,5 @@ services:
 ```
 
 Then `stunt up` and make requests to the served address.
+
+Modern OAuth clients may use `GET /o/oauth2/v2/auth` and `POST /token`; the legacy `/o/oauth2/auth` and `/o/oauth2/token` paths remain supported.

@@ -29,6 +29,11 @@ endpoints:
     method: GET
     handler: scripts/oauth.star#on_jwks
 
+  # A newly created synthetic user has no profile photo.
+  - route: /v1.0/me/photos/{size}/$value
+    method: GET
+    handler: scripts/graph.star#on_photo
+
   # --- Graph /me (delegated identity) ---
   - route: /v1.0/me
     method: GET

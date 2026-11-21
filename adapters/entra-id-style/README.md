@@ -51,3 +51,5 @@ stunt up
 ```
 
 All data is synthetic. See [DISCLAIMER](DISCLAIMER).
+
+When `openid` is requested, token responses also include a real RS256 identity token with `oid`, `tid`, `sub`, `email`, `name`, issuer and audience claims. The synthetic tenant is `mock-tenant`. `GET /v1.0/me/photos/{size}/$value` validates the delegated bearer token then returns Graph `ImageNotFound`, modeling an account without a profile photo.

@@ -514,13 +514,14 @@ adapters:
       - "No createTable or other table requests (insertTableRow, updateTableCellStyle)"
   github-style:
     deviations:
+      - "OAuth app sign-in auto-approves synthetic users and accepts any non-empty client secret; registration and scope enforcement not modeled"
       - "POST /graphql served without the REST Bearer/PAT check (transport lacks auth hook)"
       - "App JWT RS256 signature not verified; the credential store is the check"
       - "Webhook body is a stunt {type, payload} envelope, not GitHub's bare event body"
       - "Runs advance on fixed clock (queued+1s, in_progress+3s); dispatch takes simulate_fail"
     missing:
       - "No X-Hub-Signature (SHA-1) or X-GitHub-Delivery UUID webhook headers"
-      - "No users, orgs, teams, or search endpoints"
+      - "No users beyond OAuth self-profile/email, orgs, teams, or search endpoints"
       - "No git data, contents, branches, or releases endpoints"
       - "No PR review comments, files, or requested_reviewers endpoints"
       - "No actions workflows, jobs, artifacts, or logs endpoints"

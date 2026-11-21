@@ -22,13 +22,19 @@ def on_authorize(req):
             "error_description": "missing required parameters (client_id, redirect_uri)",
         })
 
-    if response_type != "code":
+    if response_type not in ["code", "code id_token"]:
         return respond(400, {
             "error": "unsupported_response_type",
         })
 
+    if response_type == "code id_token" and req["query"].get("response_mode", "") != "form_post":
+        return respond(400, {"error": "unsupported_response_mode"})
+
     code_seq = store_kv_incr("siwa", "code_seq")
     code = "c." + str(code_seq) + "." + "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
+
+    user_id = _generate_user_id()
+    email = _generate_email(_to_int(store_kv_get("siwa", "user_seq")))
 
     # Store the auth code (single-use).
     cc = store_collection("auth_codes")
@@ -37,6 +43,8 @@ def on_authorize(req):
         "client_id": client_id,
         "redirect_uri": redirect_uri,
         "scope": req["query"].get("scope", ""),
+        "user_id": user_id,
+        "email": email,
     })
 
     sep = "?"
@@ -48,6 +56,15 @@ def on_authorize(req):
     if state != "":
         location = location + "&state=" + state
 
+    if req["query"].get("response_mode", "") == "form_post":
+        fields = {"code": code, "state": state}
+        if response_type == "code id_token":
+            fields["id_token"] = _mint_id_token(client_id, user_id, email)
+        body = '<!doctype html><html><body><form method="post" action="' + _html_escape(redirect_uri) + '">'
+        for name in fields:
+            body += '<input type="hidden" name="' + name + '" value="' + _html_escape(fields[name]) + '">'
+        body += '<button type="submit">Continue</button></form><script>document.forms[0].submit()</script></body></html>'
+        return respond(200, body, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store"})
     return respond(302, headers={"Location": location})
 
 # on_token handles both authorization_code and refresh_token grants.
@@ -106,11 +123,8 @@ def _handle_auth_code(body):
     cc.delete(code)
 
     # Mint tokens.
-    user_id = _generate_user_id()
-    user_seq = store_kv_get("siwa", "user_seq")
-    if user_seq == None:
-        user_seq = "1"
-    email = _generate_email(_to_int(user_seq))
+    user_id = code_doc["user_id"]
+    email = code_doc["email"]
 
     access_seq = store_kv_incr("siwa", "access_seq")
     refresh_seq = store_kv_incr("siwa", "refresh_seq")
@@ -198,3 +212,7 @@ def on_get_keys(req):
     key["use"] = "sig"
     key["alg"] = "ES256"
     return respond(200, {"keys": [key]})
+
+# Hidden field values and the form action can contain caller-controlled text.
+def _html_escape(value):
+    return value.replace("&", "&amp;").replace('"', "&quot;").replace("<", "&lt;").replace(">", "&gt;").replace("'", "&#39;")
